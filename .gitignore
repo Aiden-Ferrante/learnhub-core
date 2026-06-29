@@ -1,0 +1,41 @@
+# ---- Secrets (NEVER commit) ----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+# keep the templates:
+!.env.example
+
+# ---- Node / Next.js (frontend) ----
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Tooling / editor caches (regenerable) ----
+.understand-anything/
+.cursor/
+.vscode/
+.idea/
+.DS_Store
+
+# ---- Build / coverage / logs ----
+dist/
+build/
+coverage/
+*.log

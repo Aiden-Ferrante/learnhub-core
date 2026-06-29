@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TOC hierarchy</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; max-width: 56rem; }
+    a { color: #1a6; }
+    .meta { color: #555; font-size: 0.9rem; margin-bottom: 1rem; }
+    .error { background: #fee; border: 1px solid #caa; padding: 1rem; border-radius: 6px; }
+    .empty { color: #555; }
+    ul.toc-tree { list-style: disc; margin: 0.25rem 0 0.25rem 1.25rem; padding: 0; }
+    ul.toc-tree ul { margin-top: 0.25rem; }
+    .node-label { font-weight: 500; }
+    .node-label.entity-leaf { font-weight: normal; color: #444; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <p class="meta"><a href="/">Home</a> · <a href="/api/toc-tree">JSON</a> ·
+    <a href="/flashcards">Flashcards</a> · <a href="/quiz">Quiz</a> · <a href="/socratic">Socratic</a>
+    (append <code>?scope=toc:…</code> to limit study to a section)</p>
+  <h1>TOC hierarchy + entities per section</h1>
+  <p class="meta">Structure: <code>has_subsection</code>. Under each section: entities from <code>section_mentions</code> (every subject/object extracted in that section).</p>
+
+  {% if error %}
+  <div class="error">
+    <strong>Could not load from ArangoDB.</strong><br />
+    {{ error | e }}
+  </div>
+  {% elif not tree %}
+  <p class="empty">
+    {% if edge_count and edge_count > 0 %}
+    <strong>{{ edge_count }}</strong> <code>has_subsection</code> edge(s) exist, but no root could be inferred
+    (for example every node has a parent — a cycle). Check your graph in ArangoDB.
+    {% else %}
+    No <code>has_subsection</code> edges found. Process a document with TOC detection in txt2kg, then reload.
+    {% endif %}
+  </p>
+  {% else %}
+  <p class="meta">{{ edge_count }} <code>has_subsection</code> edge(s); {{ mention_edge_count }} <code>section_mentions</code> link(s) (entity leaves).</p>
+  {{ tree_html | safe }}
+  {% endif %}
+</body>
+</html>

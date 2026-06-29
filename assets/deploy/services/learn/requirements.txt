@@ -1,0 +1,14 @@
+fastapi>=0.115.0,<1
+uvicorn[standard]>=0.32.0,<1
+python-arango>=7.8,<8
+jinja2>=3.1,<4
+httpx>=0.27,<1
+pymupdf>=1.24,<2
+pymupdf4llm>=0.0.17,<1
+python-multipart>=0.0.9,<1
+# Higher-fidelity converter (CPU). pymupdf4llm stays as automatic fallback.
+docling>=2.7,<3
+# Audiobook TTS: Orpheus emits audio tokens (served via Ollama); SNAC decodes them
+# to 24kHz audio (torch comes in via docling). soundfile writes WAV before ffmpeg→MP3.
+snac>=1.2.0
+soundfile>=0.12

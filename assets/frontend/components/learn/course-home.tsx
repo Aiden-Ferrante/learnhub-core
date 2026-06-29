@@ -1,0 +1,522 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import {
+  BookMarked,
+  BookOpen,
+  Brain,
+  ChevronLeft,
+  Flame,
+  GraduationCap,
+  History,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Target,
+} from "lucide-react"
+import { SyllabusTree } from "@/components/learn/syllabus-tree"
+import { StudyHeatmap } from "@/components/learn/study-heatmap"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  countSections,
+  displaySectionTitle,
+  fetchDocumentConcepts,
+  fetchForecast,
+  fetchMistakes,
+  findChapterForSection,
+  findNodeBySectionKey,
+  type ForecastResponse,
+  type LearnTreeNode,
+  type MasteryResponse,
+  type Mistake,
+  type WeakestSection,
+} from "@/lib/learn-service"
+import type { Course } from "@/lib/courses"
+
+type CourseHomeProps = {
+  course: Course
+  tree: LearnTreeNode[]
+  edgeCount: number
+  loading: boolean
+  error: string | null
+  mastery: MasteryResponse | null
+  onOpenSection: (scope: string | null, node: LearnTreeNode | null) => void
+  onReview: (section: WeakestSection) => void
+  onReadBook: () => void
+  onViewConcepts: () => void
+  onBackToShelf: () => void
+  continueNode?: LearnTreeNode | null
+  onContinueReading?: () => void
+  onResumePath?: () => void
+  onDrill?: () => void
+  onBrainDump?: () => void
+  dueCount?: number
+  onReviewAll?: () => void
+  onRetry?: () => void
+}
+
+function relativeTime(ts: number): string {
+  const diff = Math.max(0, Date.now() / 1000 - ts)
+  if (diff < 60) return "just now"
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+/** A low-ink circular progress ring tinted nvidia-green over the muted track. */
+function MasteryRing({ pct }: { pct: number }) {
+  return (
+    <div
+      className="relative h-20 w-20 shrink-0 rounded-full"
+      style={{
+        background: `conic-gradient(hsl(var(--nvidia-green)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
+      }}
+    >
+      <div className="absolute inset-[6px] flex items-center justify-center rounded-full bg-card">
+        <span className="text-lg font-semibold tabular-nums">{pct}%</span>
+      </div>
+    </div>
+  )
+}
+
+function StatTile({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border bg-background/40 px-3 py-2">
+      <div className="text-lg font-semibold tabular-nums leading-tight">{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  )
+}
+
+export function CourseHome({
+  course,
+  tree,
+  edgeCount,
+  loading,
+  error,
+  mastery,
+  onOpenSection,
+  onReview,
+  onReadBook,
+  onViewConcepts,
+  onBackToShelf,
+  continueNode,
+  onContinueReading,
+  onResumePath,
+  onDrill,
+  onBrainDump,
+  dueCount = 0,
+  onReviewAll,
+  onRetry,
+}: CourseHomeProps) {
+  const sectionsTotal = useMemo(() => countSections(tree), [tree])
+  const [mistakes, setMistakes] = useState<Mistake[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMistakes(course.id, 5)
+      .then((data) => {
+        if (!cancelled && !data.error) setMistakes(data.mistakes)
+      })
+      .catch(() => {
+        // mistakes are supplementary — a failure here must not break the page
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [course.id])
+
+  const [conceptCount, setConceptCount] = useState<number | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetchDocumentConcepts(course.learnDocId)
+      .then((d) => {
+        if (!cancelled && !d.error) setConceptCount(d.concepts.length)
+      })
+      .catch(() => {
+        // concept count is supplementary
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [course.learnDocId])
+
+  // Forgetting forecast — what's fading, so review becomes a daily, actionable habit.
+  const [forecast, setForecast] = useState<ForecastResponse | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetchForecast(course.learnDocId)
+      .then((f) => {
+        if (!cancelled && !f.error) setForecast(f)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [course.learnDocId])
+
+  const { studied, needsReview } = useMemo(() => {
+    const leaves = mastery
+      ? Object.values(mastery.bySection).filter((m) => !m.isRollup)
+      : []
+    return {
+      studied: leaves.filter((m) => m.attempts > 0).length,
+      needsReview: leaves.filter((m) => m.attempts > 0 && m.mastery < 0.5).length,
+    }
+  }, [mastery])
+
+  const overallPct = mastery ? Math.round(mastery.overall * 100) : 0
+  const weakest = mastery?.weakest ?? []
+  const isEmpty = !loading && !error && tree.length === 0
+
+  let headline: { icon: React.ReactNode; text: string }
+  if (needsReview > 0) {
+    headline = {
+      icon: <Flame className="h-4 w-4 text-amber-500" />,
+      text: `${needsReview} section${needsReview === 1 ? "" : "s"} have faded — review to bring them back.`,
+    }
+  } else if (studied === 0) {
+    headline = {
+      icon: <Sparkles className="h-4 w-4 text-nvidia-green" />,
+      text: "Pick any section below and start a quiz to begin tracking mastery.",
+    }
+  } else {
+    headline = {
+      icon: <Sparkles className="h-4 w-4 text-nvidia-green" />,
+      text: "You're on top of your material — keep the streak going.",
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Back breadcrumb */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBackToShelf}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Courses
+        </button>
+        <span className="text-sm font-medium">{course.title}</span>
+      </div>
+
+      {/* Hero / overview */}
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-nvidia-green/15">
+            <GraduationCap className="h-5 w-5 text-nvidia-green" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold leading-tight">{course.title}</h2>
+            <p className="text-sm text-muted-foreground">{course.description}</p>
+          </div>
+          {mastery && <MasteryRing pct={overallPct} />}
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label="Sections" value={sectionsTotal} />
+          <StatTile label="Studied" value={mastery ? studied : "—"} />
+          <StatTile label="Need review" value={mastery ? needsReview : "—"} />
+          <StatTile label="Overall" value={mastery ? `${overallPct}%` : "—"} />
+        </div>
+
+        {mastery && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            {headline.icon}
+            <span>{headline.text}</span>
+          </div>
+        )}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {continueNode && onResumePath && (
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onResumePath}
+              title="Pick up the learning path where you left off"
+            >
+              <Play className="h-3.5 w-3.5" />
+              Resume · {displaySectionTitle(continueNode.label, continueNode.title)}
+            </Button>
+          )}
+          {onReviewAll && (
+            <Button
+              type="button"
+              variant={continueNode && onResumePath ? "outline" : "default"}
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onReviewAll}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              {dueCount > 0 ? `Review ${dueCount} due` : "Start review"}
+            </Button>
+          )}
+          {onDrill && studied > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onDrill}
+              title="Practice the concepts you're weakest on or have missed — across all chapters"
+            >
+              <Target className="h-3.5 w-3.5" />
+              Drill weak spots
+            </Button>
+          )}
+          {onBrainDump && (conceptCount ?? 0) > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onBrainDump}
+              title="Close the book and write what you remember — then see your gaps"
+            >
+              <Brain className="h-3.5 w-3.5" />
+              Free recall
+            </Button>
+          )}
+          {continueNode && onContinueReading && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onContinueReading}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Continue reading
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          <p className="text-destructive">{error}</p>
+          <p className="text-muted-foreground">
+            The course backend may still be starting. Ensure ArangoDB is running and triples are
+            stored with TOC structure (<code className="text-xs">has_subsection</code> edges).
+          </p>
+          {onRetry && (
+            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onRetry}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Retry
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Empty shell (no syllabus tree). The structural outline only builds for books with a
+          numbered TOC; concept extraction can still have produced concepts (slug-keyed books,
+          basic mode). So always offer a direct path to the concepts here. */}
+      {isEmpty && (
+        <div className="rounded-lg border border-dashed bg-card p-8 text-center">
+          <BookMarked className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm font-medium">No syllabus outline for this course</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            It may still be processing, or this book has no numbered table of contents. If
+            you've extracted concepts, view them directly:
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1.5"
+            onClick={onViewConcepts}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            View concepts
+          </Button>
+        </div>
+      )}
+
+      {/* Study activity heatmap */}
+      {!error && !isEmpty && forecast && (forecast.dueNow > 0 || (forecast.soon ?? 0) > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-amber-500/15">
+              <Flame className="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {forecast.dueNow > 0
+                  ? `${forecast.dueNow} concept${forecast.dueNow === 1 ? "" : "s"} due for review now`
+                  : "You're caught up on reviews"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {(forecast.soon ?? 0) > 0
+                  ? `${forecast.soon} more fade over the next 7 days — a few minutes keeps them fresh.`
+                  : "Nothing else fades this week."}
+              </p>
+            </div>
+          </div>
+          {onReviewAll && forecast.dueNow > 0 && (
+            <Button type="button" size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onReviewAll}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Review {forecast.dueNow} now
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!error && !isEmpty && <StudyHeatmap doc={course.id} />}
+
+      {/* Review rail */}
+      {weakest.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+            Pick up where you left off
+          </div>
+          <div className="flex flex-wrap gap-2 p-3">
+            {weakest.map((w) => {
+              const pct = Math.round(w.mastery * 100)
+              return (
+                <button
+                  key={w.sectionKey}
+                  type="button"
+                  onClick={() => onReview(w)}
+                  className="group flex min-w-[11rem] flex-1 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-nvidia-green/50 hover:bg-nvidia-green/5"
+                >
+                  <span className="text-xs text-muted-foreground">Review section</span>
+                  <span className="truncate text-sm font-medium">
+                    {displaySectionTitle(w.label, w.title)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-nvidia-green"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Recent mistakes */}
+      {!error && !isEmpty && mistakes.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+            <History className="h-3.5 w-3.5" />
+            <span>Recent mistakes</span>
+          </div>
+          <div className="divide-y">
+            {mistakes.map((m, i) => {
+              const node = findNodeBySectionKey(tree, m.sectionKey)
+              const sectionTitle = node
+                ? displaySectionTitle(node.label, node.title)
+                : displaySectionTitle(m.sectionKey)
+              return (
+                <button
+                  key={`${m.sectionKey}-${m.ts}-${i}`}
+                  type="button"
+                  onClick={() =>
+                    onReview({
+                      sectionKey: m.sectionKey,
+                      label: node?.label ?? m.sectionKey,
+                      title: node?.title,
+                      mastery: 0,
+                    })
+                  }
+                  className="flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-nvidia-green/5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{sectionTitle}</div>
+                    {m.stem && (
+                      <div className="truncate text-xs text-muted-foreground">{m.stem}</div>
+                    )}
+                    {m.expected && (
+                      <div className="truncate text-xs text-muted-foreground">
+                        Answer: <span className="text-foreground/80">{m.expected}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {relativeTime(m.ts)}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Course outline */}
+      {!error && !isEmpty && (
+        <div className="rounded-lg border bg-card">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <BookMarked className="h-3.5 w-3.5" />
+              <span>Course outline</span>
+              {!loading && edgeCount > 0 ? (
+                <span className="tabular-nums text-muted-foreground/70">· {edgeCount} sections</span>
+              ) : loading ? (
+                <Skeleton className="h-3 w-12" />
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={onReadBook}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Read the book
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={onViewConcepts}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Concepts
+                {conceptCount !== null && conceptCount > 0 && (
+                  <span className="tabular-nums text-muted-foreground/70">· {conceptCount}</span>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => onOpenSection(null, null)}
+              >
+                Study whole course
+              </Button>
+            </div>
+          </div>
+          <div className="h-[440px]">
+            <SyllabusTree
+              tree={tree}
+              selectedScope={null}
+              onSelectScope={(scope) => {
+                if (!scope) return
+                // Studying is chapter-scoped: resolve any clicked section to its chapter.
+                const chapter = findChapterForSection(tree, scope)
+                if (chapter?.sectionKey) onOpenSection(chapter.sectionKey, chapter)
+              }}
+              masteryBySection={mastery?.bySection}
+              loading={loading}
+              docId={course.learnDocId}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

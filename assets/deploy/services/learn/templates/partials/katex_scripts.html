@@ -1,0 +1,36 @@
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script>
+(function () {
+  function escapeHtml(s) {
+    if (s == null || s === "") return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  function nlToBr(html) {
+    return html.replace(/\n/g, "<br>");
+  }
+  window.learnMath = {
+    escapeHtml: escapeHtml,
+    /** Escape HTML, preserve newlines, then run KaTeX on $...$, $$...$$, \\(...\\), \\[...\\] */
+    setTextWithMath: function (el, rawText) {
+      if (!el) return;
+      const t = rawText == null ? "" : String(rawText);
+      el.innerHTML = nlToBr(escapeHtml(t));
+      if (typeof renderMathInElement !== "undefined") {
+        renderMathInElement(el, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "\\[", right: "\\]", display: true },
+          ],
+          throwOnError: false,
+          strict: false,
+        });
+      }
+    },
+  };
+})();
+</script>

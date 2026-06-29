@@ -1,0 +1,39 @@
+```mermaid
+graph LR
+  arango_content --> arango_tree
+  arango_learn --> arango_tree
+  concepts_extract --> arango_content
+  concepts_extract --> arango_tree
+  concepts_extract --> concept_resolve
+  concepts_extract --> extract
+  concepts_extract --> llm
+  extract --> arango_content
+  extract --> arango_learn
+  extract --> arango_tree
+  extract --> concepts_extract
+  extract --> llm
+  extract_routes --> concepts_extract
+  extract_routes --> extract
+  ingest_routes --> pdf_convert
+  main --> arango_content
+  main --> arango_tree
+  main --> extract_routes
+  main --> ingest_routes
+  main --> mastery
+  main --> study_routes
+  mastery --> arango_learn
+  mastery --> arango_tree
+  pdf_convert --> arango_content
+  pdf_convert --> math_markdown
+  pdf_convert --> reader
+  quiz_gen --> llm
+  reader --> math_markdown
+  study_routes --> arango_learn
+  study_routes --> arango_tree
+  study_routes --> llm
+  study_routes --> mastery
+  study_routes --> quiz_gen
+  study_routes --> rate_limit
+```
+
+%% 18 modules, 34 intra-app import edges %%

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Exam</title>
+  {% include "partials/katex_head.html" %}
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 48rem; line-height: 1.5; }
+    a { color: #1a6; }
+    .meta { color: #555; font-size: 0.9rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin: 1rem 0; padding: 0.85rem; background: #fafafa; border: 1px solid #e3e3e3; border-radius: 8px; }
+    .controls label { display: flex; flex-direction: column; font-size: 0.85rem; color: #444; gap: 0.2rem; }
+    .controls select { padding: 0.35rem; }
+    .controls .inline { flex-direction: row; align-items: center; gap: 0.4rem; }
+    button { padding: 0.55rem 0.9rem; cursor: pointer; border-radius: 6px; border: 1px solid #bbb; background: #fff; }
+    button.primary { background: #1a6; color: #fff; border-color: #1a6; }
+    .question { margin: 1.25rem 0; padding: 0.9rem 1rem; border: 1px solid #e3e3e3; border-radius: 8px; }
+    .question .stem { font-weight: 600; margin-bottom: 0.6rem; }
+    .question .opt { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.3rem 0; }
+    .question .opt input { margin-top: 0.35rem; }
+    .badge { font-size: 0.72rem; color: #888; border: 1px solid #ddd; border-radius: 10px; padding: 0 0.4rem; margin-left: 0.4rem; }
+    .scorebanner { margin: 1rem 0; padding: 1rem; border-radius: 8px; font-size: 1.05rem; }
+    .result { margin-top: 0.6rem; padding: 0.6rem 0.75rem; border-radius: 6px; }
+    .ok { background: #dfd; border: 1px solid #8c8; }
+    .bad { background: #fdd; border: 1px solid #c88; }
+    .err { color: #a00; }
+    pre { background: #f5f5f5; padding: 0.6rem; overflow: auto; margin: 0.4rem 0 0; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <p class="meta"><a href="/">Home</a> · <a href="/tree">TOC tree</a> · Section-scoped multiple-choice exam</p>
+  <h1>Knowledge check</h1>
+
+  <div class="controls">
+    <label>Section
+      <select id="section"><option value="">Whole document</option></select>
+    </label>
+    <label>Questions
+      <select id="count">
+        <option value="5">5</option>
+        <option value="8" selected>8</option>
+        <option value="15">15</option>
+      </select>
+    </label>
+    <label class="inline"><input type="checkbox" id="useLlm" checked /> Use AI phrasing</label>
+    <button type="button" id="start" class="primary">Start exam</button>
+  </div>
+
+  <p id="err" class="err" hidden></p>
+  <p id="status" class="meta"></p>
+
+  <form id="exam" class="hidden">
+    <div id="questions"></div>
+    <button type="submit" class="primary">Submit exam</button>
+  </form>
+
+  <div id="scorebanner" class="scorebanner hidden"></div>
+  <div id="review"></div>
+
+  {% include "partials/katex_scripts.html" %}
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const initialScope = params.get('scope') || '';
+    let exam = null; // { examId, questions: [{id, stem, choices}] }
+
+    function el(id) { return document.getElementById(id); }
+    function setMath(node, text) { window.learnMath.setTextWithMath(node, text || ''); }
+    function showErr(msg) { const e = el('err'); e.hidden = false; e.textContent = msg; }
+    function clearErr() { el('err').hidden = true; el('err').textContent = ''; }
+
+    // --- Section selector from the TOC hierarchy ---
+    function flattenSections(nodes, depth, out) {
+      for (const n of nodes || []) {
+        if (n && n.isSection && n.sectionKey) {
+          out.push({ key: n.sectionKey, label: ' '.repeat(depth * 2) + n.label });
+        }
+        flattenSections(n.children, depth + 1, out);
+      }
+      return out;
+    }
+
+    async function loadSections() {
+      try {
+        const r = await fetch('/api/toc-tree');
+        const data = await r.json();
+        if (!r.ok || data.error) return; // selector stays "Whole document" only
+        const sel = el('section');
+        for (const s of flattenSections(data.tree, 0, [])) {
+          const o = document.createElement('option');
+          o.value = s.key;
+          o.textContent = s.label;
+          sel.appendChild(o);
+        }
+        if (initialScope) sel.value = initialScope;
+      } catch (e) { /* non-fatal: whole-document exams still work */ }
+    }
+
+    // --- Start exam ---
+    async function startExam() {
+      clearErr();
+      el('exam').classList.add('hidden');
+      el('scorebanner').classList.add('hidden');
+      el('review').textContent = '';
+      el('status').textContent = 'Building your exam…';
+
+      const body = {
+        scope: el('section').value || null,
+        count: parseInt(el('count').value, 10),
+        include_structural: false,
+        useLlm: el('useLlm').checked,
+      };
+      try {
+        const r = await fetch('/api/quiz/exam', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        el('status').textContent = '';
+        if (!r.ok) { showErr(data.detail || JSON.stringify(data)); return; }
+        exam = data;
+        renderQuestions(data.questions);
+      } catch (e) {
+        el('status').textContent = '';
+        showErr(String(e));
+      }
+    }
+
+    function renderQuestions(questions) {
+      const wrap = el('questions');
+      wrap.textContent = '';
+      questions.forEach((q, qi) => {
+        const card = document.createElement('div');
+        card.className = 'question';
+        const stem = document.createElement('div');
+        stem.className = 'stem';
+        const num = document.createElement('span');
+        num.textContent = (qi + 1) + '. ';
+        stem.appendChild(num);
+        const stemText = document.createElement('span');
+        setMath(stemText, q.stem);
+        stem.appendChild(stemText);
+        card.appendChild(stem);
+
+        (q.choices || []).forEach((label, ci) => {
+          const row = document.createElement('label');
+          row.className = 'opt';
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = q.id;
+          input.value = String(ci);
+          row.appendChild(input);
+          const span = document.createElement('span');
+          setMath(span, label);
+          row.appendChild(span);
+          card.appendChild(row);
+        });
+        wrap.appendChild(card);
+      });
+      el('exam').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // --- Submit / grade ---
+    async function submitExam(ev) {
+      ev.preventDefault();
+      if (!exam) return;
+      clearErr();
+      const answers = exam.questions.map((q) => {
+        const checked = document.querySelector('input[name="' + q.id + '"]:checked');
+        return checked ? parseInt(checked.value, 10) : -1;
+      });
+      try {
+        const r = await fetch('/api/quiz/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ examId: exam.examId, answers }),
+        });
+        const data = await r.json();
+        if (!r.ok) { showErr(data.detail || JSON.stringify(data)); return; }
+        renderResults(data);
+      } catch (e) {
+        showErr(String(e));
+      }
+    }
+
+    function renderResults(data) {
+      el('exam').classList.add('hidden');
+      const banner = el('scorebanner');
+      banner.className = 'scorebanner ' + (data.percentage >= 60 ? 'ok' : 'bad');
+      banner.textContent = 'Score: ' + data.score + ' / ' + data.total + '  (' + data.percentage + '%)';
+      banner.classList.remove('hidden');
+
+      const review = el('review');
+      review.textContent = '';
+      (data.review || []).forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'question';
+        const stem = document.createElement('div');
+        stem.className = 'stem';
+        const stemText = document.createElement('span');
+        setMath(stemText, (i + 1) + '. ' + item.stem);
+        stem.appendChild(stemText);
+        card.appendChild(stem);
+
+        const res = document.createElement('div');
+        res.className = 'result ' + (item.correct ? 'ok' : 'bad');
+        const strong = document.createElement('strong');
+        strong.textContent = item.correct ? 'Correct' : 'Incorrect';
+        res.appendChild(strong);
+        res.appendChild(document.createElement('br'));
+
+        const yours = document.createElement('div');
+        setMath(yours, 'Your answer: ' + (item.yourAnswer == null ? '(blank)' : item.yourAnswer));
+        res.appendChild(yours);
+        if (!item.correct) {
+          const exp = document.createElement('div');
+          setMath(exp, 'Expected: ' + item.expected);
+          res.appendChild(exp);
+        }
+        if (item.explanation) {
+          const ex = document.createElement('div');
+          ex.style.marginTop = '0.35rem';
+          setMath(ex, item.explanation);
+          res.appendChild(ex);
+        }
+        if (item.triple) {
+          const pre = document.createElement('pre');
+          setMath(pre, item.triple.subject + ' | ' + item.triple.predicate + ' | ' + item.triple.object);
+          res.appendChild(pre);
+        }
+        card.appendChild(res);
+        review.appendChild(card);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    el('start').addEventListener('click', startExam);
+    el('exam').addEventListener('submit', submitExam);
+    loadSections();
+  </script>
+</body>
+</html>

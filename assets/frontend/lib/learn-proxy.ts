@@ -1,0 +1,54 @@
+import { NextResponse } from 'next/server'
+import { getLearnServiceBaseUrl } from '@/lib/learn-service'
+import { getUserDbName } from '@/lib/user-db'
+
+export async function proxyLearnGet(
+  upstreamPath: string,
+  searchParams?: URLSearchParams,
+): Promise<NextResponse> {
+  try {
+    const base = getLearnServiceBaseUrl()
+    const qs = searchParams?.toString()
+    const url = `${base}${upstreamPath}${qs ? `?${qs}` : ''}`
+    const upstream = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'X-User-Db': await getUserDbName() },
+    })
+    const body = await upstream.json().catch(() => ({}))
+    return NextResponse.json(body, { status: upstream.status })
+  } catch (error) {
+    console.error(`learn proxy GET ${upstreamPath}:`, error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json(
+      { error: `Learn service unavailable: ${message}`, tree: [], cards: [] },
+      { status: 503 },
+    )
+  }
+}
+
+export async function proxyLearnPost(
+  upstreamPath: string,
+  req: Request,
+): Promise<NextResponse> {
+  try {
+    const base = getLearnServiceBaseUrl()
+    // Forward the request's query string — some POST endpoints (e.g. exam/start) read
+    // doc/scope from the query, not the body. Dropping it broke them.
+    const qs = new URL(req.url).search
+    const body = await req.text()
+    const upstream = await fetch(`${base}${upstreamPath}${qs}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Db': await getUserDbName(),
+      },
+      body: body || '{}',
+    })
+    const data = await upstream.json().catch(() => ({}))
+    return NextResponse.json(data, { status: upstream.status })
+  } catch (error) {
+    console.error(`learn proxy POST ${upstreamPath}:`, error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: `Learn service unavailable: ${message}` }, { status: 503 })
+  }
+}

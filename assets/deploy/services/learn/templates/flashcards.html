@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flashcards</title>
+  {% include "partials/katex_head.html" %}
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 40rem; line-height: 1.5; }
+    a { color: #1a6; }
+    .meta { color: #555; font-size: 0.9rem; margin-bottom: 1rem; }
+    .card {
+      border: 1px solid #ccc; border-radius: 8px; padding: 1.25rem; min-height: 8rem;
+      background: #fafafa; cursor: pointer; white-space: normal; word-break: break-word;
+    }
+    .card.flipped { background: #eef6ff; }
+    .controls { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    button { padding: 0.4rem 0.8rem; cursor: pointer; }
+    .stats { font-size: 0.9rem; color: #555; margin-top: 0.5rem; }
+    .err { color: #a00; }
+  </style>
+</head>
+<body>
+  <p class="meta"><a href="/">Home</a> · <a href="/tree">TOC tree</a> · Add <code>?scope=toc:1.1.1</code> to this URL to limit the deck.</p>
+  <h1>Flashcards</h1>
+  <p id="status" class="meta">Loading…</p>
+  <div id="card" class="card" hidden></div>
+  <div class="controls" id="controls" hidden>
+    <button type="button" id="prev">Previous</button>
+    <button type="button" id="next">Next</button>
+    <button type="button" id="known">Known</button>
+    <button type="button" id="skip">Skip</button>
+    <span class="stats" id="stats"></span>
+  </div>
+  <p id="err" class="err" hidden></p>
+
+  {% include "partials/katex_scripts.html" %}
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const scope = params.get('scope') || '';
+    const qs = new URLSearchParams({ count: '20' });
+    if (scope) qs.set('scope', scope);
+    let cards = [];
+    let idx = 0;
+    let flipped = false;
+    let known = 0, skipped = 0;
+
+    const el = (id) => document.getElementById(id);
+    const cardEl = el('card');
+    const statusEl = el('status');
+
+    function renderCard() {
+      if (!cards.length) return;
+      const c = cards[idx];
+      flipped = false;
+      cardEl.classList.remove('flipped');
+      const raw = flipped ? (c.back || '') : (c.front || '');
+      window.learnMath.setTextWithMath(cardEl, raw);
+    }
+
+    function toggleFlip() {
+      if (!cards.length) return;
+      flipped = !flipped;
+      const c = cards[idx];
+      const raw = flipped ? (c.back || '') : (c.front || '');
+      window.learnMath.setTextWithMath(cardEl, raw);
+      cardEl.classList.toggle('flipped', flipped);
+    }
+
+    function updateStats() {
+      el('stats').textContent = `Card ${idx + 1} / ${cards.length} · marked known: ${known} · skipped: ${skipped}`;
+    }
+
+    async function load() {
+      try {
+        const r = await fetch('/api/deck?' + qs.toString());
+        const data = await r.json();
+        if (data.error) {
+          el('err').hidden = false;
+          el('err').textContent = data.error;
+          statusEl.textContent = 'Could not load deck.';
+          return;
+        }
+        cards = data.cards || [];
+        if (!cards.length) {
+          statusEl.textContent = 'No cards in this scope. Try another section or process more documents.';
+          return;
+        }
+        statusEl.textContent = scope ? `Scope: ${scope} · ${data.tripleCount} triples sampled` : `Global deck · ${data.tripleCount} triples sampled`;
+        cardEl.hidden = false;
+        el('controls').hidden = false;
+        idx = 0;
+        renderCard();
+        updateStats();
+      } catch (e) {
+        el('err').hidden = false;
+        el('err').textContent = String(e);
+        statusEl.textContent = 'Request failed.';
+      }
+    }
+
+    cardEl.addEventListener('click', toggleFlip);
+    el('next').addEventListener('click', () => {
+      if (!cards.length) return;
+      idx = (idx + 1) % cards.length;
+      renderCard();
+      updateStats();
+    });
+    el('prev').addEventListener('click', () => {
+      if (!cards.length) return;
+      idx = (idx - 1 + cards.length) % cards.length;
+      renderCard();
+      updateStats();
+    });
+    el('known').addEventListener('click', () => { known++; updateStats(); });
+    el('skip').addEventListener('click', () => { skipped++; updateStats(); });
+
+    load();
+  </script>
+</body>
+</html>

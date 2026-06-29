@@ -1,0 +1,526 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Inter typography patterns (Channel brand) */
+@import url('../styles/nvidia-build-typography.css');
+
+:root {
+  /* Off-white, not pure white — calmer reading contrast (premium-tool restraint). */
+  --foreground-rgb: 230, 233, 237;
+  /* GitHub-dark canvas (#0d1117) — matches the Channel brand. */
+  --background-rgb: 13, 17, 23;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  scroll-behavior: smooth;
+}
+
+/* Base page container styles */
+.container {
+  max-width: 90rem;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  /* NVIDIA green utility text color */
+  .text-nvidia-green {
+    color: hsl(var(--nvidia-green));
+  }
+
+  /* Accent color for native form controls (checkbox/radio) */
+  .selection-accent {
+    accent-color: hsl(var(--nvidia-green));
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  :root {
+    /* GitHub-dark canvas #0d1117 (Channel brand) */
+    --background: 216 28% 7%;
+    --foreground: 0 0% 98%;
+
+    /* Slightly raised surface #161b22 */
+    --card: 215 21% 11%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 216 28% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Channel accent blue #4da3ff as the brand primary in dark mode */
+    --primary: 211 100% 65%;
+    --primary-foreground: 216 28% 7%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 213 12% 20%;
+    --input: 213 12% 20%;
+    --ring: 211 100% 65%;
+
+    --radius: 0.75rem;
+
+    /* Channel brand accent (#4da3ff). New code should use --brand-accent or the
+       `brand` Tailwind color (text-brand / bg-brand). --nvidia-green is a
+       deprecated alias kept for the ~50 legacy `text-nvidia-green` call-sites. */
+    --brand-accent: 211 100% 65%;
+    --brand-accent-dark: 211 90% 55%;
+    --brand-accent-light: 211 100% 74%;
+    --nvidia-green: var(--brand-accent);
+    --nvidia-green-dark: var(--brand-accent-dark);
+    --nvidia-green-light: var(--brand-accent-light);
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    /* Channel accent blue, slightly deeper for light-mode contrast */
+    --primary: 211 90% 52%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 211 90% 60%;
+
+    --radius: 0.75rem;
+
+    --brand-accent: 211 90% 52%;
+    --brand-accent-dark: 211 90% 44%;
+    --brand-accent-light: 211 95% 60%;
+    --nvidia-green: var(--brand-accent);
+    --nvidia-green-dark: var(--brand-accent-dark);
+    --nvidia-green-light: var(--brand-accent-light);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ── Reading mode (warm paper) ──────────────────────────────────────────────
+   Scoped to the book/notes readers only — the dark app chrome is untouched.
+   A cream "page on a desk" surface for long reads; serif body for comfort. */
+.reading-surface-paper {
+  background-color: #f4efe6;
+  color: #3a332c;
+}
+
+/* Override the Tailwind Typography palette + font for the paper reader. */
+.read-paper-prose {
+  --tw-prose-body: #3a332c;
+  --tw-prose-headings: #221d18;
+  --tw-prose-lead: #4a4138;
+  --tw-prose-links: #8a3c1e;
+  --tw-prose-bold: #221d18;
+  --tw-prose-counters: #6b5d4d;
+  --tw-prose-bullets: #b8a489;
+  --tw-prose-hr: #e0d6c4;
+  --tw-prose-quotes: #4a4138;
+  --tw-prose-quote-borders: #cc785c;
+  --tw-prose-captions: #6b5d4d;
+  --tw-prose-code: #7a3a22;
+  --tw-prose-pre-code: #2b2520;
+  --tw-prose-pre-bg: #ebe3d3;
+  --tw-prose-th-borders: #d8cdb8;
+  --tw-prose-td-borders: #e3dac8;
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  line-height: 1.75;
+}
+
+/* Inline code keeps a faint warm chip (Typography doesn't background code by default). */
+.read-paper-prose :where(code):not(:where([class~="not-prose"] *)) {
+  background-color: #ebe3d3;
+}
+
+/* KaTeX inherits the warm body ink rather than the app foreground. */
+.read-paper-prose .katex {
+  color: #2b2520;
+}
+
+/* In-book find highlights (CSS Custom Highlight API) — amber reads on both themes. */
+::highlight(book-find) {
+  background-color: #fde68a;
+  color: #1c1714;
+}
+::highlight(book-find-active) {
+  background-color: #f59e0b;
+  color: #1c1714;
+}
+
+/* Concept source sentences highlighted in the reader — subtle nvidia-green wash + underline,
+   inviting a click (the click/hover is handled by use-concept-highlights via caret hit-test). */
+::highlight(concept-source) {
+  background-color: hsl(var(--nvidia-green) / 0.16);
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--nvidia-green) / 0.5);
+  text-underline-offset: 2px;
+}
+
+/* User highlights / notes — warm amber, distinct from concept (green) and find (yellow). */
+::highlight(user-highlight) {
+  background-color: rgba(251, 191, 36, 0.28);
+}
+
+/* Glossary terms — every occurrence of a concept name; subtle dotted underline, hover for def. */
+::highlight(concept-term) {
+  text-decoration: underline dotted;
+  text-decoration-color: hsl(var(--nvidia-green) / 0.55);
+  text-underline-offset: 3px;
+}
+
+/* Modern UI Elements */
+.glass-card {
+  @apply bg-card/80 backdrop-blur-md shadow-xl;
+  border: 1px solid;
+  border-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.light .glass-card {
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.10);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 20px -6px rgba(0, 0, 0, 0.10), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+.light .glass-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.glass-card h2 {
+  letter-spacing: 0.01em;
+}
+
+.glass-card p {
+  line-height: 1.6;
+}
+
+.gradient-text {
+  background: linear-gradient(to right, hsl(var(--nvidia-green)), hsl(var(--nvidia-green-light)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.10), 0 6px 8px -6px rgba(0, 0, 0, 0.08);
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px rgba(77, 163, 255, 0.2), 0 0 10px rgba(77, 163, 255, 0.1);
+  }
+  to {
+    box-shadow: 0 0 10px rgba(77, 163, 255, 0.3), 0 0 20px rgba(77, 163, 255, 0.2);
+  }
+}
+
+/* Light mode row selection highlight using the brand accent */
+.light .row-selected {
+  background-color: hsl(var(--nvidia-green) / 0.08);
+}
+
+.light .row-selected:hover {
+  background-color: hsl(var(--nvidia-green) / 0.12);
+}
+
+/* Slider Styles */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: hsl(var(--nvidia-green));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slider-thumb::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: hsl(var(--nvidia-green));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Button Styles */
+.btn-primary {
+  @apply px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md text-sm 
+         hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-md;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-secondary text-secondary-foreground font-medium rounded-md text-sm 
+         hover:bg-secondary/90 transition-colors flex items-center gap-2;
+}
+
+.btn-outline {
+  @apply px-4 py-2 bg-transparent border border-border text-foreground font-medium rounded-md text-sm 
+         hover:bg-muted transition-colors flex items-center gap-2;
+}
+
+.btn-destructive {
+  @apply px-4 py-2 bg-destructive/20 text-destructive font-medium rounded-md text-sm 
+         hover:bg-destructive/30 transition-colors flex items-center gap-2;
+}
+
+.btn-icon {
+  @apply p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors;
+}
+
+/* Dropdown Menu Fixes */
+.dropdown-menu {
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.dropdown-container {
+  position: relative;
+}
+
+/* Light mode: soften elevation globally to reduce heavy shadows */
+.light .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important; }
+.light .shadow, 
+.light .shadow-md { box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important; }
+.light .shadow-lg { box-shadow: 0 6px 14px -6px rgba(0,0,0,0.10) !important; }
+.light .shadow-xl { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
+.light .shadow-2xl { box-shadow: 0 12px 22px -10px rgba(0,0,0,0.14) !important; }
+
+/* Light mode: tune specific custom elements */
+.light .glass-card:hover { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
+
+/* Progress bar indeterminate animation - smooth sliding with gradient shine */
+@keyframes progress {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 40%;
+    margin-left: 30%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress 1.8s ease-in-out infinite;
+}
+
+/* Progress bar shimmer effect for determinate progress */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Enhanced skeleton shimmer with directional sweep */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.08) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Accessibility: honor the OS "reduce motion" setting (WCAG 2.3.3). Looping
+   animations are the most fatiguing in a long study session, so neutralize them
+   and collapse transitions to near-instant for users who ask for calm. Skeleton
+   shimmers keep a static muted fill so loading is still legible. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton-shimmer {
+    background: hsl(var(--muted));
+  }
+}
+
+/* ---- Built-in reader (markdown-reader.tsx) ---- */
+
+/* Wide equations scroll within the column instead of overflowing the pane. */
+.markdown-reader .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25rem;
+}
+
+/* Restrained syntax highlighting (highlight.js token classes). Calm by design:
+   muted comments, one green accent for keywords, everything else near-foreground —
+   no rainbow, matching the premium-calm token palette. */
+.markdown-reader .hljs {
+  color: hsl(var(--foreground) / 0.9);
+  background: transparent;
+}
+.markdown-reader .hljs-comment,
+.markdown-reader .hljs-quote {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.markdown-reader .hljs-keyword,
+.markdown-reader .hljs-selector-tag,
+.markdown-reader .hljs-built_in,
+.markdown-reader .hljs-meta {
+  color: hsl(var(--nvidia-green));
+}
+.markdown-reader .hljs-string,
+.markdown-reader .hljs-regexp,
+.markdown-reader .hljs-symbol {
+  color: hsl(45 70% 62%);
+}
+.markdown-reader .hljs-number,
+.markdown-reader .hljs-literal,
+.markdown-reader .hljs-bullet {
+  color: hsl(200 55% 65%);
+}
+.markdown-reader .hljs-title,
+.markdown-reader .hljs-function .hljs-title,
+.markdown-reader .hljs-section,
+.markdown-reader .hljs-name {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+.markdown-reader .hljs-attr,
+.markdown-reader .hljs-attribute,
+.markdown-reader .hljs-variable,
+.markdown-reader .hljs-params {
+  color: hsl(var(--foreground) / 0.85);
+}
+.markdown-reader .hljs-emphasis {
+  font-style: italic;
+}
+.markdown-reader .hljs-strong {
+  font-weight: 700;
+}
