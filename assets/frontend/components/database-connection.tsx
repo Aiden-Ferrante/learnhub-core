@@ -156,7 +156,8 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
     try {
       // Use current dbType state which was already determined from server/localStorage
       const graphDbType = dbType === "Neo4j" ? "neo4j" : "arangodb"
-      const endpoint = graphDbType === "neo4j" ? '/api/neo4j/disconnect' : '/api/graph-db/disconnect'
+      // /api/graph-db/disconnect handles all graph DB types (the old /api/neo4j shim just redirected here)
+      const endpoint = '/api/graph-db/disconnect'
       
       const response = await fetch(endpoint, {
         method: 'POST',

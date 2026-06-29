@@ -22,7 +22,6 @@ import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { type Triple, triplesToGraph } from "@/utils/text-processing"
 import { extractDocumentWithOptionalToc } from "@/utils/toc-processing"
 import { resolveTocForExtraction } from "@/lib/toc-preview-helpers"
-import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-toast"
 import { type PromptConfigurations } from "@/components/prompt-configuration"
 import type { PreparedIngestFile } from "@/lib/convert-pdf"
@@ -108,7 +107,6 @@ type DocumentContextType = {
   addTriple: (documentId: string, triple: Triple) => void
   editTriple: (documentId: string, index: number, triple: Triple) => void
   deleteTriple: (documentId: string, index: number) => void
-  openGraphVisualization: (documentId?: string) => Promise<void>
   generateEmbeddings: (documentId: string) => Promise<void>
   isGeneratingEmbeddings: boolean
   viewTriples?: (documentId: string) => void
@@ -136,7 +134,6 @@ const generateUUID = (): string => {
 };
 
 export function DocumentProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const [documents, setDocuments] = useState<Document[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   // Only enable the destructive autosave once the initial load SUCCEEDS. If the
@@ -1095,73 +1092,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const openGraphVisualization = async (documentId?: string) => {
-    // Find the document to visualize
-    const doc = documentId
-      ? documents.find((d) => d.id === documentId && d.status === "Processed" && d.triples && d.triples.length > 0)
-      : documents.find((d) => d.status === "Processed" && d.triples && d.triples.length > 0)
-
-    if (!doc || !doc.triples) {
-      console.warn("No suitable document found for graph visualization")
-      return
-    }
-
-    try {
-      // Create a timestamp to ensure we have unique localStorage keys that don't conflict
-      const timestamp = Date.now();
-      
-      // Always store in localStorage as a backup with a timestamp suffix
-      try {
-        // Store with both the old keys (for backward compatibility) and new timestamped keys
-        localStorage.setItem("graphTriples", JSON.stringify(doc.triples))
-        localStorage.setItem("graphDocumentName", doc.name)
-        
-        // Also store with timestamp for uniqueness
-        localStorage.setItem(`graphTriples_${timestamp}`, JSON.stringify(doc.triples))
-        localStorage.setItem(`graphDocumentName_${timestamp}`, doc.name)
-        
-        console.log(`Stored ${doc.triples.length} triples in localStorage for document: ${doc.name}`)
-      } catch (localStorageError) {
-        console.error("LocalStorage error:", localStorageError);
-        alert("Warning: Unable to save graph data to browser storage. The graph may not persist if you navigate away.");
-        // Continue with API storage even if localStorage fails
-      }
-
-      // Try the API approach
-      try {
-        const response = await fetch("/api/graph-data", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            triples: doc.triples,
-            documentName: doc.name,
-            timestamp // Include timestamp for correlation
-          }),
-        })
-
-        if (response.ok) {
-          const { graphId } = await response.json()
-          console.log(`Successfully stored graph data with ID: ${graphId}`)
-          // Use Next.js router.replace to avoid building up history stack
-          router.replace(`/graph?id=${graphId}&ts=${timestamp}`)
-        } else {
-          console.warn(`API storage failed (${response.status}): ${await response.text()}`)
-          // If API fails, use localStorage fallback with timestamp parameter
-          router.replace(`/graph?source=local&ts=${timestamp}`)
-        }
-      } catch (apiError) {
-        console.error("Error with API storage:", apiError)
-        // Navigate using localStorage fallback with timestamp
-        router.replace(`/graph?source=local&ts=${timestamp}`)
-      }
-    } catch (error) {
-      console.error("Error preparing graph data:", error)
-      alert("Failed to prepare graph data. See console for details.")
-    }
-  }
-
   const generateEmbeddings = async (documentId: string) => {
     // Add more detailed diagnostics
     const doc = documents.find(d => d.id === documentId);
@@ -1351,7 +1281,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         addTriple,
         editTriple,
         deleteTriple,
-        openGraphVisualization,
         generateEmbeddings,
         isGeneratingEmbeddings
       }}
