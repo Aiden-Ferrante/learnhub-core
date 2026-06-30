@@ -718,6 +718,17 @@ async def _run_job(
             doc_id=doc_id, section_keys=section_keys, scope=scope, concurrency=concurrency,
             model=model, on_progress=on_progress,
         )
+        # Best-effort: refresh the semantic-search index so ask_textbook / semantic-search cover
+        # the freshly-processed content. Never fail the extraction over indexing.
+        try:
+            import asyncio as _asyncio
+
+            from app.arango_tree import connect_arango
+            from app.semantic_search import ensure_index
+
+            await _asyncio.to_thread(lambda: ensure_index(connect_arango(), doc_id))
+        except Exception:  # noqa: BLE001
+            pass
         _JOBS[key] = {"status": "done", "scope": scope, "docId": doc_id, "summary": summary}
     except Exception as exc:  # noqa: BLE001 — surface in status, never crash the loop
         _JOBS[key] = {"status": "error", "scope": scope, "docId": doc_id, "error": str(exc)}

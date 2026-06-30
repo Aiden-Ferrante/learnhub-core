@@ -8,6 +8,7 @@ import { ConceptsView } from "@/components/learn/concepts-view"
 import { DrillView } from "@/components/learn/drill-view"
 import { DumpView } from "@/components/learn/dump-view"
 import { BookReader } from "@/components/learn/book-reader"
+import { AskPanel } from "@/components/learn/ask-panel"
 import { type StudyMode } from "@/components/learn/section-panel"
 import {
   fetchChapterProgress,
@@ -33,7 +34,7 @@ type LearnTabProps = {
   onTabChange?: (tab: string) => void
 }
 
-type View = "shelf" | "home" | "lesson" | "read" | "concepts" | "drill" | "dump"
+type View = "shelf" | "home" | "lesson" | "read" | "concepts" | "drill" | "dump" | "ask"
 
 export function LearnTab({ onTabChange }: LearnTabProps) {
   const { documents } = useDocuments()
@@ -337,6 +338,16 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     )
   }
 
+  if (view === "ask" && selectedCourse) {
+    return (
+      <AskPanel
+        course={selectedCourse}
+        onBack={backToCourseHome}
+        onOpenSection={(scope) => openSection(scope, scope ? findNodeBySectionKey(tree, scope) : null)}
+      />
+    )
+  }
+
   if (view === "home" && selectedCourse) {
     return (
       <CourseHome
@@ -350,6 +361,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
         onReview={handleReview}
         onReadBook={() => setView("read")}
         onViewConcepts={() => setView("concepts")}
+        onAsk={() => setView("ask")}
         onDrill={() => setView("drill")}
         onBrainDump={() => setView("dump")}
         onBackToShelf={backToShelf}

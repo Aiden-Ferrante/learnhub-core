@@ -11,6 +11,7 @@ import {
   History,
   Play,
   RotateCcw,
+  Search,
   Sparkles,
   Target,
 } from "lucide-react"
@@ -45,6 +46,7 @@ type CourseHomeProps = {
   onReview: (section: WeakestSection) => void
   onReadBook: () => void
   onViewConcepts: () => void
+  onAsk?: () => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
   onContinueReading?: () => void
@@ -100,6 +102,7 @@ export function CourseHome({
   onReview,
   onReadBook,
   onViewConcepts,
+  onAsk,
   onBackToShelf,
   continueNode,
   onContinueReading,
@@ -476,6 +479,18 @@ export function CourseHome({
                 <BookOpen className="h-3.5 w-3.5" />
                 Read the book
               </Button>
+              {onAsk && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={onAsk}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Ask this book
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
