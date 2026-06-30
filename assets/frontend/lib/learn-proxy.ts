@@ -33,8 +33,11 @@ export async function proxyLearnPost(
   try {
     const base = getLearnServiceBaseUrl()
     // Forward the request's query string — some POST endpoints (e.g. exam/start) read
-    // doc/scope from the query, not the body. Dropping it broke them.
-    const qs = new URL(req.url).search
+    // doc/scope from the query, not the body. Dropping it broke them. But only append it when
+    // the caller hasn't already put a query on upstreamPath — otherwise the URL gets a doubled
+    // query string ("?doc=X&scope=Y?doc=X&scope=Y") and params arrive corrupted (e.g. audiobook
+    // scope = "toc:1~2?scope=toc:1~2", which silently fails the job).
+    const qs = upstreamPath.includes('?') ? '' : new URL(req.url).search
     const body = await req.text()
     const upstream = await fetch(`${base}${upstreamPath}${qs}`, {
       method: 'POST',
