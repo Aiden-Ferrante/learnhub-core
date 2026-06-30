@@ -23,6 +23,7 @@ from app.extract_routes import router as extract_router
 from app.ingest_routes import router as ingest_router
 from app.mastery import compute_activity, compute_calibration, compute_forecast, compute_mastery, record_engagement
 from app.reading_routes import router as reading_router
+from app.search_routes import router as search_router
 from app.study_routes import router as study_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,6 +37,7 @@ app.include_router(concept_study_router)
 app.include_router(audiobook_router)
 app.include_router(learning_path_router)
 app.include_router(reading_router)
+app.include_router(search_router)
 app.include_router(admin_router)
 
 

@@ -132,13 +132,36 @@ def get_section(doc: str, section_key: str) -> Any:
 
 @mcp.tool()
 def search_text(doc: str, query: str, limit: int = 8, full: bool = False) -> Any:
-    """Find where a topic is discussed WITHOUT knowing the chapter (e.g. "quantization"). Returns
-    the best-matching passages with section, heading, page, score and a snippet. Set `full=True`
-    for the matched blocks' full markdown, or take a match's `sectionKey` into get_section()."""
+    """KEYWORD search — find where a literal term is discussed (e.g. "quantization"). Returns the
+    best-matching passages with section, heading, page, score and a snippet. For meaning-based
+    search use semantic_search; to get an answer use ask_textbook. Set `full=True` for full markdown."""
     params: dict[str, Any] = {"doc": doc, "q": query, "limit": limit}
     if full:
         params["full"] = "true"
     return _req("GET", "/api/search", params=params)
+
+
+@mcp.tool()
+def semantic_search(doc: str, query: str, k: int = 8) -> Any:
+    """MEANING-based search over the book (MiniLM embeddings) — finds relevant passages even when
+    the wording differs (e.g. "making models smaller" finds quantization). Returns ranked passages
+    with section/heading/page/score/snippet. Run index_book(doc) once first if results are empty."""
+    return _req("GET", "/api/semantic-search", params={"doc": doc, "q": query, "k": k})
+
+
+@mcp.tool()
+def ask_textbook(doc: str, question: str, k: int = 6) -> Any:
+    """Ask a question and get a grounded, cited answer drawn ONLY from the book's content (keyless
+    retrieval + Ollama). Returns {answer, citations:[{n,heading,page}]}. Needs the book indexed
+    (index_book(doc)). `k` = how many passages to ground the answer in."""
+    return _req("POST", "/api/ask", params={"doc": doc}, json={"q": question, "k": k})
+
+
+@mcp.tool()
+def index_book(doc: str) -> Any:
+    """Embed a book's content for semantic_search / ask_textbook (one-time, ~seconds; idempotent —
+    re-run after adding chapters). Returns {total, indexed}."""
+    return _req("POST", "/api/search/index", params={"doc": doc})
 
 
 # ── Processing (writes to the course) ───────────────────────────────────────────────────────
