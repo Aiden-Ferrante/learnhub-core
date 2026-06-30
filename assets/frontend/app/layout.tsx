@@ -22,7 +22,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { DocumentProvider } from "@/contexts/document-context"
 import { ClientInitializer } from "@/components/client-init"
 import Link from "next/link"
-import { BookOpen, Search as SearchIcon } from "lucide-react"
+import { BookOpen } from "lucide-react"
 import { BrandMark } from "@/components/brand-mark"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { InfoModal } from "@/components/info-modal"
@@ -63,13 +63,6 @@ export default function RootLayout({
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Link
-                    href="/rag"
-                    className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-nvidia-green/40 text-nvidia-green bg-nvidia-green/10 hover:bg-nvidia-green/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50 dark:bg-nvidia-green/20 dark:hover:bg-nvidia-green/30 dark:border-nvidia-green/50"
-                  >
-                    <SearchIcon className="h-4 w-4 text-current" />
-                    <span>RAG Search</span>
-                  </Link>
                   <Link
                     href="/#learn"
                     className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-border text-foreground/90 bg-muted/40 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50"
