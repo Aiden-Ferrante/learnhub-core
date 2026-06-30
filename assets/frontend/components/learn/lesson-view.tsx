@@ -17,11 +17,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SyllabusTree } from "@/components/learn/syllabus-tree"
 import { type StudyMode } from "@/components/learn/section-panel"
 import { nextStage, stageForMode, stageIndexForMode } from "@/lib/learn-path"
-import {
-  SectionConceptsPanel,
-  type ConceptWalkState,
-} from "@/components/learn/section-concepts-panel"
-import { SkeletonPanel } from "@/components/learn/skeleton-panel"
 import { ChapterWalk } from "@/components/learn/chapter-walk"
 import { OrientPanel } from "@/components/learn/orient-panel"
 import { ExamPanel } from "@/components/learn/exam-panel"
@@ -66,14 +61,12 @@ type LessonViewProps = {
 const PANEL_TITLE: Record<Exclude<StudyMode, null>, string> = {
   orient: "Orient",
   learn: "Learn",
-  skeleton: "Skeleton",
-  concepts: "Concepts",
   lesson: "Lesson",
   review: "Review",
-  conceptQuiz: "Quiz",
-  exam: "Chapter exam",
+  conceptQuiz: "Quizzes",
+  exam: "Exam",
   lockin: "Lock in",
-  read: "Notes",
+  read: "Read",
   listen: "Audiobook",
 }
 
@@ -102,12 +95,6 @@ export function LessonView({
 
   // The Read stage can be read or listened to — same content, two ways to take it in.
   const [readSubmode, setReadSubmode] = useState<"read" | "listen">("read")
-
-  // Walk state reported up by the concepts panel, so Continue steps subsections then the stage.
-  const [conceptsWalk, setConceptsWalk] = useState<ConceptWalkState>(null)
-  useEffect(() => {
-    if (studyMode !== "concepts") setConceptsWalk(null)
-  }, [studyMode])
 
   // Bumped whenever a stage reports completion, so the path stepper re-reads its ✓ progress
   // without waiting for a mode switch.
@@ -179,18 +166,9 @@ export function LessonView({
   const nextChapterTitle = nextChapter
     ? displaySectionTitle(nextChapter.label, nextChapter.title)
     : null
-  // Inside the Concepts stage, Continue walks the sub-sections top-down first, then advances
-  // to the next stage once the last sub-section is reached.
-  const walkingConcepts = studyMode === "concepts" && conceptsWalk?.next
   const continueAction: { label: string; sub: string; run: () => void } | null =
     !onPath || studyMode === "learn"
-    ? null
-    : walkingConcepts
-      ? {
-          label: "Continue: next subsection",
-          sub: `Subsection ${conceptsWalk!.index + 1} of ${conceptsWalk!.total} — keep descending.`,
-          run: conceptsWalk!.next!,
-        }
+      ? null
       : ns
         ? { label: `Continue: ${ns.label}`, sub: ns.lead, run: () => onStudyModeChange(ns.mode) }
         : nextChapter && onStartChapter && nextChapterTitle
@@ -418,6 +396,8 @@ export function LessonView({
               isReadStage && !listening && readingTheme === "paper" && "reading-surface-paper",
             )}
           >
+            {/* Keyed so each stage (and read↔listen) cross-fades in instead of popping. */}
+            <div key={`${studyMode}:${listening}`} className="animate-in fade-in-0 duration-200">
             {studyMode === "orient" && (
               <OrientPanel scope={scope} docId={course.learnDocId} onAcknowledge={handleAnswered} />
             )}
@@ -431,17 +411,6 @@ export function LessonView({
                   const n = nextStage("learn")
                   if (n) onStudyModeChange(n.mode)
                 }}
-              />
-            )}
-            {studyMode === "skeleton" && (
-              <SkeletonPanel scope={scope} docId={course.learnDocId} tree={tree} onGraded={handleAnswered} />
-            )}
-            {studyMode === "concepts" && (
-              <SectionConceptsPanel
-                scope={scope}
-                docId={course.learnDocId}
-                onAnswered={handleAnswered}
-                onWalk={setConceptsWalk}
               />
             )}
             {studyMode === "lesson" && (
@@ -482,6 +451,7 @@ export function LessonView({
                 through the chapter.
               </p>
             )}
+            </div>
           </div>
           {continueAction && (
             <div className="flex items-center justify-end gap-3 border-t bg-card px-3 py-2">

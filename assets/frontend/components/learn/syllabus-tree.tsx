@@ -132,6 +132,9 @@ function TreeRow({
   const isExpanded = expanded.has(node.id)
   const isSelected = node.sectionKey != null && node.sectionKey === selectedScope
   const isSection = node.isSection
+  // Mastery % for the completion gauge next to the concept count (0% = not started).
+  const sm = isSection && node.sectionKey ? masteryBySection?.[node.sectionKey] : undefined
+  const masteryPct = sm ? Math.round((sm.mastery ?? 0) * 100) : null
 
   return (
     <li className="list-none">
@@ -190,6 +193,23 @@ function TreeRow({
             title={`${node.conceptCount} concept${node.conceptCount === 1 ? "" : "s"}`}
           >
             {node.conceptCount}
+          </span>
+        ) : null}
+        {isSection && (node.conceptCount ?? 0) > 0 && masteryPct != null ? (
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+              masteryPct >= 80
+                ? "bg-emerald-500/10 text-emerald-500"
+                : masteryPct >= 50
+                  ? "bg-brand/10 text-brand"
+                  : masteryPct > 0
+                    ? "bg-amber-500/10 text-amber-500"
+                    : "bg-muted text-muted-foreground",
+            )}
+            title={`${masteryPct}% mastery${sm?.isRollup ? " · chapter average" : ""}`}
+          >
+            {masteryPct}%
           </span>
         ) : null}
         {isSection && node.sectionKey && onExtract ? (

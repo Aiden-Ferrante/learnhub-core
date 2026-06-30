@@ -98,7 +98,7 @@ export function OrientPanel({ scope, docId, onAcknowledge }: OrientPanelProps) {
 
       <div className="border-t pt-3">
         {acked ? (
-          <p className="text-sm text-nvidia-green">Oriented — go build the skeleton next.</p>
+          <p className="text-sm text-nvidia-green">Oriented — hit Continue to start learning the chapter.</p>
         ) : (
           <Button
             type="button"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Zap } from "lucide-react"
+import { CheckCircle2, ChevronDown, Zap } from "lucide-react"
 import { AnswerFeedback } from "@/components/learn/answer-feedback"
 import { ConceptCard } from "@/components/learn/concept-card"
 import { ConceptMarkdown } from "@/components/learn/concept-markdown"
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import {
-  displaySectionTitle,
   fetchConceptMastery,
   fetchSectionConcepts,
   startConceptQuiz,
@@ -19,8 +18,6 @@ import {
   type ConceptQuizResult,
   type ConceptQuizSession,
 } from "@/lib/learn-service"
-
-type ConceptSection = { sectionKey: string; title: string; essence?: string; depth?: number }
 
 const QUICK_CHECK_QUESTIONS = 2
 
@@ -106,6 +103,7 @@ function ConceptQuickCheck({
       <button
         type="button"
         onClick={begin}
+        title="Two quick questions to confirm this subsection landed before you move on"
         className="flex items-center gap-1.5 self-start rounded-md border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-brand/50 hover:text-brand"
       >
         <Zap className="h-3.5 w-3.5" />
@@ -204,64 +202,35 @@ function ConceptQuickCheck({
 }
 
 /** State of the top-down sub-section walk, reported up so the lesson Continue footer can drive it. */
-export type ConceptWalkState = { index: number; total: number; next: (() => void) | null } | null
-
-/** The concepts extracted from a TOC section. For a chapter scope this is a guided top-down WALK —
- *  one sub-section at a time. `onWalk` lets the lesson Continue footer step the walk. */
+/** The concepts extracted from one leaf TOC section: their cards, plus an optional quick-check.
+ *  The chapter walk drives the per-section progression around this panel. */
 export function SectionConceptsPanel({
   scope,
   docId,
   onAnswered,
-  onWalk,
 }: {
   scope: string | null
   docId?: string
   onAnswered?: () => void
-  onWalk?: (state: ConceptWalkState) => void
 }) {
   const [concepts, setConcepts] = useState<ConceptLesson[]>([])
-  const [sections, setSections] = useState<ConceptSection[]>([])
   const [mastery, setMastery] = useState<ConceptMasteryResponse["byConcept"]>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Index into the top-down sub-section walk (Pass 2: one sub-section at a time).
-  const [step, setStep] = useState(0)
-
-  // Report walk position up so the lesson Continue footer / → key can advance subsections.
-  const total = sections.length
-  const walkActive = total > 1
-  const idx = Math.min(step, Math.max(0, total - 1))
-  useEffect(() => {
-    if (!onWalk) return
-    if (!walkActive) {
-      onWalk(null)
-      return
-    }
-    onWalk({
-      index: idx,
-      total,
-      next: idx < total - 1 ? () => setStep((n) => Math.min(total - 1, n + 1)) : null,
-    })
-  }, [onWalk, walkActive, idx, total])
 
   useEffect(() => {
     if (!scope) {
       setConcepts([])
-      setSections([])
       return
     }
     let active = true
     setLoading(true)
     setError(null)
-    setStep(0)
     Promise.all([fetchSectionConcepts(scope, docId), fetchConceptMastery(docId).catch(() => null)])
       .then(([res, m]) => {
         if (!active) return
         if (res.error) setError(res.error)
-        else {
-          setConcepts(res.concepts || [])
-          setSections(res.sections || [])
-        }
+        else setConcepts(res.concepts || [])
         if (m && !m.error) setMastery(m.byConcept || {})
       })
       .catch((e) => active && setError(e instanceof Error ? e.message : "Failed to load concepts"))
@@ -304,61 +273,11 @@ export function SectionConceptsPanel({
     )
   }
 
-  // Single sub-section (leaf scope) → flat list. A chapter spanning several sub-sections →
-  // a guided top-down WALK: one sub-section at a time. The lesson Continue footer / → key
-  // advances the walk (then moves on to quizzes); the chevrons here are for manual nav.
-  if (!walkActive) {
-    return <ul className="flex flex-col gap-2 p-4">{concepts.map(renderCard)}</ul>
-  }
-
-  const s = sections[idx]
-  const items = concepts.filter((c) => c.sectionKey === s.sectionKey)
-  const depth = Math.min(s.depth ?? 0, 4)
-
+  // The leaf's concept cards, then an optional quick-check to retrieve right after encoding.
   return (
     <div className="flex flex-col gap-3 p-4">
-      {/* Walk position + manual nav */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs tabular-nums text-muted-foreground">
-          Subsection {idx + 1} / {total}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            disabled={idx === 0}
-            onClick={() => setStep((n) => Math.max(0, n - 1))}
-            title="Previous subsection"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            disabled={idx >= total - 1}
-            onClick={() => setStep((n) => Math.min(total - 1, n + 1))}
-            title="Next subsection"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Where you are in the outline */}
-      <div style={{ marginLeft: `${depth * 0.75}rem` }}>
-        <h3 className="text-base font-semibold text-foreground">
-          {displaySectionTitle(s.title || s.sectionKey)}
-        </h3>
-        {s.essence && <p className="mt-0.5 text-sm text-muted-foreground">{s.essence}</p>}
-      </div>
-
-      <ul className="flex flex-col gap-2">{items.map(renderCard)}</ul>
-
-      <ConceptQuickCheck key={s.sectionKey} scope={s.sectionKey} docId={docId} onAnswered={onAnswered} />
+      <ul className="flex flex-col gap-2">{concepts.map(renderCard)}</ul>
+      <ConceptQuickCheck key={scope ?? ""} scope={scope} docId={docId} onAnswered={onAnswered} />
     </div>
   )
 }

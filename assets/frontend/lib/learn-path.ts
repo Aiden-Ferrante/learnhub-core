@@ -19,8 +19,8 @@ export const PATH_STAGES: PathStage[] = [
   // chapter-progress + the gradeSkeleton "done" signal carry over.)
   { key: "skeleton", mode: "learn", label: "Learn", lead: "Build the chapter top-down — frame it, then learn each branch in turn." },
   { key: "read", mode: "read", label: "Read", lead: "Read it through with that shape already in mind." },
-  { key: "quizzes", mode: "conceptQuiz", label: "Quizzes", lead: "Test the joints — quick checks on what you just learned." },
-  { key: "exam", mode: "exam", label: "Exam", lead: "Load-test the whole chapter in one sitting." },
+  { key: "quizzes", mode: "conceptQuiz", label: "Quizzes", lead: "Retrieve and apply each concept — application questions across the chapter." },
+  { key: "exam", mode: "exam", label: "Exam", lead: "One graded, interleaved pass over the whole chapter — pass to lock it in." },
   { key: "lockin", mode: "lockin", label: "Lock in", lead: "Let it set — the keepers go into spaced review." },
 ]
 

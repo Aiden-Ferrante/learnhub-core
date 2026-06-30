@@ -122,19 +122,25 @@ export function DrillView({ scope, docId, title, onBack, onDone }: DrillViewProp
   }, [questions, idx, result, busy, pending, commit])
 
   const header = (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Back
-      </button>
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <Target className="h-4 w-4 text-brand" />
-        {title || "Practice your weak spots"}
-      </span>
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back
+        </button>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <Target className="h-4 w-4 text-brand" />
+          {title || "Practice your weak spots"}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Adaptive multiple-choice on the concepts you most need — missed first, then weakest, across
+        all chapters. Ungraded practice.
+      </p>
     </div>
   )
 

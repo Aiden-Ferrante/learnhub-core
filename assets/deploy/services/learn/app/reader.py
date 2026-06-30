@@ -37,6 +37,12 @@ _CONVERTER_LOCK = threading.Lock()
 _ATX_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _HEADING_LABELS = {"section_header", "title"}
 
+# Typed-element extraction (the retrieval layer): pull figures/tables/equations/code out of
+# the structured Docling document alongside the markdown. On by default; LEARN_EXTRACT_ELEMENTS=0
+# disables it (and skips picture rasterization, saving convert time/memory).
+_EXTRACT_ELEMENTS = os.environ.get("LEARN_EXTRACT_ELEMENTS", "1").strip().lower() not in ("0", "false", "no")
+_IMAGE_SCALE = float(os.environ.get("LEARN_IMAGE_SCALE", "2.0") or "2.0")
+
 
 @dataclass
 class HeadingPage:
@@ -55,6 +61,25 @@ class PageText:
 
 
 @dataclass
+class Element:
+    """A typed, page-located artifact from the structured document (figure / table /
+    equation / code) — the retrieval layer that sits beside the flat markdown."""
+
+    type: str  # figure | table | equation | code
+    page: int | None = None
+    bbox: list[float] | None = None      # [l, t, r, b] in the page's coordinate space
+    bbox_origin: str | None = None       # TOPLEFT | BOTTOMLEFT (how to read bbox)
+    caption: str | None = None
+    text: str | None = None              # generic text payload (reserved; unused in v1)
+    latex: str | None = None             # equation body
+    table_markdown: str | None = None
+    table_data: dict | None = None       # {columns: [...], rows: [[...]]}
+    code: str | None = None
+    language: str | None = None
+    image_png: bytes | None = None       # figure raster (PNG); persisted to /shared in piece 2
+
+
+@dataclass
 class ConvertedDoc:
     """Full-document markdown plus page-provenance side channels."""
 
@@ -63,6 +88,7 @@ class ConvertedDoc:
     heading_pages: list[HeadingPage] = field(default_factory=list)
     pages: list[PageText] = field(default_factory=list)
     outline: list[dict] = field(default_factory=list)  # embedded PDF bookmarks (the real TOC)
+    elements: list[Element] = field(default_factory=list)  # typed artifacts (figure/table/equation/code)
 
 
 class PdfConvertError(Exception):
@@ -115,8 +141,9 @@ class DoclingConverter:
     def __init__(self) -> None:
         self._converter = None
         # Captured from the most recent ``to_markdown`` call so ``convert_document``
-        # can read per-heading page numbers without re-running Docling.
+        # can read per-heading page numbers + typed elements without re-running Docling.
         self.last_heading_pages: list[HeadingPage] = []
+        self.last_elements: list[Element] = []
 
     def _get_converter(self):
         if self._converter is not None:
@@ -143,6 +170,11 @@ class DoclingConverter:
             # If the source is a scanned/image PDF and formulas still don't decode,
             # the next lever is enabling do_ocr above (slower).
             pipeline_options.do_formula_enrichment = True
+            # Rasterize figures so the retrieval layer can persist them; without this,
+            # pictures are detected but dropped as "<!-- image -->" placeholders.
+            if _EXTRACT_ELEMENTS:
+                pipeline_options.generate_picture_images = True
+                pipeline_options.images_scale = _IMAGE_SCALE
 
             self._converter = DocumentConverter(
                 format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
@@ -156,6 +188,7 @@ class DoclingConverter:
         result = self._get_converter().convert(source)
         document = result.document
         self.last_heading_pages = _docling_heading_pages(document)
+        self.last_elements = _docling_elements(document) if _EXTRACT_ELEMENTS else []
         return document.export_to_markdown() or ""
 
 
@@ -174,6 +207,113 @@ def _docling_heading_pages(document) -> list[HeadingPage]:
             if label in _HEADING_LABELS and text and prov:
                 out.append(HeadingPage(text=str(text), page_no=int(prov[0].page_no)))
     except Exception:
+        return []
+    return out
+
+
+def _prov_page_bbox(item) -> tuple[int | None, list[float] | None, str | None]:
+    """``(1-based page, [l,t,r,b], coord_origin)`` from an item's first provenance, or Nones."""
+    prov = getattr(item, "prov", None) or []
+    if not prov:
+        return None, None, None
+    p = prov[0]
+    page = int(p.page_no) if getattr(p, "page_no", None) is not None else None
+    bbox = origin = None
+    bb = getattr(p, "bbox", None)
+    if bb is not None:
+        try:
+            bbox = [float(bb.l), float(bb.t), float(bb.r), float(bb.b)]
+            origin = str(getattr(bb, "coord_origin", "") or "") or None
+        except Exception:  # noqa: BLE001
+            bbox = origin = None
+    return page, bbox, origin
+
+
+def _caption_text(item, document) -> str | None:
+    try:
+        cap = (item.caption_text(document) or "").strip()
+    except Exception:  # noqa: BLE001
+        return None
+    return cap or None
+
+
+def _picture_png(item, document) -> bytes | None:
+    """Render a PictureItem to PNG bytes (requires ``generate_picture_images``)."""
+    try:
+        img = item.get_image(document)
+    except Exception:  # noqa: BLE001
+        return None
+    if img is None:
+        return None
+    try:
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _docling_elements(document) -> list[Element]:
+    """Typed artifacts (figure/table/equation/code) from a DoclingDocument, in reading order.
+
+    Best-effort: a structural surprise on one item is skipped (never fatal), and the whole
+    walk returns ``[]`` on any top-level failure so ingestion never breaks.
+    """
+    try:
+        from docling_core.types.doc.document import CodeItem, FormulaItem, PictureItem, TableItem
+    except Exception:  # noqa: BLE001
+        return []
+
+    out: list[Element] = []
+    try:
+        for item, _level in document.iterate_items():
+            try:
+                # FormulaItem/CodeItem subclass TextItem, so test the specific types.
+                if isinstance(item, TableItem):
+                    page, bbox, origin = _prov_page_bbox(item)
+                    try:
+                        table_md = item.export_to_markdown(document) or None
+                    except Exception:  # noqa: BLE001
+                        table_md = None
+                    table_data = None
+                    try:
+                        df = item.export_to_dataframe(document)
+                        table_data = {
+                            "columns": [str(c) for c in df.columns],
+                            "rows": df.astype(str).values.tolist(),
+                        }
+                    except Exception:  # noqa: BLE001
+                        table_data = None
+                    out.append(Element(
+                        type="table", page=page, bbox=bbox, bbox_origin=origin,
+                        caption=_caption_text(item, document),
+                        table_markdown=table_md, table_data=table_data,
+                    ))
+                elif isinstance(item, PictureItem):
+                    page, bbox, origin = _prov_page_bbox(item)
+                    out.append(Element(
+                        type="figure", page=page, bbox=bbox, bbox_origin=origin,
+                        caption=_caption_text(item, document),
+                        image_png=_picture_png(item, document),
+                    ))
+                elif isinstance(item, FormulaItem):
+                    latex = (getattr(item, "text", "") or "").strip()
+                    if latex:
+                        page, bbox, origin = _prov_page_bbox(item)
+                        out.append(Element(type="equation", page=page, bbox=bbox, bbox_origin=origin, latex=latex))
+                elif isinstance(item, CodeItem):
+                    code = (getattr(item, "text", "") or "").strip()
+                    if code:
+                        page, bbox, origin = _prov_page_bbox(item)
+                        lang = getattr(item, "code_language", None)
+                        lang = getattr(lang, "value", lang)
+                        out.append(Element(
+                            type="code", page=page, bbox=bbox, bbox_origin=origin,
+                            code=code, language=(str(lang) if lang else None),
+                        ))
+            except Exception:  # noqa: BLE001
+                continue
+    except Exception:  # noqa: BLE001
         return []
     return out
 
@@ -289,10 +429,12 @@ def convert_document(data: bytes, filename: str) -> ConvertedDoc:
     """
     primary = select_converter()
     heading_pages: list[HeadingPage] = []
+    elements: list[Element] = []
     try:
         md = primary.to_markdown(data, filename)
         engine = primary.name
         heading_pages = list(getattr(primary, "last_heading_pages", []) or [])
+        elements = list(getattr(primary, "last_elements", []) or [])
         if not (md and md.strip()) and primary.name != PyMuPDFConverter.name:
             raise PdfConvertError("Converter produced no text", 500)
     except PdfConvertError:
@@ -305,6 +447,7 @@ def convert_document(data: bytes, filename: str) -> ConvertedDoc:
             md = fallback.to_markdown(data, filename)
             engine = fallback.name
             heading_pages = []
+            elements = []  # pymupdf has no structured-item layer
         except Exception as fexc:  # noqa: BLE001
             raise PdfConvertError(f"PDF conversion failed: {fexc}", 500) from fexc
 
@@ -314,7 +457,7 @@ def convert_document(data: bytes, filename: str) -> ConvertedDoc:
         heading_pages = _heading_pages_from_pages(pages)
     outline = extract_pdf_outline(data)
     return ConvertedDoc(
-        markdown=md, engine=engine, heading_pages=heading_pages, pages=pages, outline=outline
+        markdown=md, engine=engine, heading_pages=heading_pages, pages=pages, outline=outline, elements=elements
     )
 
 

@@ -64,6 +64,11 @@ export function DumpView({ chapters, docId, onBack, onDone }: DumpViewProps) {
         </span>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Close the book and write everything you remember about a chapter from memory — then see
+        which concepts you covered and which you missed.
+      </p>
+
       <div className="rounded-lg border bg-card p-6">
         {pickable.length > 1 && (
           <div className="mb-3 flex items-center gap-2">

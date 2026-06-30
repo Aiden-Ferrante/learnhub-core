@@ -79,10 +79,21 @@ if [ "$USE_VECTOR_SEARCH" = true ]; then
   PROFILES="--profile vector-search"
 fi
 
-echo "Stopping txt2kg services..."
+echo "Stopping txt2kg services (leaving the shared Ollama running)..."
 cd "$SCRIPT_DIR"
-eval "$CMD $PROFILES down"
+# Stop every service EXCEPT ollama. Ollama is a shared LLM other apps depend on
+# and is managed independently (Mission Control's `ollama` service), so tearing
+# down the whole stack here would needlessly kill it. Use `rm -sf` (stop+remove)
+# rather than `down`: `down` removes the compose network, which would detach the
+# still-running ollama container.
+SERVICES="$(eval "$CMD $PROFILES config --services" 2>/dev/null | grep -vx ollama | tr '\n' ' ')"
+if [ -n "${SERVICES// /}" ]; then
+  eval "$CMD $PROFILES rm -sf $SERVICES"
+else
+  echo "  (no non-ollama services found; nothing to stop)"
+fi
 
 echo ""
-echo "All services stopped."
+echo "All txt2kg services stopped; Ollama left running for other apps."
 echo "To start again, run: ./start.sh"
+echo "To stop Ollama too: docker compose -f $COMPOSE_FILE stop ollama"

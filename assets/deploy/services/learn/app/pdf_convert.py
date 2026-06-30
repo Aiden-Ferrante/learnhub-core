@@ -39,6 +39,7 @@ class ConvertResult:
     doc_id: str | None
     engine: str
     has_page_provenance: bool = False
+    element_count: int = 0
 
 
 def _normalize_markdown(text: str, engine: str) -> str:
@@ -106,6 +107,26 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> Conve
     pages = [(pt.page_no, pt.markdown) for pt in converted.pages]
     has_page_provenance = bool(pages) and bool(heading_pages)
 
+    # Flatten the typed elements to plain dicts so persist_document stays decoupled from the
+    # reader types (mirrors how heading_pages/pages are passed). Image bytes ride along as
+    # ``imagePng`` and are written to /shared by the store, never kept in the DB row.
+    elements = [
+        {
+            "type": e.type,
+            "page": e.page,
+            "bbox": e.bbox,
+            "bboxOrigin": e.bbox_origin,
+            "caption": e.caption,
+            "latex": e.latex,
+            "tableMarkdown": e.table_markdown,
+            "tableData": e.table_data,
+            "code": e.code,
+            "language": e.language,
+            "imagePng": e.image_png,
+        }
+        for e in converted.elements
+    ]
+
     output_filename = _output_name(filename or "document.pdf")
     doc_id = str(uuid.uuid4())
     saved_path = _save_artifacts(data, markdown, filename, doc_id) if save else None
@@ -119,6 +140,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> Conve
             heading_pages=heading_pages,
             pages=pages,
             outline=converted.outline,
+            elements=elements,
         )
         if save
         else None
@@ -133,6 +155,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> Conve
         doc_id=persisted_id,
         engine=engine,
         has_page_provenance=has_page_provenance,
+        element_count=len(elements),
     )
 
 

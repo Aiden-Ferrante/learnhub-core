@@ -19,6 +19,11 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import FastMCP
 
+try:  # returning an actual image (for get_figure) is optional — degrade to metadata if absent
+    from mcp.server.fastmcp import Image
+except Exception:  # noqa: BLE001
+    Image = None  # type: ignore[assignment]
+
 LEARN_URL = (os.environ.get("LEARN_URL") or "http://localhost:8010").rstrip("/")
 USER_DB = os.environ.get("LEARN_USER_DB") or "txt2kg"
 _HEADERS = {"X-User-Db": USER_DB}
@@ -306,6 +311,41 @@ def audiobook_status(doc: str, scope: str, source: str = "text") -> Any:
 def audiobook_list(doc: str) -> Any:
     """List the audiobooks already generated for a course."""
     return _req("GET", "/api/audiobook/list", params={"doc": doc})
+
+
+# ── Elements (typed retrieval layer) ──────────────────────────────────────────────────────────
+@mcp.tool()
+def list_elements(doc: str, scope: str | None = None, type: str | None = None) -> Any:
+    """List the typed artifacts pulled from a book — figures, tables, equations, code blocks —
+    each with its page, sectionKey, caption and reading `order`. Filter by `scope` (a toc: key →
+    that section + descendants) and/or `type` (figure | table | equation | code). Use this to find a
+    specific figure/table/equation without loading a whole chapter: tables include their cell data
+    (`tableData`) and markdown, equations their `latex`, figures an `imageRef` — pass that order to
+    get_figure(doc, n) to see the picture."""
+    params: dict[str, Any] = {"doc": doc}
+    if scope:
+        params["scope"] = scope
+    if type:
+        params["type"] = type
+    return _req("GET", "/api/elements", params=params)
+
+
+@mcp.tool()
+def get_figure(doc: str, n: int) -> Any:
+    """Fetch a figure image so you can SEE it. `n` is the element `order` from list_elements (the
+    figure's `imageRef` ends in `e<n>.png`). Returns the PNG image (or its metadata if this client
+    can't render images)."""
+    url = f"{LEARN_URL}/api/figure"
+    try:
+        with httpx.Client(timeout=60.0) as c:
+            r = c.get(url, params={"doc": doc, "n": n}, headers=_HEADERS)
+    except httpx.HTTPError as exc:
+        return {"error": f"cannot reach learn service at {url}: {exc}"}
+    if r.status_code >= 400:
+        return {"error": f"HTTP {r.status_code}", "doc": doc, "n": n}
+    if Image is not None:
+        return Image(data=r.content, format="png")
+    return {"doc": doc, "n": n, "bytes": len(r.content), "note": "image content unsupported by this client"}
 
 
 if __name__ == "__main__":

@@ -101,7 +101,15 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
       )}
 
       {locked ? (
-        <p className="text-sm text-nvidia-green">Chapter locked in. Nice work.</p>
+        <div className="flex items-center gap-2.5 rounded-lg border border-nvidia-green/40 bg-nvidia-green/10 p-3 animate-in fade-in-0 zoom-in-95 duration-300">
+          <PartyPopper className="h-5 w-5 shrink-0 text-nvidia-green" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Chapter complete — nice work.</p>
+            <p className="text-xs text-muted-foreground">
+              Its concepts are in your spaced-review rotation now.
+            </p>
+          </div>
+        </div>
       ) : (
         <Button type="button" onClick={lockIn}>
           Mark chapter complete

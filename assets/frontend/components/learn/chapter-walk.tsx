@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, ListTree, Sparkles } from "lucide-react"
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, ListTree, RotateCcw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionConceptsPanel } from "@/components/learn/section-concepts-panel"
 import {
@@ -12,6 +12,7 @@ import {
   numberSections,
   numberedSectionTitle,
   type LearnTreeNode,
+  type SkeletonGrade,
 } from "@/lib/learn-service"
 
 type ChapterWalkProps = {
@@ -26,11 +27,25 @@ type ChapterWalkProps = {
   onComplete?: () => void
 }
 
+// Self-grade scale for each recall step (mirrors the backend GRADE_VALUE).
+const GRADES: { value: SkeletonGrade; label: string; cls: string }[] = [
+  { value: "missed", label: "Missed a lot", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
+  { value: "partial", label: "Partial", cls: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" },
+  { value: "most", label: "Most of it", cls: "border-brand/50 text-brand hover:bg-brand/10" },
+  { value: "nailed", label: "Nailed it", cls: "border-brand/60 text-brand hover:bg-brand/15" },
+]
+const GRADE_VALUE: Record<SkeletonGrade, number> = { missed: 1, partial: 2, most: 3, nailed: 4 }
+const VALUE_GRADE: Record<number, SkeletonGrade> = { 1: "missed", 2: "partial", 3: "most", 4: "nailed" }
+
 /**
  * The unified, top-down "learn the chapter" walk: frame the chapter (recall its sections from
  * memory), then descend one branch at a time — recall a branch's sub-sections, then learn each
  * leaf's concepts — before moving to the next branch. Same numbered outline as the TOC; reuses
- * SectionConceptsPanel for the concept steps. Replaces the separate Skeleton + Concepts stages.
+ * SectionConceptsPanel for the concept steps.
+ *
+ * Each recall step is a level-by-level retrieval: recall from memory → reveal (compare against
+ * the real outline) → self-grade. The chapter's skeleton grade is the AVERAGE of those per-step
+ * grades, so the Learn stage reflects how recall actually went (not a blanket "nailed").
  */
 export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: ChapterWalkProps) {
   const numbers = useMemo(() => numberSections(tree ?? []), [tree])
@@ -44,8 +59,13 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
   const [revealed, setRevealed] = useState(false)
   const [recall, setRecall] = useState("")
   const [essences, setEssences] = useState<Record<string, string>>({})
+  // Per-recall-step self-grades (keyed by the recalled node), averaged into the chapter grade.
+  const [grades, setGrades] = useState<Record<string, SkeletonGrade>>({})
+  // Brief "Recorded ✓" confirmation shown after grading, before the step advances.
+  const [justGraded, setJustGraded] = useState<SkeletonGrade | null>(null)
 
   const progressKey = `txt2k:chapter-walk:${docId ?? ""}:${scope ?? ""}`
+  const gradesKey = `txt2k:walk-grades:${docId ?? ""}:${scope ?? ""}`
 
   // Resume the saved step + load per-section essences once per chapter.
   useEffect(() => {
@@ -58,6 +78,12 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
       saved = 0
     }
     setStepIdx(Math.min(Math.max(0, saved), Math.max(0, steps.length - 1)))
+    try {
+      const rawGrades = localStorage.getItem(gradesKey)
+      setGrades(rawGrades ? (JSON.parse(rawGrades) as Record<string, SkeletonGrade>) : {})
+    } catch {
+      setGrades({})
+    }
     fetchSkeleton(scope, docId)
       .then((r) => {
         if (cancelled || r.error) return
@@ -73,7 +99,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
     return () => {
       cancelled = true
     }
-  }, [scope, docId, progressKey, steps.length])
+  }, [scope, docId, progressKey, gradesKey, steps.length])
 
   const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))]
   const draftKey = step?.kind === "skeleton" ? `txt2k:walk-recall:${docId ?? ""}:${step.ofKey}` : ""
@@ -81,6 +107,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
   // Each step starts fresh: hide the reveal, load that skeleton step's saved recall draft.
   useEffect(() => {
     setRevealed(false)
+    setJustGraded(null)
     if (!draftKey) {
       setRecall("")
       return
@@ -102,20 +129,47 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
 
   const isLast = stepIdx >= steps.length - 1
 
+  // Finish the walk: record the chapter's skeleton grade as the average of the per-step
+  // self-grades (default "most" when there was nothing to recall), then advance the path.
+  const finishWith = useCallback(
+    (g: Record<string, SkeletonGrade>) => {
+      const vals = Object.values(g).map((v) => GRADE_VALUE[v])
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 3
+      const overall = VALUE_GRADE[Math.max(1, Math.min(4, Math.round(avg)))]
+      gradeSkeleton(scope, docId, overall).catch(() => {})
+      onComplete?.()
+    },
+    [scope, docId, onComplete],
+  )
+
   const goNext = useCallback(() => {
-    setStepIdx((i) => {
-      if (i >= steps.length - 1) {
-        gradeSkeleton(scope, docId, "nailed").catch(() => {}) // mark the Learn stage done
-        onComplete?.()
-        return i
-      }
-      return i + 1
-    })
-  }, [steps.length, scope, docId, onComplete])
+    if (stepIdx >= steps.length - 1) finishWith(grades)
+    else setStepIdx((i) => Math.min(steps.length - 1, i + 1))
+  }, [stepIdx, steps.length, finishWith, grades])
 
   const goPrev = () => setStepIdx((i) => Math.max(0, i - 1))
 
-  // → reveals a skeleton step, then advances (kept off inputs the panels use).
+  // Record this recall step's self-grade (persisted so a mid-walk reload keeps it), flash a
+  // brief confirmation, then advance — finishing the walk if it was the last step.
+  const gradeStep = (g: SkeletonGrade) => {
+    if (step?.kind !== "skeleton" || justGraded) return
+    const next = { ...grades, [step.ofKey]: g }
+    setGrades(next)
+    setJustGraded(g)
+    try {
+      localStorage.setItem(gradesKey, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+    const last = stepIdx >= steps.length - 1
+    window.setTimeout(() => {
+      if (last) finishWith(next)
+      else setStepIdx((i) => Math.min(steps.length - 1, i + 1))
+    }, 700)
+  }
+
+  // → reveals a skeleton step; on concept steps it advances. A revealed skeleton step waits for
+  // a self-grade click (kept off inputs the panels use).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowRight" || e.metaKey || e.ctrlKey || e.altKey) return
@@ -123,8 +177,11 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
       if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
       if (t && t.isContentEditable) return
       e.preventDefault()
-      if (step?.kind === "skeleton" && !revealed) setRevealed(true)
-      else goNext()
+      if (step?.kind === "skeleton") {
+        if (!revealed) setRevealed(true)
+      } else {
+        goNext()
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
@@ -200,21 +257,67 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
                 className="w-full resize-y rounded-md border bg-background p-3 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-brand/50"
               />
             ) : (
-              <ul className="space-y-1 text-sm">
-                {step.childKeys.map((k) => {
-                  const n = nodeFor(k)
-                  if (!n) return null
-                  const ess = n.sectionKey ? essences[n.sectionKey] : ""
-                  return (
-                    <li key={n.id} className="leading-snug">
-                      <span className="font-medium">
-                        {numberedSectionTitle(numbers.get(n.id), n.label, n.title)}
-                      </span>
-                      {ess && <span className="text-muted-foreground"> — {ess}</span>}
-                    </li>
-                  )
-                })}
-              </ul>
+              <div className="space-y-4">
+                {recall.trim() && (
+                  <details className="rounded-lg border bg-muted/20 p-3 text-sm">
+                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                      Your recall
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap font-sans text-foreground/90">{recall}</pre>
+                  </details>
+                )}
+                <ul className="space-y-1 text-sm">
+                  {step.childKeys.map((k) => {
+                    const n = nodeFor(k)
+                    if (!n) return null
+                    const ess = n.sectionKey ? essences[n.sectionKey] : ""
+                    return (
+                      <li key={n.id} className="leading-snug">
+                        <span className="font-medium">
+                          {numberedSectionTitle(numbers.get(n.id), n.label, n.title)}
+                        </span>
+                        {ess && <span className="text-muted-foreground"> — {ess}</span>}
+                      </li>
+                    )
+                  })}
+                </ul>
+                <div className="space-y-2 border-t pt-3">
+                  {justGraded ? (
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-brand">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Recorded: {GRADES.find((g) => g.value === justGraded)?.label}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium">How complete was your recall?</p>
+                      <div className="flex flex-wrap gap-2">
+                        {GRADES.map((g) => (
+                          <Button
+                            key={g.value}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={g.cls}
+                            onClick={() => gradeStep(g.value)}
+                          >
+                            {g.label}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRevealed(false)}
+                        className="text-muted-foreground"
+                      >
+                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                        Try again
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         ) : (
@@ -234,16 +337,24 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
           <ArrowLeft className="h-3.5 w-3.5" />
           Back
         </Button>
-        {step.kind === "skeleton" && !revealed ? (
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 gap-1.5 px-3 text-xs"
-            onClick={() => setRevealed(true)}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            Reveal
-          </Button>
+        {step.kind === "skeleton" ? (
+          !revealed ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={() => setRevealed(true)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Reveal
+            </Button>
+          ) : justGraded ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-brand">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Recorded
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Grade your recall to continue</span>
+          )
         ) : (
           <Button
             type="button"

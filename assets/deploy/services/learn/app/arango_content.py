@@ -16,9 +16,12 @@ this change (no heading/page side channels) keep working with page data absent.
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from arango.database import StandardDatabase
 
@@ -27,6 +30,7 @@ from app.arango_tree import connect_arango
 DOCUMENTS = "documents"
 SECTION_CONTENT = "section_content"
 PAGE_CONTENT = "page_content"
+ELEMENTS = "elements"
 
 TOC_ROOT_KEY = "toc:root"
 
@@ -288,6 +292,12 @@ def _ensure_collections(db: StandardDatabase) -> None:
         col = db.create_collection(PAGE_CONTENT)
         col.add_persistent_index(fields=["docId"])
         col.add_persistent_index(fields=["docId", "pageNo"])
+    if not db.has_collection(ELEMENTS):
+        col = db.create_collection(ELEMENTS)
+        col.add_persistent_index(fields=["docId"])
+        col.add_persistent_index(fields=["docId", "type"])
+        col.add_persistent_index(fields=["docId", "sectionKey"])
+        col.add_persistent_index(fields=["docId", "page"])
 
 
 _OUTLINE_NUM = re.compile(r"^\s*(?:chapter|part|appendix|section)?\s*(\d+(?:\.\d+)*)\s*[.:)]?\s+(.*)$", re.IGNORECASE)
@@ -409,6 +419,103 @@ def normalize_outline(raw_outline: list[dict] | None, blocks: list[SectionBlock]
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Typed elements (the retrieval layer): figures / tables / equations / code
+# --------------------------------------------------------------------------- #
+
+_IMAGE_PLACEHOLDER = re.compile(r"<!--\s*image\s*-->")
+
+
+def _figure_url(doc_id: str, order: int) -> str:
+    """Browser-facing URL for a figure (served by the learn `/api/figure` route via the Next
+    `/api/learn/*` proxy). Keyed by (doc, element order) so the reader and an agent agree."""
+    return f"/api/learn/figure?doc={doc_id}&n={order}"
+
+
+def _figure_md_link(doc_id: str, order: int, caption: str | None, ref: str | None) -> str | None:
+    if not ref:
+        return None
+    alt = (caption or "Figure").strip().replace("[", " ").replace("]", " ") or "Figure"
+    return f"![{alt}]({_figure_url(doc_id, order)})"
+
+
+def _save_element_figures(doc_id: str, elements: list[dict]) -> list[str | None]:
+    """Assign each element its reading `order`, write figure PNGs to ``/shared/figures/<docId>/``,
+    set ``imageRef`` on figures, and return the per-figure markdown links in reading order (used
+    to swap the ``<!-- image -->`` placeholders). Best-effort: a bad write leaves ``imageRef`` None.
+    """
+    shared = os.environ.get("SHARED_DIR", "/shared")
+    fig_dir = Path(shared) / "figures" / doc_id
+    shutil.rmtree(fig_dir, ignore_errors=True)  # drop stale figures on re-ingest
+    links: list[str | None] = []
+    for order, e in enumerate(elements):
+        e["order"] = order
+        if e.get("type") != "figure":
+            continue
+        ref = None
+        png = e.get("imagePng")
+        if png:
+            try:
+                fig_dir.mkdir(parents=True, exist_ok=True)
+                (fig_dir / f"e{order}.png").write_bytes(png)
+                ref = f"figures/{doc_id}/e{order}.png"
+            except OSError:
+                ref = None
+        e["imageRef"] = ref
+        links.append(_figure_md_link(doc_id, order, e.get("caption"), ref))
+    return links
+
+
+def _swap_image_placeholders(markdown: str, figure_links: list[str | None]) -> str:
+    """Replace each ``<!-- image -->`` (Docling emits one per figure, in reading order) with the
+    matching figure's markdown link, so the reader shows real images. Unmatched/None → left as-is."""
+    it = iter(figure_links)
+    def repl(_m: re.Match) -> str:
+        link = next(it, None)
+        return link if link else _m.group(0)
+    return _IMAGE_PLACEHOLDER.sub(repl, markdown)
+
+
+def _element_rows(doc_id: str, elements: list[dict], blocks: list[SectionBlock]) -> list[dict]:
+    """Build the ``elements`` rows, each tagged with the section that contains its page (the most
+    recent heading at/before that page — same rule as the outline page-match)."""
+    paged = sorted([b for b in blocks if b.page_start is not None], key=lambda b: b.page_start)
+
+    def section_for_page(page: int | None) -> str | None:
+        if page is None:
+            return None
+        chosen = None
+        for b in paged:
+            if b.page_start is not None and b.page_start <= page:
+                chosen = b
+            else:
+                break
+        return chosen.section_key if chosen else None
+
+    rows: list[dict] = []
+    for e in elements:
+        order = e.get("order", 0)
+        rows.append({
+            "_key": f"{doc_id}__e{order}",
+            "docId": doc_id,
+            "order": order,
+            "type": e.get("type"),
+            "page": e.get("page"),
+            "bbox": e.get("bbox"),
+            "bboxOrigin": e.get("bboxOrigin"),
+            "sectionKey": section_for_page(e.get("page")),
+            "caption": e.get("caption"),
+            "imageRef": e.get("imageRef"),
+            "latex": e.get("latex"),
+            "tableMarkdown": e.get("tableMarkdown"),
+            "tableData": e.get("tableData"),
+            "code": e.get("code"),
+            "language": e.get("language"),
+            "embedding": None,  # reserved for Phase-2 semantic search
+        })
+    return rows
+
+
 def persist_document(
     *,
     doc_id: str,
@@ -419,6 +526,7 @@ def persist_document(
     heading_pages: list[tuple[str, int]] | None = None,
     pages: list[tuple[int, str]] | None = None,
     outline: list[dict] | None = None,
+    elements: list[dict] | None = None,
 ) -> str | None:
     """Store full markdown + section blocks + page-primary blocks. Best-effort.
 
@@ -429,6 +537,15 @@ def persist_document(
     try:
         db = connect_arango()
         _ensure_collections(db)
+
+        # Typed elements (retrieval layer): save figure images + swap <!-- image --> placeholders
+        # BEFORE splitting, so documents.markdown AND every section block inherit the real links.
+        # sectionKey is assigned after the page-ranges/keys are final (below).
+        elements = elements or []
+        figure_links = _save_element_figures(doc_id, elements)
+        if figure_links:
+            markdown = _swap_image_placeholders(markdown, figure_links)
+
         blocks = split_markdown_sections(markdown)
 
         hp = [(t, int(p)) for (t, p) in (heading_pages or [])]
@@ -468,6 +585,7 @@ def persist_document(
                 "charCount": len(markdown),
                 "sectionCount": len(blocks),
                 "pageBlockCount": len(page_blocks),
+                "elementCount": len(elements),
                 "hasPageProvenance": has_page_provenance,
                 "outline": outline_entries,
                 "createdAt": int(time.time()),
@@ -516,6 +634,12 @@ def persist_document(
                 ],
                 on_duplicate="replace",
             )
+
+        el = db.collection(ELEMENTS)
+        el.delete_match({"docId": doc_id})
+        element_rows = _element_rows(doc_id, elements, blocks)
+        if element_rows:
+            el.import_bulk(element_rows, on_duplicate="replace")
         return doc_id
     except Exception:
         return None
@@ -665,3 +789,52 @@ def fetch_page(page_no: int, doc_id: str | None = None) -> dict:
         }
     except Exception as exc:
         return {"page": None, "error": str(exc)}
+
+
+_ELEMENT_FIELDS = (
+    "order", "type", "page", "bbox", "bboxOrigin", "sectionKey",
+    "caption", "imageRef", "latex", "tableMarkdown", "tableData", "code", "language",
+)
+
+
+def fetch_elements(
+    doc_id: str | None = None, scope: str | None = None, el_type: str | None = None
+) -> dict:
+    """The typed retrieval layer: list a document's elements, optionally filtered by ``el_type``
+    (figure/table/equation/code) and ``scope`` (a ``toc:`` key — returns that section + descendants).
+    Image bytes are never returned — figures carry an ``imageRef`` the ``/api/figure`` route serves."""
+    try:
+        db = connect_arango()
+        if not db.has_collection(ELEMENTS):
+            return {"docId": doc_id, "elements": []}
+        if doc_id is None:
+            latest = fetch_latest_document()
+            doc = latest.get("document")
+            doc_id = doc.get("id") if doc else None
+        if not doc_id:
+            return {"docId": doc_id, "elements": []}
+
+        aql = "FOR e IN elements FILTER e.docId == @d"
+        binds: dict = {"d": doc_id}
+        if el_type:
+            aql += " AND e.type == @t"
+            binds["t"] = el_type
+        aql += " SORT e.order RETURN e"
+        rows = list(db.aql.execute(aql, bind_vars=binds))
+
+        if scope:
+            rows = [r for r in rows if r.get("sectionKey") and is_ancestor_section_key(scope, r["sectionKey"])]
+
+        out = [{k: r.get(k) for k in _ELEMENT_FIELDS} for r in rows]
+        return {"docId": doc_id, "scope": scope, "type": el_type, "count": len(out), "elements": out}
+    except Exception as exc:
+        return {"docId": doc_id, "elements": [], "error": str(exc)}
+
+
+def figure_path(doc_id: str, order: int) -> Path | None:
+    """Absolute path to a figure PNG for the ``/api/figure`` route, or None if it's missing.
+    Guards against path traversal (``doc_id`` is a UUID, ``order`` an int)."""
+    shared = os.environ.get("SHARED_DIR", "/shared")
+    safe_doc = re.sub(r"[^A-Za-z0-9_-]", "", doc_id or "")
+    p = Path(shared) / "figures" / safe_doc / f"e{int(order)}.png"
+    return p if p.is_file() else None

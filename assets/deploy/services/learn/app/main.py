@@ -5,14 +5,16 @@ from pathlib import Path
 import os
 
 from fastapi import Body, FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.templating import Jinja2Templates
 
 from app.arango_content import (
+    fetch_elements,
     fetch_latest_document,
     fetch_outline,
     fetch_page,
     fetch_section_content,
+    figure_path,
 )
 from app.admin_routes import router as admin_router
 from app.arango_tree import get_toc_tree, render_toc_tree_html, set_request_db_name
@@ -134,6 +136,24 @@ def api_section_content(key: str, doc: str | None = None) -> JSONResponse:
 def api_page(page_no: int, doc: str | None = None) -> JSONResponse:
     data = fetch_page(page_no, doc)
     return JSONResponse(data, status_code=503 if data.get("error") else 200)
+
+
+@app.get("/api/elements")
+def api_elements(doc: str | None = None, scope: str | None = None, type: str | None = None) -> JSONResponse:
+    """The typed retrieval layer: list a document's figures/tables/equations/code, filtered by
+    ``scope`` (a toc: key → section + descendants) and/or ``type``. Figures carry an ``imageRef``;
+    fetch the bytes from ``/api/figure?doc=&n=<order>``."""
+    data = fetch_elements(doc, scope=scope, el_type=type)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
+
+
+@app.get("/api/figure")
+def api_figure(doc: str, n: int):
+    """Serve a figure PNG by (doc, element order ``n``). 404 when the file is missing."""
+    p = figure_path(doc, n)
+    if p is None:
+        return JSONResponse({"error": "figure not found"}, status_code=404)
+    return FileResponse(str(p), media_type="image/png")
 
 
 @app.get("/tree")

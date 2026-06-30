@@ -34,6 +34,7 @@ def _result_payload(result) -> dict:
         "docId": result.doc_id,
         "engine": result.engine,
         "hasPageProvenance": result.has_page_provenance,
+        "elementCount": result.element_count,
     }
 
 

@@ -91,6 +91,43 @@ function StatTile({ label, value }: { label: string; value: number | string }) {
   )
 }
 
+/** One practice mode in the grouped "Practice" menu — its own identity line so the learner
+ *  knows what it is and when to reach for it (vs. the guided path's in-chapter assessments). */
+function PracticeTile({
+  icon,
+  title,
+  desc,
+  badge,
+  onClick,
+}: {
+  icon: React.ReactNode
+  title: string
+  desc: string
+  badge?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-nvidia-green/50 hover:bg-nvidia-green/5"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-sm font-medium">
+          {icon}
+          {title}
+        </span>
+        {badge && (
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+            {badge}
+          </span>
+        )}
+      </span>
+      <span className="text-xs text-muted-foreground">{desc}</span>
+    </button>
+  )
+}
+
 export function CourseHome({
   course,
   tree,
@@ -246,44 +283,6 @@ export function CourseHome({
               Resume · {displaySectionTitle(continueNode.label, continueNode.title)}
             </Button>
           )}
-          {onReviewAll && (
-            <Button
-              type="button"
-              variant={continueNode && onResumePath ? "outline" : "default"}
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onReviewAll}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              {dueCount > 0 ? `Review ${dueCount} due` : "Start review"}
-            </Button>
-          )}
-          {onDrill && studied > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onDrill}
-              title="Practice the concepts you're weakest on or have missed — across all chapters"
-            >
-              <Target className="h-3.5 w-3.5" />
-              Drill weak spots
-            </Button>
-          )}
-          {onBrainDump && (conceptCount ?? 0) > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onBrainDump}
-              title="Close the book and write what you remember — then see your gaps"
-            >
-              <Brain className="h-3.5 w-3.5" />
-              Free recall
-            </Button>
-          )}
           {continueNode && onContinueReading && (
             <Button
               type="button"
@@ -298,6 +297,44 @@ export function CourseHome({
           )}
         </div>
       </div>
+
+      {/* Practice — strengthen what you already know. Distinct from the in-chapter assessments
+          on the guided path: these are cross-chapter, self-directed, and ungraded. */}
+      {!error && !isEmpty &&
+        (onReviewAll || (onDrill && studied > 0) || (onBrainDump && (conceptCount ?? 0) > 0)) && (
+          <div className="rounded-lg border bg-card">
+            <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+              Practice
+            </div>
+            <div className="grid gap-2 p-3 sm:grid-cols-3">
+              {onReviewAll && (
+                <PracticeTile
+                  icon={<RotateCcw className="h-4 w-4 text-nvidia-green" />}
+                  title="Review"
+                  desc="Spaced-repetition cards that have come due — keeps what you learned from fading."
+                  badge={dueCount > 0 ? `${dueCount} due` : "Caught up"}
+                  onClick={onReviewAll}
+                />
+              )}
+              {onDrill && studied > 0 && (
+                <PracticeTile
+                  icon={<Target className="h-4 w-4 text-brand" />}
+                  title="Drill weak spots"
+                  desc="Adaptive multiple-choice on your weakest concepts — missed first, across all chapters."
+                  onClick={onDrill}
+                />
+              )}
+              {onBrainDump && (conceptCount ?? 0) > 0 && (
+                <PracticeTile
+                  icon={<Brain className="h-4 w-4 text-brand" />}
+                  title="Free recall"
+                  desc="Close the book and write what you remember about a chapter — then see your gaps."
+                  onClick={onBrainDump}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
       {/* Error state */}
       {error && (

@@ -51,8 +51,13 @@ export function ChapterPath({ scope, docId, studyMode, onSelect, refreshKey }: C
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">Learning path</span>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {completed}/{STAGES.length} done
+        <span
+          className={cn(
+            "text-xs tabular-nums",
+            completed === STAGES.length ? "font-medium text-brand" : "text-muted-foreground",
+          )}
+        >
+          {completed === STAGES.length ? "✓ Chapter complete" : `${completed}/${STAGES.length} done`}
         </span>
       </div>
       <div className="flex gap-1 overflow-x-auto pb-0.5">
@@ -80,18 +85,19 @@ export function ChapterPath({ scope, docId, studyMode, onSelect, refreshKey }: C
                 type="button"
                 aria-pressed={isDone}
                 aria-label={isDone ? `${s.label}: done — mark not done` : `Mark ${s.label} done`}
+                title={isDone ? "Mark not done" : "Mark done"}
                 onClick={() => toggle(s.key, !isDone)}
                 className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums",
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums transition hover:ring-2 hover:ring-brand/40",
                   isDone ? "bg-brand text-background" : "bg-muted text-muted-foreground",
                 )}
               >
-                {isDone ? <Check className="h-3 w-3" /> : i + 1}
+                {isDone ? <Check className="h-3 w-3 animate-in zoom-in-50 duration-200" /> : i + 1}
               </button>
               <button
                 type="button"
                 onClick={() => onSelect(s.mode)}
-                title={`Go to ${s.label}`}
+                title={s.lead}
                 className="max-w-full truncate hover:text-foreground"
               >
                 {s.label}
