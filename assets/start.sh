@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-# Setup script for txt2kg project
+# Setup script for Learn Hub project
 
 # Parse command line arguments
 DEV_FRONTEND=false
@@ -161,7 +161,7 @@ eval "$CMD $PROFILES up -d"
 
 echo ""
 echo "=========================================="
-echo "txt2kg is now running!"
+echo "Learn Hub is now running!"
 echo "=========================================="
 echo ""
 echo "Core Services:"

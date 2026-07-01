@@ -20,11 +20,14 @@ import os
 import random
 import re
 import threading
-from typing import Any
+from typing import Any, TypedDict
+
+from langgraph.graph import END, START, StateGraph
 
 from app.arango_tree import connect_arango
 from app.concept_quiz_gen import _name_variants
 from app.llm import ollama_structured_completion
+from app.llm_schemas import AuthoredSet
 
 CONCEPTS = "concepts"
 # Authoring is GPU-bound on a single model, so it runs sequentially. The critic pass roughly
@@ -79,27 +82,6 @@ CRITIC_SYSTEM = (
     "Keep exactly 4 options with one correct answerIndex, a one-sentence grounded explanation, and the "
     "original TYPE on each question. Return the revised set as JSON, same schema."
 )
-
-AUTHOR_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "questions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "type": {"type": "string", "enum": list(_TYPES)},
-                    "stem": {"type": "string"},
-                    "options": {"type": "array", "items": {"type": "string"}},
-                    "answerIndex": {"type": "integer"},
-                    "explanation": {"type": "string"},
-                },
-                "required": ["type", "stem", "options", "answerIndex", "explanation"],
-            },
-        }
-    },
-    "required": ["questions"],
-}
 
 # In-flight guard so concurrent quiz requests don't author the same scope twice.
 _inflight: set[str] = set()
@@ -213,7 +195,7 @@ def _critique(passage: str, name: str, drafts: list[dict[str, Any]], model: str 
     )
     obj, err = ollama_structured_completion(
         [{"role": "system", "content": CRITIC_SYSTEM}, {"role": "user", "content": user}],
-        AUTHOR_SCHEMA,
+        AuthoredSet,
         temperature=0.2,
         model=model,
     )
@@ -223,42 +205,58 @@ def _critique(passage: str, name: str, drafts: list[dict[str, Any]], model: str 
     return revised or drafts
 
 
-def author_concept_questions(
-    concept: dict[str, Any],
-    siblings: list[str],
-    passage: str | None = None,
-    model: str | None = None,
-) -> list[dict[str, Any]]:
-    """Author → critic-revise → gate understanding MCQs for one concept. Returns the questions
-    that pass the semantic gate ([] on failure — the caller falls back to the deterministic
-    recognition question)."""
-    name = (concept.get("name") or "").strip()
-    signal = (concept.get("signal") or "").strip()
-    if not name or not signal:
-        return []
-    source = (concept.get("source") or "").strip()
-    passage = (passage or "").strip() or f"{signal}\n\n{source}"
-    sib = ", ".join(s for s in siblings[:12] if s and s != name) or "(none provided)"
+# --------------------------------------------------------------------------- #
+# author → critic → gate, as a compiled LangGraph (one graph, reused per concept)
+# --------------------------------------------------------------------------- #
 
+
+class _QuizState(TypedDict):
+    name: str
+    signal: str
+    source: str
+    passage: str
+    sib: str
+    model: str | None
+    drafts: list[dict[str, Any]]
+    revised: list[dict[str, Any]]
+    accepted: list[dict[str, Any]]
+
+
+def _author_node(state: _QuizState) -> dict[str, Any]:
+    """Author drafts grounded in the passage (temp 0.5), normalised to our shape."""
     obj, err = ollama_structured_completion(
         [
             {"role": "system", "content": AUTHOR_SYSTEM},
-            {"role": "user", "content": _author_user(name, signal, source, passage, sib)},
+            {
+                "role": "user",
+                "content": _author_user(
+                    state["name"], state["signal"], state["source"], state["passage"], state["sib"]
+                ),
+            },
         ],
-        AUTHOR_SCHEMA,
+        AuthoredSet,
         temperature=0.5,
-        model=model,
+        model=state["model"],
     )
     drafts = [] if err or not obj else [n for n in (_normalize(q) for q in obj.get("questions") or []) if n]
-    if not drafts:
-        return []
+    return {"drafts": drafts}
 
-    revised = _critique(passage, name, drafts, model)
 
+def _has_drafts(state: _QuizState) -> str:
+    """No drafts → short-circuit to END ([] accepted → caller's deterministic fallback)."""
+    return "critic" if state["drafts"] else END
+
+
+def _critic_node(state: _QuizState) -> dict[str, Any]:
+    return {"revised": _critique(state["passage"], state["name"], state["drafts"], state["model"])}
+
+
+def _gate_node(state: _QuizState) -> dict[str, Any]:
+    """Programmatic gate: drop telegraphing/invalid questions, dedup, emit server shape."""
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for q in revised:
-        if _accept(q, name) and q["stem"].lower() not in seen:
+    for q in state["revised"]:
+        if _accept(q, state["name"]) and q["stem"].lower() not in seen:
             seen.add(q["stem"].lower())
             out.append(
                 {
@@ -269,7 +267,58 @@ def author_concept_questions(
                     "kind": q["type"],
                 }
             )
-    return out
+    return {"accepted": out}
+
+
+def _build_quiz_graph():
+    g = StateGraph(_QuizState)
+    g.add_node("author", _author_node)
+    g.add_node("critic", _critic_node)
+    g.add_node("gate", _gate_node)
+    g.add_edge(START, "author")
+    g.add_conditional_edges("author", _has_drafts, {"critic": "critic", END: END})
+    g.add_edge("critic", "gate")
+    g.add_edge("gate", END)
+    return g.compile()
+
+
+# Compiled once: the graph is stateless/reusable, so the background authoring thread can
+# invoke it per concept without recompiling (state is per-invocation).
+_QUIZ_GRAPH = _build_quiz_graph()
+
+
+def author_concept_questions(
+    concept: dict[str, Any],
+    siblings: list[str],
+    passage: str | None = None,
+    model: str | None = None,
+) -> list[dict[str, Any]]:
+    """Author → critic-revise → gate understanding MCQs for one concept, via the compiled
+    LangGraph (author → [drafts? critic : end] → gate). Returns the questions that pass the
+    semantic gate ([] on failure — the caller falls back to the deterministic recognition
+    question)."""
+    name = (concept.get("name") or "").strip()
+    signal = (concept.get("signal") or "").strip()
+    if not name or not signal:
+        return []
+    source = (concept.get("source") or "").strip()
+    passage = (passage or "").strip() or f"{signal}\n\n{source}"
+    sib = ", ".join(s for s in siblings[:12] if s and s != name) or "(none provided)"
+
+    state = _QUIZ_GRAPH.invoke(
+        {
+            "name": name,
+            "signal": signal,
+            "source": source,
+            "passage": passage,
+            "sib": sib,
+            "model": model,
+            "drafts": [],
+            "revised": [],
+            "accepted": [],
+        }
+    )
+    return state.get("accepted", [])
 
 
 def _concept_passage(db, concept: dict[str, Any]) -> str:

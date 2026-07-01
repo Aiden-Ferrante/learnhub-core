@@ -38,8 +38,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "txt2kg | Knowledge Graph Learning Studio",
-  description: "Turn documents into a knowledge graph you can study — read, quiz, and master.",
+  title: "Learn Hub | Study from your textbooks",
+  description: "Turn a PDF into concepts you can study — read, quiz, and master.",
 }
 
 export default function RootLayout({
@@ -59,7 +59,7 @@ export default function RootLayout({
                 <div className="flex items-center gap-3">
                   <BrandMark className="h-8 w-8 text-nvidia-green" />
                   <div>
-                    <span className="text-xl font-bold gradient-text">txt2kg</span>
+                    <span className="text-xl font-bold gradient-text">Learn Hub</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

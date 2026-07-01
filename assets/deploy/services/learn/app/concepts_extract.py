@@ -32,6 +32,7 @@ from app.extract import (
     upsert_structural_edges,
 )
 from app.llm import ollama_structured_completion
+from app.llm_schemas import ConceptResult
 
 CONCEPTS = "concepts"
 CONCEPT_PREREQ = "concept_prereq"
@@ -66,26 +67,6 @@ CONCEPT_SYSTEM_PROMPT = (
     "- Do not invent anything not stated. Canonicalize names (collapse variants to one).\n"
     "- Return ONLY data conforming to the schema."
 )
-
-CONCEPT_JSON_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "concepts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "kind": {"type": "string", "enum": list(_KINDS)},
-                    "signal": {"type": "string"},
-                    "source_sentence": {"type": "string"},
-                },
-                "required": ["name", "kind", "signal", "source_sentence"],
-            },
-        }
-    },
-    "required": ["concepts"],
-}
 
 
 # --------------------------------------------------------------------------- #
@@ -397,7 +378,7 @@ def _extract_one_section_concepts(inp, model: str | None = None) -> tuple[Sectio
     last_err: str | None = None
     for _ in range(3):
         obj, err = ollama_structured_completion(
-            messages, CONCEPT_JSON_SCHEMA, temperature=0.2, model=use_model
+            messages, ConceptResult, temperature=0.2, model=use_model
         )
         if obj is not None:
             concepts = parse_concepts_response(obj)

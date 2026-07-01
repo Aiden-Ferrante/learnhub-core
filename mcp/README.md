@@ -1,6 +1,6 @@
 # learn-hub MCP server
 
-Lets an MCP client (Claude Code / Claude Desktop) drive the txt2kg **Learn Hub** — inspect
+Lets an MCP client (Claude Code / Claude Desktop) drive the **Learn Hub** — inspect
 courses & study state, run processing, study interactively, and curate content.
 
 **Design:** the server talks **only** to the Learn service's REST API (`:8010`). It holds **no

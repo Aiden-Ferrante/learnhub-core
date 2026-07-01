@@ -16,6 +16,7 @@ from app.arango_content import fetch_latest_document
 from app.arango_tree import connect_arango
 from app.extract import _load_section_blocks
 from app.llm import ollama_structured_completion
+from app.llm_schemas import Orient, Skeleton
 
 SKELETONS = "chapter_skeletons"
 ORIENT = "chapter_orient"
@@ -102,21 +103,6 @@ SKELETON_SYSTEM = (
     "drop, merge, or reorder. No markdown, no section numbers."
 )
 
-SKELETON_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "sections": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"heading": {"type": "string"}, "essence": {"type": "string"}},
-                "required": ["heading", "essence"],
-            },
-        }
-    },
-    "required": ["sections"],
-}
-
 
 def _clean(s: object) -> str:
     return re.sub(r"[*_`#]", "", str(s or "")).strip()
@@ -153,7 +139,7 @@ def generate_skeleton(db, doc_id: str, scope: str | None, model: str | None = No
     essences: dict[str, str] = {}
     obj, _err = ollama_structured_completion(
         [{"role": "system", "content": SKELETON_SYSTEM}, {"role": "user", "content": user}],
-        SKELETON_SCHEMA, temperature=0.3, model=model,
+        Skeleton, temperature=0.3, model=model,
     )
     if obj and isinstance(obj.get("sections"), list):
         for it in obj["sections"]:
@@ -214,15 +200,6 @@ ORIENT_SYSTEM = (
     "Spoken, concise, one sentence each. No markdown. Ground everything in the given concepts."
 )
 
-ORIENT_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "objectives": {"type": "array", "items": {"type": "string"}},
-        "watchFor": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["objectives", "watchFor"],
-}
-
 
 def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None) -> dict | None:
     sections = _load_section_blocks(db, doc_id, scope=scope)
@@ -242,7 +219,7 @@ def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None
     user = f"Chapter key concepts:\n{concept_lines}"
     obj, _err = ollama_structured_completion(
         [{"role": "system", "content": ORIENT_SYSTEM}, {"role": "user", "content": user}],
-        ORIENT_SCHEMA, temperature=0.4, model=model,
+        Orient, temperature=0.4, model=model,
     )
     if not obj:
         return {"objectives": [], "watchFor": []}

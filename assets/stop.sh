@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-# Stop script for txt2kg project
+# Stop script for Learn Hub project
 
 # Check which Docker Compose version is available
 DOCKER_COMPOSE_CMD=""
@@ -79,7 +79,7 @@ if [ "$USE_VECTOR_SEARCH" = true ]; then
   PROFILES="--profile vector-search"
 fi
 
-echo "Stopping txt2kg services (leaving the shared Ollama running)..."
+echo "Stopping Learn Hub services (leaving the shared Ollama running)..."
 cd "$SCRIPT_DIR"
 # Stop every service EXCEPT ollama. Ollama is a shared LLM other apps depend on
 # and is managed independently (Mission Control's `ollama` service), so tearing
@@ -94,6 +94,6 @@ else
 fi
 
 echo ""
-echo "All txt2kg services stopped; Ollama left running for other apps."
+echo "All Learn Hub services stopped; Ollama left running for other apps."
 echo "To start again, run: ./start.sh"
 echo "To stop Ollama too: docker compose -f $COMPOSE_FILE stop ollama"

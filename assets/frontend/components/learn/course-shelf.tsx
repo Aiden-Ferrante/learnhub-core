@@ -333,7 +333,7 @@ export function CourseShelf({
           </div>
           <h3 className="text-xl font-semibold">Start your first course</h3>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Drop in a PDF and txt2kg turns it into a knowledge graph you can study —
+            Drop in a PDF and Learn Hub turns it into concepts you can study —
             read it, get quizzed, and track what you&rsquo;ve mastered.
           </p>
           <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">

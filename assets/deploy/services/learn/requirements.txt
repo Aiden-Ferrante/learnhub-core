@@ -12,3 +12,9 @@ docling>=2.7,<3
 # to 24kHz audio (torch comes in via docling). soundfile writes WAV before ffmpeg→MP3.
 snac>=1.2.0
 soundfile>=0.12
+# LLM orchestration. langchain-ollama talks to the LOCAL Ollama daemon (native
+# /api endpoint, not the /v1 shim) — fully keyless. langgraph drives the
+# author→critic→gate concept-quiz pipeline. pydantic v2 already present via docling/fastapi.
+langchain-core>=0.3,<0.4
+langchain-ollama>=0.2,<0.3
+langgraph>=0.2,<0.3

@@ -1,12 +1,26 @@
-"""Ollama chat completions: free-text (Socratic) + JSON-schema-constrained (extraction)."""
+"""Ollama chat completions, on LangChain (``langchain-ollama``).
+
+Free-text (Socratic) + JSON-schema/Pydantic-constrained (extraction) generation, all
+keyless and fully local. ``ChatOllama`` talks to Ollama's **native** ``/api`` endpoint
+(NOT the OpenAI-compat ``/v1`` shim), so the base URL is taken from
+``_ollama_native_base()`` — ``OLLAMA_BASE_URL`` keeps its historical ``/v1`` suffix for
+the rest of the stack, and we strip it here.
+
+The two public helpers (``ollama_chat_completion`` / ``ollama_structured_completion``)
+keep their original ``(result, error)`` tuple contract so every call site is unchanged;
+LangChain lives entirely behind this boundary. Per-request model selection (the UI model
+picker) is preserved by building a fresh ``ChatOllama`` per call via ``get_chat_model`` —
+the model is never bound once at construction.
+"""
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
-import httpx
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
+from pydantic import BaseModel
 
 DEFAULT_TIMEOUT = 120.0
 
@@ -16,7 +30,11 @@ def _ollama_base() -> str:
 
 
 def _ollama_native_base() -> str:
-    """Base URL for Ollama's native API (strip the OpenAI-compat ``/v1`` suffix)."""
+    """Base URL for Ollama's native API (strip the OpenAI-compat ``/v1`` suffix).
+
+    ``langchain-ollama`` speaks the native protocol, so ``ChatOllama(base_url=...)`` must
+    receive the root (``http://host:11434``), never the ``/v1`` shim.
+    """
     base = _ollama_base()
     return base[:-3].rstrip("/") if base.endswith("/v1") else base
 
@@ -25,118 +43,88 @@ def _ollama_model() -> str:
     return os.environ.get("OLLAMA_MODEL") or "llama3.1:8b"
 
 
+def get_chat_model(
+    model: str | None = None,
+    temperature: float = 0.6,
+    timeout: float = DEFAULT_TIMEOUT,
+    num_predict: int | None = None,
+) -> ChatOllama:
+    """Build a ``ChatOllama`` bound to the native Ollama endpoint.
+
+    ``model`` is the UI-selected model (threaded from the request); when omitted it falls
+    back to the ``OLLAMA_MODEL`` env default. Construction is cheap (the weights live in the
+    Ollama daemon), so we make a fresh client per request to honour the model picker.
+    """
+    kwargs: dict[str, Any] = {
+        "model": model or _ollama_model(),
+        "base_url": _ollama_native_base(),
+        "temperature": temperature,
+        "client_kwargs": {"timeout": timeout},
+    }
+    if num_predict is not None:
+        kwargs["num_predict"] = num_predict
+    return ChatOllama(**kwargs)
+
+
+def _to_lc_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
+    """Convert the ``[{"role", "content"}]`` wire format into LangChain message objects."""
+    out: list[BaseMessage] = []
+    for m in messages:
+        role = (m.get("role") or "user").lower()
+        content = m.get("content") or ""
+        if role == "system":
+            out.append(SystemMessage(content=content))
+        elif role == "assistant":
+            out.append(AIMessage(content=content))
+        else:
+            out.append(HumanMessage(content=content))
+    return out
+
+
 def ollama_chat_completion(
     messages: list[dict[str, str]],
     temperature: float = 0.6,
     model: str | None = None,
 ) -> tuple[str | None, str | None]:
-    """
-    Returns (assistant_content, error_message).
+    """Free-text chat completion. Returns ``(assistant_content, error_message)``.
 
-    ``model`` is the UI-selected Ollama model (threaded from the request); when
-    omitted it falls back to the ``OLLAMA_MODEL`` env default.
+    ``model`` is the UI-selected Ollama model (threaded from the request); when omitted it
+    falls back to the ``OLLAMA_MODEL`` env default.
     """
-    url = f"{_ollama_base()}/chat/completions"
-    payload: dict[str, Any] = {
-        "model": model or _ollama_model(),
-        "messages": messages,
-        "temperature": temperature,
-    }
     try:
-        with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
-            r = client.post(url, json=payload)
-            r.raise_for_status()
-            data = r.json()
-        choices = data.get("choices") or []
-        if not choices:
-            return None, "Empty choices from Ollama"
-        msg = (choices[0].get("message") or {}).get("content")
-        if not msg or not isinstance(msg, str):
+        llm = get_chat_model(model=model, temperature=temperature)
+        resp = llm.invoke(_to_lc_messages(messages))
+        content = resp.content if isinstance(resp.content, str) else str(resp.content)
+        if not content or not content.strip():
             return None, "No assistant content in response"
-        return msg.strip(), None
-    except httpx.HTTPStatusError as e:
-        return None, f"Ollama HTTP {e.response.status_code}: {e.response.text[:500]}"
-    except httpx.RequestError as e:
-        return None, f"Ollama request failed: {e}"
-    except Exception as e:
+        return content.strip(), None
+    except Exception as e:  # noqa: BLE001 — preserve the (None, error) contract for callers
         return None, str(e)
 
 
 def ollama_structured_completion(
     messages: list[dict[str, str]],
-    json_schema: dict[str, Any],
+    json_schema: dict[str, Any] | type[BaseModel],
     temperature: float = 0.2,
     model: str | None = None,
     timeout: float = 300.0,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Chat completion constrained to a JSON schema. Returns ``(parsed_obj, error)``.
+    """Chat completion constrained to a schema. Returns ``(parsed_obj, error)``.
 
-    Tries the OpenAI-compatible ``/v1`` shim with ``response_format: json_schema`` first
-    (no compose changes), and falls back to Ollama's native ``/api/chat`` with ``format``
-    if the shim rejects it (older Ollama). Either way the model is forced to emit JSON
-    matching ``json_schema``, so parsing is a plain ``json.loads`` — no regex salvage.
+    ``json_schema`` may be either a raw JSON-schema ``dict`` (the historical form) or a
+    Pydantic ``BaseModel`` subclass. Either way the model is forced to emit matching JSON via
+    Ollama's native ``format`` (``method="json_schema"``), so parsing is handled by LangChain
+    and the result is normalised to a plain ``dict`` for callers (Pydantic results are
+    ``model_dump(by_alias=True)``-ed so downstream key names are unchanged).
     """
-    mdl = model or _ollama_model()
-    url = f"{_ollama_base()}/chat/completions"
-    payload: dict[str, Any] = {
-        "model": mdl,
-        "messages": messages,
-        "temperature": temperature,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": "extraction", "strict": True, "schema": json_schema},
-        },
-    }
     try:
-        with httpx.Client(timeout=timeout) as client:
-            r = client.post(url, json=payload)
-            if r.status_code == 400:  # shim lacks response_format → native fallback
-                return _ollama_native_structured(messages, json_schema, temperature, mdl, timeout)
-            r.raise_for_status()
-            data = r.json()
-        content = ((data.get("choices") or [{}])[0].get("message") or {}).get("content")
-        if not content or not isinstance(content, str):
-            return None, "No assistant content in structured response"
-        try:
-            return json.loads(content), None
-        except Exception as e:
-            return None, f"JSON parse failed: {e}: {content[:300]}"
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 400:
-            return _ollama_native_structured(messages, json_schema, temperature, mdl, timeout)
-        return None, f"Ollama HTTP {e.response.status_code}: {e.response.text[:500]}"
-    except httpx.RequestError as e:
-        return None, f"Ollama request failed: {e}"
-    except Exception as e:
+        llm = get_chat_model(model=model, temperature=temperature, timeout=timeout)
+        structured = llm.with_structured_output(json_schema, method="json_schema")
+        result = structured.invoke(_to_lc_messages(messages))
+        if result is None:
+            return None, "No structured content in response"
+        if isinstance(result, BaseModel):
+            return result.model_dump(by_alias=True), None
+        return dict(result), None
+    except Exception as e:  # noqa: BLE001 — preserve the (None, error) contract for callers
         return None, str(e)
-
-
-def _ollama_native_structured(
-    messages: list[dict[str, str]],
-    json_schema: dict[str, Any],
-    temperature: float,
-    model: str,
-    timeout: float,
-) -> tuple[dict[str, Any] | None, str | None]:
-    url = f"{_ollama_native_base()}/api/chat"
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "format": json_schema,
-        "stream": False,
-        "options": {"temperature": temperature},
-    }
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            r = client.post(url, json=payload)
-            r.raise_for_status()
-            data = r.json()
-        content = (data.get("message") or {}).get("content")
-        if not content or not isinstance(content, str):
-            return None, "No content from native Ollama"
-        try:
-            return json.loads(content), None
-        except Exception as e:
-            return None, f"native JSON parse failed: {e}: {content[:300]}"
-    except Exception as e:
-        return None, f"native Ollama failed: {e}"

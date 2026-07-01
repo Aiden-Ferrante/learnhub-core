@@ -26,6 +26,7 @@ from app.arango_content import _clean_heading_markup, fetch_latest_document, is_
 from app.arango_learn import triple_id
 from app.arango_tree import connect_arango, get_toc_tree
 from app.llm import ollama_structured_completion
+from app.llm_schemas import ExtractionResult
 
 ENTITIES = "entities"
 RELATIONSHIPS = "relationships"
@@ -68,37 +69,6 @@ EXTRACTION_SYSTEM_PROMPT = (
     "otherwise prefer the concept they denote.\n"
     "- Return ONLY data conforming to the schema. No commentary."
 )
-
-EXTRACTION_JSON_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "propositions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "proposition_text": {"type": "string"},
-                    "source_sentence": {"type": "string"},
-                    "triples": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "subject": {"type": "string"},
-                                "predicate": {"type": "string"},
-                                "object": {"type": "string"},
-                            },
-                            "required": ["subject", "predicate", "object"],
-                        },
-                    },
-                },
-                "required": ["proposition_text", "source_sentence", "triples"],
-            },
-        }
-    },
-    "required": ["propositions"],
-}
-
 
 # --------------------------------------------------------------------------- #
 # Dataclasses
@@ -602,7 +572,7 @@ def _extract_one_section(inp: SectionExtractInput, retries: int = 2) -> tuple[Se
     last_err: str | None = None
     for _ in range(retries + 1):
         obj, err = ollama_structured_completion(
-            messages, EXTRACTION_JSON_SCHEMA, temperature=0.2, model=_extract_model()
+            messages, ExtractionResult, temperature=0.2, model=_extract_model()
         )
         if obj is not None:
             return assemble_section_extraction(inp, parse_extraction_response(obj)), None

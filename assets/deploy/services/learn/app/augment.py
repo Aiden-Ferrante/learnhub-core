@@ -12,17 +12,9 @@ from typing import Any
 from app.arango_tree import connect_arango
 from app.concepts_extract import fetch_section_concepts
 from app.llm import _ollama_model, ollama_structured_completion
+from app.llm_schemas import Augment
 
 AUGMENT = "section_augment"
-
-AUGMENT_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "objectives": {"type": "array", "items": {"type": "string"}},
-        "recap": {"type": "string"},
-    },
-    "required": ["objectives", "recap"],
-}
 
 _KIND_VERB = {
     "definition": "Define",
@@ -88,7 +80,7 @@ def section_augment(
     user = f"Concepts taught in this section:\n{listing}\n\nReturn objectives + recap."
     obj, err = ollama_structured_completion(
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        AUGMENT_SCHEMA,
+        Augment,
         model=model or _augment_model(),
         timeout=180.0,
     )

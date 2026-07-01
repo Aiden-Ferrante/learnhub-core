@@ -1,9 +1,9 @@
 # Concept Layer — implementation spec
 
 Status: draft for review · Date: 2026-06-14
-Owner: (you) · Scope: txt2kg Learn service + frontend
+Owner: (you) · Scope: Learn Hub service + frontend
 
-A two-axis knowledge model for the txt2kg learning hub. Adds a canonical **Concept**
+A two-axis knowledge model for the Learn Hub. Adds a canonical **Concept**
 layer (the "raw meat" of a learnable thing, tracked across all sources/domains) on
 top of the existing provenance + triple store, and re-points mastery and study at it.
 

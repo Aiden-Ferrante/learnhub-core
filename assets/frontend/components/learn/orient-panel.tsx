@@ -1,19 +1,27 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, Compass, Loader2, Target } from "lucide-react"
+import { AlertTriangle, Compass, ListTree, Loader2, Sparkles, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { fetchOrient, updateChapterStage, type OrientResponse } from "@/lib/learn-service"
+import {
+  countSections,
+  fetchOrient,
+  updateChapterStage,
+  type LearnTreeNode,
+  type OrientResponse,
+} from "@/lib/learn-service"
 
 type OrientPanelProps = {
   scope: string | null
   docId?: string
+  /** The chapter node — used for the "what's ahead" size hint. */
+  node?: LearnTreeNode | null
   /** Marks the orient stage acknowledged (the path's soft gate). */
   onAcknowledge?: () => void
 }
 
 /** Advance organizer shown before reading: objectives + things to watch for. */
-export function OrientPanel({ scope, docId, onAcknowledge }: OrientPanelProps) {
+export function OrientPanel({ scope, docId, node, onAcknowledge }: OrientPanelProps) {
   const [data, setData] = useState<OrientResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +63,8 @@ export function OrientPanel({ scope, docId, onAcknowledge }: OrientPanelProps) {
 
   const objectives = data?.objectives ?? []
   const watchFor = data?.watchFor ?? []
+  const sectionCount = node ? countSections(node.children) : 0
+  const conceptCount = node?.conceptCount ?? 0
 
   return (
     <div className="space-y-5 p-6">
@@ -62,6 +72,24 @@ export function OrientPanel({ scope, docId, onAcknowledge }: OrientPanelProps) {
         <Compass className="h-4 w-4 text-nvidia-green" />
         <span className="text-sm font-medium">Before you start</span>
       </div>
+
+      {(sectionCount > 0 || conceptCount > 0) && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span>What&rsquo;s ahead:</span>
+          {sectionCount > 0 && (
+            <span className="flex items-center gap-1.5">
+              <ListTree className="h-3.5 w-3.5" />
+              {sectionCount} section{sectionCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {conceptCount > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              {conceptCount} concept{conceptCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">

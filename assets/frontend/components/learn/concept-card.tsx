@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronDown, ChevronRight, ArrowUpRight } from "lucide-react"
 import { ConceptMarkdown } from "@/components/learn/concept-markdown"
 import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
+import { cn } from "@/lib/utils"
 import type { ConceptLesson } from "@/lib/learn-service"
 
 export const KIND_STYLES: Record<string, string> = {
@@ -12,6 +13,15 @@ export const KIND_STYLES: Record<string, string> = {
   principle: "bg-amber-500/15 text-amber-400",
   result: "bg-emerald-500/15 text-emerald-400",
   method: "bg-rose-500/15 text-rose-400",
+}
+
+/** Left-edge accent per kind — lets you tell concept types apart while scanning a list. */
+const KIND_BORDER: Record<string, string> = {
+  definition: "border-l-blue-500/60",
+  theorem: "border-l-purple-500/60",
+  principle: "border-l-amber-500/60",
+  result: "border-l-emerald-500/60",
+  method: "border-l-rose-500/60",
 }
 
 export function prettyScope(key?: string): string {
@@ -36,9 +46,14 @@ export function ConceptCard({
   const [open, setOpen] = useState(false)
   const kindClass = KIND_STYLES[c.kind] || "bg-muted text-muted-foreground"
   const elsewhere = (c.appearsIn || []).filter((p) => p.sectionKey !== c.sectionKey)
+  const pageLabel = c.pageStart
+    ? c.pageEnd && c.pageEnd !== c.pageStart
+      ? `pp. ${c.pageStart}–${c.pageEnd}`
+      : `p. ${c.pageStart}`
+    : null
 
   return (
-    <li className="rounded-lg border bg-card p-3">
+    <li className={cn("rounded-lg border border-l-2 bg-card p-3", KIND_BORDER[c.kind] || "border-l-border")}>
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -60,6 +75,11 @@ export function ConceptCard({
             {elsewhere.length > 0 && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 also in {elsewhere.map((p) => "§" + prettyScope(p.sectionKey)).join(", ")}
+              </span>
+            )}
+            {pageLabel && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {pageLabel}
               </span>
             )}
           </span>

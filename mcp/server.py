@@ -1,5 +1,5 @@
-"""learn-hub MCP server — lets an MCP client (Claude Code / Claude Desktop) drive the txt2kg
-Learn Hub: inspect courses & study state, run processing, study interactively, and curate content.
+"""learn-hub MCP server — lets an MCP client (Claude Code / Claude Desktop) drive the Learn
+Hub: inspect courses & study state, run processing, study interactively, and curate content.
 
 Design: this server talks ONLY to the Learn service's REST API (default http://localhost:8010).
 It holds NO database credentials — every gap (listing courses, editing concepts) is a REST
@@ -31,7 +31,7 @@ _HEADERS = {"X-User-Db": USER_DB}
 mcp = FastMCP(
     "learn-hub",
     instructions=(
-        "Drive the txt2kg Learn Hub — courses built from textbook PDFs into concept-based study "
+        "Drive the Learn Hub — courses built from textbook PDFs into concept-based study "
         "decks with spaced repetition. Typical flow: list_courses() to get a `doc` id, then "
         "get_outline / list_concepts / concept_mastery / due_reviews to inspect. Run processing "
         "with extract() and prepare_quizzes(). Study interactively with quiz_next() → quiz_answer(), "

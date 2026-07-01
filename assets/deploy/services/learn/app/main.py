@@ -31,7 +31,7 @@ from app.study_routes import router as study_router
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-app = FastAPI(title="txt2kg Learning", version="0.2.0")
+app = FastAPI(title="Learn Hub", version="0.2.0")
 app.include_router(study_router)
 app.include_router(ingest_router)
 app.include_router(extract_router)
@@ -209,7 +209,7 @@ def landing() -> str:
 </head>
 <body>
   <h1>Learning environment</h1>
-  <p>Graph-grounded study using the same ArangoDB as txt2kg. Optional query <code>?scope=toc:1.1.1</code> on study pages.</p>
+  <p>Concept-grounded study in Learn Hub. Optional query <code>?scope=toc:1.1.1</code> on study pages.</p>
   <ul class="links">
     <li><a href="/tree">TOC hierarchy + entities</a></li>
     <li><a href="/flashcards">Flashcards</a> (triples)</li>

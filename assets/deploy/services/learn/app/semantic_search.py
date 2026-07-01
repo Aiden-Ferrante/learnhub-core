@@ -12,9 +12,13 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 
 from app.concept_resolve import embed_texts
-from app.llm import ollama_chat_completion
+from app.lc_embeddings import SentenceTransformerEmbeddings
+from app.lc_vectorstore import ArangoContentVectorStore
+from app.llm import get_chat_model
 
 VECTORS = "content_vectors"
 SECTION_CONTENT = "section_content"
@@ -140,28 +144,56 @@ def semantic_search(db, query: str, doc: str | None = None, k: int = 8) -> dict[
     return {"query": query, "matches": matches, "indexed": len(rows)}
 
 
+_ASK_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", ANSWER_SYSTEM),
+        ("human", "Question: {query}\n\nSources:\n{context}\n\nAnswer using only the sources above, citing [n]."),
+    ]
+)
+
+
+def _format_context(docs) -> str:
+    """Numbered source block the answer cites against — `[n] (p.X, heading)` then the passage."""
+    return "\n\n".join(
+        f"[{d.metadata['n']}] (p.{d.metadata.get('pageStart')}, "
+        f"{d.metadata.get('heading') or d.metadata.get('sectionKey')})\n"
+        f"{(d.page_content or '')[:1200]}"
+        for d in docs
+    )
+
+
 def ask(db, query: str, doc: str | None = None, k: int = 6, model: str | None = None) -> dict[str, Any]:
-    """Retrieve the top passages and have Ollama answer the question grounded in them, with
-    inline [n] citations. Returns {answer, citations, matches}."""
-    res = semantic_search(db, query, doc, k)
-    matches = res.get("matches") or []
-    if not matches:
-        return {"answer": None, "citations": [], "error": res.get("error") or res.get("hint") or "no matches"}
-    context = "\n\n".join(
-        f"[{i + 1}] (p.{m.get('pageStart')}, {m.get('heading') or m.get('sectionKey')})\n"
-        f"{(m.get('text') or '')[:1200]}"
-        for i, m in enumerate(matches)
-    )
-    user = f"Question: {query}\n\nSources:\n{context}\n\nAnswer using only the sources above, citing [n]."
-    answer, err = ollama_chat_completion(
-        [{"role": "system", "content": ANSWER_SYSTEM}, {"role": "user", "content": user}],
-        temperature=0.3,
-        model=model,
-    )
-    if err:
-        return {"answer": None, "citations": [], "error": err}
+    """Retrieve the top passages and have Ollama answer grounded in them, with inline [n]
+    citations. Built as an LCEL chain (prompt | ChatOllama | StrOutputParser) over the
+    LangChain retriever; citations are assembled from retrieved-doc metadata outside the LLM
+    step so the [1][2] numbering matches the sources. Returns {query, answer, citations}."""
+    if not (query or "").strip():
+        return {"answer": None, "citations": [], "error": "empty query"}
+    try:
+        retriever = ArangoContentVectorStore(db, SentenceTransformerEmbeddings(), doc)
+        docs = retriever.similarity_search(query, k=k)
+    except Exception as e:  # noqa: BLE001 — embedder/db down → graceful error
+        return {"answer": None, "citations": [], "error": str(e)}
+    if not docs:
+        return {
+            "answer": None,
+            "citations": [],
+            "error": "no embeddings yet — call ensure_index for this doc",
+        }
+
+    chain = _ASK_PROMPT | get_chat_model(model=model, temperature=0.3) | StrOutputParser()
+    try:
+        answer = chain.invoke({"query": query, "context": _format_context(docs)})
+    except Exception as e:  # noqa: BLE001
+        return {"answer": None, "citations": [], "error": str(e)}
+
     citations = [
-        {"n": i + 1, "sectionKey": m.get("sectionKey"), "heading": m.get("heading"), "page": m.get("pageStart")}
-        for i, m in enumerate(matches)
+        {
+            "n": d.metadata["n"],
+            "sectionKey": d.metadata.get("sectionKey"),
+            "heading": d.metadata.get("heading"),
+            "page": d.metadata.get("pageStart"),
+        }
+        for d in docs
     ]
     return {"query": query, "answer": answer, "citations": citations}

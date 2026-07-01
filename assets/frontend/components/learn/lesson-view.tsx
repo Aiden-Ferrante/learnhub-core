@@ -399,7 +399,7 @@ export function LessonView({
             {/* Keyed so each stage (and read↔listen) cross-fades in instead of popping. */}
             <div key={`${studyMode}:${listening}`} className="animate-in fade-in-0 duration-200">
             {studyMode === "orient" && (
-              <OrientPanel scope={scope} docId={course.learnDocId} onAcknowledge={handleAnswered} />
+              <OrientPanel scope={scope} docId={course.learnDocId} node={node} onAcknowledge={handleAnswered} />
             )}
             {studyMode === "learn" && (
               <ChapterWalk
@@ -438,6 +438,7 @@ export function LessonView({
               <GuidedReader
                 scope={scope}
                 docId={course.learnDocId}
+                tree={tree}
                 theme={readingTheme}
                 proseSize={readingPrefs.size}
                 measure={readingPrefs.measure}

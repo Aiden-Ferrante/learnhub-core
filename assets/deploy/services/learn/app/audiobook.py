@@ -25,6 +25,7 @@ from app.arango_content import fetch_latest_document
 from app.arango_tree import connect_arango
 from app.extract import _load_section_blocks
 from app.llm import ollama_structured_completion
+from app.llm_schemas import GuidedScript
 from app.tts_orpheus import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
 
 AUDIO_DIR = os.environ.get("AUDIOBOOK_DIR", "/shared/audiobooks")
@@ -185,23 +186,6 @@ GUIDED_SYSTEM = (
     "Ground everything in the given passages and concepts; invent nothing."
 )
 
-GUIDED_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "intro": {"type": "string"},
-        "comments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"after": {"type": "integer"}, "note": {"type": "string"}},
-                "required": ["after", "note"],
-            },
-        },
-        "takeaways": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["intro", "takeaways"],
-}
-
 
 def _spoken(s: object) -> str:
     return re.sub(r"[*_`#]", "", str(s or "")).strip()
@@ -230,7 +214,7 @@ def _guided_script_for_section(heading: str, passages: list[str], concepts: list
         {"role": "system", "content": GUIDED_SYSTEM},
         {"role": "user", "content": user},
     ]
-    obj, _err = ollama_structured_completion(messages, GUIDED_SCHEMA, temperature=0.4, model=model)
+    obj, _err = ollama_structured_completion(messages, GuidedScript, temperature=0.4, model=model)
     return obj if isinstance(obj, dict) else None
 
 

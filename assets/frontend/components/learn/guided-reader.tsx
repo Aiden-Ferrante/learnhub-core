@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowUp, ChevronDown, ChevronUp, Loader2, Search, Sparkles, Target, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -11,8 +11,12 @@ import {
   displaySectionTitle,
   fetchReadingGuide,
   fetchReadingPrepareStatus,
+  findNodeBySectionKey,
+  numberSections,
+  numberedSectionTitle,
   prepareReadingGuide,
   recordEngagement,
+  type LearnTreeNode,
   type ReadingCheck,
   type ReadingGuideSection,
   type ReadingPrepareStatus,
@@ -23,6 +27,8 @@ import type { Measure, ProseSize } from "@/hooks/use-reading-prefs"
 type GuidedReaderProps = {
   scope: string | null
   docId?: string
+  /** Full syllabus tree — used to label rail sections with the canonical TOC numbers/titles. */
+  tree?: LearnTreeNode[]
   theme?: ReadingTheme
   proseSize?: ProseSize
   measure?: Measure
@@ -56,6 +62,7 @@ function CheckItem({ check }: { check: ReadingCheck }) {
 export function GuidedReader({
   scope,
   docId,
+  tree,
   theme = "dark",
   proseSize = "base",
   measure = "normal",
@@ -65,6 +72,52 @@ export function GuidedReader({
   const [error, setError] = useState<string | null>(null)
   const [prep, setPrep] = useState<ReadingPrepareStatus | null>(null)
   const [activeKey, setActiveKey] = useState<string | null>(null)
+
+  // Canonical TOC title + tree-relative depth for each of the chapter's sections, so the rail
+  // matches the syllabus tree / walk exactly (same numbers, titles, and nesting).
+  const railInfo = useMemo(() => {
+    const m = new Map<string, { title: string; depth: number }>()
+    if (!tree) return m
+    const nums = numberSections(tree)
+    const chapter = scope ? findNodeBySectionKey(tree, scope) : null
+    const roots = chapter ? chapter.children : tree
+    const walk = (nodes: LearnTreeNode[], depth: number) => {
+      for (const n of nodes) {
+        if (n.isSection && n.sectionKey) {
+          m.set(n.sectionKey, { title: numberedSectionTitle(nums.get(n.id), n.label, n.title), depth })
+        }
+        walk(n.children, depth + 1)
+      }
+    }
+    walk(roots, 0)
+    return m
+  }, [tree, scope])
+
+  // The reader returns one block per heading, and several fine sub-headings can fold onto one
+  // canonical section. Collapse the rail to the first block of each canonical section so it shows
+  // the same outline as the tree — the full text below still renders every block.
+  const railSections = useMemo(() => {
+    const seen = new Set<string>()
+    const out: ReadingGuideSection[] = []
+    for (const s of sections) {
+      if (s.sectionKey && !seen.has(s.sectionKey)) {
+        seen.add(s.sectionKey)
+        out.push(s)
+      }
+    }
+    return out
+  }, [sections])
+  // Which content blocks start a new canonical section (only these anchor the rail + scroll-spy).
+  const isFirstBlock = useMemo(() => {
+    const seen = new Set<string>()
+    return sections.map((s) => {
+      if (!s.sectionKey || seen.has(s.sectionKey)) return false
+      seen.add(s.sectionKey)
+      return true
+    })
+  }, [sections])
+  const railLabel = (s: ReadingGuideSection) =>
+    railInfo.get(s.sectionKey)?.title ?? displaySectionTitle(s.heading)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const headingRefs = useRef<Map<string, HTMLElement>>(new Map())
@@ -211,9 +264,11 @@ export function GuidedReader({
           In this chapter
         </p>
         <ul className="space-y-0.5">
-          {sections.map((s) => {
-            const d = Math.min(s.depth ?? 0, 4)
+          {railSections.map((s) => {
+            const info = railInfo.get(s.sectionKey)
+            const d = Math.min(info?.depth ?? s.depth ?? 0, 4)
             const isActive = s.sectionKey === activeKey
+            const label = info?.title ?? displaySectionTitle(s.heading)
             return (
               <li key={s.sectionKey}>
                 <button
@@ -226,9 +281,9 @@ export function GuidedReader({
                       ? "bg-brand/15 font-medium text-brand"
                       : "text-muted-foreground hover:text-foreground",
                   )}
-                  title={displaySectionTitle(s.heading)}
+                  title={label}
                 >
-                  {displaySectionTitle(s.heading)}
+                  {label}
                 </button>
               </li>
             )
@@ -309,15 +364,17 @@ export function GuidedReader({
         )}
 
         <div className="flex flex-col gap-8">
-          {sections.map((s) => (
-            <section key={s.sectionKey} className="scroll-mt-4">
-              <span
-                ref={(el) => {
-                  if (el) headingRefs.current.set(s.sectionKey, el)
-                  else headingRefs.current.delete(s.sectionKey)
-                }}
-                aria-hidden
-              />
+          {sections.map((s, i) => (
+            <section key={`${s.sectionKey}-${i}`} className="scroll-mt-4">
+              {isFirstBlock[i] && (
+                <span
+                  ref={(el) => {
+                    if (el) headingRefs.current.set(s.sectionKey, el)
+                    else headingRefs.current.delete(s.sectionKey)
+                  }}
+                  aria-hidden
+                />
+              )}
 
               {/* Focus moment — what to watch for here. */}
               {s.focus && (

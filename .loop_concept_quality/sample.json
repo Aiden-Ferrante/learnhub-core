@@ -1,0 +1,137 @@
+[
+  {
+    "conceptKey": "f31f3ae9e4144f2b",
+    "name": "Model as a service",
+    "kind": "definition",
+    "signal": "Model as a service refers to the practice where large models developed by a few organizations are made available for others to use. This allows anyone to build AI applications without needing to invest upfront in building a model.",
+    "source": "This has led to the emergence of model as a service : models developed by these few organizations are made available for others to use as a service.",
+    "sectionKey": "toc:1",
+    "pageStart": 25
+  },
+  {
+    "conceptKey": "8d6ff9a5f43e1944",
+    "name": "Prompt engineering",
+    "kind": "method",
+    "signal": "Prompt engineering is a technique where detailed instructions, often with examples of desirable outputs, are crafted to guide a model's generation. This approach helps adapt a model to specific needs.",
+    "source": "For example, you can craft detailed instructions with examples of the desirable product descriptions. This approach is prompt engineering .",
+    "sectionKey": "toc:from-large-language-models-to-foundation-models",
+    "pageStart": 32
+  },
+  {
+    "conceptKey": "107498984db3118b",
+    "name": "AI coding tools popularity",
+    "kind": "result",
+    "signal": "Coding is the most popular use case for generative AI tools. This popularity is driven by both AI's proficiency in coding and the fact that early AI engineers are often coders themselves.",
+    "source": "In multiple generative AI surveys, coding is hands down the most popular use case.",
+    "sectionKey": "toc:coding",
+    "pageStart": 44
+  },
+  {
+    "conceptKey": "726ffa2b29943969",
+    "name": "AI writing for enterprises",
+    "kind": "method",
+    "signal": "For businesses, AI writing is commonly used in sales, marketing, and general team communication to craft content like cold outreach emails, ad copywriting, and product descriptions.",
+    "source": "AI can help craft effective cold outreach emails, ad copywriting, and product descriptions.",
+    "sectionKey": "toc:writing",
+    "pageStart": 46
+  },
+  {
+    "conceptKey": "21adb9c6f8c4e167",
+    "name": "Information aggregation",
+    "kind": "principle",
+    "signal": "Information aggregation is a process that helps organize and consolidate various sources of information, which is essential for efficient enterprise operations.",
+    "source": "Information aggregation and distillation are essential for enterprise operations.",
+    "sectionKey": "toc:information-aggregation",
+    "pageStart": 50
+  },
+  {
+    "conceptKey": "e596a1c27fec0f41",
+    "name": "Latency metrics",
+    "kind": "definition",
+    "signal": "Latency metrics include Time to First Token (TTFT), Time Per Output Token (TPOT), and total latency. Acceptable latency depends heavily on the specific use case.",
+    "source": "Latency metrics including TTFT (time to first token), TPOT (time per output token), and total latency.",
+    "sectionKey": "toc:setting-expectations",
+    "pageStart": 56
+  },
+  {
+    "conceptKey": "d5796c16921a0a1f",
+    "name": "Model adaptation techniques",
+    "kind": "definition",
+    "signal": "Model adaptation techniques can be divided into two categories, depending on whether they require updating model weights.",
+    "source": "In general, model adaptation techniques can be divided into two categories, depending on whether they require updating model weights.",
+    "sectionKey": "toc:ai-engineering-versus-ml-engineering",
+    "pageStart": 63
+  },
+  {
+    "conceptKey": "843e83c47db11334",
+    "name": "Traditional ML process separation",
+    "kind": "principle",
+    "signal": "In traditional ML engineering, model development and product development are often separate processes, limiting ML engineers' involvement in product decisions.",
+    "source": "In traditional ML engineering, model development and product development are often disjointed processes, with ML engineers rarely involved in product decisions at many organizations.",
+    "sectionKey": "toc:ai-engineering-versus-full-stack-engineering",
+    "pageStart": 70
+  },
+  {
+    "conceptKey": "548c659a5b04753d",
+    "name": "Fine-tuning models",
+    "kind": "method",
+    "signal": "Fine-tuning is the process of adapting a general-purpose model by training it further on a smaller, specialized dataset, rather than training it entirely from scratch.",
+    "source": "While language- and domain-specific foundation models can be trained from scratch, it's also common to finetune them on top of general-purpose models.",
+    "sectionKey": "toc:training-data",
+    "pageStart": 74
+  },
+  {
+    "conceptKey": "5eeccf57f7b45a17",
+    "name": "Query vector (Q)",
+    "kind": "definition",
+    "signal": "The query vector represents the current state of the decoder at each decoding step, acting as the information seeker.",
+    "source": "The query vector (Q) represents the current state of the decoder at each decoding step.",
+    "sectionKey": "toc:model-architecture",
+    "pageStart": 82
+  },
+  {
+    "conceptKey": "bc9b943b1ca33cd4",
+    "name": "Output layer (Unembedding layer)",
+    "kind": "definition",
+    "signal": "The output layer maps the model's output vectors into token probabilities, typically using a single matrix called the unembedding layer.",
+    "source": "This module typically consists of one matrix, which is also called the unembedding layer .",
+    "sectionKey": "toc:model-architecture",
+    "pageStart": 82
+  },
+  {
+    "conceptKey": "d9e558f290aae0bc",
+    "name": "Reinforcement learning from human feedback (RLHF)",
+    "kind": "method",
+    "signal": "RLHF is a technique used for preference finetuning. It involves optimizing a model's output against human preference signals, as demonstrated by models like GPT-3.5 and Llama 2.",
+    "source": "Techniques for preference finetuning include reinforcement learning from human feedback (RLHF) (used by GPT-3.5 and Llama 2), DPO (Direct Preference Optimization) (used by Llama 3), and reinforcement learning from AI feedback (RLAIF) (potentially used by Claude).",
+    "sectionKey": "toc:post-training",
+    "pageStart": 102
+  },
+  {
+    "conceptKey": "fcf800fc920bd53d",
+    "name": "Greedy sampling",
+    "kind": "method",
+    "signal": "Greedy sampling is the strategy of always selecting the outcome that has the highest computed probability. This method is often effective for simple classification tasks.",
+    "source": "Always picking the most likely outcome = is called greedy sampling .",
+    "sectionKey": "toc:sampling-fundamentals",
+    "pageStart": 112
+  },
+  {
+    "conceptKey": "9e00f17de8ffec23",
+    "name": "Log probability of a sequence",
+    "kind": "result",
+    "signal": "The log probability of a sequence of tokens is the sum of the log probabilities of all tokens in the sequence, which simplifies calculation since the logarithm of a product is the sum of logarithms.",
+    "source": "The logarithm of a product is equal to a sum of logarithms, so the logprob of a sequence of tokens is the sum of the logprob of all tokens in the sequence: logprob( I love food ) = logprob( I ) + logprob( I | love ) + logprob( food | I, love )",
+    "sectionKey": "toc:test-time-compute",
+    "pageStart": 120
+  },
+  {
+    "conceptKey": "8309e81e37ff3b2c",
+    "name": "Deterministic outcome",
+    "kind": "definition",
+    "signal": "A deterministic outcome is one that can be determined without any random variation. Unlike probabilistic models, the result will be the same every time the input is given.",
+    "source": "The opposite of probabilistic is deterministic , when the outcome can be determined without any random variation.",
+    "sectionKey": "toc:the-probabilistic-nature-of-ai",
+    "pageStart": 129
+  }
+]

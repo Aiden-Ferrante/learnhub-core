@@ -19,6 +19,7 @@ from app.arango_content import fetch_latest_document
 from app.arango_tree import connect_arango
 from app.extract import _load_section_blocks
 from app.llm import ollama_structured_completion
+from app.llm_schemas import ReadingGuide
 
 GUIDE_COL = "reading_guides"
 # Reuse the quiz authoring model override unless a reading-specific one is set.
@@ -38,22 +39,6 @@ AUTHOR_SYSTEM = (
     "section, each with a concise model answer (1-2 sentences). Test understanding, not trivia.\n"
     "No markdown, no preamble."
 )
-
-AUTHOR_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "focus": {"type": "string"},
-        "checks": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"q": {"type": "string"}, "a": {"type": "string"}},
-                "required": ["q", "a"],
-            },
-        },
-    },
-    "required": ["focus", "checks"],
-}
 
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
@@ -96,7 +81,7 @@ def author_reading_guide(section: dict[str, Any], model: str | None = None) -> d
     user = f"Section: {heading}\n\nText:\n{text[:_MAX_PASSAGE]}"
     obj, err = ollama_structured_completion(
         [{"role": "system", "content": AUTHOR_SYSTEM}, {"role": "user", "content": user}],
-        AUTHOR_SCHEMA,
+        ReadingGuide,
         temperature=0.3,
         model=model,
     )
