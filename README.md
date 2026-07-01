@@ -1,4 +1,4 @@
-# Text to Knowledge Graph on DGX Spark
+# Learn Hub on DGX Spark
 
 > Transform unstructured text into interactive knowledge graphs with LLM inference and graph visualization
 
@@ -18,7 +18,7 @@
 This playbook demonstrates how to build and deploy a comprehensive knowledge graph generation and visualization solution that serves as a reference for knowledge graph extraction.
 The unified memory architecture enables running larger, more accurate models that produce higher-quality knowledge graphs and deliver superior downstream GraphRAG performance.
 
-This txt2kg playbook transforms unstructured text documents into structured knowledge graphs using:
+This Learn Hub playbook transforms unstructured text documents into structured knowledge graphs using:
 - **Knowledge Triple Extraction**: Using Ollama with GPU acceleration for local LLM inference to extract subject-predicate-object relationships
 - **Graph Database Storage**: ArangoDB for storing and querying knowledge triples with relationship traversal
 - **GPU-Accelerated Visualization**: Three.js WebGPU rendering for interactive 2D/3D graph exploration
@@ -73,7 +73,7 @@ git clone https://github.com/NVIDIA/dgx-spark-playbooks
 cd dgx-spark-playbooks/nvidia/txt2kg/assets
 ```
 
-## Step 2. Start the txt2kg services
+## Step 2. Start the Learn Hub services
 
 Use the provided start script to launch all required services. This will set up Ollama, ArangoDB, and the Next.js frontend:
 

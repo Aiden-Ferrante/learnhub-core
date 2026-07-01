@@ -1,8 +1,8 @@
-# NVIDIA txt2kg
+# Learn Hub
 
 ## Overview
 
-This playbook serves as a reference solution for knowledge graph extraction and querying with Retrieval Augmented Generation (RAG). This txt2kg playbook extracts knowledge triples from text and constructs a knowledge graph for visualization and querying, creating a more structured form of information retrieval compared to traditional RAG approaches. By leveraging graph databases and entity relationships, this playbook delivers more contextually rich answers that better represent complex relationships in your data.
+This playbook serves as a reference solution for knowledge graph extraction and querying with Retrieval Augmented Generation (RAG). This Learn Hub playbook extracts knowledge triples from text and constructs a knowledge graph for visualization and querying, creating a more structured form of information retrieval compared to traditional RAG approaches. By leveraging graph databases and entity relationships, this playbook delivers more contextually rich answers that better represent complex relationships in your data.
 
 <details>
 <summary>📋 Table of Contents</summary>
@@ -70,7 +70,7 @@ By default, this playbook leverages **Ollama** for local LLM inference, providin
 ### Default Architecture (Minimal Setup)
 
 The core workflow for knowledge graph building and visualization:
-1. User uploads documents through the txt2kg web UI
+1. User uploads documents through the Learn Hub web UI
 2. Documents are processed and chunked for analysis
 3. **Ollama** extracts knowledge triples (subject-predicate-object) from the text using local LLM inference
 4. Triples are stored in **ArangoDB** graph database

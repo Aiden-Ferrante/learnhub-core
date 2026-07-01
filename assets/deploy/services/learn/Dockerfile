@@ -23,7 +23,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# --timeout/--retries: the heavy wheels (torch via docling) are large; tolerate a slow/flaky
+# network so a single dropped download doesn't fail the whole build.
+RUN pip install --no-cache-dir --timeout=1000 --retries=10 -r requirements.txt
 
 COPY app ./app
 COPY templates ./templates
