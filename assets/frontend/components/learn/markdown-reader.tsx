@@ -1,7 +1,7 @@
 "use client"
 
 import "katex/dist/katex.min.css"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
@@ -18,6 +18,8 @@ type MarkdownReaderProps = {
   /** Text size (Tailwind prose scale) and line width — driven by the reading controls. */
   proseSize?: ProseSize
   measure?: Measure
+  /** Extra react-markdown component overrides (e.g. inline concept annotation). */
+  components?: Components
 }
 
 const SIZE_CLASS: Record<ProseSize, string> = {
@@ -47,6 +49,7 @@ export function MarkdownReader({
   theme = "dark",
   proseSize = "sm",
   measure = "normal",
+  components,
 }: MarkdownReaderProps) {
   const paper = theme === "paper"
   return (
@@ -89,6 +92,7 @@ export function MarkdownReader({
               <table {...props} />
             </div>
           ),
+          ...components,
         }}
       >
         {content}

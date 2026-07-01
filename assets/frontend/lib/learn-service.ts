@@ -236,6 +236,8 @@ export type ConceptLesson = {
   pageEnd?: number | null
   appearsIn?: ConceptProvenance[]
   aliasCount?: number
+  /** 1-2 paragraph expansion of `signal`, pre-generated for the Deep Chapter surface. */
+  deepExplanation?: string | null
 }
 
 export type DocumentConceptsResponse = {
@@ -1052,4 +1054,57 @@ export async function buildSearchIndex(doc: string): Promise<SearchIndexStatus> 
     body: '{}',
   })
   return parseJsonResponse<SearchIndexStatus>(res)
+}
+
+// ---------------------------------------------------------------------------
+// Deep Chapter — the one-call reading-first chapter surface
+// ---------------------------------------------------------------------------
+
+export type DeepChapterBriefing = {
+  objectives: string[]
+  watchFor: string[]
+  sections: { sectionKey: string; heading: string; essence?: string; depth?: number }[]
+  keyConcepts: { name: string; kind: string; signal: string }[]
+  conceptCount?: number
+}
+
+export type DeepChapterStatus = {
+  totalConcepts: number
+  explained: number
+  running: boolean
+  briefing: boolean
+}
+
+export type DeepChapterResponse = {
+  docId?: string
+  scope: string
+  briefing: DeepChapterBriefing | null
+  markdown: string
+  blocks: SectionContentBlock[]
+  concepts: ConceptLesson[]
+  sections: { sectionKey: string; title: string; essence?: string; depth?: number }[]
+  augments: Record<string, { objectives: string[]; recap: string }>
+  pageStart?: number | null
+  pageEnd?: number | null
+  status: DeepChapterStatus
+  error?: string
+}
+
+export async function fetchDeepChapter(doc: string, scope: string): Promise<DeepChapterResponse> {
+  const params = new URLSearchParams({ doc, scope })
+  const res = await fetch(`/api/learn/deep-chapter?${params}`, { cache: 'no-store' })
+  return parseJsonResponse<DeepChapterResponse>(res)
+}
+
+export async function prepareDeepChapter(
+  doc: string,
+  scope: string,
+): Promise<DeepChapterStatus & { started?: boolean; error?: string }> {
+  const params = new URLSearchParams({ doc, scope })
+  const res = await fetch(`/api/learn/deep-chapter/prepare?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  return parseJsonResponse<DeepChapterStatus & { started?: boolean }>(res)
 }

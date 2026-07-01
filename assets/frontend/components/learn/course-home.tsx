@@ -45,6 +45,7 @@ type CourseHomeProps = {
   onOpenSection: (scope: string | null, node: LearnTreeNode | null) => void
   onReview: (section: WeakestSection) => void
   onReadBook: () => void
+  onDeepRead?: () => void
   onViewConcepts: () => void
   onAsk?: () => void
   onBackToShelf: () => void
@@ -138,6 +139,7 @@ export function CourseHome({
   onOpenSection,
   onReview,
   onReadBook,
+  onDeepRead,
   onViewConcepts,
   onAsk,
   onBackToShelf,
@@ -516,6 +518,18 @@ export function CourseHome({
                 <BookOpen className="h-3.5 w-3.5" />
                 Read the book
               </Button>
+              {onDeepRead && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={onDeepRead}
+                >
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  Deep read
+                </Button>
+              )}
               {onAsk && (
                 <Button
                   type="button"
