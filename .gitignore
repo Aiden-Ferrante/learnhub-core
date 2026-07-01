@@ -39,3 +39,6 @@ dist/
 build/
 coverage/
 *.log
+
+# Scratch harness for the concept-extraction quality /loop (critic + A/B extractor)
+.loop_concept_quality/
