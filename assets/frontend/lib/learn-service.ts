@@ -17,41 +17,12 @@ export type TocTreeResponse = {
   error?: string
 }
 
-export type Flashcard = {
-  id: string
-  front: string
-  back: string
-  triple: { subject: string; predicate: string; object: string }
-}
-
-export type DeckResponse = {
-  cards: Flashcard[]
-  tripleCount: number
-  scope: string | null
-  error?: string
-}
-
 export type SectionStatsResponse = {
   scope: string
   tripleCount: number
   entityCount: number
   mentionCount?: number
   error?: string
-}
-
-export type QuizSessionResponse = {
-  sessionId: string
-  question: string
-  choices: string[]
-  subject: string
-  predicate: string
-}
-
-export type QuizAnswerResponse = {
-  correct: boolean
-  expected: string
-  triple: { subject: string; predicate: string; object: string }
-  explanation: string
 }
 
 export type SectionMastery = {
@@ -141,14 +112,6 @@ export type SectionContentResponse = {
   blocks: SectionContentBlock[]
   markdown: string
   error?: string
-}
-
-export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string }
-
-export type ChatResponse = {
-  reply: string
-  contextTripleCount: number
-  scope: string | null
 }
 
 export function getLearnServiceBaseUrl(): string {
@@ -309,25 +272,6 @@ export async function fetchSectionConcepts(
   const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
   const res = await fetch(`/api/learn/section/concepts/${segs}${qs}`, { cache: 'no-store' })
   return parseJsonResponse<SectionConceptsResponse>(res)
-}
-
-export type SectionAugment = {
-  objectives: string[]
-  recap: string
-  cached?: boolean
-  error?: string
-}
-
-// LLM-generated learning objectives + recap for a section (the "augmented ebook" layer).
-// Cached server-side after first generation, so the first call can take a while.
-export async function fetchSectionAugment(
-  sectionKey: string,
-  docId?: string,
-): Promise<SectionAugment> {
-  const segs = sectionKey.split('/').map(encodeURIComponent).join('/')
-  const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
-  const res = await fetch(`/api/learn/section/augment/${segs}${qs}`, { cache: 'no-store' })
-  return parseJsonResponse<SectionAugment>(res)
 }
 
 // ----- Spaced-repetition concept review (keyless) -----
@@ -612,57 +556,6 @@ export async function getExtractionStatus(
   return parseJsonResponse<ExtractStatusResponse>(res)
 }
 
-export async function fetchDeck(
-  scope: string | null,
-  count = 20,
-  doc?: string,
-): Promise<DeckResponse> {
-  const params = new URLSearchParams({ count: String(count) })
-  if (scope) params.set('scope', scope)
-  if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/deck?${params}`, { cache: 'no-store' })
-  return parseJsonResponse<DeckResponse>(res)
-}
-
-export async function startQuizSession(
-  scope: string | null,
-  doc?: string,
-): Promise<QuizSessionResponse> {
-  const model = selectedOllamaModel()
-  const res = await fetch('/api/learn/quiz/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scope, doc: doc ?? null, ...(model ? { model } : {}) }),
-  })
-  return parseJsonResponse<QuizSessionResponse>(res)
-}
-
-export async function submitQuizAnswer(
-  sessionId: string,
-  choiceIndex: number,
-): Promise<QuizAnswerResponse> {
-  const res = await fetch('/api/learn/quiz/answer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId, choiceIndex }),
-  })
-  return parseJsonResponse<QuizAnswerResponse>(res)
-}
-
-export async function sendChatMessage(
-  messages: ChatMessage[],
-  scope: string | null,
-  doc?: string,
-): Promise<ChatResponse> {
-  const model = selectedOllamaModel()
-  const res = await fetch('/api/learn/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, scope, doc: doc ?? null, ...(model ? { model } : {}) }),
-  })
-  return parseJsonResponse<ChatResponse>(res)
-}
-
 /** Find a section node by its sectionKey anywhere in the forest. */
 export function findNodeBySectionKey(nodes: LearnTreeNode[], key: string): LearnTreeNode | null {
   for (const n of nodes) {
@@ -726,12 +619,6 @@ export function flattenSections(nodes: LearnTreeNode[]): LearnTreeNode[] {
   }
   nodes.forEach(visit)
   return out
-}
-
-/** Count entity leaf nodes under a tree node. */
-export function countEntityLeaves(node: LearnTreeNode): number {
-  if (!node.isSection && node.children.length === 0) return 1
-  return node.children.reduce((sum, c) => sum + countEntityLeaves(c), 0)
 }
 
 /** Count all section nodes in a tree/forest. */
