@@ -473,6 +473,25 @@ async def extract_concepts_document(
     # Keep the structural TOC tree (drives the syllabus view).
     upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
+    # Eagerly pre-generate the Deep Chapter overlay (assembled briefing + per-section
+    # recaps + per-concept deep explanations) so opening the chapter is instant.
+    # Idempotent and error-isolated: a failure here never fails the extraction.
+    if os.environ.get("LEARN_DEEP_PREGEN", "1") != "0":
+        try:
+            from app.deep_chapter import generate_deep_chapter_artifacts
+
+            if on_progress:
+                on_progress(total, total, "deep chapter overlay")
+            deep = await asyncio.to_thread(
+                generate_deep_chapter_artifacts,
+                db, doc_id, scope, [s.section_key for s in sections], model,
+            )
+            for k in ("briefingError", "explainError"):
+                if deep.get(k):
+                    errors.append(f"deep-chapter: {deep[k]}")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"deep-chapter: {exc}")
+
     # Basic mode: no embedding-based dedup (resolution) and no prerequisite graph. Each section
     # just contributes its key concepts (name + kind + grounded signal). The read path groups by
     # canonicalKey OR the concept's own key, so concepts still render without a resolve pass.
