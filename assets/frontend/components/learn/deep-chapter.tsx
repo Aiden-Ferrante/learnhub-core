@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,7 @@ import { useReadingTheme } from "@/hooks/use-reading-theme"
 import { useReadingPrefs, type Measure } from "@/hooks/use-reading-prefs"
 import {
   askTextbook,
+  audiobookFileUrl,
   cancelChapterBuild,
   enqueueChapterBuild,
   fetchChapterProgress,
@@ -57,6 +59,7 @@ import {
   fetchDeepChapter,
   fetchOutline,
   fetchReviewQueue,
+  getAudiobookStatus,
   recordEngagement,
   updateChapterStage,
   type AskResponse,
@@ -157,6 +160,16 @@ function masteryTint(m: ConceptMastery | undefined, threshold: number): string {
   if (m.mastery >= threshold) return "border-solid border-nvidia-green/60"
   if (m.due != null && m.due <= Date.now() / 1000) return "border-dotted border-amber-400/80"
   return "border-dotted border-nvidia-green/90"
+}
+
+/** Highlighter wash (toggleable in reading settings): brightest on unseen concepts,
+ *  amber when due, nearly invisible once mastered — the chapter fades as you learn it. */
+function masteryWash(m: ConceptMastery | undefined, threshold: number): string {
+  if (m && m.attempts) {
+    if (m.mastery >= threshold) return "rounded-[3px] bg-nvidia-green/[0.05]"
+    if (m.due != null && m.due <= Date.now() / 1000) return "rounded-[3px] bg-amber-400/10"
+  }
+  return "rounded-[3px] bg-nvidia-green/10"
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +329,33 @@ export function DeepChapter({
   // so it always matches what's on screen. Scroll-spy highlights where you are.
   const [outlineItems, setOutlineItems] = useState<{ text: string; level: number }[]>([])
   const [activeOutline, setActiveOutline] = useState(-1)
+  // Concept highlighter wash (default on; toggle lives in the Aa reading settings).
+  const [highlightConcepts, setHighlightConcepts] = useState(true)
+  // Narration: play the chapter's audiobook file when one has already been generated.
+  const [audioReady, setAudioReady] = useState(false)
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const [narrSpeed, setNarrSpeed] = useState(1)
+  const narrAudioRef = useRef<HTMLAudioElement>(null)
+  const narrSaveAt = useRef(0)
+
+  useEffect(() => {
+    try {
+      setHighlightConcepts(localStorage.getItem("txt2k:concept-highlight") !== "0")
+      const s = Number(localStorage.getItem("txt2k:audio-speed"))
+      if (s >= 0.5 && s <= 3) setNarrSpeed(s)
+    } catch {
+      // storage unavailable
+    }
+  }, [])
+
+  const toggleHighlight = (v: boolean) => {
+    setHighlightConcepts(v)
+    try {
+      localStorage.setItem("txt2k:concept-highlight", v ? "1" : "0")
+    } catch {
+      // storage unavailable
+    }
+  }
 
   // Inline concept popover (event-delegated so the reader never re-renders on open/close).
   const [active, setActive] = useState<{ idx: number; x: number; y: number } | null>(null)
@@ -592,6 +632,35 @@ export function DeepChapter({
     if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
   }, [data?.markdown, chapterKey, docId])
 
+  // Narration availability: show the play control only when this chapter's audiobook
+  // file already exists — generation stays an explicit act (the Listen drawer).
+  useEffect(() => {
+    setAudioReady(false)
+    setPlayerOpen(false)
+    if (!chapterKey) return
+    let alive = true
+    getAudiobookStatus(chapterKey, docId, "text")
+      .then((st) => {
+        if (alive && st.status === "done") setAudioReady(true)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [chapterKey, docId])
+
+  const cycleNarrSpeed = () => {
+    const steps = [1, 1.25, 1.5, 1.75, 2]
+    const next = steps[(steps.indexOf(narrSpeed) + 1) % steps.length] ?? 1
+    setNarrSpeed(next)
+    if (narrAudioRef.current) narrAudioRef.current.playbackRate = next
+    try {
+      localStorage.setItem("txt2k:audio-speed", String(next))
+    } catch {
+      // storage unavailable
+    }
+  }
+
   // Poll while a prepare/build pass runs so explanations stream in as they finish.
   useEffect(() => {
     if (!preparing && !building) return
@@ -672,7 +741,8 @@ export function DeepChapter({
     const regex = buildConceptRegex(concepts)
     const classFor = (idx: number) => {
       const c = concepts[idx]
-      return masteryTint(c?.conceptKey ? masteryByKey[c.conceptKey] : undefined, masteredThreshold)
+      const m = c?.conceptKey ? masteryByKey[c.conceptKey] : undefined
+      return cn(masteryTint(m, masteredThreshold), highlightConcepts && masteryWash(m, masteredThreshold))
     }
     const annotate = (children: React.ReactNode) =>
       regex ? annotateNode(children, regex, indexByName, new Set<string>(), classFor) : children
@@ -695,7 +765,7 @@ export function DeepChapter({
         }
       />
     )
-  }, [displayMarkdown, concepts, indexByName, theme, prefs.size, prefs.measure, masteryByKey, masteredThreshold])
+  }, [displayMarkdown, concepts, indexByName, theme, prefs.size, prefs.measure, masteryByKey, masteredThreshold, highlightConcepts])
 
   // Post-render pass over the committed DOM: (1) dedupe underlines to the FIRST mention of
   // each concept in the chapter (per-paragraph marking alone is too noisy — "response time"
@@ -971,7 +1041,29 @@ export function DeepChapter({
             </DropdownMenu>
           )
         )}
-        <ReadingControls prefs={prefs} onChange={setPrefs} />
+        {audioReady && (
+          <Button
+            type="button"
+            variant={playerOpen ? "default" : "ghost"}
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={() => setPlayerOpen((o) => !o)}
+            title="Narration — this chapter has generated audio"
+          >
+            <Headphones className="h-3.5 w-3.5" />
+            Narrate
+          </Button>
+        )}
+        <ReadingControls
+          prefs={prefs}
+          onChange={setPrefs}
+          extras={
+            <label className="flex cursor-pointer items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">Highlight concepts</span>
+              <Switch checked={highlightConcepts} onCheckedChange={toggleHighlight} />
+            </label>
+          }
+        />
         <ReadingThemeToggle />
         <div className="flex items-center gap-1">
           <Button
@@ -1021,6 +1113,53 @@ export function DeepChapter({
               </React.Fragment>
             )
           })}
+        </div>
+      )}
+
+      {/* Narration mini-player — read along; position/speed persist (shared with the Listen drawer). */}
+      {playerOpen && audioReady && chapterKey && (
+        <div className="flex items-center gap-2 border-b bg-card/70 px-4 py-1.5">
+          <audio
+            ref={narrAudioRef}
+            controls
+            preload="metadata"
+            src={audiobookFileUrl(chapterKey, docId, "text")}
+            className="h-8 min-w-0 flex-1 max-w-2xl"
+            onLoadedMetadata={() => {
+              const el = narrAudioRef.current
+              if (!el) return
+              el.playbackRate = narrSpeed
+              try {
+                const t = Number(localStorage.getItem(`txt2k:audio-pos:${chapterKey}:text`))
+                if (t > 0 && t < el.duration - 2) el.currentTime = t
+              } catch {
+                // storage unavailable
+              }
+            }}
+            onTimeUpdate={() => {
+              const el = narrAudioRef.current
+              if (!el) return
+              const now = Date.now()
+              if (now - narrSaveAt.current < 2000) return
+              narrSaveAt.current = now
+              try {
+                localStorage.setItem(`txt2k:audio-pos:${chapterKey}:text`, String(Math.floor(el.currentTime)))
+              } catch {
+                // storage unavailable
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={cycleNarrSpeed}
+            className="rounded border px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground hover:text-foreground"
+            title="Playback speed"
+          >
+            {narrSpeed}×
+          </button>
+          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setPlayerOpen(false)}>
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 

@@ -13,11 +13,14 @@ export function ReadingControls({
   onChange,
   focus,
   onToggleFocus,
+  extras,
 }: {
   prefs: ReadingPrefs
   onChange: (p: Partial<ReadingPrefs>) => void
   focus?: boolean
   onToggleFocus?: () => void
+  /** Surface-specific settings appended to the popover (e.g. concept highlighting). */
+  extras?: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const sizeIdx = PROSE_SIZES.indexOf(prefs.size)
@@ -97,6 +100,7 @@ export function ReadingControls({
                 {focus ? "Exit focus" : "Focus mode"}
               </Button>
             )}
+            {extras && <div className="mt-3 border-t pt-3">{extras}</div>}
           </div>
         </>
       )}
