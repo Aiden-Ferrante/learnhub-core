@@ -43,6 +43,17 @@ def _ollama_model() -> str:
     return os.environ.get("OLLAMA_MODEL") or "llama3.1:8b"
 
 
+def _num_ctx() -> int:
+    """Context window for EVERY Ollama call. Left unset, Ollama's server default (2-4K
+    tokens) silently TRUNCATES longer prompts — with a ~4K-char extraction system prompt
+    that meant long sections lost their tails and nobody saw an error. The GB10's unified
+    memory affords a generous window; override via ``OLLAMA_NUM_CTX``."""
+    try:
+        return int(os.environ.get("OLLAMA_NUM_CTX") or 32768)
+    except ValueError:
+        return 32768
+
+
 def get_chat_model(
     model: str | None = None,
     temperature: float = 0.6,
@@ -59,6 +70,7 @@ def get_chat_model(
         "model": model or _ollama_model(),
         "base_url": _ollama_native_base(),
         "temperature": temperature,
+        "num_ctx": _num_ctx(),
         "client_kwargs": {"timeout": timeout},
     }
     if num_predict is not None:

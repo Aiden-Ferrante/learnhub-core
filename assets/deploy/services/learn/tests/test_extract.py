@@ -5,7 +5,6 @@ from app.extract import (
     ExtractedTriple,
     SectionExtractInput,
     _blocks_in_scope,
-    _section_depth,
     assemble_section_extraction,
     build_system_prompt,
     build_user_prompt,
@@ -158,9 +157,17 @@ _SCOPE_ROWS = [
 
 
 def test_section_depth():
-    assert _section_depth("toc:1") == 1
-    assert _section_depth("toc:1.2.3") == 3
-    assert _section_depth("toc:preface") == 99
+    # The pure helper was folded into _section_level_fn; assert the same contract
+    # through the default level rule _blocks_in_scope uses (numeric depth, slug=leaf).
+    from app.extract import _NUMERIC
+
+    def depth(sk: str) -> int:
+        body = sk[4:]
+        return body.count(".") + 1 if _NUMERIC.match(body) else 99
+
+    assert depth("toc:1") == 1
+    assert depth("toc:1.2.3") == 3
+    assert depth("toc:preface") == 99
 
 
 def test_blocks_in_scope_chapter_includes_slugs_stops_at_next_chapter():

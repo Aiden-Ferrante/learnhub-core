@@ -256,6 +256,7 @@ def _run_build(db, job: dict[str, Any]) -> None:
             # Already extracted — go straight to the deep overlay (briefing + explanations).
             _update_job(db, key, {"phase": "deep", "done": 0, "total": 0})
             generate_deep_chapter_artifacts(db, doc_id, scope, list(section_keys))
+            _update_job(db, key, {"outcomes": None})
         else:
             # Extraction; its eager hook generates the deep overlay in the same pass.
             last_write = 0.0
@@ -275,6 +276,13 @@ def _run_build(db, job: dict[str, Any]) -> None:
                 _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
                                       "error": str(res["error"])})
                 return
+            # Persist the per-section extraction report on the job so the Process
+            # dashboard can show WHY sections produced 0 concepts (capped for sanity).
+            _update_job(db, key, {
+                "outcomes": (res.get("outcomes") or [])[:200],
+                "concepts": res.get("concepts"),
+                "prereqEdges": res.get("prereqEdges"),
+            })
 
         _update_job(db, key, {"status": "done", "finishedAt": int(time.time()), "phase": None})
     except Exception as exc:  # noqa: BLE001

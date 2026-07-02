@@ -1173,6 +1173,19 @@ export async function fetchTodayPlan(doc: string, hintScope?: string | null): Pr
 
 // --- Chapter build queue -----------------------------------------------------
 
+export type SectionOutcome = {
+  sectionKey: string
+  heading: string
+  status: 'ok' | 'empty' | 'error' | 'skipped'
+  reason?: string
+  concepts?: number
+  raw?: number
+  gated?: number
+  malformed?: number
+  chunks?: number
+  error?: string
+}
+
 export type ChapterBuildJob = {
   key?: string
   scope: string
@@ -1186,6 +1199,24 @@ export type ChapterBuildJob = {
   total?: number
   error?: string | null
   already?: boolean
+  /** Per-section extraction report (why sections produced 0 concepts, etc.). */
+  outcomes?: SectionOutcome[] | null
+  concepts?: number | null
+  prereqEdges?: number | null
+}
+
+export async function fetchChapterBuilds(
+  doc: string,
+): Promise<{ docId?: string; builds: ChapterBuildJob[]; error?: string }> {
+  const res = await fetch(`/api/learn/build?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; builds: ChapterBuildJob[] }>(res)
+}
+
+export type LearnDocumentInfo = { docId: string; title: string; sourceFilename?: string }
+
+export async function fetchLearnDocuments(): Promise<{ documents: LearnDocumentInfo[]; error?: string }> {
+  const res = await fetch('/api/learn/documents', { cache: 'no-store' })
+  return parseJsonResponse<{ documents: LearnDocumentInfo[] }>(res)
 }
 
 export type ChapterReadiness = {

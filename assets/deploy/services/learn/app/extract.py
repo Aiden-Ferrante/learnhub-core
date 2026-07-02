@@ -520,7 +520,11 @@ def _scope_keys_from_outline(db, doc_id: str, scope: str) -> set[str] | None:
 
 
 def _load_section_blocks(
-    db, doc_id: str, section_keys: list[str] | None = None, scope: str | None = None
+    db,
+    doc_id: str,
+    section_keys: list[str] | None = None,
+    scope: str | None = None,
+    skipped_out: list[dict] | None = None,
 ) -> list[SectionExtractInput]:
     rows = list(
         db.aql.execute(
@@ -542,8 +546,12 @@ def _load_section_blocks(
             continue
         md = r.get("markdown") or ""
         if section_body_len(md) < _MIN_SECTION_BODY_CHARS:
+            if skipped_out is not None:
+                skipped_out.append({"sectionKey": sk, "heading": r.get("heading") or sk, "reason": "too-short"})
             continue
         if _JUNK_HEADING.search(r.get("heading") or ""):
+            if skipped_out is not None:
+                skipped_out.append({"sectionKey": sk, "heading": r.get("heading") or sk, "reason": "junk-heading"})
             continue
         out.append(
             SectionExtractInput(

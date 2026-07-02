@@ -18,7 +18,7 @@ import asyncio
 import hashlib
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.arango_content import fetch_latest_document
 from app.arango_tree import connect_arango
@@ -135,23 +135,35 @@ def _name_norm(name: str) -> str:
     return normalize_concept_name(name).lower()
 
 
-def parse_concepts_response(obj: object) -> list[ExtractedConcept]:
-    """Validate the model's structured output into concepts (drop malformed)."""
+def parse_concepts_response(obj: object, stats: dict | None = None) -> list[ExtractedConcept]:
+    """Validate the model's structured output into concepts (drop malformed).
+
+    ``stats`` (optional dict) is updated with drop accounting — ``raw`` (items the model
+    returned), ``malformed`` and ``gated`` (dropped by the source-grounding gate) — so a
+    zero-concept section can say WHY it's empty instead of failing silently."""
     if not isinstance(obj, dict):
         return []
     items = obj.get("concepts")
     if not isinstance(items, list):
         return []
+    if stats is not None:
+        stats["raw"] = stats.get("raw", 0) + len(items)
     out: list[ExtractedConcept] = []
     for c in items:
         if not isinstance(c, dict):
+            if stats is not None:
+                stats["malformed"] = stats.get("malformed", 0) + 1
             continue
         name = normalize_concept_name(c.get("name"))
         signal = _norm_part(c.get("signal"))
         if not name or not signal:
+            if stats is not None:
+                stats["malformed"] = stats.get("malformed", 0) + 1
             continue
         source = _norm_part(c.get("source_sentence"))
         if _REQUIRE_SOURCE and not source:
+            if stats is not None:
+                stats["gated"] = stats.get("gated", 0) + 1
             continue  # ungrounded -> almost always prose/narrative noise (domain-specificity gate)
         kind = str(c.get("kind") or "").strip().lower()
         if kind not in _KINDS:
@@ -387,27 +399,81 @@ def rebuild_prereq_edges(db, doc_id: str, min_refd: int | None = None) -> int:
 # Orchestration
 # --------------------------------------------------------------------------- #
 
-def _extract_one_section_concepts(inp, model: str | None = None) -> tuple[SectionConcepts | None, str | None]:
+def _max_section_chars() -> int:
+    """Safety chunk threshold — sections longer than this are split on paragraph
+    boundaries and extracted per chunk (results merged). With OLLAMA_NUM_CTX at 32K
+    tokens this is rarely hit, but a monster section must not silently truncate."""
+    try:
+        return int(os.environ.get("LEARN_EXTRACT_MAX_CHARS") or 60_000)
+    except ValueError:
+        return 60_000
+
+
+def _split_markdown_chunks(md: str, limit: int) -> list[str]:
+    """Split on blank lines into chunks of at most ``limit`` chars (a single oversized
+    paragraph becomes its own chunk rather than being dropped)."""
+    chunks: list[str] = []
+    cur: list[str] = []
+    size = 0
+    for para in md.split("\n\n"):
+        plen = len(para) + 2
+        if cur and size + plen > limit:
+            chunks.append("\n\n".join(cur))
+            cur, size = [], 0
+        cur.append(para)
+        size += plen
+    if cur:
+        chunks.append("\n\n".join(cur))
+    return chunks
+
+
+def _extract_one_section_concepts(
+    inp, model: str | None = None
+) -> tuple[SectionConcepts | None, str | None, dict]:
+    """Extract one section's concepts. Returns ``(section_concepts, error, meta)`` where
+    ``meta`` carries drop accounting (raw/gated/malformed) and the chunk count."""
     from app.extract import build_user_prompt  # reuse the templated user message
 
-    messages = [
-        {"role": "system", "content": build_concept_system_prompt()},
-        {"role": "user", "content": build_user_prompt(inp)},
-    ]
     # Precedence: the request's model (UI picker) > LEARN_EXTRACT_MODEL > OLLAMA_MODEL.
     use_model = model or _extract_model()
+    meta: dict = {}
+    limit = _max_section_chars()
+    parts = _split_markdown_chunks(inp.markdown, limit) if len(inp.markdown) > limit else [inp.markdown]
+    if len(parts) > 1:
+        meta["chunks"] = len(parts)
+
+    merged: list[ExtractedConcept] = []
+    seen_names: set[str] = set()
     last_err: str | None = None
-    for _ in range(3):
-        obj, err = ollama_structured_completion(
-            messages, ConceptResult, temperature=0.2, model=use_model
-        )
-        if obj is not None:
-            concepts = parse_concepts_response(obj)
-            return assemble_section_concepts(
-                inp.doc_id, inp.section_key, inp.page_start, inp.page_end, concepts
-            ), None
-        last_err = err
-    return None, last_err
+    for part in parts:
+        piece = inp if len(parts) == 1 else replace(inp, markdown=part)
+        messages = [
+            {"role": "system", "content": build_concept_system_prompt()},
+            {"role": "user", "content": build_user_prompt(piece)},
+        ]
+        obj = None
+        for _ in range(3):
+            obj, err = ollama_structured_completion(
+                messages, ConceptResult, temperature=0.2, model=use_model
+            )
+            if obj is not None:
+                break
+            last_err = err
+        if obj is None:
+            if len(parts) == 1:
+                return None, last_err, meta
+            continue  # a failed chunk shouldn't sink the section's other chunks
+        for c in parse_concepts_response(obj, stats=meta):
+            if c.name.lower() in seen_names:
+                continue
+            seen_names.add(c.name.lower())
+            merged.append(c)
+
+    return (
+        assemble_section_concepts(inp.doc_id, inp.section_key, inp.page_start, inp.page_end, merged),
+        None,
+        meta,
+    )
 
 
 async def extract_concepts_document(
@@ -433,9 +499,17 @@ async def extract_concepts_document(
         return {"error": "no document found"}
 
     ensure_concept_collections(db)
-    sections = _load_section_blocks(db, doc_id, section_keys=section_keys, scope=scope)
+    skipped: list[dict] = []
+    sections = _load_section_blocks(db, doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
+    outcomes: list[dict] = [
+        {"sectionKey": s["sectionKey"], "heading": s["heading"], "status": "skipped", "reason": s["reason"]}
+        for s in skipped
+    ]
     if not sections:
-        return {"docId": doc_id, "scope": scope, "sections": 0, "concepts": 0, "errors": ["no sections with content"]}
+        return {
+            "docId": doc_id, "scope": scope, "sections": 0, "concepts": 0,
+            "outcomes": outcomes, "errors": ["no sections with content"],
+        }
 
     total = len(sections)
     done = 0
@@ -449,11 +523,16 @@ async def extract_concepts_document(
     async def run(inp) -> None:
         nonlocal done
         async with sem:
-            sc, err = await asyncio.to_thread(_extract_one_section_concepts, inp, model)
+            sc, err, meta = await asyncio.to_thread(_extract_one_section_concepts, inp, model)
+            outcome = {"sectionKey": inp.section_key, "heading": inp.heading, **meta}
             if err:
                 errors.append(f"{inp.section_key}: {err}")
+                outcome.update(status="error", error=str(err)[:300])
             elif sc is not None:
                 results.append(sc)
+                # A zero-concept section now says WHY: nothing returned vs everything gated.
+                outcome.update(status="ok" if sc.concepts else "empty", concepts=len(sc.concepts))
+            outcomes.append(outcome)
             # Safe under asyncio: the increment runs on the event loop, not in the thread.
             done += 1
             if on_progress:
@@ -469,6 +548,15 @@ async def extract_concepts_document(
         write_section_concepts(db, sc)
         total_concepts += len(sc.concepts)
         total_questions += sum(len(c.questions) for c in sc.concepts)
+
+    # Prerequisite graph: resolve the concepts' prereqNames into oriented, acyclic
+    # concept_prereq edges. (The rebuild existed but was never invoked — the mastery
+    # gate and prereq displays ran on names only.) Doc-wide and idempotent.
+    prereq_edges = 0
+    try:
+        prereq_edges = rebuild_prereq_edges(db, doc_id)
+    except Exception as exc:  # noqa: BLE001 — edges are supplementary, never fail the run
+        errors.append(f"prereq-edges: {exc}")
 
     # Keep the structural TOC tree (drives the syllabus view).
     upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
@@ -496,6 +584,9 @@ async def extract_concepts_document(
     # just contributes its key concepts (name + kind + grounded signal). The read path groups by
     # canonicalKey OR the concept's own key, so concepts still render without a resolve pass.
 
+    # Reading-order outcomes read better than completion-order.
+    outcomes.sort(key=lambda o: str(o.get("sectionKey") or ""))
+
     return {
         "docId": doc_id,
         "scope": scope,
@@ -505,7 +596,8 @@ async def extract_concepts_document(
         "questions": total_questions,
         "canonicalConcepts": total_concepts,
         "mergedConcepts": 0,
-        "prereqEdges": 0,
+        "prereqEdges": prereq_edges,
+        "outcomes": outcomes,
         "seconds": round(time.time() - t0, 1),
         "errors": errors,
     }

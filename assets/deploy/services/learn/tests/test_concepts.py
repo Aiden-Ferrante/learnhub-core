@@ -25,6 +25,9 @@ MODEL_OUT = {
             "name": "**Path**",
             "kind": "not-a-kind",  # clamped → result
             "signal": "A path is a sequence of consecutive edges in a graph.",
+            # The grounding gate (LEARN_REQUIRE_SOURCE, default on) drops sourceless
+            # concepts — this fixture must carry one to test the kind clamp.
+            "source_sentence": "A path is a sequence of consecutive edges in a graph.",
             "questions": [],
             "prerequisites": [],
         },
@@ -70,3 +73,20 @@ def test_resolve_prereq_pairs():
 
 def test_normalize_concept_name():
     assert normalize_concept_name("  **Bayes' rule**  ") == "Bayes' rule"
+
+
+def test_parse_concepts_stats_accounting():
+    stats: dict = {}
+    parse_concepts_response(MODEL_OUT, stats=stats)
+    assert stats["raw"] == 3
+    assert stats["malformed"] == 1
+    assert "gated" not in stats  # both kept concepts are grounded
+
+
+def test_split_markdown_chunks_lossless():
+    from app.concepts_extract import _split_markdown_chunks
+
+    md = "\n\n".join(f"para {i} " + "x" * 50 for i in range(10))
+    chunks = _split_markdown_chunks(md, 120)
+    assert len(chunks) > 1
+    assert "\n\n".join(chunks) == md  # nothing dropped, nothing reordered
