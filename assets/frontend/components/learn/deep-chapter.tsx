@@ -14,26 +14,59 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MarkdownReader } from "@/components/learn/markdown-reader"
 import {
+  chaptersFromOutline,
+  resolveChapterForScope,
+  topLevelChapters,
+  type Chapter,
+} from "@/components/learn/chapter-reader"
+import {
   askTextbook,
   fetchDeepChapter,
+  fetchOutline,
   prepareDeepChapter,
   recordEngagement,
   type AskResponse,
   type ConceptLesson,
   type DeepChapterResponse,
   type LearnTreeNode,
+  type OutlineEntry,
 } from "@/lib/learn-service"
 import type { Course } from "@/lib/courses"
 import { cn } from "@/lib/utils"
 
 type DeepChapterProps = {
   course: Course
+  /** Initial position — any section key (e.g. the reading position); resolved to its chapter. */
   scope: string | null
-  node: LearnTreeNode | null
-  /** Top-level chapters, for prev/next navigation without leaving the surface. */
-  chapters: LearnTreeNode[]
+  tree: LearnTreeNode[]
   onBack: () => void
-  onNavigate: (node: LearnTreeNode) => void
+  /** Reports the chapter the reader lands on, so the reading position persists. */
+  onScopeChange?: (sectionKey: string) => void
+}
+
+/** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
+ *  wherever they exist — outline depth 0 can be Parts/front-matter (e.g. DDIA), which carry
+ *  no section content of their own. Fall back to depth-0 outline entries, then the TOC tree. */
+function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): Chapter[] {
+  const numbered = (outline || []).filter((e) => /^toc:\d+$/.test(e.sectionKey || ""))
+  if (numbered.length) return numbered.map((e) => ({ key: e.sectionKey, title: e.title || e.sectionKey }))
+  const fromOutline = chaptersFromOutline(outline)
+  if (fromOutline.length) return fromOutline
+  return topLevelChapters(tree)
+}
+
+/** Resolve any incoming position to a key that is GUARANTEED to be one of `chapters` —
+ *  resolveChapterForScope's tree fallback can return a top-level Part node, which carries
+ *  no section content of its own and would render an empty surface. */
+function resolveDeepChapter(chapters: Chapter[], tree: LearnTreeNode[], scope: string | null): string | null {
+  if (chapters.length === 0) return null
+  if (!scope) return chapters[0].key
+  if (chapters.some((c) => c.key === scope)) return scope
+  const num = /^toc:(\d+)/.exec(scope) // e.g. reading position toc:1.2 → chapter toc:1
+  if (num && chapters.some((c) => c.key === `toc:${num[1]}`)) return `toc:${num[1]}`
+  const { chapterKey } = resolveChapterForScope(chapters, tree, scope)
+  if (chapterKey && chapters.some((c) => c.key === chapterKey)) return chapterKey
+  return chapters[0].key
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -83,7 +116,7 @@ function annotateNode(
             key={`${name}-${m.index}`}
             type="button"
             data-concept={idx}
-            className="dc-term cursor-pointer rounded-sm border-b border-dotted border-nvidia-green/60 bg-transparent p-0 font-inherit text-inherit hover:bg-nvidia-green/10"
+            className="dc-term cursor-pointer rounded-sm border-b border-dotted border-nvidia-green/60 bg-transparent p-0 text-inherit hover:bg-nvidia-green/10"
           >
             {m[1]}
           </button>,
@@ -130,8 +163,11 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
   )
 }
 
-export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate }: DeepChapterProps) {
+export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: DeepChapterProps) {
   const docId = course.learnDocId ?? course.id
+  const [outline, setOutline] = useState<OutlineEntry[]>([])
+  const [outlineReady, setOutlineReady] = useState(false)
+  const [chapterKey, setChapterKey] = useState<string | null>(null)
   const [data, setData] = useState<DeepChapterResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -145,12 +181,33 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Chapter list: numbered outline chapters where available (see deepChapters).
+  useEffect(() => {
+    let alive = true
+    fetchOutline(docId)
+      .then((o) => alive && setOutline(o.outline || []))
+      .catch(() => {})
+      .finally(() => alive && setOutlineReady(true))
+    return () => {
+      alive = false
+    }
+  }, [docId])
+
+  const chapters = useMemo(() => deepChapters(outline, tree), [outline, tree])
+
+  // Resolve the incoming position (any section key, or nothing) to its owning chapter.
+  useEffect(() => {
+    if (chapterKey || !outlineReady || chapters.length === 0) return
+    const resolved = resolveDeepChapter(chapters, tree, scope)
+    if (resolved) setChapterKey(resolved)
+  }, [chapterKey, outlineReady, chapters, tree, scope])
+
   const load = useCallback(async () => {
-    if (!scope) return
+    if (!chapterKey) return
     setLoading(true)
     setError(null)
     try {
-      const d = await fetchDeepChapter(docId, scope)
+      const d = await fetchDeepChapter(docId, chapterKey)
       setData(d)
       setPreparing(Boolean(d.status?.running))
     } catch (e) {
@@ -158,7 +215,7 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
     } finally {
       setLoading(false)
     }
-  }, [docId, scope])
+  }, [docId, chapterKey])
 
   useEffect(() => {
     setData(null)
@@ -170,16 +227,16 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
   }, [load])
 
   useEffect(() => {
-    if (data?.markdown && scope) recordEngagement("read", scope, docId)
-  }, [data?.markdown, scope, docId])
+    if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
+  }, [data?.markdown, chapterKey, docId])
 
   // Poll while a prepare pass runs so explanations stream in as they finish.
   useEffect(() => {
     if (!preparing) return
     const t = setInterval(async () => {
-      if (!scope) return
+      if (!chapterKey) return
       try {
-        const d = await fetchDeepChapter(docId, scope)
+        const d = await fetchDeepChapter(docId, chapterKey)
         setData(d)
         if (!d.status?.running) setPreparing(false)
       } catch {
@@ -187,16 +244,21 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
       }
     }, 6000)
     return () => clearInterval(t)
-  }, [preparing, docId, scope])
+  }, [preparing, docId, chapterKey])
 
   const handlePrepare = async () => {
-    if (!scope) return
+    if (!chapterKey) return
     setPreparing(true)
     try {
-      await prepareDeepChapter(docId, scope)
+      await prepareDeepChapter(docId, chapterKey)
     } catch {
       setPreparing(false)
     }
+  }
+
+  const goChapter = (key: string) => {
+    setChapterKey(key)
+    onScopeChange?.(key)
   }
 
   const concepts = useMemo(() => data?.concepts ?? [], [data])
@@ -274,8 +336,8 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
   }
 
   const chapterIdx = useMemo(
-    () => chapters.findIndex((c) => c.sectionKey === scope),
-    [chapters, scope],
+    () => chapters.findIndex((c) => c.key === chapterKey),
+    [chapters, chapterKey],
   )
   const prevChapter = chapterIdx > 0 ? chapters[chapterIdx - 1] : null
   const nextChapter = chapterIdx >= 0 && chapterIdx < chapters.length - 1 ? chapters[chapterIdx + 1] : null
@@ -286,7 +348,8 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
     status && (!status.briefing || (status.totalConcepts > 0 && status.explained < status.totalConcepts)),
   )
   const activeConcept = active ? concepts[active.idx] : null
-  const title = node?.title || node?.label || data?.blocks?.[0]?.heading || "Chapter"
+  const title =
+    chapters[chapterIdx]?.title || data?.blocks?.[0]?.heading || "Chapter"
 
   return (
     <div className="flex h-full flex-col">
@@ -317,13 +380,13 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
         <div className="flex items-center gap-1">
           <Button
             type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"
-            disabled={!prevChapter} onClick={() => prevChapter && onNavigate(prevChapter)}
+            disabled={!prevChapter} onClick={() => prevChapter && goChapter(prevChapter.key)}
           >
             <ChevronLeft className="h-3.5 w-3.5" /> Prev
           </Button>
           <Button
             type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"
-            disabled={!nextChapter} onClick={() => nextChapter && onNavigate(nextChapter)}
+            disabled={!nextChapter} onClick={() => nextChapter && goChapter(nextChapter.key)}
           >
             Next <ChevronRight className="h-3.5 w-3.5" />
           </Button>
@@ -399,8 +462,8 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
                     The road through
                   </div>
                   <div className="space-y-1">
-                    {briefing.sections.map((s) => (
-                      <div key={s.sectionKey} className="text-sm" style={{ paddingLeft: `${(s.depth ?? 0) * 12}px` }}>
+                    {briefing.sections.map((s, i) => (
+                      <div key={`${s.sectionKey}-${i}`} className="text-sm" style={{ paddingLeft: `${(s.depth ?? 0) * 12}px` }}>
                         <span className="text-foreground/90">{s.heading}</span>
                         {s.essence && <span className="text-muted-foreground"> — {s.essence}</span>}
                       </div>
@@ -410,11 +473,11 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
               )}
               {briefing.keyConcepts.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
-                  {briefing.keyConcepts.map((c) => {
+                  {briefing.keyConcepts.map((c, i) => {
                     const idx = indexByName.get(c.name.trim().toLowerCase())
                     return (
                       <button
-                        key={c.name}
+                        key={`${c.name}-${i}`}
                         type="button"
                         data-concept={idx}
                         className={cn(
@@ -434,6 +497,12 @@ export function DeepChapter({ course, scope, node, chapters, onBack, onNavigate 
 
           {/* The reader spine. */}
           {reader}
+          {!loading && !error && data && !data.markdown && (
+            <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+              This scope has no readable content of its own
+              {nextChapter ? " — try the next chapter." : "."}
+            </div>
+          )}
         </div>
       </div>
 

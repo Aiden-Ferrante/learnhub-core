@@ -244,20 +244,12 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     ? findNodeBySectionKey(tree, continueSectionKey)
     : null
 
-  // Deep Read: the one-surface reading-first chapter view. Opens at the chapter
-  // containing the reading position (or the first chapter).
+  // Deep Read: the one-surface reading-first chapter view. Hands the reading
+  // position (or nothing) to DeepChapter, which resolves it to a real chapter.
   const openDeepRead = () => {
-    const chapters = tree.filter((n) => n.isSection && n.sectionKey)
-    if (chapters.length === 0) return
-    let target = chapters[0]
-    if (continueSectionKey) {
-      const idx = chapters.findIndex((c) => findNodeBySectionKey([c], continueSectionKey))
-      if (idx >= 0) target = chapters[idx]
-    }
-    setSelectedScope(target.sectionKey)
-    setSelectedNode(target)
+    setSelectedScope(continueSectionKey ?? null)
+    setSelectedNode(continueNode ?? null)
     setView("deep")
-    if (target.sectionKey) persistReadingPosition(target.sectionKey)
   }
 
   const handleContinueReading = () => {
@@ -299,18 +291,15 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
   }
 
   if (view === "deep" && selectedCourse) {
-    const chapters = tree.filter((n) => n.isSection && n.sectionKey)
     return (
       <DeepChapter
         course={selectedCourse}
         scope={selectedScope}
-        node={selectedNode}
-        chapters={chapters}
+        tree={isLive ? tree : []}
         onBack={backToCourseHome}
-        onNavigate={(node) => {
-          setSelectedScope(node.sectionKey)
-          setSelectedNode(node)
-          if (node.sectionKey) persistReadingPosition(node.sectionKey)
+        onScopeChange={(sectionKey) => {
+          setSelectedScope(sectionKey)
+          persistReadingPosition(sectionKey)
         }}
       />
     )
