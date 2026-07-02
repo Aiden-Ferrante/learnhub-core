@@ -3,30 +3,51 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   BookOpen,
+  Brain,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
   Loader2,
+  RotateCcw,
   Sparkles,
   Wand2,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { MarkdownReader } from "@/components/learn/markdown-reader"
+import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
+import { ReadingControls } from "@/components/learn/reading-controls"
+import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
+import { ConceptQuizPanel } from "@/components/learn/concept-quiz-panel"
+import { ReviewPanel } from "@/components/learn/review-panel"
+import { ExamPanel } from "@/components/learn/exam-panel"
 import {
   chaptersFromOutline,
   resolveChapterForScope,
   topLevelChapters,
   type Chapter,
 } from "@/components/learn/chapter-reader"
+import { useReadingTheme } from "@/hooks/use-reading-theme"
+import { useReadingPrefs, type Measure } from "@/hooks/use-reading-prefs"
 import {
   askTextbook,
+  fetchConceptMastery,
   fetchDeepChapter,
   fetchOutline,
+  fetchReviewQueue,
   prepareDeepChapter,
   recordEngagement,
   type AskResponse,
   type ConceptLesson,
+  type ConceptMastery,
   type DeepChapterResponse,
   type LearnTreeNode,
   type OutlineEntry,
@@ -42,6 +63,14 @@ type DeepChapterProps = {
   onBack: () => void
   /** Reports the chapter the reader lands on, so the reading position persists. */
   onScopeChange?: (sectionKey: string) => void
+}
+
+const KIND_COLOR: Record<string, string> = {
+  definition: "text-sky-400 border-sky-400/30 bg-sky-400/10",
+  theorem: "text-purple-400 border-purple-400/30 bg-purple-400/10",
+  principle: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+  result: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
+  method: "text-rose-400 border-rose-400/30 bg-rose-400/10",
 }
 
 /** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
@@ -69,18 +98,52 @@ function resolveDeepChapter(chapters: Chapter[], tree: LearnTreeNode[], scope: s
   return chapters[0].key
 }
 
-const KIND_COLOR: Record<string, string> = {
-  definition: "text-sky-400 border-sky-400/30 bg-sky-400/10",
-  theorem: "text-purple-400 border-purple-400/30 bg-purple-400/10",
-  principle: "text-amber-400 border-amber-400/30 bg-amber-400/10",
-  result: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
-  method: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+function normHeading(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim()
+}
+
+/** The converter stores every heading as `##`, so chapters read as one flat wall. The document
+ *  outline knows the real nesting — re-level heading lines (outside code fences) from it. */
+function relevelHeadings(markdown: string, outline: OutlineEntry[], chapterKey: string | null): string {
+  if (!outline?.length || !chapterKey) return markdown
+  const depthByTitle = new Map<string, number>()
+  let chapterDepth: number | null = null
+  for (const e of outline) {
+    const t = normHeading(e.title || "")
+    if (t && !depthByTitle.has(t)) depthByTitle.set(t, e.listDepth)
+    if (e.sectionKey === chapterKey && chapterDepth === null) chapterDepth = e.listDepth
+  }
+  if (chapterDepth === null) return markdown
+  const base = chapterDepth
+  let inFence = false
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^(```|~~~)/.test(line)) inFence = !inFence
+      if (inFence) return line
+      const m = /^(#{1,6})\s+(.*)$/.exec(line)
+      if (!m) return line
+      const d = depthByTitle.get(normHeading(m[2]))
+      if (d === undefined) return line
+      const level = Math.min(5, Math.max(2, 2 + (d - base)))
+      return "#".repeat(level) + " " + m[2]
+    })
+    .join("\n")
+}
+
+/** Underline tint = live mastery state: unseen (quiet invite), learning, due again (amber),
+ *  mastered (solid). This is where the reader meets the retention loop. */
+function masteryTint(m: ConceptMastery | undefined, threshold: number): string {
+  if (!m || !m.attempts) return "border-dotted border-nvidia-green/50"
+  if (m.mastery >= threshold) return "border-solid border-nvidia-green/60"
+  if (m.due != null && m.due <= Date.now() / 1000) return "border-dotted border-amber-400/80"
+  return "border-dotted border-nvidia-green/90"
 }
 
 // ---------------------------------------------------------------------------
-// Inline concept annotation: turn concept-name mentions inside prose into live
-// spans (first mention of each name per paragraph/list item, stateless so the
-// output is deterministic under re-renders).
+// Inline concept annotation: concept-name mentions inside prose become live
+// spans. Marked first-per-paragraph statelessly here; a post-render DOM pass
+// dedupes to first-per-chapter (see the layout effect in the component).
 // ---------------------------------------------------------------------------
 
 function escapeRegExp(s: string): string {
@@ -99,6 +162,7 @@ function annotateNode(
   regex: RegExp,
   indexByName: Map<string, number>,
   seen: Set<string>,
+  classForIdx: (idx: number) => string,
 ): React.ReactNode {
   return React.Children.map(children, (child) => {
     if (typeof child === "string") {
@@ -116,7 +180,10 @@ function annotateNode(
             key={`${name}-${m.index}`}
             type="button"
             data-concept={idx}
-            className="dc-term cursor-pointer rounded-sm border-b border-dotted border-nvidia-green/60 bg-transparent p-0 text-inherit hover:bg-nvidia-green/10"
+            className={cn(
+              "dc-term cursor-pointer rounded-sm border-b bg-transparent p-0 text-inherit hover:bg-nvidia-green/10",
+              classForIdx(idx),
+            )}
           >
             {m[1]}
           </button>,
@@ -135,7 +202,7 @@ function annotateNode(
       if (!tag || ["code", "pre", "a"].includes(tag) || /katex|math/.test(cls)) return child
       const inner = (child.props as { children?: React.ReactNode }).children
       if (inner === undefined) return child
-      return React.cloneElement(child, undefined, annotateNode(inner, regex, indexByName, seen))
+      return React.cloneElement(child, undefined, annotateNode(inner, regex, indexByName, seen, classForIdx))
     }
     return child
   })
@@ -163,8 +230,30 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
   )
 }
 
+type MarginNote = { key: string; idx: number; top: number; name: string; signal: string }
+type StudyDrawer = "quiz" | "review" | "exam" | null
+
+/** Half the prose measure — where the margin-note column starts (center + half + gap). */
+const HALF_MEASURE: Record<Measure, string> = {
+  narrow: "30ch",
+  normal: "37.5ch",
+  wide: "45ch",
+}
+
+function layoutNotes(notes: MarginNote[]): MarginNote[] {
+  const sorted = [...notes].sort((a, b) => a.top - b.top)
+  let floor = 0
+  for (const n of sorted) {
+    n.top = Math.max(n.top, floor)
+    floor = n.top + 84
+  }
+  return sorted
+}
+
 export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: DeepChapterProps) {
   const docId = course.learnDocId ?? course.id
+  const [theme] = useReadingTheme()
+  const [prefs, setPrefs] = useReadingPrefs()
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [outlineReady, setOutlineReady] = useState(false)
   const [chapterKey, setChapterKey] = useState<string | null>(null)
@@ -172,6 +261,13 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
+  const [masteryByKey, setMasteryByKey] = useState<Record<string, ConceptMastery>>({})
+  const [masteredThreshold, setMasteredThreshold] = useState(0.75)
+  const [dueCount, setDueCount] = useState(0)
+  const [drawer, setDrawer] = useState<StudyDrawer>(null)
+  const [resumed, setResumed] = useState(false)
+  const [notes, setNotes] = useState<MarginNote[]>([])
+  const [wide, setWide] = useState(false)
 
   // Inline concept popover (event-delegated so the reader never re-renders on open/close).
   const [active, setActive] = useState<{ idx: number; x: number; y: number } | null>(null)
@@ -179,7 +275,45 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const [selChip, setSelChip] = useState<{ text: string; x: number; y: number } | null>(null)
   const [explain, setExplain] = useState<{ q: string; res: AskResponse | null; loading: boolean } | null>(null)
 
+  const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const scrollSaveAt = useRef(0)
+  // Last REAL reading position. When leaving a chapter the content unmounts first and the
+  // browser clamps scrollTop to 0 before effect cleanups run — saving the live value there
+  // would always persist 0. handleScroll keeps this ref honest (and ignores the clamp event,
+  // which arrives while data is null).
+  const lastScrollTop = useRef(0)
+
+  const paper = theme === "paper"
+  // Cards sit on the reading surface, so they follow it: warm on paper, app-dark otherwise.
+  const cardCls = paper ? "border-[#e0d6c4] bg-[#efe8da] text-[#3a332c]" : "bg-card"
+  const mutedCls = paper ? "text-[#6b5d4d]" : "text-muted-foreground"
+
+  // The surface lives inside the app's padded, page-scrolling container — pin its height to
+  // the viewport so the READER owns the scroll (scroll persistence, margin notes, and the
+  // sticky chrome all depend on the inner scroller actually scrolling).
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const size = () => {
+      window.scrollTo(0, 0)
+      const top = Math.max(0, Math.round(el.getBoundingClientRect().top))
+      el.style.height = `calc(100dvh - ${top}px - 12px)`
+    }
+    size()
+    window.addEventListener("resize", size)
+    return () => window.removeEventListener("resize", size)
+  }, [])
+
+  // Margin notes only when there's real margin to use.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1440px)")
+    const sync = () => setWide(mq.matches)
+    sync()
+    mq.addEventListener("change", sync)
+    return () => mq.removeEventListener("change", sync)
+  }, [])
 
   // Chapter list: numbered outline chapters where available (see deepChapters).
   useEffect(() => {
@@ -202,6 +336,24 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
 
+  const refreshMastery = useCallback(() => {
+    fetchConceptMastery(docId)
+      .then((r) => {
+        setMasteryByKey(r.byConcept || {})
+        if (r.masteredThreshold) setMasteredThreshold(r.masteredThreshold)
+      })
+      .catch(() => {})
+    if (chapterKey) {
+      fetchReviewQueue(docId, chapterKey, 1)
+        .then((r) => setDueCount(r.counts?.due ?? 0))
+        .catch(() => {})
+    }
+  }, [docId, chapterKey])
+
+  useEffect(() => {
+    refreshMastery()
+  }, [refreshMastery])
+
   const load = useCallback(async () => {
     if (!chapterKey) return
     setLoading(true)
@@ -222,9 +374,51 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     setActive(null)
     setSelChip(null)
     setExplain(null)
+    setDrawer(null)
+    setNotes([])
+    setResumed(false)
     load()
-    scrollRef.current?.scrollTo({ top: 0 })
   }, [load])
+
+  // Scroll: restore the saved position for this chapter once content is up, else start at top.
+  // Synchronous (no rAF) — frames don't advance in hidden tabs, and the effect runs post-commit
+  // anyway. The cleanup writes the final position when leaving the chapter.
+  const scrollKey = `txt2k:deep-scroll:${docId}:${chapterKey ?? ""}`
+  useEffect(() => {
+    const box = scrollRef.current
+    if (!box || !data?.markdown) return
+    const saved = Number(localStorage.getItem(scrollKey) || 0)
+    box.scrollTop = saved
+    lastScrollTop.current = box.scrollTop
+    if (saved > 400) setResumed(true)
+    return () => {
+      try {
+        localStorage.setItem(scrollKey, String(Math.round(lastScrollTop.current)))
+      } catch {
+        // storage may be unavailable
+      }
+    }
+  }, [data?.markdown, scrollKey])
+
+  useEffect(() => {
+    if (!resumed) return
+    const t = setTimeout(() => setResumed(false), 6000)
+    return () => clearTimeout(t)
+  }, [resumed])
+
+  const handleScroll = () => {
+    const box = scrollRef.current
+    if (!box || !chapterKey || !data?.markdown) return
+    lastScrollTop.current = box.scrollTop
+    const now = Date.now()
+    if (now - scrollSaveAt.current < 300) return
+    scrollSaveAt.current = now
+    try {
+      localStorage.setItem(scrollKey, String(Math.round(box.scrollTop)))
+    } catch {
+      // storage may be unavailable
+    }
+  }
 
   useEffect(() => {
     if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
@@ -262,6 +456,9 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   }
 
   const concepts = useMemo(() => data?.concepts ?? [], [data])
+  const conceptsRef = useRef(concepts)
+  conceptsRef.current = concepts
+
   const indexByName = useMemo(() => {
     const m = new Map<string, number>()
     concepts.forEach((c, i) => {
@@ -271,17 +468,32 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     return m
   }, [concepts])
 
-  // The reader element is memoized: popover/selection state changes must not
+  // Flat `##` walls → real hierarchy, from the outline's nesting.
+  const displayMarkdown = useMemo(
+    () => (data?.markdown ? relevelHeadings(data.markdown, outline, chapterKey) : ""),
+    [data?.markdown, outline, chapterKey],
+  )
+
+  // The reader element is memoized: popover/selection/drawer state changes must not
   // re-parse a whole chapter of markdown.
   const reader = useMemo(() => {
-    if (!data?.markdown) return null
+    if (!displayMarkdown) return null
     const regex = buildConceptRegex(concepts)
+    const classFor = (idx: number) => {
+      const c = concepts[idx]
+      return masteryTint(c?.conceptKey ? masteryByKey[c.conceptKey] : undefined, masteredThreshold)
+    }
     const annotate = (children: React.ReactNode) =>
-      regex ? annotateNode(children, regex, indexByName, new Set<string>()) : children
+      regex ? annotateNode(children, regex, indexByName, new Set<string>(), classFor) : children
     return (
       <MarkdownReader
-        content={data.markdown}
-        proseSize="base"
+        content={displayMarkdown}
+        theme={theme}
+        proseSize={prefs.size}
+        measure={prefs.measure}
+        // content-visibility keeps 50–90K-char chapters snappy: below-fold blocks skip
+        // layout/paint until scrolled near.
+        className="[&>*]:[content-visibility:auto] [&>*]:[contain-intrinsic-size:auto_150px]"
         components={
           regex
             ? {
@@ -292,7 +504,67 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
         }
       />
     )
-  }, [data?.markdown, concepts, indexByName])
+  }, [displayMarkdown, concepts, indexByName, theme, prefs.size, prefs.measure, masteryByKey, masteredThreshold])
+
+  // Post-render pass over the committed DOM: (1) dedupe underlines to the FIRST mention of
+  // each concept in the chapter (per-paragraph marking alone is too noisy — "response time"
+  // would be underlined a dozen times); (2) place margin notes beside the kept spans on wide
+  // screens. Positions are measured synchronously and re-measured on scroll: below-fold
+  // content-visibility blocks report ESTIMATED offsets until rendered, so the throttled
+  // re-measure self-corrects any drift as the reader scrolls. (No rAF/IntersectionObserver —
+  // those never fire in hidden tabs.)
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper || !displayMarkdown) return
+    const seen = new Set<string>()
+    const kept: HTMLElement[] = []
+    wrapper.querySelectorAll<HTMLElement>(".markdown-reader [data-concept]").forEach((el) => {
+      const k = el.dataset.concept!
+      if (seen.has(k)) el.replaceWith(document.createTextNode(el.textContent || ""))
+      else {
+        seen.add(k)
+        kept.push(el)
+      }
+    })
+
+    if (!wide || kept.length === 0) {
+      setNotes([])
+      return
+    }
+    const measure = () => {
+      const wrapRect = wrapper.getBoundingClientRect()
+      const list: MarginNote[] = []
+      for (const el of kept) {
+        if (!el.isConnected) continue
+        const idx = Number(el.dataset.concept)
+        const c = conceptsRef.current[idx]
+        if (!c) continue
+        list.push({
+          key: c.conceptKey || String(idx),
+          idx,
+          top: el.getBoundingClientRect().top - wrapRect.top,
+          name: c.name,
+          signal: c.signal,
+        })
+      }
+      setNotes(layoutNotes(list))
+    }
+    measure()
+    const scroller = scrollRef.current
+    let last = 0
+    const remeasure = () => {
+      const now = Date.now()
+      if (now - last < 250) return
+      last = now
+      measure()
+    }
+    scroller?.addEventListener("scroll", remeasure, { passive: true })
+    window.addEventListener("resize", remeasure)
+    return () => {
+      scroller?.removeEventListener("scroll", remeasure)
+      window.removeEventListener("resize", remeasure)
+    }
+  }, [reader, displayMarkdown, wide])
 
   // Event delegation: clicks on annotated terms open the concept popover in place.
   const handleReaderClick = (e: React.MouseEvent) => {
@@ -348,20 +620,43 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     status && (!status.briefing || (status.totalConcepts > 0 && status.explained < status.totalConcepts)),
   )
   const activeConcept = active ? concepts[active.idx] : null
-  const title =
-    chapters[chapterIdx]?.title || data?.blocks?.[0]?.heading || "Chapter"
+  const activeMastery =
+    activeConcept?.conceptKey != null ? masteryByKey[activeConcept.conceptKey] : undefined
+  const title = chapters[chapterIdx]?.title || data?.blocks?.[0]?.heading || "Chapter"
 
   return (
-    <div className="flex h-full flex-col">
+    <div ref={rootRef} className="flex h-full flex-col">
       {/* Header — the only chrome; everything else happens on the one surface. */}
       <div className="flex items-center gap-2 border-b bg-card/80 px-3 py-2 backdrop-blur">
         <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onBack}>
           <ChevronLeft className="h-3.5 w-3.5" />
           {course.title}
         </Button>
-        <div className="min-w-0 flex-1 truncate text-sm font-medium">{title}</div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-sm font-medium hover:text-nvidia-green"
+              title="Jump to a chapter"
+            >
+              <span className="truncate">{title}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-96 w-80 overflow-y-auto">
+            {chapters.map((c) => (
+              <DropdownMenuItem
+                key={c.key}
+                onSelect={() => goChapter(c.key)}
+                className={cn("truncate", c.key === chapterKey && "text-nvidia-green")}
+              >
+                {c.title}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {status && status.totalConcepts > 0 && (
-          <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">
+          <span className="hidden text-xs tabular-nums text-muted-foreground lg:inline">
             deep layer {status.explained}/{status.totalConcepts}
           </span>
         )}
@@ -377,6 +672,8 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
             </Button>
           )
         )}
+        <ReadingControls prefs={prefs} onChange={setPrefs} />
+        <ReadingThemeToggle />
         <div className="flex items-center gap-1">
           <Button
             type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"
@@ -395,116 +692,186 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-6"
+        onScroll={handleScroll}
+        className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-6", paper && "reading-surface-paper")}
         onClick={handleReaderClick}
         onMouseUp={handleMouseUp}
       >
-        <div className="mx-auto max-w-[80ch]">
-          {loading && !data && (
-            <div className="space-y-3">
-              <Skeleton className="h-8 w-2/3" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          )}
-          {error && (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-              {error}
-              <Button type="button" variant="outline" size="sm" className="ml-3 h-7 text-xs" onClick={load}>
-                Retry
-              </Button>
-            </div>
-          )}
+        <div ref={wrapperRef} className="relative">
+          <div className="mx-auto max-w-[80ch]">
+            {loading && !data && (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-2/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            )}
+            {error && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+                {error}
+                <Button type="button" variant="outline" size="sm" className="ml-3 h-7 text-xs" onClick={load}>
+                  Retry
+                </Button>
+              </div>
+            )}
 
-          {/* Briefing — what this chapter teaches, assembled from the pre-generated layer. */}
-          {briefing && (
-            <div className="mb-8 rounded-lg border bg-card p-4">
-              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <BookOpen className="h-3.5 w-3.5" />
-                <span>Chapter briefing</span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {briefing.objectives.length > 0 && (
-                  <div>
-                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      You&apos;ll be able to
-                    </div>
-                    <ul className="space-y-1 text-sm text-foreground/90">
-                      {briefing.objectives.map((o, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-nvidia-green">•</span>
-                          <span>{o}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {briefing.watchFor.length > 0 && (
-                  <div>
-                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Watch for
-                    </div>
-                    <ul className="space-y-1 text-sm text-foreground/90">
-                      {briefing.watchFor.map((w, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-amber-400">•</span>
-                          <span>{w}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              {briefing.sections.length > 0 && (
-                <div className="mt-4 border-t pt-3">
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    The road through
-                  </div>
-                  <div className="space-y-1">
-                    {briefing.sections.map((s, i) => (
-                      <div key={`${s.sectionKey}-${i}`} className="text-sm" style={{ paddingLeft: `${(s.depth ?? 0) * 12}px` }}>
-                        <span className="text-foreground/90">{s.heading}</span>
-                        {s.essence && <span className="text-muted-foreground"> — {s.essence}</span>}
+            {/* Briefing — what this chapter teaches, assembled from the pre-generated layer. */}
+            {briefing && (
+              <div className={cn("mb-8 rounded-lg border p-4", cardCls)}>
+                <div className={cn("mb-3 flex items-center gap-2 text-xs font-medium", mutedCls)}>
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Chapter briefing</span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {briefing.objectives.length > 0 && (
+                    <div>
+                      <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+                        You&apos;ll be able to
                       </div>
-                    ))}
+                      <ul className="space-y-1 text-sm opacity-90">
+                        {briefing.objectives.map((o, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="text-nvidia-green">•</span>
+                            <span>{o}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {briefing.watchFor.length > 0 && (
+                    <div>
+                      <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+                        Watch for
+                      </div>
+                      <ul className="space-y-1 text-sm opacity-90">
+                        {briefing.watchFor.map((w, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="text-amber-400">•</span>
+                            <span>{w}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                {briefing.sections.length > 0 && (
+                  <details className="mt-4 border-t pt-3" open={briefing.sections.length <= 8}>
+                    <summary className={cn("cursor-pointer text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+                      The road through · {briefing.sections.length} sections
+                    </summary>
+                    <div className="mt-1.5 space-y-1">
+                      {briefing.sections.map((s, i) => (
+                        <div key={`${s.sectionKey}-${i}`} className="text-sm" style={{ paddingLeft: `${(s.depth ?? 0) * 12}px` }}>
+                          <span className="opacity-90">{s.heading}</span>
+                          {s.essence && <span className={mutedCls}> — {s.essence}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+                {briefing.keyConcepts.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
+                    {briefing.keyConcepts.map((c, i) => {
+                      const idx = indexByName.get(c.name.trim().toLowerCase())
+                      return (
+                        <button
+                          key={`${c.name}-${i}`}
+                          type="button"
+                          data-concept={idx}
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-xs",
+                            KIND_COLOR[c.kind] ?? "border-border text-muted-foreground",
+                          )}
+                          title={c.signal}
+                        >
+                          {c.name}
+                        </button>
+                      )
+                    })}
                   </div>
-                </div>
-              )}
-              {briefing.keyConcepts.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
-                  {briefing.keyConcepts.map((c, i) => {
-                    const idx = indexByName.get(c.name.trim().toLowerCase())
-                    return (
-                      <button
-                        key={`${c.name}-${i}`}
-                        type="button"
-                        data-concept={idx}
-                        className={cn(
-                          "rounded-full border px-2 py-0.5 text-xs",
-                          KIND_COLOR[c.kind] ?? "border-border text-muted-foreground",
-                        )}
-                        title={c.signal}
-                      >
-                        {c.name}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
-          {/* The reader spine. */}
-          {reader}
-          {!loading && !error && data && !data.markdown && (
-            <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
-              This scope has no readable content of its own
-              {nextChapter ? " — try the next chapter." : "."}
-            </div>
-          )}
+            {/* The reader spine. */}
+            {reader}
+            {!loading && !error && data && !data.markdown && (
+              <div className={cn("rounded-lg border p-6 text-sm", cardCls, mutedCls)}>
+                This scope has no readable content of its own
+                {nextChapter ? " — try the next chapter." : "."}
+              </div>
+            )}
+
+            {/* Close the loop — the study actions live on the same surface, as drawers. */}
+            {!loading && data?.markdown && (
+              <div className={cn("mt-10 rounded-lg border p-5", cardCls)}>
+                <div className="text-sm font-semibold">Close the loop</div>
+                <p className={cn("mt-0.5 text-xs", mutedCls)}>
+                  Lock in what you just read — everything opens right here.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("quiz")}>
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    Quiz this chapter
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Review{dueCount > 0 ? ` · ${dueCount} due` : ""}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("exam")}>
+                    <Brain className="h-3.5 w-3.5" />
+                    Chapter exam
+                  </Button>
+                  {nextChapter && (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => goChapter(nextChapter.key)}>
+                      Next: {nextChapter.title} <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Margin notes (wide screens): first mentions surface as Tufte-style sidenotes. */}
+          {wide &&
+            notes.map((n) => (
+              <button
+                key={n.key}
+                type="button"
+                className={cn(
+                  "absolute hidden w-52 rounded-md border border-transparent p-1.5 text-left transition-colors min-[1440px]:block",
+                  paper ? "hover:border-[#e0d6c4] hover:bg-[#efe8da]" : "hover:border-border hover:bg-card",
+                )}
+                style={{ top: n.top, left: `calc(50% + ${HALF_MEASURE[prefs.measure]} + 28px)` }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  setActive({ idx: n.idx, x: Math.max(16, r.left - 440), y: r.top })
+                }}
+              >
+                <div className={cn("truncate text-xs font-medium", paper ? "text-[#221d18]" : "text-foreground/90")}>
+                  {n.name}
+                </div>
+                <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>{n.signal}</div>
+              </button>
+            ))}
         </div>
       </div>
+
+      {/* Resumed-position chip. */}
+      {resumed && (
+        <button
+          type="button"
+          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full border bg-popover px-3 py-1.5 text-xs shadow-lg hover:bg-muted"
+          onClick={() => {
+            scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+            setResumed(false)
+          }}
+        >
+          Resumed where you left off — back to top
+        </button>
+      )}
 
       {/* Concept popover — anchored to the clicked term. */}
       {activeConcept && active && (
@@ -518,6 +885,7 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
         >
           <div className="mb-1.5 flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
+              <ConceptMasteryDot mastery={activeMastery?.mastery} attempts={activeMastery?.attempts} />
               <span className="text-sm font-semibold">{activeConcept.name}</span>
               <span
                 className={cn(
@@ -596,6 +964,25 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Study drawer — quiz / review / exam over the same surface (spec §8 step 5). */}
+      {drawer && (
+        <div className="fixed bottom-0 right-0 top-12 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b px-4 py-2">
+            <div className="text-xs font-medium text-muted-foreground">
+              {drawer === "quiz" ? "Chapter quiz" : drawer === "review" ? "Review" : "Chapter exam"} · {title}
+            </div>
+            <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setDrawer(null)}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {drawer === "quiz" && <ConceptQuizPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
+            {drawer === "review" && <ReviewPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
+            {drawer === "exam" && <ExamPanel scope={chapterKey} docId={docId} onGraded={refreshMastery} />}
+          </div>
         </div>
       )}
     </div>

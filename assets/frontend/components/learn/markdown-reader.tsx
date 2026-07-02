@@ -1,6 +1,7 @@
 "use client"
 
 import "katex/dist/katex.min.css"
+import { useMemo } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -41,6 +42,23 @@ const KATEX_OPTIONS = { throwOnError: false, strict: false, errorColor: "current
 // Bare fences (no language tag) are common in PDF exports — let hljs auto-detect.
 const HIGHLIGHT_OPTIONS = { detect: true } as const
 
+/** PDF-extraction debris that survives conversion: lines that are only a bare `|`
+ *  (table remnants that render as orphaned pipes) and a space wedged before
+ *  punctuation ("faults , and"). Applied to prose segments only — never inside
+ *  fenced code blocks. */
+function tidyProse(seg: string): string {
+  return seg
+    .replace(/^[ \t]*\|[ \t]*$/gm, "")
+    .replace(/(\S) +([,.;:!?])(?=\s|$)/gm, "$1$2")
+}
+
+function tidyMarkdown(content: string): string {
+  return content
+    .split(/(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$))/)
+    .map((seg, i) => (i % 2 ? seg : tidyProse(seg)))
+    .join("")
+}
+
 /** Renders textbook markdown (GFM + LaTeX math + highlighted code) with calm,
  *  prose-tuned styling. Math is normalized upstream by app/math_markdown.py. */
 export function MarkdownReader({
@@ -52,6 +70,7 @@ export function MarkdownReader({
   components,
 }: MarkdownReaderProps) {
   const paper = theme === "paper"
+  const tidied = useMemo(() => tidyMarkdown(content), [content])
   return (
     <div
       className={cn(
@@ -95,7 +114,7 @@ export function MarkdownReader({
           ...components,
         }}
       >
-        {content}
+        {tidied}
       </ReactMarkdown>
     </div>
   )

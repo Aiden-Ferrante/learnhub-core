@@ -212,6 +212,7 @@ export function CourseHome({
   const weakest = mastery?.weakest ?? []
   const isEmpty = !loading && !error && tree.length === 0
 
+
   let headline: { icon: React.ReactNode; text: string }
   if (needsReview > 0) {
     headline = {
@@ -273,28 +274,32 @@ export function CourseHome({
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
+          {/* Reading-first: the deep reading surface is the primary way into the course. */}
+          {onDeepRead && !isEmpty && (
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              onClick={onDeepRead}
+              title="Read on the deep chapter surface"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              {continueNode
+                ? `Continue reading · ${displaySectionTitle(continueNode.label, continueNode.title)}`
+                : "Start reading"}
+            </Button>
+          )}
           {continueNode && onResumePath && (
             <Button
               type="button"
+              variant="outline"
               size="sm"
               className="h-8 gap-1.5 px-3 text-xs"
               onClick={onResumePath}
               title="Pick up the learning path where you left off"
             >
               <Play className="h-3.5 w-3.5" />
-              Resume · {displaySectionTitle(continueNode.label, continueNode.title)}
-            </Button>
-          )}
-          {continueNode && onContinueReading && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onContinueReading}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              Continue reading
+              Resume path · {displaySectionTitle(continueNode.label, continueNode.title)}
             </Button>
           )}
         </div>
