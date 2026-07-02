@@ -18,8 +18,7 @@
 
 import { useState, useEffect } from "react"
 import { ApiKeyPrompt } from "@/components/api-key-prompt"
-import { Upload, Zap, GraduationCap } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ChevronLeft } from "lucide-react"
 import React from "react"
 import { UploadTab } from "@/components/tabs/UploadTab"
 import { ConfigureTab } from "@/components/tabs/ConfigureTab"
@@ -40,15 +39,11 @@ const globalStyles = `
 `;
 
 export default function Home() {
-  // Study (Learn) is the front door; the four pipeline steps are grouped as
-  // secondary "Manage material" actions you drop into when adding/curating content.
+  // Study (Learn) IS the app — no tab chrome; the learning surface gets the whole
+  // screen. Upload/Process are reachable from the course shelf and render as
+  // sub-pages with a slim back bar.
   const [activeTab, setActiveTab] = useState("learn");
-  const primaryStep = { value: "learn", label: "Study", Icon: GraduationCap } as const;
-  const materialSteps = [
-    { value: "upload", label: "Upload", Icon: Upload },
-    { value: "configure", label: "Process", Icon: Zap },
-  ] as const;
-  
+
   // Controlled-tab switch: update state (and URL hash) directly.
   const handleTabChange = React.useCallback((tab: string) => {
     window.location.hash = tab;
@@ -81,71 +76,24 @@ export default function Home() {
       {/* Add style element for global styles */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
       
-      <main className="container mx-auto px-6 py-12 border-b border-border/10">
-        
-        <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
-          <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            {/* Primary surface: Study is the front door */}
-            <TabsList className="nvidia-build-tabs nvidia-build-tabs-primary" aria-label="Study">
-              <TabsTrigger
-                value={primaryStep.value}
-                onClick={() => {
-                  window.location.hash = primaryStep.value;
-                  setActiveTab(primaryStep.value);
-                }}
-                data-value={primaryStep.value}
-                className={`nvidia-build-tab nvidia-build-tab-primary ${activeTab === primaryStep.value ? 'nvidia-build-tab-active' : ''}`}
-              >
-                <div className="nvidia-build-tab-icon">
-                  <primaryStep.Icon className="h-4 w-4 text-nvidia-green" />
-                </div>
-                <span>{primaryStep.label}</span>
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Secondary cluster: pipeline steps for adding/curating material */}
-            <div className="flex flex-col gap-1.5">
-              <span className="pl-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Manage material
-              </span>
-              <TabsList className="nvidia-build-tabs nvidia-build-tabs-secondary" aria-label="Manage material">
-                {materialSteps.map(({ value, label, Icon }) => (
-                  <TabsTrigger
-                    key={value}
-                    value={value}
-                    onClick={() => {
-                      window.location.hash = value;
-                      setActiveTab(value);
-                    }}
-                    data-value={value}
-                    className={`nvidia-build-tab nvidia-build-tab-sm ${activeTab === value ? 'nvidia-build-tab-active' : ''}`}
-                  >
-                    <div className="nvidia-build-tab-icon">
-                      <Icon className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                    <span>{label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
-          </div>
-          
-          {/* Step 1: Document Upload */}
-          <TabsContent value="upload" className="nvidia-build-tab-content">
-            <UploadTab onTabChange={handleTabChange} />
-          </TabsContent>
-          
-          {/* Step 2: Configure & Process */}
-          <TabsContent value="configure" className="nvidia-build-tab-content">
-            <ConfigureTab />
-          </TabsContent>
-          
-          {/* Learn (Study) — the primary surface */}
-          <TabsContent value="learn" className="nvidia-build-tab-content">
-            <LearnTab onTabChange={handleTabChange} />
-          </TabsContent>
-        </Tabs>
-      </main>
+      {activeTab === "learn" ? (
+        // The learning pipeline owns the whole screen below the site banner.
+        <main className="mx-auto w-full px-4 pb-3 pt-3">
+          <LearnTab onTabChange={handleTabChange} />
+        </main>
+      ) : (
+        <main className="container mx-auto px-6 py-6">
+          <button
+            type="button"
+            onClick={() => handleTabChange("learn")}
+            className="mb-4 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to courses
+          </button>
+          {activeTab === "upload" ? <UploadTab onTabChange={handleTabChange} /> : <ConfigureTab />}
+        </main>
+      )}
 
       <ApiKeyPrompt />
     </div>

@@ -803,6 +803,29 @@ export function DeepChapter({
     }
   }
 
+  // Numbered outline, same convention as the course-dashboard syllabus: the book's own
+  // numbers win (headings that already start with one aren't re-prefixed); otherwise
+  // synthesize hierarchical numbers under the chapter's number (toc:2 → 2.1, 2.1.1, …).
+  const numberedOutline = useMemo(() => {
+    if (outlineItems.length === 0) return []
+    const m = chapterKey ? /^toc:(\d+)$/.exec(chapterKey) : null
+    const chapterNum = m ? m[1] : null
+    // Depth is relative to the chapter heading's level — an unmatched `##` deep in the
+    // chapter (e.g. an un-outlined "Summary") must not shift every section down a level.
+    const baseSub = (outlineItems[0]?.level ?? 2) + 1
+    const counters: number[] = []
+    return outlineItems.map((it, i) => {
+      if (i === 0) return { ...it, num: chapterNum ?? "" }
+      if (/^\d+(\.\d+)*[\s.]/.test(it.text)) return { ...it, num: "" }
+      const depth = Math.max(0, it.level - baseSub)
+      counters.splice(depth + 1)
+      counters[depth] = (counters[depth] || 0) + 1
+      for (let d = 0; d < depth; d++) if (!counters[d]) counters[d] = 1
+      const num = [chapterNum, ...counters.slice(0, depth + 1)].filter(Boolean).join(".")
+      return { ...it, num }
+    })
+  }, [outlineItems, chapterKey])
+
   const chapterIdx = useMemo(
     () => chapters.findIndex((c) => c.key === chapterKey),
     [chapters, chapterKey],
@@ -991,11 +1014,11 @@ export function DeepChapter({
                 In this chapter
               </div>
               <div className="space-y-0.5">
-                {outlineItems.map((it, i) => (
+                {numberedOutline.map((it, i) => (
                   <button
                     key={`${it.text}-${i}`}
                     type="button"
-                    title={it.text}
+                    title={it.num ? `${it.num} ${it.text}` : it.text}
                     onClick={(e) => {
                       e.stopPropagation()
                       headingEls.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -1008,6 +1031,7 @@ export function DeepChapter({
                     )}
                     style={{ paddingLeft: `${8 + Math.max(0, it.level - 2) * 12}px` }}
                   >
+                    {it.num && <span className="mr-1.5 tabular-nums opacity-60">{it.num}</span>}
                     {it.text}
                   </button>
                 ))}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen, GraduationCap, MoreVertical, Plus } from "lucide-react"
+import { BookOpen, GraduationCap, MoreVertical, Plus, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -62,6 +62,8 @@ type CourseShelfProps = {
   liveCourseId?: string | null
   onSelect: (course: Course) => void
   onNewCourse?: () => void
+  /** Open the processing dashboard (extraction/TOC) — material management lives here now. */
+  onProcess?: () => void
 }
 
 const STATUS_BADGE: Record<CourseStatus, { label: string; variant: "secondary" | "outline" }> = {
@@ -201,6 +203,7 @@ export function CourseShelf({
   liveCourseId,
   onSelect,
   onNewCourse,
+  onProcess,
 }: CourseShelfProps) {
   const liveSections = useMemo(() => countSections(liveTree), [liveTree])
 
@@ -314,15 +317,38 @@ export function CourseShelf({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-nvidia-green/15">
           <GraduationCap className="h-4 w-4 text-nvidia-green" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold leading-tight">Learn</h2>
           <p className="text-sm text-muted-foreground">
             Your courses — each one built from a document you processed.
           </p>
+        </div>
+        {/* Material management moved off the top tabs — it lives with the shelf now. */}
+        <div className="flex items-center gap-1.5">
+          {onNewCourse && (
+            <button
+              type="button"
+              onClick={onNewCourse}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-nvidia-green/50 hover:text-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Upload
+            </button>
+          )}
+          {onProcess && (
+            <button
+              type="button"
+              onClick={onProcess}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-nvidia-green/50 hover:text-foreground"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Process
+            </button>
+          )}
         </div>
       </div>
 

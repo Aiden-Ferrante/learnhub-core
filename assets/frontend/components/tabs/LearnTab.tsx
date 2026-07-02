@@ -300,6 +300,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
       liveCourseId={selectedCourseId}
       onSelect={openCourse}
       onNewCourse={onTabChange ? () => onTabChange("upload") : undefined}
+      onProcess={onTabChange ? () => onTabChange("configure") : undefined}
     />
   )
 }
