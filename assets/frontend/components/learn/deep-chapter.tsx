@@ -56,8 +56,10 @@ import {
   fetchChapterProgress,
   fetchChaptersReadiness,
   fetchConceptMastery,
+  fetchCourseChapters,
   fetchDeepChapter,
   fetchOutline,
+  flattenChapterOutline,
   fetchReviewQueue,
   getAudiobookStatus,
   recordEngagement,
@@ -421,7 +423,34 @@ export function DeepChapter({
     }
   }, [docId])
 
-  const chapters = useMemo(() => deepChapters(outline, tree), [outline, tree])
+  // Canonical chapter list from /api/chapters — the SAME derivation the dashboard
+  // tree and the Today plan use. The outline-rule fallback only covers the moment
+  // before the fetch lands (or a backend error).
+  const [canonChapters, setCanonChapters] = useState<Chapter[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetchCourseChapters(docId)
+      .then((r) => {
+        if (alive && r.chapters?.length) setCanonChapters(r.chapters.map((c) => ({ key: c.key, title: c.title })))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [docId])
+
+  const chapters = useMemo(
+    () => canonChapters ?? deepChapters(outline, tree),
+    [canonChapters, outline, tree],
+  )
+
+  // Within-chapter outline from the SAME tree + numbering the dashboard renders.
+  const treeOutline = useMemo(
+    () => (chapterKey ? flattenChapterOutline(tree, chapterKey) : []),
+    [tree, chapterKey],
+  )
+  // treeOutline item index → rendered-heading index (or -1 when the text has no match).
+  const [railTargets, setRailTargets] = useState<number[]>([])
 
   // Resolve the incoming position (any section key, or nothing) to its owning chapter.
   useEffect(() => {
@@ -905,22 +934,82 @@ export function DeepChapter({
     })
   }, [outlineItems, chapterKey])
 
-  // Mirror the outline's numbers onto the headings IN the text (idempotent DOM pass).
+  // Rail ↔ text binding: match the canonical outline items to the rendered headings
+  // and stamp the DASHBOARD's numbers onto them (idempotent DOM pass). Falls back to
+  // the synthesized positional numbering only when the tree has no entry for this
+  // chapter — so the rail, the in-text numbers, and the course dashboard cannot drift.
   useEffect(() => {
-    numberedOutline.forEach((it, i) => {
-      const el = headingEls.current[i]
-      if (!el || !it.num || el.dataset.numbered) return
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim()
+    const headNorms = outlineItems.map((it) => norm(it.text))
+    const stamp = (el: HTMLElement, num: string) => {
+      if (!num || el.dataset.numbered) return
       el.dataset.numbered = "1"
       const span = document.createElement("span")
       span.className = "dc-heading-num"
-      span.textContent = it.num
+      span.textContent = num
       span.style.opacity = "0.45"
       span.style.fontVariantNumeric = "tabular-nums"
       span.style.marginRight = "0.45em"
       span.style.fontWeight = "500"
       el.prepend(span)
-    })
-  }, [numberedOutline])
+    }
+    if (treeOutline.length) {
+      const used = new Set<number>()
+      const targets = treeOutline.map((item) => {
+        const t = norm(item.title)
+        if (!t) return -1
+        for (let i = 0; i < headNorms.length; i++) {
+          if (used.has(i)) continue
+          const h = headNorms[i]
+          if (h === t || h.startsWith(t) || t.startsWith(h)) {
+            used.add(i)
+            return i
+          }
+        }
+        return -1
+      })
+      setRailTargets(targets)
+      treeOutline.forEach((item, j) => {
+        const el = targets[j] >= 0 ? headingEls.current[targets[j]] : null
+        if (el) stamp(el, item.number)
+      })
+    } else {
+      setRailTargets([])
+      numberedOutline.forEach((it, i) => {
+        const el = headingEls.current[i]
+        if (el) stamp(el, it.num)
+      })
+    }
+  }, [treeOutline, outlineItems, numberedOutline])
+
+  // Rail items: the canonical (dashboard) outline when the tree knows this chapter,
+  // else the synthesized heading outline. `target` = rendered-heading index to jump to.
+  const railItems = useMemo(
+    () =>
+      treeOutline.length
+        ? treeOutline.map((it, j) => ({
+            key: `${it.sectionKey}-${j}`,
+            number: it.number,
+            text: it.title,
+            depthPad: it.depth,
+            target: railTargets[j] ?? -1,
+          }))
+        : numberedOutline.map((it, i) => ({
+            key: `${it.text}-${i}`,
+            number: it.num,
+            text: it.text,
+            depthPad: Math.max(0, it.level - 2),
+            target: i,
+          })),
+    [treeOutline, railTargets, numberedOutline],
+  )
+  const activeRail = useMemo(
+    () =>
+      treeOutline.length
+        ? railItems.reduce((acc, it, j) => (it.target >= 0 && it.target <= activeOutline ? j : acc), -1)
+        : activeOutline,
+    [treeOutline.length, railItems, activeOutline],
+  )
 
   const chapterIdx = useMemo(
     () => chapters.findIndex((c) => c.key === chapterKey),
@@ -1173,30 +1262,32 @@ export function DeepChapter({
         <div className="mx-auto flex max-w-[110rem] justify-center gap-8">
           {/* Chapter outline — always in view while reading, locked to THIS chapter.
               Fills the dead left margin; scroll-spy shows where you are. */}
-          {outlineItems.length > 0 && (
+          {railItems.length > 0 && (
             <nav className="sticky top-0 hidden max-h-[calc(100dvh-220px)] w-56 shrink-0 self-start overflow-y-auto pb-4 pr-1 pt-1 lg:block">
               <div className={cn("mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide", mutedCls)}>
                 In this chapter
               </div>
               <div className="space-y-0.5">
-                {numberedOutline.map((it, i) => (
+                {railItems.map((it, j) => (
                   <button
-                    key={`${it.text}-${i}`}
+                    key={it.key}
                     type="button"
-                    title={it.num ? `${it.num} ${it.text}` : it.text}
+                    title={it.number ? `${it.number} ${it.text}` : it.text}
                     onClick={(e) => {
                       e.stopPropagation()
-                      headingEls.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" })
+                      if (it.target >= 0)
+                        headingEls.current[it.target]?.scrollIntoView({ behavior: "smooth", block: "start" })
                     }}
                     className={cn(
                       "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
-                      i === activeOutline
+                      j === activeRail
                         ? "bg-nvidia-green/10 font-medium text-nvidia-green"
                         : cn(mutedCls, paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/50", "hover:opacity-100"),
+                      it.target < 0 && "cursor-default opacity-60",
                     )}
-                    style={{ paddingLeft: `${8 + Math.max(0, it.level - 2) * 12}px` }}
+                    style={{ paddingLeft: `${8 + it.depthPad * 12}px` }}
                   >
-                    {it.num && <span className="mr-1.5 tabular-nums opacity-60">{it.num}</span>}
+                    {it.number && <span className="mr-1.5 tabular-nums opacity-60">{it.number}</span>}
                     {it.text}
                   </button>
                 ))}

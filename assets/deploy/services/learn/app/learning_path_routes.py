@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
+from app.chapters import chapter_units
 from app.drill import grade_drill, start_drill
 from app.exam import grade_exam, start_exam
 from app.plan import build_plan
@@ -62,6 +63,13 @@ def api_recall_check(body: dict | None = Body(default=None)) -> JSONResponse:
     body = body or {}
     data = check_recall(body.get("doc"), body.get("scope"), str(body.get("text") or ""))
     return JSONResponse(data, status_code=400 if data.get("error") else 200)
+
+
+@router.get("/api/chapters")
+def api_chapters(doc: str | None = None) -> JSONResponse:
+    """Canonical chapter units — every chapter list in the app derives from this."""
+    data = chapter_units(doc)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.get("/api/plan")

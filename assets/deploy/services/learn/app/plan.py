@@ -36,36 +36,20 @@ def _resolve_doc_id(doc_id: str | None) -> str | None:
     return doc.get("id") if doc else None
 
 
-def _chapters_from_outline(db, doc_id: str) -> list[dict[str, str]]:
-    """Same rule as the frontend's deepChapters(): numbered chapters (toc:N) where they
-    exist — outline depth 0 can be Parts/front-matter — else depth-0 entries."""
-    doc = db.collection("documents").get(doc_id) or {}
-    outline = doc.get("outline") or []
-    numbered = [e for e in outline if re.match(r"^toc:\d+$", e.get("sectionKey") or "")]
-    if numbered:
-        return [{"key": e["sectionKey"], "title": e.get("title") or e["sectionKey"]} for e in numbered]
-    seen: set[str] = set()
-    out: list[dict[str, str]] = []
-    for e in outline:
-        sk = e.get("sectionKey")
-        if e.get("listDepth") == 0 and sk and sk not in seen:
-            seen.add(sk)
-            out.append({"key": sk, "title": e.get("title") or sk})
-    return out
-
-
 def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, Any]:
     """Assemble the Today plan. ``hint_scope`` is the client's reading position
     (stored client-side), which wins over inferred recency when it maps to a chapter."""
     try:
         from app.build_queue import chapters_readiness
+        from app.chapters import chapter_units
 
         db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
 
-        chapters = _chapters_from_outline(db, doc_id)
+        # Canonical chapter list — same derivation as every other surface (app/chapters.py).
+        chapters = chapter_units(doc_id).get("chapters", [])
         if not chapters:
             return {"docId": doc_id, "chapters": [], "resume": None, "reviewsDue": 0, "nextUnbuilt": None}
         chapter_keys = [c["key"] for c in chapters]

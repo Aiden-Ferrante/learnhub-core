@@ -1096,6 +1096,53 @@ export async function fetchDeepChapter(doc: string, scope: string): Promise<Deep
   return parseJsonResponse<DeepChapterResponse>(res)
 }
 
+// --- Canonical chapters ---------------------------------------------------------
+// The course dashboard's syllabus tree is the outline of record. /api/chapters is
+// its single server-side derivation (content-bearing tree nodes, Parts descended);
+// EVERY chapter list in the app must come from here so surfaces cannot drift.
+
+export type CourseChapter = { key: string; title: string }
+
+export async function fetchCourseChapters(
+  doc: string,
+): Promise<{ docId?: string; chapters: CourseChapter[]; error?: string }> {
+  const res = await fetch(`/api/learn/chapters?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; chapters: CourseChapter[] }>(res)
+}
+
+export type ChapterOutlineItem = {
+  sectionKey: string
+  title: string
+  number: string
+  depth: number
+}
+
+/** The within-chapter outline, flattened from the SAME tree + numberSections map the
+ *  course dashboard renders — the reader's rail and in-text numbering derive from this
+ *  so they literally cannot disagree with the dashboard. */
+export function flattenChapterOutline(
+  tree: LearnTreeNode[],
+  chapterKey: string,
+): ChapterOutlineItem[] {
+  const node = findNodeBySectionKey(tree, chapterKey)
+  if (!node) return []
+  const numbers = numberSections(tree)
+  const out: ChapterOutlineItem[] = []
+  const walk = (n: LearnTreeNode, depth: number) => {
+    if (n.isSection && n.sectionKey) {
+      out.push({
+        sectionKey: n.sectionKey,
+        title: n.title || n.label || n.sectionKey,
+        number: numbers.get(n.id) ?? '',
+        depth,
+      })
+    }
+    for (const c of n.children || []) walk(c, depth + 1)
+  }
+  walk(node, 0)
+  return out
+}
+
 // --- Course-level Today plan ---------------------------------------------------
 
 export type TodayPlan = {

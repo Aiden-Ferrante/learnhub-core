@@ -724,12 +724,17 @@ def fetch_section_content(section_key: str, doc_id: str | None = None) -> dict:
           RETURN b
         """
         rows = list(db.aql.execute(aql, bind_vars={"docId": doc_id}))
-        # Level-aware reading-order span (shared with audiobook/extraction): a chapter scope
-        # pulls the whole chapter even for slug-keyed books, not just the exact heading block.
-        # Local import avoids an arango_content <-> extract module cycle.
-        from app.extract import _blocks_in_scope, _section_level_fn
+        # Outline-first spanning — the SAME rule extraction uses (_load_section_blocks):
+        # a numbered chapter's sub-sections are usually slug-keyed, which the numeric
+        # ancestor walk can't see, so chapters whose heading block isn't keyed toc:N
+        # would read as EMPTY (DDIA ch.3+, AI-Eng ch.2-9). Reading-order span remains
+        # the fallback. Local import avoids an arango_content <-> extract module cycle.
+        from app.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 
-        matched = _blocks_in_scope(rows, section_key, _section_level_fn(db, doc_id))
+        okeys = _scope_keys_from_outline(db, doc_id, section_key)
+        matched = [r for r in rows if r.get("sectionKey") in okeys] if okeys else []
+        if not matched:
+            matched = _blocks_in_scope(rows, section_key, _section_level_fn(db, doc_id))
         blocks = [
             {
                 "sectionKey": r.get("sectionKey"),
