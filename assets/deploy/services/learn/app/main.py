@@ -130,6 +130,23 @@ def api_outline(doc: str | None = None) -> JSONResponse:
     return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
+@app.get("/api/document/pdf")
+def api_document_pdf(doc: str | None = None):
+    """The ORIGINAL uploaded PDF, untouched — the source of truth a reader can verify
+    the extracted content against. 404 for documents ingested from non-PDF sources."""
+    doc_id = doc
+    if not doc_id:
+        d = (fetch_latest_document() or {}).get("document")
+        doc_id = d.get("id") if d else None
+    # Ingest ids are uuid-ish; reject anything that could traverse the shared dir.
+    if not doc_id or set(doc_id) - set("0123456789abcdef-"):
+        return JSONResponse({"error": "doc required"}, status_code=400)
+    path = Path(os.environ.get("SHARED_DIR", "/shared")) / "ingest" / doc_id / "original.pdf"
+    if not path.exists():
+        return JSONResponse({"error": "no original PDF for this document"}, status_code=404)
+    return FileResponse(str(path), media_type="application/pdf")
+
+
 @app.get("/api/section/{key:path}/content")
 def api_section_content(key: str, doc: str | None = None) -> JSONResponse:
     data = fetch_section_content(key, doc)

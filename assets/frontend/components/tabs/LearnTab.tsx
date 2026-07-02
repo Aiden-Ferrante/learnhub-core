@@ -6,7 +6,7 @@ import { CourseHome } from "@/components/learn/course-home"
 import { ConceptsView } from "@/components/learn/concepts-view"
 import { DrillView } from "@/components/learn/drill-view"
 import { DumpView } from "@/components/learn/dump-view"
-import { BookReader } from "@/components/learn/book-reader"
+import { PdfBookView } from "@/components/learn/pdf-book-view"
 import { DeepChapter } from "@/components/learn/deep-chapter"
 import { AskPanel } from "@/components/learn/ask-panel"
 import {
@@ -198,7 +198,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
 
   if (view === "read" && selectedCourse) {
     return (
-      <BookReader
+      <PdfBookView
         course={selectedCourse}
         tree={isLive ? tree : []}
         loading={isLive ? loading : false}
