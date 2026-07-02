@@ -20,6 +20,7 @@ from app.admin_routes import router as admin_router
 from app.arango_tree import get_toc_tree, render_toc_tree_html, set_request_db_name
 from app.audiobook_routes import router as audiobook_router
 from app.learning_path_routes import router as learning_path_router
+from app.build_routes import router as build_router
 from app.concept_study_routes import router as concept_study_router
 from app.deep_chapter_routes import router as deep_chapter_router
 from app.extract_routes import router as extract_router
@@ -40,6 +41,7 @@ app.include_router(concept_study_router)
 app.include_router(audiobook_router)
 app.include_router(learning_path_router)
 app.include_router(deep_chapter_router)
+app.include_router(build_router)
 app.include_router(reading_router)
 app.include_router(search_router)
 app.include_router(admin_router)

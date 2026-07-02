@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   GraduationCap,
   Loader2,
   RotateCcw,
@@ -39,13 +40,16 @@ import { useReadingTheme } from "@/hooks/use-reading-theme"
 import { useReadingPrefs, type Measure } from "@/hooks/use-reading-prefs"
 import {
   askTextbook,
+  cancelChapterBuild,
+  enqueueChapterBuild,
+  fetchChaptersReadiness,
   fetchConceptMastery,
   fetchDeepChapter,
   fetchOutline,
   fetchReviewQueue,
-  prepareDeepChapter,
   recordEngagement,
   type AskResponse,
+  type ChapterReadiness,
   type ConceptLesson,
   type ConceptMastery,
   type DeepChapterResponse,
@@ -264,6 +268,7 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const [masteryByKey, setMasteryByKey] = useState<Record<string, ConceptMastery>>({})
   const [masteredThreshold, setMasteredThreshold] = useState(0.75)
   const [dueCount, setDueCount] = useState(0)
+  const [readiness, setReadiness] = useState<Record<string, ChapterReadiness>>({})
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [resumed, setResumed] = useState(false)
   const [notes, setNotes] = useState<MarginNote[]>([])
@@ -335,6 +340,75 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     const resolved = resolveDeepChapter(chapters, tree, scope)
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
+
+  // Per-chapter readiness ladder (raw → partial → deep) + any build jobs.
+  const loadReadiness = useCallback(async () => {
+    if (chapters.length === 0) return
+    try {
+      const r = await fetchChaptersReadiness(docId, chapters.map((c) => c.key))
+      setReadiness(r.chapters || {})
+    } catch {
+      // readiness is supplementary — never break the reader
+    }
+  }, [docId, chapters])
+
+  useEffect(() => {
+    loadReadiness()
+  }, [loadReadiness])
+
+  const currentBuild = chapterKey ? readiness[chapterKey]?.build ?? null : null
+  const building = currentBuild?.status === "running"
+  const queuedBuild = currentBuild?.status === "queued"
+  const anyBuildActive = useMemo(
+    () =>
+      Object.values(readiness).some(
+        (r) => r.build && (r.build.status === "queued" || r.build.status === "running"),
+      ),
+    [readiness],
+  )
+
+  // Keep the ladder live while anything is queued/building, and reload the open
+  // chapter the moment its own build lands.
+  useEffect(() => {
+    if (!anyBuildActive) return
+    const t = setInterval(loadReadiness, 10000)
+    return () => clearInterval(t)
+  }, [anyBuildActive, loadReadiness])
+
+  const prevBuildStatus = useRef<string | null>(null)
+  useEffect(() => {
+    const s = currentBuild?.status ?? null
+    if (prevBuildStatus.current === "running" && s !== "running") load()
+    prevBuildStatus.current = s
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBuild?.status])
+
+  const nextNightEpoch = () => {
+    const d = new Date()
+    d.setHours(2, 0, 0, 0)
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+    return Math.floor(d.getTime() / 1000)
+  }
+
+  const startBuild = async (at?: number | null) => {
+    if (!chapterKey) return
+    try {
+      await enqueueChapterBuild(docId, chapterKey, at)
+    } catch {
+      // surfaced via readiness on the next poll
+    }
+    loadReadiness()
+  }
+
+  const cancelBuildJob = async () => {
+    if (!chapterKey) return
+    try {
+      await cancelChapterBuild(docId, chapterKey)
+    } catch {
+      // ignore
+    }
+    loadReadiness()
+  }
 
   const refreshMastery = useCallback(() => {
     fetchConceptMastery(docId)
@@ -424,9 +498,9 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
   }, [data?.markdown, chapterKey, docId])
 
-  // Poll while a prepare pass runs so explanations stream in as they finish.
+  // Poll while a prepare/build pass runs so explanations stream in as they finish.
   useEffect(() => {
-    if (!preparing) return
+    if (!preparing && !building) return
     const t = setInterval(async () => {
       if (!chapterKey) return
       try {
@@ -438,17 +512,7 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
       }
     }, 6000)
     return () => clearInterval(t)
-  }, [preparing, docId, chapterKey])
-
-  const handlePrepare = async () => {
-    if (!chapterKey) return
-    setPreparing(true)
-    try {
-      await prepareDeepChapter(docId, chapterKey)
-    } catch {
-      setPreparing(false)
-    }
-  }
+  }, [preparing, building, docId, chapterKey])
 
   const goChapter = (key: string) => {
     setChapterKey(key)
@@ -616,9 +680,14 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
 
   const briefing = data?.briefing
   const status = data?.status
-  const needsPrepare = Boolean(
-    status && (!status.briefing || (status.totalConcepts > 0 && status.explained < status.totalConcepts)),
-  )
+  // Prefer the readiness ladder (knows about raw chapters); fall back to the
+  // response status until it loads. "Needs" = anything short of fully deep.
+  const cr = chapterKey ? readiness[chapterKey] : undefined
+  const needsPrepare = cr
+    ? cr.concepts === 0 || cr.explained < cr.concepts || !cr.briefing
+    : Boolean(
+        status && (!status.briefing || (status.totalConcepts > 0 && status.explained < status.totalConcepts)),
+      )
   const activeConcept = active ? concepts[active.idx] : null
   const activeMastery =
     activeConcept?.conceptKey != null ? masteryByKey[activeConcept.conceptKey] : undefined
@@ -644,15 +713,33 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-96 w-80 overflow-y-auto">
-            {chapters.map((c) => (
-              <DropdownMenuItem
-                key={c.key}
-                onSelect={() => goChapter(c.key)}
-                className={cn("truncate", c.key === chapterKey && "text-nvidia-green")}
-              >
-                {c.title}
-              </DropdownMenuItem>
-            ))}
+            {chapters.map((c) => {
+              const r = readiness[c.key]
+              const b = r?.build
+              // Readiness ladder dot: building / queued / deep / partial / raw.
+              const dot =
+                b?.status === "running" ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-nvidia-green" />
+                ) : b?.status === "queued" ? (
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                ) : r && r.concepts > 0 && r.explained >= r.concepts && r.briefing ? (
+                  <span className="h-2 w-2 rounded-full bg-nvidia-green" title="Deep — ready" />
+                ) : r && r.concepts > 0 ? (
+                  <span className="h-2 w-2 rounded-full border border-nvidia-green bg-nvidia-green/30" title="Partially built" />
+                ) : (
+                  <span className="h-2 w-2 rounded-full border border-muted-foreground/40" title="Not built yet" />
+                )
+              return (
+                <DropdownMenuItem
+                  key={c.key}
+                  onSelect={() => goChapter(c.key)}
+                  className={cn("gap-2", c.key === chapterKey && "text-nvidia-green")}
+                >
+                  <span className="flex w-3 shrink-0 items-center justify-center">{dot}</span>
+                  <span className="truncate">{c.title}</span>
+                </DropdownMenuItem>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
         {status && status.totalConcepts > 0 && (
@@ -660,16 +747,47 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
             deep layer {status.explained}/{status.totalConcepts}
           </span>
         )}
-        {preparing ? (
+        {building ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            building
+            {currentBuild?.phase === "extract" && currentBuild.total
+              ? ` · extracting ${currentBuild.done}/${currentBuild.total}`
+              : currentBuild?.phase === "deep"
+                ? " · deep layer"
+                : "…"}
+          </span>
+        ) : queuedBuild ? (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            {currentBuild?.notBefore
+              ? `queued · ${new Date(currentBuild.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
+              : "queued"}
+            <button type="button" className="ml-0.5 hover:text-foreground" onClick={cancelBuildJob} title="Cancel build">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ) : preparing ? (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> preparing…
           </span>
         ) : (
           needsPrepare && (
-            <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={handlePrepare}>
-              <Wand2 className="h-3.5 w-3.5" />
-              Prepare deep layer
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Build chapter
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => startBuild(null)}>Build now</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => startBuild(nextNightEpoch())}>
+                  Build tonight · 2:00 AM
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )
         )}
         <ReadingControls prefs={prefs} onChange={setPrefs} />

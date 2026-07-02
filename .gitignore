@@ -37,6 +37,8 @@ __pycache__/
 # ---- Build / coverage / logs ----
 dist/
 build/
+# …but the Next.js API route for the chapter build queue is source, not output.
+!assets/frontend/app/api/learn/build/
 coverage/
 *.log
 

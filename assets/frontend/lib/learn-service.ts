@@ -1096,6 +1096,66 @@ export async function fetchDeepChapter(doc: string, scope: string): Promise<Deep
   return parseJsonResponse<DeepChapterResponse>(res)
 }
 
+// --- Chapter build queue -----------------------------------------------------
+
+export type ChapterBuildJob = {
+  key?: string
+  scope: string
+  status: 'queued' | 'running' | 'done' | 'error'
+  notBefore?: number | null
+  requestedAt?: number
+  startedAt?: number | null
+  finishedAt?: number | null
+  phase?: string | null
+  done?: number
+  total?: number
+  error?: string | null
+  already?: boolean
+}
+
+export type ChapterReadiness = {
+  concepts: number
+  explained: number
+  briefing: boolean
+  build: Pick<ChapterBuildJob, 'status' | 'notBefore' | 'phase' | 'done' | 'total' | 'error'> | null
+}
+
+export async function enqueueChapterBuild(
+  doc: string,
+  scope: string,
+  at?: number | null,
+): Promise<ChapterBuildJob & { error?: string }> {
+  const params = new URLSearchParams({ doc, scope })
+  const res = await fetch(`/api/learn/build?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(at ? { at } : {}),
+  })
+  return parseJsonResponse<ChapterBuildJob>(res)
+}
+
+export async function cancelChapterBuild(
+  doc: string,
+  scope: string,
+): Promise<{ cancelled: boolean; reason?: string; error?: string }> {
+  const params = new URLSearchParams({ doc, scope })
+  const res = await fetch(`/api/learn/build/cancel?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  return parseJsonResponse<{ cancelled: boolean; reason?: string }>(res)
+}
+
+export async function fetchChaptersReadiness(
+  doc: string,
+  scopes: string[],
+): Promise<{ docId?: string; chapters: Record<string, ChapterReadiness>; error?: string }> {
+  const params = new URLSearchParams({ doc, scopes: scopes.join(',') })
+  const res = await fetch(`/api/learn/build/readiness?${params}`, { cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; chapters: Record<string, ChapterReadiness> }>(res)
+}
+
 export async function prepareDeepChapter(
   doc: string,
   scope: string,
