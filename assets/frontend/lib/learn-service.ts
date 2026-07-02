@@ -1096,6 +1096,34 @@ export async function fetchDeepChapter(doc: string, scope: string): Promise<Deep
   return parseJsonResponse<DeepChapterResponse>(res)
 }
 
+// --- Course-level Today plan ---------------------------------------------------
+
+export type TodayPlan = {
+  docId?: string
+  resume: {
+    scope: string
+    title: string
+    nextStage: { key: string; label: string }
+    stagesDone: number
+    stagesTotal: number
+  } | null
+  reviewsDue: number
+  nextUnbuilt: {
+    key: string
+    title: string
+    build: { status: string; notBefore?: number | null } | null
+  } | null
+  chapters: { key: string; title: string; concepts: number; explained: number }[]
+  error?: string
+}
+
+export async function fetchTodayPlan(doc: string, hintScope?: string | null): Promise<TodayPlan> {
+  const params = new URLSearchParams({ doc })
+  if (hintScope) params.set('scope', hintScope)
+  const res = await fetch(`/api/learn/plan?${params}`, { cache: 'no-store' })
+  return parseJsonResponse<TodayPlan>(res)
+}
+
 // --- Chapter build queue -----------------------------------------------------
 
 export type ChapterBuildJob = {

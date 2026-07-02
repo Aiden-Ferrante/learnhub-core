@@ -1,43 +1,26 @@
-import type { StudyMode } from "@/components/learn/section-panel"
+/** The chapter learning path — a progression RAIL over the deep reading surface
+ *  (the old lesson-view mode-switcher is retired; stages now open drawers in place).
+ *
+ *  Order: meet the chapter first (read), THEN rebuild it from memory (learn) —
+ *  recall works better against something you've actually read. Stage keys are
+ *  stable ("skeleton" stays "skeleton") so existing chapter_progress carries over. */
 
-/** A stage in the guided chapter journey. `mode` maps it to the study panel it opens;
- *  `lead` is the one-line narration shown at the seam in Guided mode. */
 export type PathStage = {
   key: string
-  mode: Exclude<StudyMode, null>
   label: string
   lead: string
 }
 
-// The chapter is one act of construction: orient → scaffold → hang → test → load-test → set.
-// This is the single source of truth for the path (shared by the stepper, the Continue
-// engine, and Guided narration).
+// Single source of truth for the path, shared by the rail, the resume logic, and
+// the course-level Today plan (mirrored server-side in app/plan.py — keep in sync).
 export const PATH_STAGES: PathStage[] = [
-  { key: "orient", mode: "orient", label: "Orient", lead: "See where this chapter is headed before you dive in." },
-  // Unified top-down walk: frame the chapter, then descend each branch — recall its sub-sections,
-  // then learn their concepts — before the next branch. (Keeps stage key "skeleton" so existing
-  // chapter-progress + the gradeSkeleton "done" signal carry over.)
-  { key: "skeleton", mode: "learn", label: "Learn", lead: "Build the chapter top-down — frame it, then learn each branch in turn." },
-  { key: "read", mode: "read", label: "Read", lead: "Read it through with that shape already in mind." },
-  { key: "quizzes", mode: "conceptQuiz", label: "Quizzes", lead: "Retrieve and apply each concept — application questions across the chapter." },
-  { key: "exam", mode: "exam", label: "Exam", lead: "One graded, interleaved pass over the whole chapter — pass to lock it in." },
-  { key: "lockin", mode: "lockin", label: "Lock in", lead: "Let it set — the keepers go into spaced review." },
+  { key: "orient", label: "Orient", lead: "See where this chapter is headed before you dive in." },
+  { key: "read", label: "Read", lead: "Read it through — meet the ideas in their own order first." },
+  { key: "skeleton", label: "Learn", lead: "Now rebuild it top-down from memory — frame it, then learn each branch." },
+  { key: "quizzes", label: "Quizzes", lead: "Retrieve and apply each concept — application questions across the chapter." },
+  { key: "exam", label: "Exam", lead: "One graded, interleaved pass over the whole chapter — pass to lock it in." },
+  { key: "lockin", label: "Lock in", lead: "Let it set — the keepers go into spaced review." },
 ]
-
-export function stageForMode(mode: StudyMode): PathStage | null {
-  return PATH_STAGES.find((s) => s.mode === mode) ?? null
-}
-
-export function stageIndexForMode(mode: StudyMode): number {
-  return PATH_STAGES.findIndex((s) => s.mode === mode)
-}
-
-/** The next stage within the same chapter, or null if `mode` is the last stage or off-path. */
-export function nextStage(mode: StudyMode): PathStage | null {
-  const i = stageIndexForMode(mode)
-  if (i < 0 || i >= PATH_STAGES.length - 1) return null
-  return PATH_STAGES[i + 1]
-}
 
 /** First stage not yet marked done — where "resume" should drop you. Defaults to the last
  *  stage when everything is complete (so a finished chapter resumes at Lock in). */

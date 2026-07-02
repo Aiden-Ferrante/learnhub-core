@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.drill import grade_drill, start_drill
 from app.exam import grade_exam, start_exam
+from app.plan import build_plan
 from app.recall import check_recall
 from app.skeleton import (
     fetch_orient,
@@ -61,6 +62,14 @@ def api_recall_check(body: dict | None = Body(default=None)) -> JSONResponse:
     body = body or {}
     data = check_recall(body.get("doc"), body.get("scope"), str(body.get("text") or ""))
     return JSONResponse(data, status_code=400 if data.get("error") else 200)
+
+
+@router.get("/api/plan")
+def api_plan(doc: str | None = None, scope: str | None = None) -> JSONResponse:
+    """Course-level Today plan: resume chapter+stage, reviews due, next chapter to build.
+    ``scope`` = the client's reading position hint."""
+    data = build_plan(doc, hint_scope=scope)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.get("/api/orient")

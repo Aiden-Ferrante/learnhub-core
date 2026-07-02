@@ -3,26 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CourseShelf } from "@/components/learn/course-shelf"
 import { CourseHome } from "@/components/learn/course-home"
-import { LessonView } from "@/components/learn/lesson-view"
 import { ConceptsView } from "@/components/learn/concepts-view"
 import { DrillView } from "@/components/learn/drill-view"
 import { DumpView } from "@/components/learn/dump-view"
 import { BookReader } from "@/components/learn/book-reader"
 import { DeepChapter } from "@/components/learn/deep-chapter"
 import { AskPanel } from "@/components/learn/ask-panel"
-import { type StudyMode } from "@/components/learn/section-panel"
 import {
-  fetchChapterProgress,
   fetchMastery,
   fetchReviewQueue,
   fetchTocTree,
   findNodeBySectionKey,
-  flattenSections,
   type LearnTreeNode,
   type MasteryResponse,
   type WeakestSection,
 } from "@/lib/learn-service"
-import { doneMap, firstIncompleteStage } from "@/lib/learn-path"
 import {
   fetchReadingProgress,
   saveReadingPosition,
@@ -35,7 +30,13 @@ type LearnTabProps = {
   onTabChange?: (tab: string) => void
 }
 
-type View = "shelf" | "home" | "lesson" | "read" | "deep" | "concepts" | "drill" | "dump" | "ask"
+type View = "shelf" | "home" | "read" | "deep" | "concepts" | "drill" | "dump" | "ask"
+
+/** What the deep surface should open with (e.g. "Review all" lands in the review drawer). */
+type DeepIntent = {
+  drawer?: "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen"
+  wholeCourseReview?: boolean
+} | null
 
 export function LearnTab({ onTabChange }: LearnTabProps) {
   const { documents } = useDocuments()
@@ -48,8 +49,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
   const [view, setView] = useState<View>("shelf")
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [selectedScope, setSelectedScope] = useState<string | null>(null)
-  const [selectedNode, setSelectedNode] = useState<LearnTreeNode | null>(null)
-  const [studyMode, setStudyMode] = useState<StudyMode>(null)
+  const [deepIntent, setDeepIntent] = useState<DeepIntent>(null)
   const [readingProgress, setReadingProgress] = useState<ReadingProgress>({})
   const [reviewDue, setReviewDue] = useState(0)
 
@@ -119,29 +119,6 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     wasReadyRef.current = ready
   }, [selectedCourse, view, loadTree, loadMastery, loadDue])
 
-  const sections = useMemo(() => flattenSections(tree), [tree])
-
-  const { prevSection, nextSection } = useMemo(() => {
-    if (!selectedScope) return { prevSection: null, nextSection: null }
-    const idx = sections.findIndex((s) => s.sectionKey === selectedScope)
-    return {
-      prevSection: idx > 0 ? sections[idx - 1] : null,
-      nextSection: idx >= 0 && idx < sections.length - 1 ? sections[idx + 1] : null,
-    }
-  }, [sections, selectedScope])
-
-  // The chapter after the one currently in scope — top-level tree nodes are chapters. Used by
-  // the Continue engine to hop chapters at the end of a path. Null when the scope isn't under
-  // a recognizable top-level chapter (the engine then just offers "back to outline").
-  const nextChapter = useMemo(() => {
-    if (!selectedScope || tree.length === 0) return null
-    const chapters = tree.filter((n) => n.isSection && n.sectionKey)
-    if (chapters.length === 0) return null
-    const idx = chapters.findIndex((c) => findNodeBySectionKey([c], selectedScope))
-    if (idx < 0) return null
-    return idx < chapters.length - 1 ? chapters[idx + 1] : null
-  }, [tree, selectedScope])
-
   const persistReadingPosition = useCallback(
     (sectionKey: string) => {
       if (!selectedCourseId) return
@@ -154,8 +131,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
   const openCourse = (course: Course) => {
     setSelectedCourseId(course.id)
     setSelectedScope(null)
-    setSelectedNode(null)
-    setStudyMode(null)
+    setDeepIntent(null)
     setView("home")
     // Prime the readiness tracker so the live-refresh effect doesn't double-load.
     wasReadyRef.current = isCourseReady(course)
@@ -173,70 +149,6 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     loadMastery()
   }
 
-  const openSection = (scope: string | null, node: LearnTreeNode | null) => {
-    setSelectedScope(scope)
-    setSelectedNode(node)
-    // Open a chapter at the start of its learning path (Orient → Learn → …).
-    setStudyMode(scope ? "orient" : null)
-    setView("lesson")
-    if (scope) persistReadingPosition(scope)
-  }
-
-  // Whole-course review: jump into the Review mode over the full due queue (scope=null).
-  const reviewAll = () => {
-    setSelectedScope(null)
-    setSelectedNode(null)
-    setStudyMode("review")
-    setView("lesson")
-  }
-
-  const navigateSection = (node: LearnTreeNode) => {
-    setSelectedScope(node.sectionKey)
-    setSelectedNode(node)
-    if (node.sectionKey) persistReadingPosition(node.sectionKey)
-  }
-
-  // Jump to any chapter/subsection (or whole course) from inside the lesson view,
-  // keeping the current study mode — used by the in-lesson scope picker.
-  const selectScope = (scope: string | null, node: LearnTreeNode | null) => {
-    setSelectedScope(scope)
-    setSelectedNode(node)
-    if (scope) persistReadingPosition(scope)
-  }
-
-  // Start a chapter at the top of its path (Orient) — the Continue engine's "next chapter" hop.
-  const startChapterPath = (node: LearnTreeNode) => {
-    setSelectedScope(node.sectionKey)
-    setSelectedNode(node)
-    setStudyMode("orient")
-    setView("lesson")
-    if (node.sectionKey) persistReadingPosition(node.sectionKey)
-  }
-
-  // Resume the learning path: drop into the last-studied chapter at its first incomplete stage.
-  const handleResumePath = async () => {
-    if (!continueSectionKey) return
-    setSelectedScope(continueSectionKey)
-    setSelectedNode(continueNode)
-    setView("lesson")
-    setStudyMode("orient") // optimistic — refined once progress loads
-    try {
-      const learnDoc = selectedCourse?.learnDocId ?? selectedCourse?.id
-      const p = await fetchChapterProgress(continueSectionKey, learnDoc)
-      setStudyMode(firstIncompleteStage(doneMap(p.stages)).mode)
-    } catch {
-      // optimistic orient stands if progress can't load
-    }
-  }
-
-  const handleReview = (section: WeakestSection) => {
-    const node = findNodeBySectionKey(tree, section.sectionKey)
-    setSelectedScope(section.sectionKey)
-    setSelectedNode(node)
-    setStudyMode("review")
-    setView("lesson")
-  }
-
   const continueSectionKey = selectedCourseId
     ? readingProgress[selectedCourseId]
     : undefined
@@ -244,26 +156,33 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     ? findNodeBySectionKey(tree, continueSectionKey)
     : null
 
-  // Deep Read: the one-surface reading-first chapter view. Hands the reading
-  // position (or nothing) to DeepChapter, which resolves it to a real chapter.
-  const openDeepRead = () => {
-    setSelectedScope(continueSectionKey ?? null)
-    setSelectedNode(continueNode ?? null)
+  // EVERY study entrance lands on the deep surface now — the lesson mode-flow is
+  // retired; the path lives as a rail (and drawers) on the reader itself.
+  const openDeep = (scope: string | null, intent: DeepIntent = null) => {
+    setSelectedScope(scope)
+    setDeepIntent(intent)
     setView("deep")
+    if (scope) persistReadingPosition(scope)
   }
 
-  const handleContinueReading = () => {
-    if (!continueSectionKey) return
-    setSelectedScope(continueSectionKey)
-    setSelectedNode(continueNode)
-    setStudyMode("read")
-    setView("lesson")
+  const openSection = (scope: string | null, node: LearnTreeNode | null) => {
+    void node
+    openDeep(scope)
   }
+
+  // Whole-course review: the deep surface opens with the review drawer over the full queue.
+  const reviewAll = () => openDeep(continueSectionKey ?? null, { drawer: "review", wholeCourseReview: true })
+
+  const handleReview = (section: WeakestSection) =>
+    openDeep(section.sectionKey, { drawer: "review" })
+
+  const openDeepRead = () => openDeep(continueSectionKey ?? null)
 
   const backToCourseHome = () => {
     setView("home")
-    setStudyMode(null)
+    setDeepIntent(null)
     loadMastery(selectedCourse ? (selectedCourse.learnDocId ?? selectedCourse.id) : undefined)
+    loadDue(selectedCourse ? (selectedCourse.learnDocId ?? selectedCourse.id) : undefined)
   }
 
   // Re-run the course loads after a transient backend failure (e.g. ArangoDB still booting).
@@ -301,6 +220,8 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
           setSelectedScope(sectionKey)
           persistReadingPosition(sectionKey)
         }}
+        initialDrawer={deepIntent?.drawer}
+        reviewWholeCourse={deepIntent?.wholeCourseReview}
       />
     )
   }
@@ -335,39 +256,12 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     )
   }
 
-  if (view === "lesson" && selectedCourse) {
-    return (
-      <LessonView
-        course={selectedCourse}
-        scope={selectedScope}
-        node={selectedNode}
-        studyMode={studyMode}
-        onStudyModeChange={setStudyMode}
-        sectionMastery={selectedScope ? mastery?.bySection[selectedScope] : undefined}
-        onBack={backToCourseHome}
-        onAnswered={() => {
-          const d = selectedCourse.learnDocId ?? selectedCourse.id
-          loadMastery(d)
-          loadDue(d)
-        }}
-        prevSection={prevSection}
-        nextSection={nextSection}
-        onNavigate={navigateSection}
-        tree={isLive ? tree : []}
-        masteryBySection={isLive ? mastery?.bySection : undefined}
-        onSelectScope={selectScope}
-        nextChapter={nextChapter}
-        onStartChapter={startChapterPath}
-      />
-    )
-  }
-
   if (view === "ask" && selectedCourse) {
     return (
       <AskPanel
         course={selectedCourse}
         onBack={backToCourseHome}
-        onOpenSection={(scope) => openSection(scope, scope ? findNodeBySectionKey(tree, scope) : null)}
+        onOpenSection={(scope) => openDeep(scope)}
       />
     )
   }
@@ -391,8 +285,6 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
         onBrainDump={() => setView("dump")}
         onBackToShelf={backToShelf}
         continueNode={isLive ? continueNode : null}
-        onContinueReading={handleContinueReading}
-        onResumePath={handleResumePath}
         dueCount={reviewDue}
         onReviewAll={reviewAll}
         onRetry={retryCourseLoad}

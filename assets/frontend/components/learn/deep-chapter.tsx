@@ -4,12 +4,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   BookOpen,
   Brain,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   GraduationCap,
+  Headphones,
   Loader2,
+  MessageCircleQuestion,
+  Network,
   RotateCcw,
   Sparkles,
   Wand2,
@@ -30,6 +34,11 @@ import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
 import { ConceptQuizPanel } from "@/components/learn/concept-quiz-panel"
 import { ReviewPanel } from "@/components/learn/review-panel"
 import { ExamPanel } from "@/components/learn/exam-panel"
+import { ChapterWalk } from "@/components/learn/chapter-walk"
+import { LockInPanel } from "@/components/learn/lockin-panel"
+import { LessonPanel } from "@/components/learn/lesson-panel"
+import { AudiobookPanel } from "@/components/learn/audiobook-panel"
+import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/lib/learn-path"
 import {
   chaptersFromOutline,
   resolveChapterForScope,
@@ -42,12 +51,14 @@ import {
   askTextbook,
   cancelChapterBuild,
   enqueueChapterBuild,
+  fetchChapterProgress,
   fetchChaptersReadiness,
   fetchConceptMastery,
   fetchDeepChapter,
   fetchOutline,
   fetchReviewQueue,
   recordEngagement,
+  updateChapterStage,
   type AskResponse,
   type ChapterReadiness,
   type ConceptLesson,
@@ -67,6 +78,10 @@ type DeepChapterProps = {
   onBack: () => void
   /** Reports the chapter the reader lands on, so the reading position persists. */
   onScopeChange?: (sectionKey: string) => void
+  /** Open a drawer once the chapter resolves (e.g. course-home "Review all" lands here). */
+  initialDrawer?: "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen"
+  /** Review drawer covers the whole course (scope=null) instead of just this chapter. */
+  reviewWholeCourse?: boolean
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -235,7 +250,17 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
 }
 
 type MarginNote = { key: string; idx: number; top: number; name: string; signal: string }
-type StudyDrawer = "quiz" | "review" | "exam" | null
+type StudyDrawer = "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen" | null
+
+const DRAWER_TITLES: Record<Exclude<StudyDrawer, null>, string> = {
+  quiz: "Chapter quiz",
+  review: "Review",
+  exam: "Chapter exam",
+  walk: "Learn — top-down walk",
+  lockin: "Lock in",
+  tutor: "Tutor",
+  listen: "Listen",
+}
 
 /** Half the prose measure — where the margin-note column starts (center + half + gap). */
 const HALF_MEASURE: Record<Measure, string> = {
@@ -254,7 +279,15 @@ function layoutNotes(notes: MarginNote[]): MarginNote[] {
   return sorted
 }
 
-export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: DeepChapterProps) {
+export function DeepChapter({
+  course,
+  scope,
+  tree,
+  onBack,
+  onScopeChange,
+  initialDrawer,
+  reviewWholeCourse,
+}: DeepChapterProps) {
   const docId = course.learnDocId ?? course.id
   const [theme] = useReadingTheme()
   const [prefs, setPrefs] = useReadingPrefs()
@@ -269,6 +302,9 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const [masteredThreshold, setMasteredThreshold] = useState(0.75)
   const [dueCount, setDueCount] = useState(0)
   const [readiness, setReadiness] = useState<Record<string, ChapterReadiness>>({})
+  // Path rail: {stageKey: done} from chapter_progress — the same store the old
+  // lesson flow wrote, so history carries over.
+  const [stages, setStages] = useState<Record<string, boolean>>({})
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [resumed, setResumed] = useState(false)
   const [notes, setNotes] = useState<MarginNote[]>([])
@@ -283,6 +319,10 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const briefingRef = useRef<HTMLDivElement>(null)
+  // Soft-gate counters for the two stages nothing else reports.
+  const quizAnswers = useRef(0)
+  const readMarked = useRef(false)
   const scrollSaveAt = useRef(0)
   // Last REAL reading position. When leaving a chapter the content unmounts first and the
   // browser clamps scrollTop to 0 before effect cleanups run — saving the live value there
@@ -340,6 +380,35 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     const resolved = resolveDeepChapter(chapters, tree, scope)
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
+
+  // Path progress for the open chapter (orient/read/skeleton/quizzes/exam/lockin).
+  const loadProgress = useCallback(async () => {
+    if (!chapterKey) return
+    try {
+      const p = await fetchChapterProgress(chapterKey, docId)
+      setStages(doneMap(p.stages))
+    } catch {
+      // progress is supplementary — never break the reader
+    }
+  }, [chapterKey, docId])
+
+  useEffect(() => {
+    setStages({})
+    quizAnswers.current = 0
+    readMarked.current = false
+    loadProgress()
+  }, [loadProgress])
+
+  const markStage = useCallback(
+    (key: string) => {
+      if (!chapterKey) return
+      setStages((s) => ({ ...s, [key]: true }))
+      updateChapterStage(chapterKey, docId, key, { done: true })
+        .then(() => loadProgress())
+        .catch(() => {})
+    },
+    [chapterKey, docId, loadProgress],
+  )
 
   // Per-chapter readiness ladder (raw → partial → deep) + any build jobs.
   const loadReadiness = useCallback(async () => {
@@ -484,6 +553,11 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
     const box = scrollRef.current
     if (!box || !chapterKey || !data?.markdown) return
     lastScrollTop.current = box.scrollTop
+    // Read stage: reaching the tail of the chapter marks it read (soft gate).
+    if (!readMarked.current && !stages.read && box.scrollTop + box.clientHeight >= box.scrollHeight * 0.92) {
+      readMarked.current = true
+      markStage("read")
+    }
     const now = Date.now()
     if (now - scrollSaveAt.current < 300) return
     scrollSaveAt.current = now
@@ -517,6 +591,39 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
   const goChapter = (key: string) => {
     setChapterKey(key)
     onScopeChange?.(key)
+  }
+
+  // Entry intent (e.g. "Review all" from course home) — open the drawer once, after
+  // the chapter resolves; chapter switches afterwards close drawers as usual.
+  const initialDrawerDone = useRef(false)
+  useEffect(() => {
+    if (initialDrawerDone.current || !chapterKey || !initialDrawer) return
+    initialDrawerDone.current = true
+    setDrawer(initialDrawer)
+  }, [chapterKey, initialDrawer])
+
+  // Rail click → the stage's home on this surface: orient/read scroll, the rest are drawers.
+  const runStage = (key: string) => {
+    switch (key) {
+      case "orient":
+        briefingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        break
+      case "read":
+        scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+        break
+      case "skeleton":
+        setDrawer("walk")
+        break
+      case "quizzes":
+        setDrawer("quiz")
+        break
+      case "exam":
+        setDrawer("exam")
+        break
+      case "lockin":
+        setDrawer("lockin")
+        break
+    }
   }
 
   const concepts = useMemo(() => data?.concepts ?? [], [data])
@@ -808,6 +915,41 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
         </div>
       </div>
 
+      {/* Path rail — the guided journey as a rail over ONE surface (the mode-switcher is retired). */}
+      {chapterKey && (
+        <div className="flex items-center gap-1 overflow-x-auto border-b bg-card/60 px-3 py-1.5">
+          {PATH_STAGES.map((s, i) => {
+            const done = !!stages[s.key]
+            const isNext = firstIncompleteStage(stages).key === s.key
+            return (
+              <React.Fragment key={s.key}>
+                {i > 0 && <span className="h-px w-3 shrink-0 bg-border" />}
+                <button
+                  type="button"
+                  title={s.lead}
+                  onClick={() => runStage(s.key)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                    done
+                      ? "border-nvidia-green/40 bg-nvidia-green/10 text-nvidia-green"
+                      : isNext
+                        ? "border-foreground/30 text-foreground"
+                        : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
+                  )}
+                >
+                  {done ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <span className={cn("h-1.5 w-1.5 rounded-full", isNext ? "bg-nvidia-green" : "bg-muted-foreground/40")} />
+                  )}
+                  {s.label}
+                </button>
+              </React.Fragment>
+            )
+          })}
+        </div>
+      )}
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -836,7 +978,7 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
 
             {/* Briefing — what this chapter teaches, assembled from the pre-generated layer. */}
             {briefing && (
-              <div className={cn("mb-8 rounded-lg border p-4", cardCls)}>
+              <div ref={briefingRef} className={cn("mb-8 rounded-lg border p-4", cardCls)}>
                 <div className={cn("mb-3 flex items-center gap-2 text-xs font-medium", mutedCls)}>
                   <BookOpen className="h-3.5 w-3.5" />
                   <span>Chapter briefing</span>
@@ -888,6 +1030,14 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
                     </div>
                   </details>
                 )}
+                {!stages.orient && (
+                  <div className="mt-4 border-t pt-3">
+                    <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => markStage("orient")}>
+                      <Check className="h-3.5 w-3.5" />
+                      I&apos;m oriented — start reading
+                    </Button>
+                  </div>
+                )}
                 {briefing.keyConcepts.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
                     {briefing.keyConcepts.map((c, i) => {
@@ -929,17 +1079,35 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
                   Lock in what you just read — everything opens right here.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("walk")}>
+                    <Network className="h-3.5 w-3.5" />
+                    Learn top-down{stages.skeleton ? " ✓" : ""}
+                  </Button>
                   <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("quiz")}>
                     <GraduationCap className="h-3.5 w-3.5" />
-                    Quiz this chapter
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Review{dueCount > 0 ? ` · ${dueCount} due` : ""}
+                    Quiz{stages.quizzes ? " ✓" : ""}
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("exam")}>
                     <Brain className="h-3.5 w-3.5" />
-                    Chapter exam
+                    Exam{stages.exam ? " ✓" : ""}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("lockin")}>
+                    <Check className="h-3.5 w-3.5" />
+                    Lock in{stages.lockin ? " ✓" : ""}
+                  </Button>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Review{dueCount > 0 ? ` · ${dueCount} due` : ""}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("tutor")}>
+                    <MessageCircleQuestion className="h-3.5 w-3.5" />
+                    Tutor
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("listen")}>
+                    <Headphones className="h-3.5 w-3.5" />
+                    Listen
                   </Button>
                   {nextChapter && (
                     <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => goChapter(nextChapter.key)}>
@@ -1090,16 +1258,50 @@ export function DeepChapter({ course, scope, tree, onBack, onScopeChange }: Deep
         <div className="fixed bottom-0 right-0 top-12 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
           <div className="flex items-center justify-between border-b px-4 py-2">
             <div className="text-xs font-medium text-muted-foreground">
-              {drawer === "quiz" ? "Chapter quiz" : drawer === "review" ? "Review" : "Chapter exam"} · {title}
+              {DRAWER_TITLES[drawer]} · {title}
             </div>
             <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setDrawer(null)}>
               <X className="h-4 w-4" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {drawer === "quiz" && <ConceptQuizPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
-            {drawer === "review" && <ReviewPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
-            {drawer === "exam" && <ExamPanel scope={chapterKey} docId={docId} onGraded={refreshMastery} />}
+            {drawer === "quiz" && (
+              <ConceptQuizPanel
+                scope={chapterKey}
+                docId={docId}
+                onAnswered={() => {
+                  refreshMastery()
+                  // Quizzes soft gate: a real round of retrieval marks the stage.
+                  quizAnswers.current += 1
+                  if (quizAnswers.current >= 5 && !stages.quizzes) markStage("quizzes")
+                }}
+              />
+            )}
+            {drawer === "review" && (
+              <ReviewPanel scope={reviewWholeCourse ? null : chapterKey} docId={docId} onAnswered={refreshMastery} />
+            )}
+            {drawer === "exam" && (
+              <ExamPanel
+                scope={chapterKey}
+                docId={docId}
+                onGraded={() => {
+                  refreshMastery()
+                  loadProgress() // exam stage is written server-side on a passing grade
+                }}
+              />
+            )}
+            {drawer === "walk" && (
+              <ChapterWalk
+                scope={chapterKey}
+                docId={docId}
+                tree={tree}
+                onAnswered={refreshMastery}
+                onComplete={() => loadProgress()} // walk grades the skeleton stage itself
+              />
+            )}
+            {drawer === "lockin" && <LockInPanel scope={chapterKey} docId={docId} onDone={loadProgress} />}
+            {drawer === "tutor" && <LessonPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
+            {drawer === "listen" && <AudiobookPanel scope={chapterKey} docId={docId} />}
           </div>
         </div>
       )}

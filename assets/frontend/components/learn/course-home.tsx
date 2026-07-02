@@ -1,19 +1,21 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   BookMarked,
   BookOpen,
   Brain,
   ChevronLeft,
+  Clock,
   Flame,
   GraduationCap,
   History,
-  Play,
+  Loader2,
   RotateCcw,
   Search,
   Sparkles,
   Target,
+  Wand2,
 } from "lucide-react"
 import { SyllabusTree } from "@/components/learn/syllabus-tree"
 import { StudyHeatmap } from "@/components/learn/study-heatmap"
@@ -22,15 +24,18 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   countSections,
   displaySectionTitle,
+  enqueueChapterBuild,
   fetchDocumentConcepts,
   fetchForecast,
   fetchMistakes,
+  fetchTodayPlan,
   findChapterForSection,
   findNodeBySectionKey,
   type ForecastResponse,
   type LearnTreeNode,
   type MasteryResponse,
   type Mistake,
+  type TodayPlan,
   type WeakestSection,
 } from "@/lib/learn-service"
 import type { Course } from "@/lib/courses"
@@ -50,8 +55,6 @@ type CourseHomeProps = {
   onAsk?: () => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
-  onContinueReading?: () => void
-  onResumePath?: () => void
   onDrill?: () => void
   onBrainDump?: () => void
   dueCount?: number
@@ -144,8 +147,6 @@ export function CourseHome({
   onAsk,
   onBackToShelf,
   continueNode,
-  onContinueReading,
-  onResumePath,
   onDrill,
   onBrainDump,
   dueCount = 0,
@@ -212,6 +213,37 @@ export function CourseHome({
   const weakest = mastery?.weakest ?? []
   const isEmpty = !loading && !error && tree.length === 0
 
+  // Course-level Today plan: resume chapter+stage, reviews due, next chapter to build.
+  const [plan, setPlan] = useState<TodayPlan | null>(null)
+  const [queueBusy, setQueueBusy] = useState(false)
+  const planDocId = course.learnDocId ?? course.id
+  const loadPlan = useCallback(() => {
+    fetchTodayPlan(planDocId, continueNode?.sectionKey ?? null)
+      .then((p) => {
+        if (!p.error) setPlan(p)
+      })
+      .catch(() => {})
+  }, [planDocId, continueNode?.sectionKey])
+
+  useEffect(() => {
+    loadPlan()
+  }, [loadPlan])
+
+  const queueTonight = async () => {
+    if (!plan?.nextUnbuilt) return
+    setQueueBusy(true)
+    try {
+      const d = new Date()
+      d.setHours(2, 0, 0, 0)
+      if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+      await enqueueChapterBuild(planDocId, plan.nextUnbuilt.key, Math.floor(d.getTime() / 1000))
+    } catch {
+      // surfaced by the next plan reload
+    }
+    setQueueBusy(false)
+    loadPlan()
+  }
+
 
   let headline: { icon: React.ReactNode; text: string }
   if (needsReview > 0) {
@@ -273,35 +305,61 @@ export function CourseHome({
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {/* Reading-first: the deep reading surface is the primary way into the course. */}
+        {/* Today — the course-level path: what to do NOW, assembled server-side from
+            chapter progress + spaced reviews + the build queue. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {onDeepRead && !isEmpty && (
             <Button
               type="button"
               size="sm"
               className="h-8 gap-1.5 px-3 text-xs"
               onClick={onDeepRead}
-              title="Read on the deep chapter surface"
+              title={plan?.resume?.nextStage ? `Next up: ${plan.resume.nextStage.label}` : "Read on the deep chapter surface"}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              {continueNode
-                ? `Continue reading · ${displaySectionTitle(continueNode.label, continueNode.title)}`
-                : "Start reading"}
+              {plan?.resume
+                ? `Continue · ${plan.resume.title} — ${plan.resume.nextStage.label} (${plan.resume.stagesDone}/${plan.resume.stagesTotal})`
+                : continueNode
+                  ? `Continue reading · ${displaySectionTitle(continueNode.label, continueNode.title)}`
+                  : "Start reading"}
             </Button>
           )}
-          {continueNode && onResumePath && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onResumePath}
-              title="Pick up the learning path where you left off"
-            >
-              <Play className="h-3.5 w-3.5" />
-              Resume path · {displaySectionTitle(continueNode.label, continueNode.title)}
+          {plan && plan.reviewsDue > 0 && onReviewAll && (
+            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onReviewAll}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Review · {plan.reviewsDue} due
             </Button>
           )}
+          {plan?.nextUnbuilt &&
+            (plan.nextUnbuilt.build &&
+            (plan.nextUnbuilt.build.status === "queued" || plan.nextUnbuilt.build.status === "running") ? (
+              <span className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">
+                {plan.nextUnbuilt.build.status === "running" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Clock className="h-3.5 w-3.5" />
+                )}
+                {plan.nextUnbuilt.title}
+                {plan.nextUnbuilt.build.status === "running"
+                  ? " · building"
+                  : plan.nextUnbuilt.build.notBefore
+                    ? ` · ${new Date(plan.nextUnbuilt.build.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
+                    : " · queued"}
+              </span>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 px-3 text-xs"
+                onClick={queueTonight}
+                disabled={queueBusy}
+                title={`${plan.nextUnbuilt.title} has no concept layer yet — schedule its build for tonight`}
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                Build “{plan.nextUnbuilt.title.length > 26 ? `${plan.nextUnbuilt.title.slice(0, 26)}…` : plan.nextUnbuilt.title}” tonight
+              </Button>
+            ))}
         </div>
       </div>
 
