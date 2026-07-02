@@ -309,6 +309,10 @@ export function DeepChapter({
   const [resumed, setResumed] = useState(false)
   const [notes, setNotes] = useState<MarginNote[]>([])
   const [wide, setWide] = useState(false)
+  // Chapter outline (locked to THIS chapter): derived from the rendered headings,
+  // so it always matches what's on screen. Scroll-spy highlights where you are.
+  const [outlineItems, setOutlineItems] = useState<{ text: string; level: number }[]>([])
+  const [activeOutline, setActiveOutline] = useState(-1)
 
   // Inline concept popover (event-delegated so the reader never re-renders on open/close).
   const [active, setActive] = useState<{ idx: number; x: number; y: number } | null>(null)
@@ -324,6 +328,8 @@ export function DeepChapter({
   const quizAnswers = useRef(0)
   const readMarked = useRef(false)
   const scrollSaveAt = useRef(0)
+  const spyAt = useRef(0)
+  const headingEls = useRef<HTMLElement[]>([])
   // Last REAL reading position. When leaving a chapter the content unmounts first and the
   // browser clamps scrollTop to 0 before effect cleanups run — saving the live value there
   // would always persist 0. handleScroll keeps this ref honest (and ignores the clamp event,
@@ -558,6 +564,17 @@ export function DeepChapter({
       readMarked.current = true
       markStage("read")
     }
+    // Outline scroll-spy (throttled): the last heading above the reading line is "here".
+    const spyNow = Date.now()
+    if (spyNow - spyAt.current >= 150 && headingEls.current.length) {
+      spyAt.current = spyNow
+      const boxTop = box.getBoundingClientRect().top
+      let idx = -1
+      headingEls.current.forEach((el, i) => {
+        if (el.getBoundingClientRect().top - boxTop <= 96) idx = i
+      })
+      setActiveOutline((cur) => (cur === idx ? cur : idx))
+    }
     const now = Date.now()
     if (now - scrollSaveAt.current < 300) return
     scrollSaveAt.current = now
@@ -697,6 +714,14 @@ export function DeepChapter({
         kept.push(el)
       }
     })
+
+    // Chapter outline from the rendered headings (guaranteed to match the reader).
+    const heads = Array.from(wrapper.querySelectorAll<HTMLElement>(".markdown-reader h2, .markdown-reader h3, .markdown-reader h4"))
+    headingEls.current = heads
+    setOutlineItems(
+      heads.map((el) => ({ text: el.textContent?.trim() || "", level: Number(el.tagName[1]) || 2 })),
+    )
+    setActiveOutline(-1)
 
     if (!wide || kept.length === 0) {
       setNotes([])
@@ -953,12 +978,45 @@ export function DeepChapter({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-6", paper && "reading-surface-paper")}
+        className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-5", paper && "reading-surface-paper")}
         onClick={handleReaderClick}
         onMouseUp={handleMouseUp}
       >
-        <div ref={wrapperRef} className="relative">
-          <div className="mx-auto max-w-[80ch]">
+        <div className="mx-auto flex max-w-[110rem] justify-center gap-8">
+          {/* Chapter outline — always in view while reading, locked to THIS chapter.
+              Fills the dead left margin; scroll-spy shows where you are. */}
+          {outlineItems.length > 0 && (
+            <nav className="sticky top-0 hidden max-h-[calc(100dvh-220px)] w-56 shrink-0 self-start overflow-y-auto pb-4 pr-1 pt-1 lg:block">
+              <div className={cn("mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide", mutedCls)}>
+                In this chapter
+              </div>
+              <div className="space-y-0.5">
+                {outlineItems.map((it, i) => (
+                  <button
+                    key={`${it.text}-${i}`}
+                    type="button"
+                    title={it.text}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      headingEls.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }}
+                    className={cn(
+                      "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
+                      i === activeOutline
+                        ? "bg-nvidia-green/10 font-medium text-nvidia-green"
+                        : cn(mutedCls, paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/50", "hover:opacity-100"),
+                    )}
+                    style={{ paddingLeft: `${8 + Math.max(0, it.level - 2) * 12}px` }}
+                  >
+                    {it.text}
+                  </button>
+                ))}
+              </div>
+            </nav>
+          )}
+
+          <div ref={wrapperRef} className="relative min-w-0 flex-1">
+            <div className="mx-auto max-w-[80ch]">
             {loading && !data && (
               <div className="space-y-3">
                 <Skeleton className="h-8 w-2/3" />
@@ -978,12 +1036,20 @@ export function DeepChapter({
 
             {/* Briefing — what this chapter teaches, assembled from the pre-generated layer. */}
             {briefing && (
-              <div ref={briefingRef} className={cn("mb-8 rounded-lg border p-4", cardCls)}>
-                <div className={cn("mb-3 flex items-center gap-2 text-xs font-medium", mutedCls)}>
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>Chapter briefing</span>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div ref={briefingRef} className={cn("mb-6 rounded-lg border p-4", cardCls)}>
+                {/* Once oriented, the briefing folds to one line — the prose is the point. */}
+                <details open={!stages.orient}>
+                  <summary className={cn("flex cursor-pointer list-none items-center gap-2 text-xs font-medium", mutedCls)}>
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Chapter briefing</span>
+                    {stages.orient && (
+                      <span className="flex items-center gap-1 text-nvidia-green">
+                        <Check className="h-3 w-3" /> oriented
+                      </span>
+                    )}
+                    <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                  </summary>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {briefing.objectives.length > 0 && (
                     <div>
                       <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
@@ -1059,6 +1125,7 @@ export function DeepChapter({
                     })}
                   </div>
                 )}
+                </details>
               </div>
             )}
 
@@ -1142,6 +1209,7 @@ export function DeepChapter({
                 <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>{n.signal}</div>
               </button>
             ))}
+          </div>
         </div>
       </div>
 
