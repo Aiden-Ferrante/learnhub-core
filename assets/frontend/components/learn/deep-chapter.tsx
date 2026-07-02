@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MarkdownReader } from "@/components/learn/markdown-reader"
+import { MarkdownReader, MathText } from "@/components/learn/markdown-reader"
 import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
 import { ReadingControls } from "@/components/learn/reading-controls"
 import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
@@ -233,9 +233,11 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs">
-      <div className="font-medium text-foreground/90">Check yourself: {q}</div>
+      <div className="font-medium text-foreground/90">
+        Check yourself: <MathText text={q} className="inline-block" />
+      </div>
       {open ? (
-        <div className="mt-1 text-muted-foreground">{a}</div>
+        <MathText text={a} className="mt-1 text-muted-foreground" />
       ) : (
         <button
           type="button"
@@ -262,11 +264,12 @@ const DRAWER_TITLES: Record<Exclude<StudyDrawer, null>, string> = {
   listen: "Listen",
 }
 
-/** Half the prose measure — where the margin-note column starts (center + half + gap). */
+/** Half the prose measure — where the margin-note column starts (center + half + gap).
+ *  Mirrors MEASURE_CLASS in markdown-reader (70/85/100ch). */
 const HALF_MEASURE: Record<Measure, string> = {
-  narrow: "30ch",
-  normal: "37.5ch",
-  wide: "45ch",
+  narrow: "35ch",
+  normal: "42.5ch",
+  wide: "50ch",
 }
 
 function layoutNotes(notes: MarginNote[]): MarginNote[] {
@@ -716,11 +719,17 @@ export function DeepChapter({
     })
 
     // Chapter outline from the rendered headings (guaranteed to match the reader).
+    // Ignore the number spans WE inject into headings, or re-runs would read
+    // "1.2 Reliability" as the book's own number and skip renumbering.
     const heads = Array.from(wrapper.querySelectorAll<HTMLElement>(".markdown-reader h2, .markdown-reader h3, .markdown-reader h4"))
     headingEls.current = heads
-    setOutlineItems(
-      heads.map((el) => ({ text: el.textContent?.trim() || "", level: Number(el.tagName[1]) || 2 })),
-    )
+    const ownText = (el: HTMLElement) =>
+      Array.from(el.childNodes)
+        .filter((n) => !(n instanceof HTMLElement && n.classList.contains("dc-heading-num")))
+        .map((n) => n.textContent)
+        .join("")
+        .trim()
+    setOutlineItems(heads.map((el) => ({ text: ownText(el), level: Number(el.tagName[1]) || 2 })))
     setActiveOutline(-1)
 
     if (!wide || kept.length === 0) {
@@ -825,6 +834,23 @@ export function DeepChapter({
       return { ...it, num }
     })
   }, [outlineItems, chapterKey])
+
+  // Mirror the outline's numbers onto the headings IN the text (idempotent DOM pass).
+  useEffect(() => {
+    numberedOutline.forEach((it, i) => {
+      const el = headingEls.current[i]
+      if (!el || !it.num || el.dataset.numbered) return
+      el.dataset.numbered = "1"
+      const span = document.createElement("span")
+      span.className = "dc-heading-num"
+      span.textContent = it.num
+      span.style.opacity = "0.45"
+      span.style.fontVariantNumeric = "tabular-nums"
+      span.style.marginRight = "0.45em"
+      span.style.fontWeight = "500"
+      el.prepend(span)
+    })
+  }, [numberedOutline])
 
   const chapterIdx = useMemo(
     () => chapters.findIndex((c) => c.key === chapterKey),
@@ -1040,7 +1066,7 @@ export function DeepChapter({
           )}
 
           <div ref={wrapperRef} className="relative min-w-0 flex-1">
-            <div className="mx-auto max-w-[80ch]">
+            <div className="mx-auto max-w-[104ch]">
             {loading && !data && (
               <div className="space-y-3">
                 <Skeleton className="h-8 w-2/3" />
@@ -1083,7 +1109,7 @@ export function DeepChapter({
                         {briefing.objectives.map((o, i) => (
                           <li key={i} className="flex gap-2">
                             <span className="text-nvidia-green">•</span>
-                            <span>{o}</span>
+                            <MathText text={o} />
                           </li>
                         ))}
                       </ul>
@@ -1098,7 +1124,7 @@ export function DeepChapter({
                         {briefing.watchFor.map((w, i) => (
                           <li key={i} className="flex gap-2">
                             <span className="text-amber-400">•</span>
-                            <span>{w}</span>
+                            <MathText text={w} />
                           </li>
                         ))}
                       </ul>
@@ -1230,7 +1256,9 @@ export function DeepChapter({
                 <div className={cn("truncate text-xs font-medium", paper ? "text-[#221d18]" : "text-foreground/90")}>
                   {n.name}
                 </div>
-                <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>{n.signal}</div>
+                <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>
+                  <MathText text={n.signal} />
+                </div>
               </button>
             ))}
           </div>
@@ -1279,11 +1307,12 @@ export function DeepChapter({
             </button>
           </div>
           <div className="max-h-72 space-y-2 overflow-y-auto pr-1 text-sm">
-            <p className="text-foreground/90">{activeConcept.signal}</p>
+            <MathText text={activeConcept.signal} className="text-foreground/90" />
             {activeConcept.deepExplanation && (
-              <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
-                {activeConcept.deepExplanation}
-              </p>
+              <MathText
+                text={activeConcept.deepExplanation}
+                className="text-[13px] leading-relaxed text-muted-foreground"
+              />
             )}
             {(activeConcept.prereqNames?.length ?? 0) > 0 && (
               <div className="text-xs text-muted-foreground">

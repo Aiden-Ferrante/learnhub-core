@@ -30,9 +30,9 @@ const SIZE_CLASS: Record<ProseSize, string> = {
   xl: "prose-xl",
 }
 const MEASURE_CLASS: Record<Measure, string> = {
-  narrow: "max-w-[60ch]",
-  normal: "max-w-[75ch]",
-  wide: "max-w-[90ch]",
+  narrow: "max-w-[70ch]",
+  normal: "max-w-[85ch]",
+  wide: "max-w-[100ch]",
 }
 
 // Malformed `$…$` (stray from older conversions) degrades to plain text in the body
@@ -57,6 +57,27 @@ function tidyMarkdown(content: string): string {
     .split(/(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$))/)
     .map((seg, i) => (i % 2 ? seg : tidyProse(seg)))
     .join("")
+}
+
+/** Inline math-aware text for the LLM-generated layer (concept signals, deep
+ *  explanations, quiz checks, briefing lines) — models emit TeX for math books
+ *  and it must never show raw. Normalizes \\( \\) / \\[ \\] to $-delimiters
+ *  (remark-math only parses those), then renders markdown + KaTeX. */
+export function MathText({ text, className }: { text: string; className?: string }) {
+  const normalized = useMemo(
+    () =>
+      text
+        .replace(/\\\[([\s\S]+?)\\\]/g, (_, x: string) => `$$${x}$$`)
+        .replace(/\\\(([\s\S]+?)\\\)/g, (_, x: string) => `$${x}$`),
+    [text],
+  )
+  return (
+    <div className={cn("[&_p]:m-0 [&_p+p]:mt-2", className)}>
+      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, KATEX_OPTIONS]]}>
+        {normalized}
+      </ReactMarkdown>
+    </div>
+  )
 }
 
 /** Renders textbook markdown (GFM + LaTeX math + highlighted code) with calm,
