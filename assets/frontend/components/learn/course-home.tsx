@@ -25,12 +25,14 @@ import {
   countSections,
   displaySectionTitle,
   enqueueChapterBuild,
+  fetchCourseStatus,
   fetchDocumentConcepts,
   fetchForecast,
   fetchMistakes,
   fetchTodayPlan,
   findChapterForSection,
   findNodeBySectionKey,
+  type CourseStatus,
   type ForecastResponse,
   type LearnTreeNode,
   type MasteryResponse,
@@ -185,6 +187,25 @@ export function CourseHome({
     }
   }, [course.learnDocId])
 
+  // Pipeline status: drives the hero progress strip AND tells the empty shell WHY it's
+  // empty (dead content link vs no TOC vs simply not processed yet).
+  const [pipeline, setPipeline] = useState<CourseStatus | null>(null)
+  useEffect(() => {
+    if (!course.learnDocId) {
+      setPipeline(null)
+      return
+    }
+    let cancelled = false
+    fetchCourseStatus(course.learnDocId)
+      .then((s) => {
+        if (!cancelled) setPipeline(s)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [course.learnDocId])
+
   // Forgetting forecast — what's fading, so review becomes a daily, actionable habit.
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
   useEffect(() => {
@@ -297,6 +318,40 @@ export function CourseHome({
           <StatTile label="Need review" value={mastery ? needsReview : "—"} />
           <StatTile label="Overall" value={mastery ? `${overallPct}%` : "—"} />
         </div>
+
+        {/* Pipeline strip: one status for the whole ingest→study pipeline, replacing the
+            ambiguous KG-era "Processed" badge as the course's source of truth. */}
+        {pipeline?.exists && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="text-nvidia-green">✓</span> Converted
+              {pipeline.pageCount ? ` · ${pipeline.pageCount}p` : ""}
+            </span>
+            <span aria-hidden>·</span>
+            {(pipeline.outlineEntries ?? 0) > 0 ? (
+              <span className="flex items-center gap-1">
+                <span className="text-nvidia-green">✓</span> Outline
+              </span>
+            ) : (
+              <span className="text-amber-500">No outline</span>
+            )}
+            <span aria-hidden>·</span>
+            <span
+              className={
+                (pipeline.chaptersWithConcepts ?? 0) === (pipeline.chaptersTotal ?? 0) &&
+                (pipeline.chaptersTotal ?? 0) > 0
+                  ? "text-nvidia-green"
+                  : undefined
+              }
+            >
+              Concepts {pipeline.chaptersWithConcepts ?? 0}/{pipeline.chaptersTotal ?? 0} chapters
+            </span>
+            <span aria-hidden>·</span>
+            <span>
+              Quizzes {pipeline.chaptersWithQuizzes ?? 0}/{pipeline.chaptersTotal ?? 0}
+            </span>
+          </div>
+        )}
 
         {mastery && (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -418,17 +473,46 @@ export function CourseHome({
         </div>
       )}
 
-      {/* Empty shell (no syllabus tree). The structural outline only builds for books with a
-          numbered TOC; concept extraction can still have produced concepts (slug-keyed books,
-          basic mode). So always offer a direct path to the concepts here. */}
+      {/* Empty shell (no syllabus tree) — says WHY it's empty. Every failure here used to
+          render the same generic message; the pipeline status distinguishes a dead content
+          link (deleted/re-ingested doc) from a book with no TOC from plain not-processed. */}
       {isEmpty && (
         <div className="rounded-lg border border-dashed bg-card p-8 text-center">
           <BookMarked className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
-          <p className="text-sm font-medium">No syllabus outline for this course</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            It may still be processing, or this book has no numbered table of contents. If
-            you've extracted concepts, view them directly:
-          </p>
+          {!course.learnDocId ? (
+            <>
+              <p className="text-sm font-medium">This course has no learn content</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The document was added without a finished PDF conversion, so there is nothing
+                to read or study yet. Re-upload the PDF on the Upload tab to build it.
+              </p>
+            </>
+          ) : pipeline && !pipeline.exists ? (
+            <>
+              <p className="text-sm font-medium">Content link broken</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This course points at a document that no longer exists — it was likely deleted
+                or replaced by a re-ingest. Re-upload the PDF to rebuild it (identical files
+                are detected and linked automatically).
+              </p>
+            </>
+          ) : pipeline?.exists && (pipeline.outlineEntries ?? 0) === 0 ? (
+            <>
+              <p className="text-sm font-medium">This PDF has no table of contents</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The reader still works, but a syllabus tree can&apos;t be built without PDF
+                bookmarks. Concepts extracted per-section are still available:
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium">No syllabus outline for this course</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                It may still be processing, or this book has no numbered table of contents. If
+                you&apos;ve extracted concepts, view them directly:
+              </p>
+            </>
+          )}
           <Button
             type="button"
             variant="outline"

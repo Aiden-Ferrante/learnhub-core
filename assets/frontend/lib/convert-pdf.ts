@@ -12,7 +12,14 @@ export type PdfConvertResponse = {
   docId?: string;
 };
 
-type ConvertResult = { markdown: string; outputFilename: string; pageCount: number; learnDocId?: string };
+type ConvertResult = {
+  markdown: string;
+  outputFilename: string;
+  pageCount: number;
+  learnDocId?: string;
+  /** This exact PDF was already ingested — linked to the existing content, nothing re-converted. */
+  duplicateOf?: string;
+};
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 25 * 60 * 1000; // big books take minutes; allow plenty
@@ -43,6 +50,33 @@ export async function convertPdfToMarkdown(file: File): Promise<ConvertResult> {
   const startData = (await startRes.json().catch(() => ({}))) as Record<string, unknown>;
   if (!startRes.ok) {
     throw new Error((startData.error as string) || `PDF conversion failed (${startRes.status})`);
+  }
+
+  // Identical content already ingested (matched by hash): reuse the stored conversion
+  // instead of building a third copy of the same book. Fetch its markdown so the caller
+  // gets the same shape a fresh conversion would produce.
+  if (startData.status === 'duplicate' && startData.docId) {
+    const docId = startData.docId as string;
+    const docRes = await fetch(`/api/learn/document?id=${encodeURIComponent(docId)}`, {
+      cache: 'no-store',
+    });
+    const docData = (await docRes.json().catch(() => ({}))) as {
+      document?: { markdown?: string; pageCount?: number; sourceFilename?: string } | null;
+    };
+    const doc = docData.document;
+    if (!doc?.markdown) {
+      throw new Error(
+        'This PDF is already in your library, but its stored content could not be loaded — delete the existing course first if you want to re-ingest it.',
+      );
+    }
+    const base = file.name.replace(/\.pdf$/i, '');
+    return {
+      markdown: doc.markdown,
+      outputFilename: `${base}.md`,
+      pageCount: doc.pageCount ?? 0,
+      learnDocId: docId,
+      duplicateOf: (startData.existingTitle as string) || doc.sourceFilename || docId,
+    };
   }
 
   // Back-compat: an older synchronous server returns the full result directly.
@@ -111,6 +145,8 @@ export type PreparedIngestFile = {
   originalPdfName?: string;
   pageCount?: number;
   learnDocId?: string;
+  /** Set when the PDF matched an existing ingest by content hash (title of the original). */
+  duplicateOf?: string;
 };
 
 /** Convert PDFs to .md Files; pass through other supported types unchanged. */
@@ -120,13 +156,15 @@ export async function prepareFilesForIngestion(
   const results: PreparedIngestFile[] = [];
   for (const file of files) {
     if (isPdfFile(file)) {
-      const { markdown, outputFilename, pageCount, learnDocId } = await convertPdfToMarkdown(file);
+      const { markdown, outputFilename, pageCount, learnDocId, duplicateOf } =
+        await convertPdfToMarkdown(file);
       results.push({
         file: markdownToFile(markdown, outputFilename),
         convertedFromPdf: true,
         originalPdfName: file.name,
         pageCount,
         learnDocId,
+        duplicateOf,
       });
     } else {
       results.push({ file });

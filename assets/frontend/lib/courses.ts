@@ -43,7 +43,11 @@ export function courseFromDocument(doc: Document): Course {
         ? `Built from ${cleanCourseTitle(doc.originalPdfName).title}.`
         : `Built from ${title}.`,
     status:
-      doc.status === "Processed"
+      // The Learn hub reads learn-service content (PDF convert → concepts), keyed
+      // by learnDocId — a course with one is ready regardless of the KG triple
+      // pipeline's doc.status, which only the Upload/KG tabs care about. The
+      // doc.status fallback covers legacy docs processed before learnDocId existed.
+      doc.learnDocId || doc.status === "Processed"
         ? "ready"
         : doc.status === "Processing"
           ? "processing"

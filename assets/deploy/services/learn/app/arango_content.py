@@ -351,26 +351,67 @@ def build_outline_from_bookmarks(raw_outline: list[dict] | None) -> list[dict]:
     return out
 
 
+_LIG_SEQS = ("ffi", "ffl", "ff", "fi", "fl")
+
+
+def _lig_collapse(s: str) -> str:
+    """Fold the fi/ff/fl ligature families out of normalized heading text. PDF text
+    extraction drops ligature glyphs the font encodes as private-use codepoints
+    ("Complexity dened", "le deletion"), so equality against the clean bookmark title
+    only holds after both sides shed those sequences."""
+    for seq in _LIG_SEQS:
+        s = s.replace(seq, "")
+    return s
+
+
 def assign_blocks_to_outline(
-    outline: list[dict], blocks: list[tuple[int, str]]
+    outline: list[dict], blocks: list[tuple]
 ) -> dict[int, str]:
-    """Map each content block (``(order, heading)``, document order) to a canonical outline
-    section. Order-aware title match: a block whose heading matches the next outline entry's
-    title advances the pointer and becomes the "current" section; a finer sub-heading with no
-    outline entry of its own (e.g. "Transformer architecture") folds into the current section
-    ("Model Architecture"), so its concepts attach to a real TOC node — without stealing that
+    """Map each content block (``(order, heading[, page])``, document order) to a canonical
+    outline section. Order-aware match with per-entry precedence: same section number
+    ("5.1" == "5.1" — survives subtitles and ligature-mangled titles), exact normalized
+    title, then ligature-collapsed title. When both the block and the entry know their page,
+    they must agree within 2 pages — otherwise the book's own contents pages, whose lines
+    repeat chapter titles verbatim, hijack the pointer. A block that matches advances the
+    pointer and becomes the "current" section; a finer sub-heading with no outline entry of
+    its own (e.g. "Transformer architecture") folds into the current section ("Model
+    Architecture"), so its concepts attach to a real TOC node — without stealing that
     section's title the way a coarse page-match did."""
-    entries = [(e["sectionKey"], _heading_text_norm(e.get("title", ""))) for e in outline]
+    entries: list[dict] = []
+    for e in outline:
+        t = _heading_text_norm(e.get("title", ""))
+        entries.append(
+            {
+                "key": e["sectionKey"],
+                "num": e.get("numberKey"),
+                "title": t,
+                "lig": _lig_collapse(t),
+                "page": e.get("page"),
+            }
+        )
     out: dict[int, str] = {}
     ptr = 0
     current: str | None = None
-    for order, heading in sorted(blocks, key=lambda b: b[0]):
+    for blk in sorted(blocks, key=lambda b: b[0]):
+        order, heading = blk[0], blk[1]
+        page = blk[2] if len(blk) > 2 else None
+        num, rest = _parse_outline_number(heading)
         h = _heading_text_norm(heading)
+        titles = (h, _heading_text_norm(rest))
+        ligs = tuple(_lig_collapse(t) for t in titles)
         j = ptr
         while j < len(entries) and j - ptr <= 30:
-            if entries[j][1] and entries[j][1] == h:
+            e = entries[j]
+            pages_agree = (
+                page is None or not e["page"] or abs(int(page) - int(e["page"])) <= 2
+            )
+            if pages_agree and (
+                (num is not None and num == e["num"])
+                or (e["title"] and e["title"] in titles)
+                or (e["lig"] and e["lig"] in ligs)
+            ):
                 ptr = j + 1
-                current = entries[j][0]
+                current = e["key"]
                 break
             j += 1
         if current:
@@ -527,6 +568,7 @@ def persist_document(
     pages: list[tuple[int, str]] | None = None,
     outline: list[dict] | None = None,
     elements: list[dict] | None = None,
+    source_hash: str | None = None,
 ) -> str | None:
     """Store full markdown + section blocks + page-primary blocks. Best-effort.
 
@@ -561,7 +603,13 @@ def persist_document(
         # contains its page, so the syllabus tree, reader, and numbering line up by construction.
         # Falls back to the legacy page-matched outline when there's no page data to align on.
         canonical = build_outline_from_bookmarks(outline)
-        bmap = assign_blocks_to_outline(canonical, [(b.order, b.heading) for b in blocks]) if canonical else {}
+        bmap = (
+            assign_blocks_to_outline(
+                canonical, [(b.order, b.heading, b.page_start) for b in blocks]
+            )
+            if canonical
+            else {}
+        )
         if bmap:
             outline_entries = canonical
             for b in blocks:
@@ -588,6 +636,7 @@ def persist_document(
                 "elementCount": len(elements),
                 "hasPageProvenance": has_page_provenance,
                 "outline": outline_entries,
+                "sourceHash": source_hash,
                 "createdAt": int(time.time()),
             },
             overwrite=True,

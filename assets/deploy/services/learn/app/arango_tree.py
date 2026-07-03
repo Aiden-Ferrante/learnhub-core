@@ -232,6 +232,32 @@ def fetch_section_titles(
         existing = out.get(key)
         if not existing or _is_bare_chapter_number(existing, chapter):
             out[key] = title
+
+    # PDF bookmark titles win over extracted headings: the text layer drops ligature
+    # glyphs ("Complexity dened") and carries "Chapter N" prefixes, while the bookmark
+    # outline stores the clean human title per canonical sectionKey.
+    for entry in fetch_outline_titles(db, doc_id).items():
+        out[entry[0]] = entry[1]
+    return out
+
+
+def fetch_outline_titles(db: StandardDatabase, doc_id: str) -> dict[str, str]:
+    """sectionKey -> clean bookmark title from ``documents.outline`` (empty when absent)."""
+    if not db.has_collection("documents"):
+        return {}
+    rows = list(
+        db.aql.execute(
+            "FOR d IN documents FILTER d._key == @doc RETURN d.outline",
+            bind_vars={"doc": doc_id},
+        )
+    )
+    outline = rows[0] if rows and isinstance(rows[0], list) else []
+    out: dict[str, str] = {}
+    for e in outline:
+        key = (e.get("sectionKey") or "").strip()
+        title = (e.get("title") or "").strip()
+        if key and title:
+            out[key] = title
     return out
 
 

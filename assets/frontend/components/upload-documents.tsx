@@ -49,7 +49,14 @@ export function UploadDocuments() {
       }
       const prepared = await prepareFilesForIngestion(validFiles)
       addDocuments(prepared)
-      const converted = prepared.filter((p) => p.convertedFromPdf)
+      const duplicates = prepared.filter((p) => p.duplicateOf)
+      for (const d of duplicates) {
+        toast({
+          title: "Already in your library",
+          description: `"${d.originalPdfName}" matches an existing book — linked to its content instead of converting a second copy.`,
+        })
+      }
+      const converted = prepared.filter((p) => p.convertedFromPdf && !p.duplicateOf)
       if (converted.length > 0) {
         toast({
           title: "PDF converted",

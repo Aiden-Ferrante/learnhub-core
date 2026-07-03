@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen, GraduationCap, MoreVertical, Plus, Zap } from "lucide-react"
+import { BookOpen, GraduationCap, Loader2, MoreVertical, Plus, Trash2, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,6 +33,7 @@ import {
 import { GroupSidebar } from "@/components/learn/group-sidebar"
 import {
   countSections,
+  deleteLearnDocument,
   type LearnTreeNode,
   type MasteryResponse,
 } from "@/lib/learn-service"
@@ -100,6 +101,7 @@ function CourseCard({
   onSelect,
   onToggleMembership,
   onNewGroupForCourse,
+  onDelete,
 }: {
   course: Course
   sections: number | null
@@ -110,6 +112,7 @@ function CourseCard({
   onSelect: (course: Course) => void
   onToggleMembership: (courseId: string, groupId: string) => void
   onNewGroupForCourse: (courseId: string) => void
+  onDelete: (course: Course) => void
 }) {
   const badge = STATUS_BADGE[course.status]
   return (
@@ -148,6 +151,14 @@ function CourseCard({
             <DropdownMenuItem onClick={() => onNewGroupForCourse(course.id)}>
               <Plus className="h-4 w-4" />
               New group…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(course)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete course…
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -207,8 +218,33 @@ export function CourseShelf({
 }: CourseShelfProps) {
   const liveSections = useMemo(() => countSections(liveTree), [liveTree])
 
-  const { documents } = useDocuments()
+  const { documents, deleteDocuments } = useDocuments()
   const courses = useMemo(() => documents.map(courseFromDocument), [documents])
+
+  // Delete flow: cascade the learn-service content (sections, concepts, reviews, artifacts)
+  // and then drop the course from the client's document list — no more DB surgery to remove
+  // a duplicate or broken ingest.
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      if (deleteTarget.learnDocId) {
+        const res = await deleteLearnDocument(deleteTarget.learnDocId)
+        if (res.error) throw new Error(res.error)
+      }
+      deleteDocuments([deleteTarget.id])
+      setDeleteTarget(null)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Delete failed")
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
 
   const [groupsState, setGroupsState] = useState<GroupsState>(EMPTY_GROUPS_STATE)
   const [groupsHydrated, setGroupsHydrated] = useState(false)
@@ -427,6 +463,7 @@ export function CourseShelf({
                   loading={ready && course.id === liveCourseId ? liveLoading : false}
                   groups={groupsState.groups}
                   courseGroupIds={groupsState.membership[course.id] ?? []}
+                  onDelete={setDeleteTarget}
                   onSelect={onSelect}
                   onToggleMembership={handleToggleMembership}
                   onNewGroupForCourse={openNewGroupDialog}
@@ -503,6 +540,48 @@ export function CourseShelf({
             </Button>
             <Button onClick={submitDialog} disabled={!nameInput.trim()}>
               {dialogMode === "rename" ? "Save" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete-course confirmation */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteBusy) {
+            setDeleteTarget(null)
+            setDeleteError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete “{deleteTarget?.title}”?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              This permanently removes the course and everything built from it: the converted
+              book, sections, figures, extracted concepts, quiz questions, and your review
+              history for it.
+            </p>
+            <p>The original PDF on your computer is not touched.</p>
+            {deleteError && <p className="text-destructive">{deleteError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={deleteBusy} onClick={confirmDelete}>
+              {deleteBusy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" /> Delete course
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import uuid
@@ -25,8 +26,36 @@ __all__ = [
     "ConvertResult",
     "PdfConvertError",
     "convert_pdf_bytes",
+    "find_existing_ingest",
     "pdf_convert_health",
+    "source_hash_of",
 ]
+
+
+def source_hash_of(data: bytes) -> str:
+    """Content identity for dedup — sha256 of the raw PDF bytes."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def find_existing_ingest(data: bytes) -> dict | None:
+    """The already-ingested document with this exact content, or None. Best-effort:
+    any DB trouble reads as "no duplicate" so ingestion never breaks on the check."""
+    try:
+        from app.arango_tree import connect_arango
+
+        db = connect_arango()
+        if not db.has_collection("documents"):
+            return None
+        rows = list(
+            db.aql.execute(
+                "FOR d IN documents FILTER d.sourceHash == @h LIMIT 1 "
+                "RETURN {docId: d._key, title: d.title, sourceFilename: d.sourceFilename}",
+                bind_vars={"h": source_hash_of(data)},
+            )
+        )
+        return rows[0] if rows else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 @dataclass
@@ -141,6 +170,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> Conve
             pages=pages,
             outline=converted.outline,
             elements=elements,
+            source_hash=source_hash_of(data),
         )
         if save
         else None

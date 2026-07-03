@@ -254,6 +254,52 @@ export async function fetchDocumentConcepts(doc?: string): Promise<DocumentConce
   return parseJsonResponse<DocumentConceptsResponse>(res)
 }
 
+// One pipeline status per course: whether the learn content exists (a dead learnDocId is the
+// "content link broken" empty state), and chapter-level concept/quiz coverage for the strip.
+export type CourseStatus = {
+  doc: string
+  exists: boolean
+  reason?: string
+  title?: string
+  converted?: boolean
+  pageCount?: number
+  sectionCount?: number
+  outlineEntries?: number
+  chaptersTotal?: number
+  chaptersWithConcepts?: number
+  chaptersWithQuizzes?: number
+  conceptCount?: number
+  error?: string
+}
+
+export async function fetchCourseStatus(doc: string): Promise<CourseStatus> {
+  const res = await fetch(`/api/learn/course-status?doc=${encodeURIComponent(doc)}`, {
+    cache: 'no-store',
+  })
+  // 404 = the course points at content that no longer exists — a state the caller renders,
+  // not an exception (parseJsonResponse would throw on it).
+  const body = (await res.json().catch(() => ({}))) as Partial<CourseStatus>
+  if (!res.ok && res.status !== 404) {
+    return { doc, exists: false, error: body.error || res.statusText }
+  }
+  return { ...body, doc, exists: body.exists ?? false }
+}
+
+export async function deleteConcept(key: string): Promise<{ deleted?: string; error?: string }> {
+  const res = await fetch(`/api/learn/concept/${encodeURIComponent(key)}`, { method: 'DELETE' })
+  return parseJsonResponse(res)
+}
+
+// Delete a course's learn content outright (document, sections, concepts, reviews, artifacts).
+export async function deleteLearnDocument(
+  doc: string,
+): Promise<{ deleted?: string; removed?: Record<string, number>; error?: string }> {
+  const res = await fetch(`/api/learn/document?doc=${encodeURIComponent(doc)}`, {
+    method: 'DELETE',
+  })
+  return parseJsonResponse(res)
+}
+
 export type SectionConceptsResponse = {
   sectionKey: string
   docId?: string

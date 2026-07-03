@@ -8,6 +8,10 @@ edit a concept / its quiz questions for curation. Everything else the MCP needs 
 
 from __future__ import annotations
 
+import os
+import re
+import shutil
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, Query
@@ -249,6 +253,169 @@ def api_update_concept(key: str, body: dict = Body(...)) -> JSONResponse:
             return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
         col.update({"_key": key, **patch})
         return JSONResponse({"updated": key, "fields": sorted(patch)})
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.delete("/api/concept/{key}")
+def api_delete_concept(key: str) -> JSONResponse:
+    """Curation: remove a junk concept plus its review history and prerequisite edges.
+    The concept's section/document content is untouched — re-extracting the section will
+    re-create the concept if the model still finds it."""
+    try:
+        db = connect_arango()
+        col = db.collection(CONCEPTS)
+        row = col.get(key)
+        if row is None:
+            return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
+        removed: dict[str, Any] = {"concept": row.get("name")}
+        if db.has_collection("concept_reviews"):
+            removed["reviews"] = list(
+                db.aql.execute(
+                    "FOR r IN concept_reviews FILTER r.conceptKey == @k "
+                    "REMOVE r IN concept_reviews COLLECT WITH COUNT INTO n RETURN n",
+                    bind_vars={"k": key},
+                )
+            )[0]
+        if db.has_collection("concept_prereq"):
+            removed["prereqEdges"] = list(
+                db.aql.execute(
+                    "FOR e IN concept_prereq FILTER e._from == @cid OR e._to == @cid "
+                    "REMOVE e IN concept_prereq COLLECT WITH COUNT INTO n RETURN n",
+                    bind_vars={"cid": f"concepts/{key}"},
+                )
+            )[0]
+        col.delete(key)
+        return JSONResponse({"deleted": key, **removed})
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+# Learn-content collections that carry a per-document field. KG entities/relationships are
+# deliberately NOT touched: they live in the frontend doc-id namespace (docIds arrays) and
+# belong to the Upload/KG tabs' clear flow, not the learn store.
+_DOC_CASCADE: tuple[tuple[str, str], ...] = (
+    ("section_content", "docId"),
+    ("page_content", "docId"),
+    ("elements", "docId"),
+    ("content_vectors", "docId"),
+    ("concepts", "docId"),
+    ("propositions", "docId"),
+    ("concept_reviews", "docId"),
+    ("concept_prereq", "docId"),
+    ("study_events", "doc"),
+    ("chapter_builds", "docId"),
+    ("chapter_skeletons", "docId"),
+    ("chapter_orient", "docId"),
+    ("chapter_progress", "docId"),
+    ("deep_chapter_briefing", "docId"),
+    ("reading_guides", "docId"),
+    ("section_augment", "docId"),
+)
+
+
+@router.delete("/api/document")
+def api_delete_document(doc: str = Query(...)) -> JSONResponse:
+    """Delete a course outright: the document row, every learn collection keyed by it, and
+    its on-disk artifacts (original PDF + figures). Irreversible."""
+    if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", doc or ""):
+        return JSONResponse({"error": "invalid doc id"}, status_code=400)
+    try:
+        db = connect_arango()
+        docs = db.collection(DOCUMENTS)
+        existed = docs.has(doc)
+        removed: dict[str, int] = {}
+        for coll, field in _DOC_CASCADE:
+            if not db.has_collection(coll):
+                continue
+            n = list(
+                db.aql.execute(
+                    f"FOR x IN {coll} FILTER x.{field} == @d REMOVE x IN {coll} "
+                    "COLLECT WITH COUNT INTO n RETURN n",
+                    bind_vars={"d": doc},
+                )
+            )[0]
+            if n:
+                removed[coll] = n
+        if existed:
+            docs.delete(doc)
+        shared = Path(os.environ.get("SHARED_DIR", "/shared"))
+        for sub in ("ingest", "figures"):
+            target = shared / sub / doc
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+        if not existed and not removed:
+            return JSONResponse({"error": f"document {doc} not found"}, status_code=404)
+        return JSONResponse({"deleted": doc, "removed": removed})
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+# Sections map to their chapter by number prefix ("toc:2.1" -> "toc:2"); slug keys are
+# their own chapter. Mirrors the outline's listDepth-0 topology.
+_CHAPTER_OF = re.compile(r"^toc:(\d+)(?:\.\d+)*(?:~\d+)?$")
+
+
+def chapter_key_of(section_key: str) -> str:
+    m = _CHAPTER_OF.match(section_key or "")
+    return f"toc:{m.group(1)}" if m else (section_key or "")
+
+
+@router.get("/api/course-status")
+def api_course_status(doc: str = Query(...)) -> JSONResponse:
+    """One pipeline status for a course: does the content exist, is there an outline, and
+    how far concept/quiz coverage has progressed per chapter. Drives the UI status strip
+    and reason-aware empty states (exists=false -> broken content link)."""
+    try:
+        db = connect_arango()
+        row = db.collection(DOCUMENTS).get(doc) if db.has_collection(DOCUMENTS) else None
+        if row is None:
+            return JSONResponse(
+                {"doc": doc, "exists": False, "reason": "doc-not-found"}, status_code=404
+            )
+        outline = row.get("outline") or []
+        top = [e for e in outline if (e.get("listDepth") or 0) == 0]
+        # Numbered chapters are the study surface; front/back matter (Title Page, Index…)
+        # never gets concepts and would make the coverage denominator unreachable. Books
+        # without numbered chapters (slug outlines) fall back to all top-level entries.
+        numbered = [e for e in top if e.get("numberKey")]
+        chapters = numbered or top
+        chapter_keys = {e.get("sectionKey") for e in chapters if e.get("sectionKey")}
+
+        concept_rows = (
+            list(
+                db.aql.execute(
+                    "FOR c IN concepts FILTER c.docId == @d "
+                    "RETURN {s: c.sectionKey, q: LENGTH(c.quizQuestions || [])}",
+                    bind_vars={"d": doc},
+                )
+            )
+            if db.has_collection(CONCEPTS)
+            else []
+        )
+        with_concepts: set[str] = set()
+        with_quizzes: set[str] = set()
+        for c in concept_rows:
+            ck = chapter_key_of(c.get("s") or "")
+            if ck in chapter_keys:
+                with_concepts.add(ck)
+                if c.get("q"):
+                    with_quizzes.add(ck)
+        return JSONResponse(
+            {
+                "doc": doc,
+                "exists": True,
+                "title": row.get("title"),
+                "converted": True,
+                "pageCount": row.get("pageCount"),
+                "sectionCount": row.get("sectionCount"),
+                "outlineEntries": len(outline),
+                "chaptersTotal": len(chapter_keys),
+                "chaptersWithConcepts": len(with_concepts),
+                "chaptersWithQuizzes": len(with_quizzes),
+                "conceptCount": len(concept_rows),
+            }
+        )
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
 

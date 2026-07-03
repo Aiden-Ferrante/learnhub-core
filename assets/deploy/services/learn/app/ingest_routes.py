@@ -12,10 +12,15 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.pdf_convert import PdfConvertError, convert_pdf_bytes, pdf_convert_health
+from app.pdf_convert import (
+    PdfConvertError,
+    convert_pdf_bytes,
+    find_existing_ingest,
+    pdf_convert_health,
+)
 
 router = APIRouter()
 
@@ -63,8 +68,11 @@ def convert_pdf_health() -> JSONResponse:
 
 
 @router.post("/api/convert-pdf")
-async def convert_pdf(file: UploadFile = File(...)) -> JSONResponse:
-    """Start a background PDF->markdown conversion; returns ``{jobId, status:"running"}``."""
+async def convert_pdf(file: UploadFile = File(...), force: int = Query(0)) -> JSONResponse:
+    """Start a background PDF->markdown conversion; returns ``{jobId, status:"running"}``.
+    If this exact PDF (by content hash) was already ingested, returns
+    ``{status:"duplicate", docId, ...}`` instead — pass ``?force=1`` to re-ingest anyway
+    (e.g. after a pipeline fix)."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
     if not file.filename.lower().endswith(".pdf"):
@@ -72,6 +80,19 @@ async def convert_pdf(file: UploadFile = File(...)) -> JSONResponse:
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
+
+    if not force:
+        existing = find_existing_ingest(data)
+        if existing:
+            return JSONResponse(
+                {
+                    "status": "duplicate",
+                    "docId": existing["docId"],
+                    "existingTitle": existing.get("title"),
+                    "existingFilename": existing.get("sourceFilename"),
+                    "filename": file.filename,
+                }
+            )
 
     job_id = uuid.uuid4().hex
     _prune_jobs()

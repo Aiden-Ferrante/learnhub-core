@@ -9,6 +9,7 @@ import {
   Clock,
   Loader2,
   RefreshCw,
+  Trash2,
   Wand2,
   X,
   Zap,
@@ -18,13 +19,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cleanCourseTitle } from "@/lib/courses"
 import {
   cancelChapterBuild,
+  deleteConcept,
   enqueueChapterBuild,
   fetchChapterBuilds,
   fetchChaptersReadiness,
   fetchCourseChapters,
   fetchLearnDocuments,
+  fetchSectionConcepts,
   type ChapterBuildJob,
   type ChapterReadiness,
+  type ConceptLesson,
   type CourseChapter,
   type LearnDocumentInfo,
   type SectionOutcome,
@@ -43,7 +47,92 @@ function nextNightEpoch(): number {
   return Math.floor(d.getTime() / 1000)
 }
 
-function OutcomeReport({ job }: { job: ChapterBuildJob }) {
+/** The receipt's payload: what was actually extracted, inspectable and cullable in place.
+ *  Junk concepts die here in one tap instead of surviving into quizzes and reviews. */
+function ConceptReceipt({ docId, scope }: { docId: string; scope: string }) {
+  const [concepts, setConcepts] = useState<ConceptLesson[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchSectionConcepts(scope, docId)
+      .then((d) => {
+        if (cancelled) return
+        if (d.error) setError(d.error)
+        else setConcepts(d.concepts)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "failed to load concepts")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [docId, scope])
+
+  const remove = async (key: string) => {
+    setBusyKey(key)
+    try {
+      const res = await deleteConcept(key)
+      if (!res.error) {
+        setConcepts((prev) => (prev ? prev.filter((c) => c.conceptKey !== key) : prev))
+      }
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  if (error) {
+    return <div className="px-3 py-2 text-xs text-destructive">{error}</div>
+  }
+  if (concepts === null) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> Loading concepts…
+      </div>
+    )
+  }
+  if (!concepts.length) {
+    return <div className="px-3 py-2 text-xs text-muted-foreground">No concepts in this chapter.</div>
+  }
+  return (
+    <div className="space-y-1 border-t px-3 py-2">
+      <div className="text-xs font-medium text-muted-foreground">
+        Extracted concepts · {concepts.length}
+      </div>
+      <div className="max-h-64 space-y-1 overflow-y-auto">
+        {concepts.map((c) => (
+          <div key={c.conceptKey ?? c.name} className="group flex items-start gap-2 text-xs">
+            <span className="mt-0.5 shrink-0 rounded bg-muted px-1 py-px text-[10px] text-muted-foreground">
+              {c.kind}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="font-medium text-foreground/90">{c.name}</span>
+              <span className="text-muted-foreground"> — {c.signal}</span>
+            </span>
+            {c.conceptKey && (
+              <button
+                type="button"
+                className="shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                title="Delete this concept (removes its reviews and prerequisite links)"
+                disabled={busyKey === c.conceptKey}
+                onClick={() => remove(c.conceptKey!)}
+              >
+                {busyKey === c.conceptKey ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function OutcomeReport({ job, docId }: { job: ChapterBuildJob; docId: string }) {
   const outcomes = job.outcomes ?? []
   const counts = useMemo(() => {
     const c = { ok: 0, empty: 0, error: 0, skipped: 0, gated: 0, chunked: 0 }
@@ -60,8 +149,11 @@ function OutcomeReport({ job }: { job: ChapterBuildJob }) {
 
   if (!outcomes.length) {
     return (
-      <div className="px-3 py-2 text-xs text-muted-foreground">
-        No extraction report — this build only refreshed the deep overlay (concepts already existed).
+      <div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          No extraction report — this build only refreshed the deep overlay (concepts already existed).
+        </div>
+        <ConceptReceipt docId={docId} scope={job.scope} />
       </div>
     )
   }
@@ -105,6 +197,7 @@ function OutcomeReport({ job }: { job: ChapterBuildJob }) {
           ))}
         </div>
       )}
+      <ConceptReceipt docId={docId} scope={job.scope} />
     </div>
   )
 }
@@ -364,7 +457,7 @@ export function ProcessDashboard() {
                   {isOpen && (
                     <div className="border-t bg-muted/20">
                       {job ? (
-                        <OutcomeReport job={job} />
+                        <OutcomeReport job={job} docId={docId!} />
                       ) : (
                         <div className="px-3 py-2 text-xs text-muted-foreground">
                           No build recorded for this chapter yet.
