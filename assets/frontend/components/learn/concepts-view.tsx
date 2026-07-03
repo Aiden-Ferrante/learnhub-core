@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, GraduationCap, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConceptCard, prettyScope } from "@/components/learn/concept-card"
@@ -18,11 +18,13 @@ import type { Course } from "@/lib/courses"
 type ConceptsViewProps = {
   course: Course
   onBack: () => void
+  /** Open straight onto this concept's detail (e.g. a concept clicked in the syllabus tree). */
+  initialConceptKey?: string | null
 }
 
 type Mode = "list" | "detail" | "session"
 
-export function ConceptsView({ course, onBack }: ConceptsViewProps) {
+export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsViewProps) {
   const [concepts, setConcepts] = useState<ConceptLesson[]>([])
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [mastery, setMastery] = useState<Record<string, ConceptMastery>>({})
@@ -95,6 +97,17 @@ export function ConceptsView({ course, onBack }: ConceptsViewProps) {
     const found = concepts.find((c) => c.name.toLowerCase() === name.toLowerCase())
     if (found) openConcept(found)
   }
+
+  // Deep-link from the syllabus tree: once concepts arrive, jump to the requested one.
+  const focusedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!initialConceptKey || focusedRef.current === initialConceptKey || !concepts.length) return
+    const found = concepts.find((c) => c.conceptKey === initialConceptKey)
+    if (found) {
+      focusedRef.current = initialConceptKey
+      openConcept(found)
+    }
+  }, [initialConceptKey, concepts])
 
   if (mode === "session") {
     return (

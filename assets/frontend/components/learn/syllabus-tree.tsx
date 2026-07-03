@@ -25,6 +25,8 @@ type SyllabusTreeProps = {
   docId?: string | null
   /** Collapse to top-level chapters only — no drilling into sub-sections. */
   chaptersOnly?: boolean
+  /** Open a concept clicked in the tree (its detail view). Omit to hide concept leaves. */
+  onSelectConcept?: (conceptKey: string) => void
 }
 
 function ExtractButton({
@@ -95,6 +97,7 @@ function MasteryDot({ mastery }: { mastery: SectionMastery | undefined }) {
 function nodeMatchesFilter(node: LearnTreeNode, filter: string): boolean {
   const f = filter.toLowerCase()
   if (`${node.label} ${node.title ?? ""}`.toLowerCase().includes(f)) return true
+  if (node.concepts?.some((c) => c.name.toLowerCase().includes(f))) return true
   return node.children.some((c) => nodeMatchesFilter(c, f))
 }
 
@@ -111,6 +114,7 @@ function TreeRow({
   extractState,
   numbers,
   chaptersOnly,
+  onSelectConcept,
 }: {
   node: LearnTreeNode
   depth: number
@@ -124,11 +128,15 @@ function TreeRow({
   extractState?: Record<string, ExtractState>
   numbers: Map<string, string>
   chaptersOnly?: boolean
+  onSelectConcept?: (conceptKey: string) => void
 }) {
   if (filter && !nodeMatchesFilter(node, filter)) return null
 
+  // Concept leaves render under their section like sub-entries — the concept layer made
+  // visible in the course's main navigation, not hidden behind the Concepts view.
+  const conceptLeaves = (onSelectConcept && !chaptersOnly && node.concepts) || []
   // Chapters-only: collapse the tree to its top level — no expanding into sub-sections.
-  const hasChildren = node.children.length > 0 && !chaptersOnly
+  const hasChildren = (node.children.length > 0 || conceptLeaves.length > 0) && !chaptersOnly
   const isExpanded = expanded.has(node.id)
   const isSelected = node.sectionKey != null && node.sectionKey === selectedScope
   const isSection = node.isSection
@@ -222,6 +230,28 @@ function TreeRow({
       </div>
       {hasChildren && isExpanded ? (
         <ul>
+          {conceptLeaves.map((c) =>
+            filter && !c.name.toLowerCase().includes(filter.toLowerCase()) ? null : (
+              <li key={c.key ?? c.name} className="list-none">
+                <button
+                  type="button"
+                  className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-xs text-muted-foreground hover:bg-nvidia-green/5 hover:text-foreground"
+                  style={{ paddingLeft: `${(depth + 1) * 0.75 + 1.25}rem` }}
+                  onClick={() => c.key && onSelectConcept?.(c.key)}
+                  disabled={!c.key}
+                  title={c.kind ? `${c.kind} — open concept` : "open concept"}
+                >
+                  <Sparkles className="h-3 w-3 shrink-0 text-nvidia-green/60" />
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  {c.kind && (
+                    <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] opacity-0 transition-opacity group-hover/concept:opacity-100">
+                      {c.kind}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ),
+          )}
           {node.children.map((child) => (
             <TreeRow
               key={child.id}
@@ -236,6 +266,7 @@ function TreeRow({
               onExtract={onExtract}
               extractState={extractState}
               numbers={numbers}
+              onSelectConcept={onSelectConcept}
             />
           ))}
         </ul>
@@ -252,6 +283,7 @@ export function SyllabusTree({
   loading,
   docId,
   chaptersOnly,
+  onSelectConcept,
 }: SyllabusTreeProps) {
   const [filter, setFilter] = useState("")
   const [extractState, setExtractState] = useState<Record<string, ExtractState>>({})
@@ -357,6 +389,7 @@ export function SyllabusTree({
               extractState={extractState}
               numbers={numbers}
               chaptersOnly={chaptersOnly}
+              onSelectConcept={onSelectConcept}
             />
           ))}
         </ul>

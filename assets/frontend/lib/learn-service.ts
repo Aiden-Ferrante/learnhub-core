@@ -7,6 +7,8 @@ export type LearnTreeNode = {
   sectionKey: string | null
   isSection: boolean
   conceptCount?: number
+  /** This section's OWN extracted concepts (not rolled up) — clickable leaves in the tree. */
+  concepts?: { key?: string | null; name: string; kind?: string | null }[]
   children: LearnTreeNode[]
 }
 

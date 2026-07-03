@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic'
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { key: string } },
+  { params }: { params: Promise<{ key: string }> },
 ) {
-  const { key } = params
+  const { key } = await params
   return proxyLearnDelete(`/api/concept/${encodeURIComponent(key)}`)
 }

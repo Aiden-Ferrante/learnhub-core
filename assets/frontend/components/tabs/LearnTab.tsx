@@ -181,8 +181,16 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
   const backToCourseHome = () => {
     setView("home")
     setDeepIntent(null)
+    setConceptFocusKey(null)
     loadMastery(selectedCourse ? (selectedCourse.learnDocId ?? selectedCourse.id) : undefined)
     loadDue(selectedCourse ? (selectedCourse.learnDocId ?? selectedCourse.id) : undefined)
+  }
+
+  // A concept clicked as a leaf in the course outline — open its detail in ConceptsView.
+  const [conceptFocusKey, setConceptFocusKey] = useState<string | null>(null)
+  const openConceptDetail = (conceptKey: string) => {
+    setConceptFocusKey(conceptKey)
+    setView("concepts")
   }
 
   // Re-run the course loads after a transient backend failure (e.g. ArangoDB still booting).
@@ -227,7 +235,13 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
   }
 
   if (view === "concepts" && selectedCourse) {
-    return <ConceptsView course={selectedCourse} onBack={backToCourseHome} />
+    return (
+      <ConceptsView
+        course={selectedCourse}
+        onBack={backToCourseHome}
+        initialConceptKey={conceptFocusKey}
+      />
+    )
   }
 
   if (view === "drill" && selectedCourse) {
@@ -280,6 +294,7 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
         onReadBook={() => setView("read")}
         onDeepRead={openDeepRead}
         onViewConcepts={() => setView("concepts")}
+        onOpenConcept={openConceptDetail}
         onAsk={() => setView("ask")}
         onDrill={() => setView("drill")}
         onBrainDump={() => setView("dump")}

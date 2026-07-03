@@ -54,6 +54,8 @@ type CourseHomeProps = {
   onReadBook: () => void
   onDeepRead?: () => void
   onViewConcepts: () => void
+  /** Open one concept's detail (clicked as a leaf in the course outline). */
+  onOpenConcept?: (conceptKey: string) => void
   onAsk?: () => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
@@ -146,6 +148,7 @@ export function CourseHome({
   onReadBook,
   onDeepRead,
   onViewConcepts,
+  onOpenConcept,
   onAsk,
   onBackToShelf,
   continueNode,
@@ -726,6 +729,7 @@ export function CourseHome({
               masteryBySection={mastery?.bySection}
               loading={loading}
               docId={course.learnDocId}
+              onSelectConcept={onOpenConcept}
             />
           </div>
         </div>

@@ -27,6 +27,9 @@ class TreeNode:
     title: str | None = None
     children: list[TreeNode] = field(default_factory=list)
     concept_count: int = 0  # rollup: concepts in this section + all descendants
+    # This section's OWN concepts (not rolled up): [{key, name, kind}] in extraction order,
+    # so the syllabus can show them as clickable leaves under their section.
+    concepts: list[dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         is_section = (self.id or "").startswith("toc:")
@@ -37,6 +40,7 @@ class TreeNode:
             "sectionKey": self.id if is_section else None,
             "isSection": is_section,
             "conceptCount": self.concept_count if is_section else 0,
+            "concepts": self.concepts if is_section else [],
             "children": [c.as_dict() for c in self.children],
         }
 
@@ -385,6 +389,35 @@ def _annotate_concept_counts(nodes: list[TreeNode], counts: dict[str, int]) -> i
     return total
 
 
+def _concepts_by_section(db: StandardDatabase, doc_id: str) -> dict[str, list[dict[str, Any]]]:
+    """sectionKey -> [{key, name, kind}] in extraction order — the syllabus's concept leaves."""
+    try:
+        if not db.has_collection("concepts"):
+            return {}
+        rows = db.aql.execute(
+            "FOR c IN concepts FILTER c.docId == @d SORT c.sectionKey, c.order "
+            "RETURN {sk: c.sectionKey, key: c._key, name: c.name, kind: c.kind}",
+            bind_vars={"d": doc_id},
+        )
+        out: dict[str, list[dict[str, Any]]] = {}
+        for r in rows:
+            sk = r.get("sk")
+            if sk and r.get("name"):
+                out.setdefault(sk, []).append(
+                    {"key": r.get("key"), "name": r["name"], "kind": r.get("kind")}
+                )
+        return out
+    except Exception:
+        return {}
+
+
+def _attach_concepts(nodes: list[TreeNode], by_section: dict[str, list[dict[str, Any]]]) -> None:
+    """Attach each section's OWN concepts (pre-order, in place)."""
+    for n in nodes:
+        n.concepts = by_section.get(n.id, [])
+        _attach_concepts(n.children, by_section)
+
+
 def _filter_to_concept_sections(nodes: list[TreeNode]) -> list[TreeNode]:
     """Keep only sections whose subtree contains concepts (rollup > 0); prune the rest. Ancestors
     of a concept-bearing section are kept so the chapter structure stays intact."""
@@ -502,6 +535,7 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     counts = _concept_counts_by_section(db, doc_key) if doc_key else {}
     if counts:
         _annotate_concept_counts(forest_nodes, counts)
+        _attach_concepts(forest_nodes, _concepts_by_section(db, doc_key))
     # The course outline IS the textbook's TOC: show the whole book (chapters & sections, whether
     # or not concepts are extracted yet), pruning only top-level front/back matter, and dropping
     # mis-bookmarked orphan "Part" containers so chapters read as a clean numbered list.
