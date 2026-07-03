@@ -716,22 +716,21 @@ export function CourseHome({
               </Button>
             </div>
           </div>
-          <div className="h-[440px]">
-            <SyllabusTree
-              tree={tree}
-              selectedScope={null}
-              onSelectScope={(scope) => {
-                if (!scope) return
-                // Studying is chapter-scoped: resolve any clicked section to its chapter.
-                const chapter = findChapterForSection(tree, scope)
-                if (chapter?.sectionKey) onOpenSection(chapter.sectionKey, chapter)
-              }}
-              masteryBySection={mastery?.bySection}
-              loading={loading}
-              docId={course.learnDocId}
-              onSelectConcept={onOpenConcept}
-            />
-          </div>
+          <SyllabusTree
+            tree={tree}
+            selectedScope={null}
+            onSelectScope={(scope) => {
+              if (!scope) return
+              // Studying is chapter-scoped: resolve any clicked section to its chapter.
+              const chapter = findChapterForSection(tree, scope)
+              if (chapter?.sectionKey) onOpenSection(chapter.sectionKey, chapter)
+            }}
+            masteryBySection={mastery?.bySection}
+            loading={loading}
+            docId={course.learnDocId}
+            onSelectConcept={onOpenConcept}
+            autoHeight
+          />
         </div>
       )}
     </div>
