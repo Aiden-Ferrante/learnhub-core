@@ -341,10 +341,15 @@ export type ReviewCard = {
   pageStart?: number | null
   pageEnd?: number | null
   /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
-   *  seeded by the chapter walk's self-grades. Absent/'concept' = a normal concept card. */
-  itemType?: 'concept' | 'skeleton'
+   *  seeded by the chapter walk's self-grades. 'figure' = a figure-recall card (image front,
+   *  caption reveal), seeded by chapter-scoped review. Absent/'concept' = a concept card. */
+  itemType?: 'concept' | 'skeleton' | 'figure'
   /** Skeleton cards only: the branch's true children, snapshotted at walk time. */
   children?: { heading: string; essence?: string }[]
+  /** Figure cards only: the figure's reading-order n for /api/learn/figure. */
+  figureOrder?: number | null
+  /** Figure cards only: the source page, kept on the row at seed time. */
+  page?: number | null
 }
 
 export type ReviewQueueResponse = {
@@ -392,6 +397,22 @@ export async function submitReviewGrade(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
+  })
+  return parseJsonResponse<ReviewGradeResponse>(res)
+}
+
+// Seed-or-advance a FIGURE-recall item ("what does this figure show?"). Sent with the full
+// snapshot every time — the backend upsert keeps caption/section fresh on the row.
+export async function submitFigureReviewGrade(
+  docId: string,
+  figureOrder: number,
+  grade: ReviewGrade,
+  snapshot?: { caption?: string; sectionKey?: string; chapterScope?: string; page?: number | null },
+): Promise<ReviewGradeResponse> {
+  const res = await fetch('/api/learn/review/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ figure: true, doc: docId, figureOrder, grade, ...snapshot }),
   })
   return parseJsonResponse<ReviewGradeResponse>(res)
 }

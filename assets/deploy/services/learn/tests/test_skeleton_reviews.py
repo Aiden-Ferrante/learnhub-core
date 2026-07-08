@@ -68,3 +68,51 @@ def test_skeleton_card_shape_and_fallbacks():
     assert bare["name"] == "toc:2"  # heading falls back to the section key
     assert bare["children"] == []
     assert bare["state"] == "review"
+
+
+# ---- figure-recall items (same review envelope, image front / caption reveal) ----
+
+from app.concept_study_routes import (  # noqa: E402
+    FIGURE_KEY_PREFIX,
+    figure_card,
+    figure_review_key,
+    new_figure_card,
+)
+
+
+def test_figure_review_key_deterministic_prefixed_and_distinct():
+    a = figure_review_key("doc1", 13)
+    assert a == figure_review_key("doc1", 13)
+    assert a.startswith(FIGURE_KEY_PREFIX)
+    assert figure_review_key("doc1", 14) != a
+    assert figure_review_key("doc2", 13) != a
+
+
+def test_figure_card_carries_caption_as_signal_and_no_scheduler_internals():
+    row = {
+        "_key": "fig-abc",
+        "caption": "Figure 1-1. Tokenization.",
+        "figureOrder": 13,
+        "page": 27,
+        "sectionKey": "toc:1.1",
+        "docId": "doc1",
+        "state": "review",
+        "due": 99.0,
+        "ease": 2.5,
+    }
+    card = figure_card(row)
+    assert card["itemType"] == "figure"
+    assert card["conceptKey"] == "fig-abc"
+    assert card["signal"] == "Figure 1-1. Tokenization."
+    assert card["figureOrder"] == 13
+    assert card["name"] == "Figure · p.27"
+    assert "ease" not in card
+
+
+def test_new_figure_card_is_new_and_keyed_like_its_future_row():
+    fig = {"order": 13, "page": 27, "caption": "Figure 1-1.", "sectionKey": "toc:1.1"}
+    card = new_figure_card("doc1", fig)
+    assert card["state"] == "new"
+    assert card["due"] is None
+    assert card["conceptKey"] == figure_review_key("doc1", 13)
+    assert card["signal"] == "Figure 1-1."

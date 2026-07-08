@@ -7,6 +7,8 @@ import { ConceptMarkdown } from "@/components/learn/concept-markdown"
 import { SectionFigures } from "@/components/learn/section-figures"
 import {
   fetchReviewQueue,
+  figureUrl,
+  submitFigureReviewGrade,
   submitReviewGrade,
   type ReviewCard,
   type ReviewGrade,
@@ -77,14 +79,25 @@ export function ReviewPanel({
   const grade = useCallback(
     (g: ReviewGrade) => {
       if (!card) return
-      submitReviewGrade(card.conceptKey, g, docId).catch(() => {})
+      if (card.itemType === "figure" && card.docId && card.figureOrder != null) {
+        // Full snapshot every time: the first grade SEEDS the row (new cards have no
+        // review row yet); re-grades keep its caption/section fresh.
+        submitFigureReviewGrade(card.docId, card.figureOrder, g, {
+          caption: card.signal,
+          sectionKey: card.sectionKey,
+          chapterScope: scope ?? undefined,
+          page: card.page,
+        }).catch(() => {})
+      } else {
+        submitReviewGrade(card.conceptKey, g, docId).catch(() => {})
+      }
       onAnswered?.()
       setDone((d) => d + 1)
       setStats((s) => (g >= 3 ? { ...s, good: s.good + 1 } : { ...s, again: s.again + 1 }))
       setRevealed(false)
       setIdx((i) => i + 1)
     },
-    [card, docId, onAnswered],
+    [card, docId, scope, onAnswered],
   )
 
   // Keyboard: space/enter reveals; 1-4 grade once revealed.
@@ -134,9 +147,11 @@ export function ReviewPanel({
   }
 
   const isSkeleton = card.itemType === "skeleton"
-  const kindClass = isSkeleton
-    ? "bg-brand/15 text-brand"
-    : KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
+  const isFigure = card.itemType === "figure"
+  const kindClass =
+    isSkeleton || isFigure
+      ? "bg-brand/15 text-brand"
+      : KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -172,15 +187,37 @@ export function ReviewPanel({
         </div>
 
         {!revealed ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 overflow-auto text-center">
+            {isFigure && card.docId && card.figureOrder != null && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={figureUrl(card.docId, card.figureOrder)}
+                alt="Figure to recall"
+                className="max-h-64 w-full rounded-lg border bg-white object-contain"
+              />
+            )}
             <p className="text-sm text-muted-foreground">
               {isSkeleton
                 ? "Rebuild this branch from memory — what sits under it, and what does each part say?"
-                : "Recall what this concept means."}
+                : isFigure
+                  ? "What does this figure show?"
+                  : "Recall what this concept means."}
             </p>
             <Button onClick={() => setRevealed(true)}>
               Reveal <kbd className="ml-2 rounded bg-muted px-1 text-[10px]">space</kbd>
             </Button>
+          </div>
+        ) : isFigure ? (
+          <div className="flex flex-1 flex-col gap-3 overflow-auto">
+            {card.docId && card.figureOrder != null && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={figureUrl(card.docId, card.figureOrder)}
+                alt={card.signal}
+                className="max-h-56 w-full rounded-lg border bg-white object-contain"
+              />
+            )}
+            <p className="text-sm font-medium">{card.signal}</p>
           </div>
         ) : isSkeleton ? (
           <ul className="flex-1 space-y-1.5 text-sm">

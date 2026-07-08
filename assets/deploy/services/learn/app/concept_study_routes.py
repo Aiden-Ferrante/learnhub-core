@@ -157,6 +157,53 @@ def skeleton_card(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+FIGURE_KEY_PREFIX = "fig-"
+
+
+def figure_review_key(doc_id: str, order: int) -> str:
+    """Deterministic review-row key for a figure-recall item (a figure is identified by its
+    reading-order ``order`` within a document — the same n /api/figure serves)."""
+    digest = hashlib.sha256(f"{doc_id}|fig|{order}".encode()).hexdigest()[:16]
+    return FIGURE_KEY_PREFIX + digest
+
+
+def figure_card(row: dict[str, Any]) -> dict[str, Any]:
+    """A due figure-recall card: front = the image (client renders figureOrder via
+    /api/figure), reveal = the caption (carried in ``signal`` like a concept's answer)."""
+    page = row.get("page")
+    return {
+        "itemType": "figure",
+        "conceptKey": row.get("_key"),
+        "name": f"Figure · p.{page}" if page else "Figure",
+        "kind": "figure",
+        "signal": row.get("caption") or "",
+        "figureOrder": row.get("figureOrder"),
+        "sectionKey": row.get("sectionKey"),
+        "docId": row.get("docId"),
+        "state": row.get("state", "review"),
+        "due": row.get("due"),
+    }
+
+
+def new_figure_card(doc_id: str, fig: dict[str, Any]) -> dict[str, Any]:
+    """An unseeded figure as a 'new' card (chapter-scoped sessions only — figures enter the
+    review system through deliberate chapter study, the way skeletons enter through the walk)."""
+    page = fig.get("page")
+    return {
+        "itemType": "figure",
+        "conceptKey": figure_review_key(doc_id, int(fig.get("order") or 0)),
+        "name": f"Figure · p.{page}" if page else "Figure",
+        "kind": "figure",
+        "signal": fig.get("caption") or "",
+        "figureOrder": fig.get("order"),
+        "page": page,
+        "sectionKey": fig.get("sectionKey"),
+        "docId": doc_id,
+        "state": "new",
+        "due": None,
+    }
+
+
 def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
     return {
         "conceptKey": c["key"],
@@ -194,36 +241,64 @@ def api_review_queue(
         if not db.has_collection(CONCEPTS):
             return JSONResponse({"cards": [], "counts": {"due": 0, "new": 0, "later": 0}})
         _ensure_reviews(db)
+        # A chapter scope spans ALL its sub-sections (same reading-order span the reader and
+        # quiz use) — exact-key matching misses everything under a chapter node.
+        span = _scope_section_keys(db, doc, scope) if scope else None
         concepts = list(
             db.aql.execute(
                 "FOR c IN concepts "
-                "FILTER (@doc == null OR c.docId == @doc) AND (@scope == null OR c.sectionKey == @scope) "
+                "FILTER (@doc == null OR c.docId == @doc) "
                 "SORT c.order "
                 "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
                 "source: c.source, sectionKey: c.sectionKey, docId: c.docId, "
                 "pageStart: c.pageStart, pageEnd: c.pageEnd}",
-                bind_vars={"doc": doc, "scope": scope},
+                bind_vars={"doc": doc},
             )
         )
+        if span is not None:
+            concepts = [c for c in concepts if c.get("sectionKey") in span]
         reviews: dict[str, dict[str, Any]] = {}
         for r in db.aql.execute(
             "FOR r IN concept_reviews FILTER (@doc == null OR r.docId == @doc) "
-            "AND r.itemType != 'skeleton' "
+            "AND r.itemType NOT IN ['skeleton', 'figure'] "
             "RETURN {key: r._key, due: r.due, state: r.state}",
             bind_vars={"doc": doc},
         ):
             reviews[r["key"]] = r
-        # Skeleton (structure-recall) cards: exist only once the chapter walk has graded them,
-        # so they surface purely on their SM-2 due date — never as "new".
-        skeleton_rows = list(
+        # Skeleton (structure-recall) and figure-recall cards: they enter the system through
+        # deliberate study (the walk / a chapter review), then surface on their SM-2 due date.
+        typed_rows = list(
             db.aql.execute(
-                "FOR r IN concept_reviews FILTER r.itemType == 'skeleton' "
-                "AND (@doc == null OR r.docId == @doc) "
-                "AND (@scope == null OR r.sectionKey == @scope OR r.chapterScope == @scope) "
-                "RETURN r",
-                bind_vars={"doc": doc, "scope": scope},
+                "FOR r IN concept_reviews FILTER r.itemType IN ['skeleton', 'figure'] "
+                "AND (@doc == null OR r.docId == @doc) RETURN r",
+                bind_vars={"doc": doc},
             )
         )
+        if scope is not None:
+            typed_rows = [
+                r
+                for r in typed_rows
+                if r.get("chapterScope") == scope or (span and r.get("sectionKey") in span)
+            ]
+        skeleton_rows = [r for r in typed_rows if r.get("itemType") == "skeleton"]
+        figure_rows = [r for r in typed_rows if r.get("itemType") == "figure"]
+        # Chapter-scoped sessions also OFFER the chapter's unseeded captioned figures as new
+        # cards ("what does this figure show?") — first grade seeds their schedule.
+        new_figures: list[dict[str, Any]] = []
+        if scope is not None and doc and span and db.has_collection("elements"):
+            seeded = {r["_key"] for r in figure_rows}
+            for f in db.aql.execute(
+                "FOR e IN elements FILTER e.docId == @d AND e.type == 'figure' "
+                "AND e.caption != null AND e.caption != '' "
+                "SORT e.order RETURN {order: e.order, page: e.page, caption: e.caption, "
+                "sectionKey: e.sectionKey}",
+                bind_vars={"d": doc},
+            ):
+                if f.get("sectionKey") not in span:
+                    continue
+                if figure_review_key(doc, int(f.get("order") or 0)) in seeded:
+                    continue
+                new_figures.append(new_figure_card(doc, f))
         # Daily new-card allowance (unscoped sessions only): how many concepts already got
         # their first grade since the learner's midnight?
         introduced_today = 0
@@ -256,22 +331,28 @@ def api_review_queue(
             due.append(skeleton_card(r))
         else:
             later += 1
+    for r in figure_rows:
+        if float(r.get("due", 0)) <= now:
+            due.append(figure_card(r))
+        else:
+            later += 1
     due.sort(key=lambda x: x.get("due") or 0)
     if scope is None:
         allowance = new_allowance(new_limit if new_limit is not None else NEW_PER_DAY, introduced_today)
         served_new = new[:allowance]
     else:
+        # Deliberate chapter study: all its new concepts, then its unseeded figures.
         allowance = len(new)
-        served_new = new
+        served_new = new + new_figures
     queue = (due + served_new)[:limit]
     return JSONResponse(
         {
             "cards": queue,
             "counts": {
                 "due": len(due),
-                "new": len(new),
+                "new": len(new) + len(new_figures),
                 "later": later,
-                "newAllowance": allowance,
+                "newAllowance": allowance if scope is None else len(served_new),
             },
         }
     )
@@ -297,6 +378,8 @@ def api_review_grade(body: dict = Body(...)) -> JSONResponse:
     now = time.time()
     if body.get("skeleton") or concept_key.startswith(SKELETON_KEY_PREFIX):
         return _grade_skeleton_item(body, concept_key, grade, now)
+    if body.get("figure") or concept_key.startswith(FIGURE_KEY_PREFIX):
+        return _grade_figure_item(body, concept_key, grade, now)
     if not concept_key:
         return JSONResponse({"error": "conceptKey and grade (1-4) are required"}, status_code=400)
     try:
@@ -402,6 +485,72 @@ def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -
         doc=doc_id,
         stem=row.get("heading") or section_key,
         expected="; ".join(c["heading"] for c in (row.get("children") or [])) or None,
+        kind="recall",
+    )
+    return JSONResponse(
+        {
+            "conceptKey": key,
+            "due": next_state["due"],
+            "intervalDays": next_state["interval"],
+            "state": next_state["state"],
+        }
+    )
+
+
+def _grade_figure_item(body: dict, concept_key: str, grade: int, now: float) -> JSONResponse:
+    """Advance (or seed) the SM-2 state of one figure-recall item and log a ``recall`` event.
+
+    First grades come from a chapter-scoped session and carry the snapshot (doc + figureOrder
+    + caption/page/sectionKey); queue re-grades address the existing row by its ``fig-…`` key.
+    """
+    doc_id = str(body.get("doc") or "").strip()
+    order = body.get("figureOrder")
+    try:
+        db = connect_arango()
+        _ensure_reviews(db)
+        reviews = db.collection(REVIEWS)
+        if doc_id and order is not None:
+            key = figure_review_key(doc_id, int(order))
+            existing = reviews.get(key)
+        elif concept_key.startswith(FIGURE_KEY_PREFIX):
+            key = concept_key
+            existing = reviews.get(key)
+            if not existing:
+                return JSONResponse({"error": "unknown figure item"}, status_code=404)
+            doc_id = existing.get("docId")
+            order = existing.get("figureOrder")
+        else:
+            return JSONResponse(
+                {"error": "doc and figureOrder are required for a figure grade"}, status_code=400
+            )
+        state = existing if existing else srs.new_state(now)
+        next_state = srs.schedule(state, grade, now)
+        row = {
+            **next_state,
+            "_key": key,
+            "itemType": "figure",
+            "docId": doc_id,
+            "figureOrder": int(order) if order is not None else None,
+        }
+        if not existing:
+            row["firstReview"] = now
+        for field in ("caption", "sectionKey", "chapterScope"):
+            val = str(body.get(field) or "").strip()
+            if val:
+                row[field] = val
+        if body.get("page") is not None:
+            row["page"] = body.get("page")
+        reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per figure)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    record_quiz_event(
+        row.get("sectionKey"),
+        None,
+        correct=(grade >= 3),
+        doc=doc_id,
+        stem=f"Figure p.{row.get('page')}" if row.get("page") else "Figure",
+        expected=row.get("caption"),
         kind="recall",
     )
     return JSONResponse(
