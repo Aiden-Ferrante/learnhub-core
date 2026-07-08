@@ -19,10 +19,14 @@ type ExamPanelProps = {
   docId?: string
   /** Bubble up after grading (the path uses the exam result for its soft gate). */
   onGraded?: () => void
+  /** Result-screen guidance: jump to the quiz drawer to drill what was missed (fail). */
+  onDrillMisses?: () => void
+  /** Result-screen guidance: jump to the lock-in drawer (pass). */
+  onLockIn?: () => void
 }
 
 /** Comprehensive chapter exam: a fixed, interleaved MCQ set, answered then scored. */
-export function ExamPanel({ scope, docId, onGraded }: ExamPanelProps) {
+export function ExamPanel({ scope, docId, onGraded, onDrillMisses, onLockIn }: ExamPanelProps) {
   const [questions, setQuestions] = useState<ExamQuestion[] | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [passPct, setPassPct] = useState(80)
@@ -144,10 +148,35 @@ export function ExamPanel({ scope, docId, onGraded }: ExamPanelProps) {
             </li>
           ))}
         </ol>
-        <Button type="button" variant="outline" onClick={begin} disabled={busy}>
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Retake exam
-        </Button>
+        {/* What now? Failing without a next step strands the learner on this screen. */}
+        <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+          {result.pass ? (
+            <p className="text-muted-foreground">
+              Chapter cleared — lock it in so its concepts drop into spaced review.
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              {(result.total ?? 0) - (result.correct ?? 0)} missed. Drill those concepts with the chapter
+              quiz first — retaking cold usually repeats the same misses.
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {result.pass && onLockIn && (
+              <Button type="button" size="sm" onClick={onLockIn}>
+                Lock in the chapter
+              </Button>
+            )}
+            {!result.pass && onDrillMisses && (
+              <Button type="button" size="sm" onClick={onDrillMisses}>
+                Drill the chapter quiz
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={begin} disabled={busy}>
+              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+              Retake exam
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }

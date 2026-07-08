@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MarkdownReader, MathText } from "@/components/learn/markdown-reader"
+import { useToast } from "@/hooks/use-toast"
 import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
 import { ReadingControls } from "@/components/learn/reading-controls"
 import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
@@ -323,6 +324,7 @@ export function DeepChapter({
   // Path rail: {stageKey: done} from chapter_progress — the same store the old
   // lesson flow wrote, so history carries over.
   const [stages, setStages] = useState<Record<string, boolean>>({})
+  const { toast } = useToast()
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [resumed, setResumed] = useState(false)
   const [notes, setNotes] = useState<MarginNote[]>([])
@@ -480,12 +482,22 @@ export function DeepChapter({
   const markStage = useCallback(
     (key: string) => {
       if (!chapterKey) return
+      // Announce the flip — the rail's checkmark alone is easy to miss, and "what now?"
+      // is the question every stage completion raises.
+      if (!stages[key]) {
+        const i = PATH_STAGES.findIndex((p) => p.key === key)
+        const next = PATH_STAGES[i + 1]
+        toast({
+          title: `${PATH_STAGES[i]?.label ?? key} complete ✓`,
+          description: next ? `Next: ${next.label} — ${next.lead}` : "Chapter path complete.",
+        })
+      }
       setStages((s) => ({ ...s, [key]: true }))
       updateChapterStage(chapterKey, docId, key, { done: true })
         .then(() => loadProgress())
         .catch(() => {})
     },
-    [chapterKey, docId, loadProgress],
+    [chapterKey, docId, loadProgress, stages, toast],
   )
 
   // Per-chapter readiness ladder (raw → partial → deep) + any build jobs.
@@ -1639,6 +1651,8 @@ export function DeepChapter({
                   refreshMastery()
                   loadProgress() // exam stage is written server-side on a passing grade
                 }}
+                onDrillMisses={() => setDrawer("quiz")}
+                onLockIn={() => setDrawer("lockin")}
               />
             )}
             {drawer === "walk" && (

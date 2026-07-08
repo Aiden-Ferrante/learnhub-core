@@ -68,6 +68,9 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
 
   const progressKey = `txt2k:chapter-walk:${docId ?? ""}:${scope ?? ""}`
   const gradesKey = `txt2k:walk-grades:${docId ?? ""}:${scope ?? ""}`
+  // Set once any grade has been POSTed to the review system — its absence next to saved
+  // grades means they predate the SRS wiring and need a one-time backfill sync.
+  const syncedKey = `txt2k:walk-synced:${docId ?? ""}:${scope ?? ""}`
 
   // Resume the saved step + load per-section essences once per chapter.
   useEffect(() => {
@@ -80,28 +83,63 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
       saved = 0
     }
     setStepIdx(Math.min(Math.max(0, saved), Math.max(0, steps.length - 1)))
+    let savedGrades: Record<string, SkeletonGrade> = {}
     try {
       const rawGrades = localStorage.getItem(gradesKey)
-      setGrades(rawGrades ? (JSON.parse(rawGrades) as Record<string, SkeletonGrade>) : {})
+      savedGrades = rawGrades ? (JSON.parse(rawGrades) as Record<string, SkeletonGrade>) : {}
     } catch {
-      setGrades({})
+      savedGrades = {}
     }
+    setGrades(savedGrades)
+
+    // One-time backfill: per-step grades recorded before the SRS wiring never reached the
+    // review system — post them now so those branches resurface without re-walking.
+    const syncSaved = (essMap: Record<string, string>) => {
+      if (!docId || cancelled) return
+      try {
+        if (localStorage.getItem(syncedKey) || !Object.keys(savedGrades).length) return
+        localStorage.setItem(syncedKey, "1")
+      } catch {
+        return
+      }
+      for (const [ofKey, g] of Object.entries(savedGrades)) {
+        const walkStep = steps.find((s) => s.kind === "skeleton" && s.ofKey === ofKey)
+        if (!walkStep || walkStep.kind !== "skeleton") continue
+        const children = walkStep.childKeys.map((k) => {
+          const n = findNodeBySectionKey(tree ?? [], k)
+          return {
+            heading: n ? numberedSectionTitle(numbers.get(n.id), n.label, n.title) : k,
+            essence: (n?.sectionKey && essMap[n.sectionKey]) || undefined,
+          }
+        })
+        const node = findNodeBySectionKey(tree ?? [], ofKey)
+        submitSkeletonReviewGrade(docId, ofKey, GRADE_VALUE[g] as ReviewGrade, {
+          heading: node ? numberedSectionTitle(numbers.get(node.id), node.label, node.title) : ofKey,
+          chapterScope: scope,
+          children,
+        }).catch(() => {})
+      }
+    }
+
     fetchSkeleton(scope, docId)
       .then((r) => {
-        if (cancelled || r.error) return
+        if (cancelled) return
         const m: Record<string, string> = {}
-        for (const s of r.sections || []) {
-          if (s.sectionKey && s.essence) m[s.sectionKey] = s.essence
+        if (!r.error) {
+          for (const s of r.sections || []) {
+            if (s.sectionKey && s.essence) m[s.sectionKey] = s.essence
+          }
+          setEssences(m)
         }
-        setEssences(m)
+        syncSaved(m)
       })
       .catch(() => {
-        /* essence is supplementary */
+        syncSaved({}) // essence is supplementary; still backfill the grades
       })
     return () => {
       cancelled = true
     }
-  }, [scope, docId, progressKey, gradesKey, steps.length])
+  }, [scope, docId, progressKey, gradesKey, syncedKey, steps, tree, numbers])
 
   const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))]
   const draftKey = step?.kind === "skeleton" ? `txt2k:walk-recall:${docId ?? ""}:${step.ofKey}` : ""
@@ -178,6 +216,12 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
         chapterScope: scope ?? undefined,
         children,
       }).catch(() => {})
+      try {
+        // Live grades reach the review system directly — never backfill this walk on load.
+        localStorage.setItem(syncedKey, "1")
+      } catch {
+        /* ignore */
+      }
     }
     const last = stepIdx >= steps.length - 1
     window.setTimeout(() => {
@@ -251,6 +295,12 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           Step {stepIdx + 1} / {steps.length}
         </span>
+      </div>
+      <div className="h-0.5 w-full bg-muted">
+        <div
+          className="h-full bg-nvidia-green transition-all"
+          style={{ width: `${(stepIdx / Math.max(1, steps.length - 1)) * 100}%` }}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">

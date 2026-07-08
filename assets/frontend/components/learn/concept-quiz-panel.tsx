@@ -48,8 +48,11 @@ export function ConceptQuizPanel({
     start()
   }, [start])
 
-  // Application-question authoring status for this chapter, with a one-shot "prepare all".
+  // Application-question authoring status for this chapter. Opening the quiz AUTO-KICKS the
+  // authoring pass when questions are missing (it used to hide behind a "Prepare all" button
+  // nobody found until mid-quiz) — the strip below just reports progress.
   const [prep, setPrep] = useState<QuizPrepareStatus | null>(null)
+  const [autoKicked, setAutoKicked] = useState(false)
   const loadStatus = useCallback(() => {
     if (!scope) {
       setPrep(null)
@@ -60,18 +63,21 @@ export function ConceptQuizPanel({
       .catch(() => {})
   }, [scope, docId])
   useEffect(() => {
+    setAutoKicked(false)
     loadStatus()
   }, [loadStatus])
+  useEffect(() => {
+    if (autoKicked || !prep || prep.running || !prep.total || prep.authored >= prep.total) return
+    setAutoKicked(true)
+    prepareQuizQuestions(scope, docId)
+      .then((s) => !s.error && setPrep(s))
+      .catch(() => {})
+  }, [autoKicked, prep, scope, docId])
   useEffect(() => {
     if (!prep?.running) return
     const id = setInterval(loadStatus, 5000)
     return () => clearInterval(id)
   }, [prep?.running, loadStatus])
-  const runPrepare = () => {
-    prepareQuizQuestions(scope, docId)
-      .then((s) => !s.error && setPrep(s))
-      .catch(() => {})
-  }
 
   const answer = useCallback(
     (i: number) => {
@@ -133,21 +139,9 @@ export function ConceptQuizPanel({
               <Sparkles className="h-3.5 w-3.5 text-brand" />
             )}
             {prep.running
-              ? `Writing application questions… ${prep.authored}/${prep.total}`
+              ? `Writing application questions… ${prep.authored}/${prep.total} — recall questions serve meanwhile`
               : `Application questions: ${prep.authored}/${prep.total} ready`}
           </span>
-          {!prep.running && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={runPrepare}
-              title="Author the rest of this chapter's application questions now"
-            >
-              Prepare all
-            </Button>
-          )}
         </div>
       )}
 
