@@ -11,7 +11,9 @@ import {
   gradeSkeleton,
   numberSections,
   numberedSectionTitle,
+  submitSkeletonReviewGrade,
   type LearnTreeNode,
+  type ReviewGrade,
   type SkeletonGrade,
 } from "@/lib/learn-service"
 
@@ -160,6 +162,22 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
       localStorage.setItem(gradesKey, JSON.stringify(next))
     } catch {
       /* ignore */
+    }
+    // Feed the grade into spaced repetition: this branch becomes a "rebuild from memory"
+    // review card on the same SM-2 clock as concepts (snapshot = the structure just revealed).
+    if (docId) {
+      const children = step.childKeys.map((k) => {
+        const n = nodeFor(k)
+        return {
+          heading: n ? numberedSectionTitle(numbers.get(n.id), n.label, n.title) : k,
+          essence: (n?.sectionKey && essences[n.sectionKey]) || undefined,
+        }
+      })
+      submitSkeletonReviewGrade(docId, step.ofKey, GRADE_VALUE[g] as ReviewGrade, {
+        heading: label(step.ofKey),
+        chapterScope: scope ?? undefined,
+        children,
+      }).catch(() => {})
     }
     const last = stepIdx >= steps.length - 1
     window.setTimeout(() => {

@@ -270,7 +270,8 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
         if not doc_id:
             return {"error": "no document found"}
 
-        content = fetch_section_content(scope, doc_id)
+        # include_figures: the chapter's captioned figures woven into the prose per section.
+        content = fetch_section_content(scope, doc_id, include_figures=True)
         blocks = content.get("blocks", [])
         section_keys = sorted({b.get("sectionKey") for b in blocks if b.get("sectionKey")})
 

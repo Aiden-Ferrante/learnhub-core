@@ -747,12 +747,44 @@ def fetch_outline(doc_id: str | None = None) -> dict:
         return {"docId": doc_id, "outline": [], "error": str(exc)}
 
 
-def fetch_section_content(section_key: str, doc_id: str | None = None) -> dict:
+def figure_markdown(doc_id: str, fig: dict) -> str:
+    """One figure as markdown: the image (served through the frontend's binary proxy at
+    /api/learn/figure) followed by its caption as an italic line. Alt text keeps the caption
+    but swaps brackets so it can never break the image syntax."""
+    cap = (fig.get("caption") or "").strip()
+    alt = cap.replace("[", "(").replace("]", ")") or f"Figure (page {fig.get('page')})"
+    lines = [f"![{alt}](/api/learn/figure?doc={doc_id}&n={fig.get('order')})"]
+    if cap:
+        lines.append(f"*{cap}*")
+    return "\n".join(lines)
+
+
+def _figures_by_section(db, doc_id: str, section_keys: set[str]) -> dict[str, list[dict]]:
+    """CAPTIONED figures per section, in reading order. Uncaptioned pictures (covers, logos,
+    decorations) are deliberately left out — precision over recall in the reading flow."""
+    out: dict[str, list[dict]] = {}
+    if not section_keys or not db.has_collection(ELEMENTS):
+        return out
+    for r in db.aql.execute(
+        "FOR e IN elements FILTER e.docId == @d AND e.type == 'figure' "
+        "AND e.sectionKey IN @ks AND e.caption != null AND e.caption != '' "
+        "SORT e.order RETURN {sectionKey: e.sectionKey, order: e.order, page: e.page, caption: e.caption}",
+        bind_vars={"d": doc_id, "ks": list(section_keys)},
+    ):
+        out.setdefault(r["sectionKey"], []).append(r)
+    return out
+
+
+def fetch_section_content(section_key: str, doc_id: str | None = None, include_figures: bool = False) -> dict:
     """Markdown for a section, including its descendant sub-sections, ordered.
 
     Mirrors ``isAncestorSectionKey`` so requesting ``toc:1`` returns 1 plus 1.x. The
     response resolves the section's page coordinates (``pageStart``/``pageEnd``) as the
     min/max across the matched blocks — the "section 3 → pages X–Y" drill-down answer.
+
+    ``include_figures`` weaves each section's captioned figures (image + caption) into the
+    assembled markdown at the end of that section's block — the PDF's own visuals back in
+    the reading flow.
     """
     try:
         db = connect_arango()
@@ -795,7 +827,22 @@ def fetch_section_content(section_key: str, doc_id: str | None = None) -> dict:
             }
             for r in matched
         ]
-        markdown = "\n\n".join(r.get("markdown", "") for r in matched if r.get("markdown"))
+        figures_by_sk: dict[str, list[dict]] = (
+            _figures_by_section(db, doc_id, {r.get("sectionKey") for r in matched if r.get("sectionKey")})
+            if include_figures
+            else {}
+        )
+        parts: list[str] = []
+        for r in matched:
+            part = r.get("markdown", "")
+            if not part:
+                continue
+            # pop() so a repeated sectionKey can't duplicate its figures
+            figs = figures_by_sk.pop(r.get("sectionKey"), [])
+            if figs:
+                part += "\n\n" + "\n\n".join(figure_markdown(doc_id, f) for f in figs)
+            parts.append(part)
+        markdown = "\n\n".join(parts)
         starts = [r.get("pageStart") for r in matched if r.get("pageStart") is not None]
         ends = [r.get("pageEnd") for r in matched if r.get("pageEnd") is not None]
         return {

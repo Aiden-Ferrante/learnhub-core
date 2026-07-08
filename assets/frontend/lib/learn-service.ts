@@ -335,11 +335,24 @@ export type ReviewCard = {
   sectionKey: string
   state: 'new' | 'learning' | 'review'
   due?: number | null
+  /** Which course the card belongs to — set so whole-library sessions can fetch per-card
+   *  extras (figures) without a docId prop. */
+  docId?: string | null
+  pageStart?: number | null
+  pageEnd?: number | null
+  /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
+   *  seeded by the chapter walk's self-grades. Absent/'concept' = a normal concept card. */
+  itemType?: 'concept' | 'skeleton'
+  /** Skeleton cards only: the branch's true children, snapshotted at walk time. */
+  children?: { heading: string; essence?: string }[]
 }
 
 export type ReviewQueueResponse = {
   cards: ReviewCard[]
-  counts: { due: number; new: number; later: number }
+  /** `new` is the full untouched backlog; `newAllowance` (unscoped sessions only) is how many
+   *  of them today's session will actually serve — the daily intake cap minus what was
+   *  already introduced since midnight. */
+  counts: { due: number; new: number; later: number; newAllowance?: number }
   error?: string
 }
 
@@ -364,6 +377,8 @@ export async function fetchReviewQueue(
   const params = new URLSearchParams({ limit: String(limit) })
   if (docId) params.set('doc', docId)
   if (scope) params.set('scope', scope)
+  // The learner's midnight, so the daily new-card allowance follows their timezone.
+  params.set('dayStart', String(new Date().setHours(0, 0, 0, 0) / 1000))
   const res = await fetch(`/api/learn/review/queue?${params}`, { cache: 'no-store' })
   return parseJsonResponse<ReviewQueueResponse>(res)
 }
@@ -377,6 +392,68 @@ export async function submitReviewGrade(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
+  })
+  return parseJsonResponse<ReviewGradeResponse>(res)
+}
+
+// ----- Typed document elements (figures/tables extracted from the PDF) -----
+
+export type LearnFigure = {
+  type: string
+  sectionKey: string
+  page?: number | null
+  order: number
+  caption?: string | null
+  imageRef?: string | null
+}
+
+/** Captioned figures for a section (and its descendants). The image itself is served by
+ *  /api/learn/figure?doc=…&n={order}. */
+export async function fetchSectionFigures(docId: string, sectionKey: string): Promise<LearnFigure[]> {
+  const params = new URLSearchParams({ doc: docId, scope: sectionKey, type: 'figure' })
+  const res = await fetch(`/api/learn/elements?${params}`, { cache: 'no-store' })
+  const data = await parseJsonResponse<{ elements?: LearnFigure[]; error?: string }>(res)
+  return (data.elements ?? []).filter((e) => (e.caption ?? '').trim())
+}
+
+export function figureUrl(docId: string, order: number): string {
+  return `/api/learn/figure?doc=${encodeURIComponent(docId)}&n=${order}`
+}
+
+// ----- Whole-library study debt (the one cross-course rollup) -----
+
+export type StudyDebt = {
+  dueNow: number
+  fadingSoon: number
+  tracked: number
+  days: number
+  courses: { doc: string; title: string; dueNow: number; fadingSoon: number; tracked: number }[]
+  error?: string
+}
+
+export async function fetchStudyDebt(days = 7): Promise<StudyDebt> {
+  const res = await fetch(`/api/learn/study-debt?days=${days}`, { cache: 'no-store' })
+  return parseJsonResponse<StudyDebt>(res)
+}
+
+// Seed-or-advance a SKELETON item's spaced-repetition state — the chapter walk calls this on
+// every structure-recall self-grade, snapshotting the branch's true children so the review
+// reveal can re-show them. Re-grades from the queue go through submitReviewGrade instead
+// (the card's conceptKey is the skel-… review-row key).
+export async function submitSkeletonReviewGrade(
+  docId: string,
+  sectionKey: string,
+  grade: ReviewGrade,
+  snapshot?: {
+    heading?: string
+    chapterScope?: string
+    children?: { heading: string; essence?: string }[]
+  },
+): Promise<ReviewGradeResponse> {
+  const res = await fetch('/api/learn/review/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skeleton: true, doc: docId, sectionKey, grade, ...snapshot }),
   })
   return parseJsonResponse<ReviewGradeResponse>(res)
 }

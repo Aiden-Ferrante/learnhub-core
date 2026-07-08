@@ -96,11 +96,21 @@ def ensure_path_collections(db) -> None:
             col.add_persistent_index(fields=["docId"])
 
 
+# Bump to invalidate cached skeletons when the essence prompt changes (lazy regenerate on fetch).
+SKELETON_PROMPT_VERSION = 2
+
 SKELETON_SYSTEM = (
-    "You distill a textbook chapter's SKELETON for a learner to memorize. Given the chapter's "
-    "sections in order (heading + key concepts), write a ONE-line essence for each section — "
-    "what it covers, in a handful of plain words. Keep the EXACT sections and order; never add, "
-    "drop, merge, or reorder. No markdown, no section numbers."
+    "You distill a textbook chapter's SKELETON — the scaffold a learner rebuilds from memory. "
+    "Given the chapter's sections in order (heading + key concepts), write a ONE-line essence "
+    "for each section: its central claim or mechanism, stated as a complete thought — what the "
+    "section SAYS, not what it is about. At most 15 plain words, self-contained, no pronouns "
+    "that point outside the line. Never a topic label or meta-summary ('Understanding X', "
+    "'Basics of Y', 'This section covers…'); name the concrete objects and relationships, "
+    "drawing on the given concepts. Example — section 'Masked language model': "
+    "BAD: 'Understanding masked prediction'. "
+    "GOOD: 'Predicts a masked token using context from both sides; powers BERT-style encoders'. "
+    "Keep the EXACT sections and order; never add, drop, merge, or reorder. No markdown, no "
+    "section numbers."
 )
 
 
@@ -168,7 +178,11 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
         col = db.collection(SKELETONS)
         if not regenerate:
             existing = col.get(k)
-            if existing and existing.get("sections"):
+            if (
+                existing
+                and existing.get("sections")
+                and existing.get("promptVersion") == SKELETON_PROMPT_VERSION
+            ):
                 return {
                     "docId": doc_id,
                     "scope": scope,
@@ -178,7 +192,14 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
         if not sections:
             return {"docId": doc_id, "scope": scope, "sections": [], "error": "no sections in this scope"}
         col.insert(
-            {"_key": k, "docId": doc_id, "scope": scope, "sections": sections, "createdAt": int(time.time())},
+            {
+                "_key": k,
+                "docId": doc_id,
+                "scope": scope,
+                "sections": sections,
+                "promptVersion": SKELETON_PROMPT_VERSION,
+                "createdAt": int(time.time()),
+            },
             overwrite=True,
         )
         return {"docId": doc_id, "scope": scope, "sections": _attach_depths(db, doc_id, sections)}

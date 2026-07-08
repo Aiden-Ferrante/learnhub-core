@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ConceptMarkdown } from "@/components/learn/concept-markdown"
 import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
 import { KIND_STYLES, prettyScope } from "@/components/learn/concept-card"
+import { SectionFigures } from "@/components/learn/section-figures"
 import { submitReviewGrade, type ConceptLesson, type ReviewGrade } from "@/lib/learn-service"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
@@ -112,6 +113,16 @@ export function ConceptDetail({
           <ConceptMarkdown content={c.source} className="text-sm italic text-muted-foreground" />
         </div>
       )}
+
+      <SectionFigures
+        docId={docId}
+        sectionKey={c.sectionKey}
+        pageStart={c.pageStart}
+        pageEnd={c.pageEnd}
+        limit={2}
+        className="grid gap-3 sm:grid-cols-2"
+      />
+
 
       {(c.prereqNames || []).length > 0 && (
         <div>

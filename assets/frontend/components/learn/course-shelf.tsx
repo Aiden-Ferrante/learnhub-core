@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GroupSidebar } from "@/components/learn/group-sidebar"
+import { TodayStrip } from "@/components/learn/today-strip"
 import {
   countSections,
   deleteLearnDocument,
@@ -387,6 +388,8 @@ export function CourseShelf({
           )}
         </div>
       </div>
+
+      <TodayStrip />
 
       {courses.length === 0 ? (
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-card/40 px-6 py-16 text-center">

@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { KIND_STYLES } from "@/components/learn/concept-card"
 import { ConceptMarkdown } from "@/components/learn/concept-markdown"
+import { SectionFigures } from "@/components/learn/section-figures"
 import {
   fetchReviewQueue,
   submitReviewGrade,
   type ReviewCard,
   type ReviewGrade,
+  type ReviewQueueResponse,
 } from "@/lib/learn-service"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
@@ -30,7 +32,7 @@ export function ReviewPanel({
   onAnswered?: () => void
 }) {
   const [cards, setCards] = useState<ReviewCard[]>([])
-  const [counts, setCounts] = useState({ due: 0, new: 0, later: 0 })
+  const [counts, setCounts] = useState<ReviewQueueResponse["counts"]>({ due: 0, new: 0, later: 0 })
   const [idx, setIdx] = useState(0)
   const [revealed, setRevealed] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -131,14 +133,20 @@ export function ReviewPanel({
     )
   }
 
-  const kindClass = KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
+  const isSkeleton = card.itemType === "skeleton"
+  const kindClass = isSkeleton
+    ? "bg-brand/15 text-brand"
+    : KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {counts.due} due · {counts.new} new
+            {counts.due} due · {Math.min(counts.new, counts.newAllowance ?? counts.new)} new
+            {counts.newAllowance != null && counts.new > counts.newAllowance && (
+              <span className="opacity-70"> ({counts.new} in backlog)</span>
+            )}
           </span>
           <span className="tabular-nums">
             {idx + 1} / {cards.length}
@@ -156,7 +164,7 @@ export function ReviewPanel({
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold">{card.name}</span>
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
-            {card.kind}
+            {isSkeleton ? "structure" : card.kind}
           </span>
           {card.state === "new" && (
             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">new</span>
@@ -165,19 +173,43 @@ export function ReviewPanel({
 
         {!revealed ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <p className="text-sm text-muted-foreground">Recall what this concept means.</p>
+            <p className="text-sm text-muted-foreground">
+              {isSkeleton
+                ? "Rebuild this branch from memory — what sits under it, and what does each part say?"
+                : "Recall what this concept means."}
+            </p>
             <Button onClick={() => setRevealed(true)}>
               Reveal <kbd className="ml-2 rounded bg-muted px-1 text-[10px]">space</kbd>
             </Button>
           </div>
+        ) : isSkeleton ? (
+          <ul className="flex-1 space-y-1.5 text-sm">
+            {(card.children ?? []).map((c, i) => (
+              <li key={i} className="leading-snug">
+                <span className="font-medium">{c.heading}</span>
+                {c.essence && <span className="text-muted-foreground"> — {c.essence}</span>}
+              </li>
+            ))}
+            {!(card.children ?? []).length && (
+              <li className="text-muted-foreground">No structure snapshot for this branch.</li>
+            )}
+          </ul>
         ) : (
-          <div className="flex flex-1 flex-col gap-3">
+          <div className="flex flex-1 flex-col gap-3 overflow-auto">
             <ConceptMarkdown content={card.signal} className="text-sm" />
             {card.source && (
               <div className="border-l-2 border-muted pl-3 text-xs italic text-muted-foreground">
                 <ConceptMarkdown content={card.source} />
               </div>
             )}
+            <SectionFigures
+              docId={card.docId ?? docId}
+              sectionKey={card.sectionKey}
+              pageStart={card.pageStart}
+              pageEnd={card.pageEnd}
+              limit={1}
+              className="space-y-2"
+            />
           </div>
         )}
       </div>

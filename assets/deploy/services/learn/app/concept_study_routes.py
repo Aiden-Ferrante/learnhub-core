@@ -3,10 +3,18 @@
 Keyless/deterministic — no LLM. The review schedule lives in a mutable ``concept_reviews``
 collection (one row per concept, _key = concept _key); every grade also appends to the
 append-only ``study_events`` floor so mastery + the heatmap keep working from one log.
+
+The same collection also schedules SKELETON items (``itemType: "skeleton"``, _key prefixed
+``skel-``): structure-recall cards seeded by the chapter walk's self-grades, so "rebuild this
+branch from memory" resurfaces on the same SM-2 clock as concepts. The branch's children
+(headings + essences) are snapshotted on the row at grade time — a book's structure is static,
+and the snapshot lets the review reveal re-show the truth without resolving the TOC tree.
 """
 
 from __future__ import annotations
 
+import hashlib
+import os
 import random
 import time
 import uuid
@@ -92,6 +100,63 @@ def _ensure_reviews(db) -> None:
         col.add_persistent_index(fields=["due"])
 
 
+# Course/library-wide review sessions introduce at most this many never-reviewed concepts per
+# day (Anki-style intake discipline) so a big backlog can't flood a session. Chapter-scoped
+# review is exempt — studying a chapter is a deliberate "learn these now" action.
+NEW_PER_DAY = int(os.getenv("LEARN_NEW_PER_DAY", "10"))
+
+
+def day_start(now: float) -> float:
+    """Epoch of local midnight for ``now`` — the boundary for the daily new-card allowance."""
+    lt = time.localtime(now)
+    return now - (lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec)
+
+
+def new_allowance(cap: int, introduced_today: int) -> int:
+    return max(0, int(cap) - max(0, int(introduced_today)))
+
+
+SKELETON_KEY_PREFIX = "skel-"
+
+
+def skeleton_review_key(doc_id: str, section_key: str) -> str:
+    """Deterministic review-row key for a skeleton (structure-recall) item — prefixed so it
+    can never collide with a concept _key and is recognizable in the grade route."""
+    digest = hashlib.sha256(f"{doc_id}|{section_key}".encode()).hexdigest()[:16]
+    return SKELETON_KEY_PREFIX + digest
+
+
+def clean_skeleton_children(children: object) -> list[dict[str, str]]:
+    """Sanitize a walk-supplied children snapshot to [{heading, essence}] rows."""
+    out: list[dict[str, str]] = []
+    if not isinstance(children, list):
+        return out
+    for c in children:
+        if not isinstance(c, dict):
+            continue
+        heading = str(c.get("heading") or "").strip()
+        if heading:
+            out.append({"heading": heading, "essence": str(c.get("essence") or "").strip()})
+    return out
+
+
+def skeleton_card(row: dict[str, Any]) -> dict[str, Any]:
+    """Shape a skeleton review row as a queue card (same envelope as concept cards; the panel
+    keys and grades by ``conceptKey``, which for skeleton items is the review-row key)."""
+    return {
+        "itemType": "skeleton",
+        "conceptKey": row.get("_key"),
+        "name": row.get("heading") or row.get("sectionKey"),
+        "kind": "skeleton",
+        "signal": "",
+        "children": row.get("children") or [],
+        "sectionKey": row.get("sectionKey"),
+        "docId": row.get("docId"),
+        "state": row.get("state", "review"),
+        "due": row.get("due"),
+    }
+
+
 def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
     return {
         "conceptKey": c["key"],
@@ -100,6 +165,9 @@ def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
         "signal": c.get("signal"),
         "source": c.get("source"),
         "sectionKey": c.get("sectionKey"),
+        "docId": c.get("docId"),
+        "pageStart": c.get("pageStart"),
+        "pageEnd": c.get("pageEnd"),
         "state": state,
         "due": due,
     }
@@ -110,9 +178,16 @@ def api_review_queue(
     doc: str | None = Query(None),
     scope: str | None = Query(None),
     limit: int = Query(40, ge=1, le=200),
+    new_limit: int | None = Query(None, alias="newLimit", ge=0, le=200),
+    day_start_ts: float | None = Query(None, alias="dayStart"),
 ) -> JSONResponse:
     """Concepts to review now: due cards (earliest first) then new (unseen) cards. ``scope`` =
-    a sectionKey limits to that section; omit for the whole-course queue."""
+    a sectionKey limits to that section; omit for the whole-course queue.
+
+    Without a scope, new-card intake is capped per local day (``newLimit``, default
+    LEARN_NEW_PER_DAY): the queue serves due cards plus at most (cap − introduced-today) new
+    ones. ``dayStart`` lets the client pass its own midnight so the day boundary follows the
+    learner's timezone, not the server's."""
     now = time.time()
     try:
         db = connect_arango()
@@ -125,17 +200,43 @@ def api_review_queue(
                 "FILTER (@doc == null OR c.docId == @doc) AND (@scope == null OR c.sectionKey == @scope) "
                 "SORT c.order "
                 "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-                "source: c.source, sectionKey: c.sectionKey}",
+                "source: c.source, sectionKey: c.sectionKey, docId: c.docId, "
+                "pageStart: c.pageStart, pageEnd: c.pageEnd}",
                 bind_vars={"doc": doc, "scope": scope},
             )
         )
         reviews: dict[str, dict[str, Any]] = {}
         for r in db.aql.execute(
-            "FOR r IN concept_reviews FILTER @doc == null OR r.docId == @doc "
+            "FOR r IN concept_reviews FILTER (@doc == null OR r.docId == @doc) "
+            "AND r.itemType != 'skeleton' "
             "RETURN {key: r._key, due: r.due, state: r.state}",
             bind_vars={"doc": doc},
         ):
             reviews[r["key"]] = r
+        # Skeleton (structure-recall) cards: exist only once the chapter walk has graded them,
+        # so they surface purely on their SM-2 due date — never as "new".
+        skeleton_rows = list(
+            db.aql.execute(
+                "FOR r IN concept_reviews FILTER r.itemType == 'skeleton' "
+                "AND (@doc == null OR r.docId == @doc) "
+                "AND (@scope == null OR r.sectionKey == @scope OR r.chapterScope == @scope) "
+                "RETURN r",
+                bind_vars={"doc": doc, "scope": scope},
+            )
+        )
+        # Daily new-card allowance (unscoped sessions only): how many concepts already got
+        # their first grade since the learner's midnight?
+        introduced_today = 0
+        if scope is None:
+            since = day_start_ts if day_start_ts is not None else day_start(now)
+            introduced_today = next(
+                db.aql.execute(
+                    "RETURN COUNT(FOR r IN concept_reviews "
+                    "FILTER (@doc == null OR r.docId == @doc) AND r.itemType != 'skeleton' "
+                    "AND r.firstReview != null AND r.firstReview >= @since RETURN 1)",
+                    bind_vars={"doc": doc, "since": since},
+                )
+            )
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)})
 
@@ -150,26 +251,54 @@ def api_review_queue(
             due.append(_card(c, r.get("state", "review"), r.get("due")))
         else:
             later += 1
+    for r in skeleton_rows:
+        if float(r.get("due", 0)) <= now:
+            due.append(skeleton_card(r))
+        else:
+            later += 1
     due.sort(key=lambda x: x.get("due") or 0)
-    queue = (due + new)[:limit]
+    if scope is None:
+        allowance = new_allowance(new_limit if new_limit is not None else NEW_PER_DAY, introduced_today)
+        served_new = new[:allowance]
+    else:
+        allowance = len(new)
+        served_new = new
+    queue = (due + served_new)[:limit]
     return JSONResponse(
-        {"cards": queue, "counts": {"due": len(due), "new": len(new), "later": later}}
+        {
+            "cards": queue,
+            "counts": {
+                "due": len(due),
+                "new": len(new),
+                "later": later,
+                "newAllowance": allowance,
+            },
+        }
     )
 
 
 @router.post("/api/review/grade")
 def api_review_grade(body: dict = Body(...)) -> JSONResponse:
     """Grade one recall (1=Again, 2=Hard, 3=Good, 4=Easy): advance the SR state (upsert
-    concept_reviews) and append a study event so mastery moves."""
+    concept_reviews) and append a study event so mastery moves.
+
+    Skeleton (structure-recall) items are graded the same way: pass ``skeleton: true`` with
+    ``doc`` + ``sectionKey`` (the chapter walk does this, snapshotting ``heading``/``children``/
+    ``chapterScope``), or pass the card's ``conceptKey`` (``skel-…``) to re-grade from the queue.
+    """
     concept_key = str(body.get("conceptKey") or "").strip()
     try:
         grade = int(body.get("grade"))
     except (TypeError, ValueError):
         return JSONResponse({"error": "grade must be 1-4"}, status_code=400)
-    if not concept_key or grade < 1 or grade > 4:
-        return JSONResponse({"error": "conceptKey and grade (1-4) are required"}, status_code=400)
+    if grade < 1 or grade > 4:
+        return JSONResponse({"error": "grade (1-4) is required"}, status_code=400)
 
     now = time.time()
+    if body.get("skeleton") or concept_key.startswith(SKELETON_KEY_PREFIX):
+        return _grade_skeleton_item(body, concept_key, grade, now)
+    if not concept_key:
+        return JSONResponse({"error": "conceptKey and grade (1-4) are required"}, status_code=400)
     try:
         db = connect_arango()
         _ensure_reviews(db)
@@ -189,6 +318,8 @@ def api_review_grade(body: dict = Body(...)) -> JSONResponse:
             "docId": doc_id,
             "sectionKey": section_key,
         }
+        if not existing:
+            row["firstReview"] = now  # feeds the daily new-card allowance
         reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per concept)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=500)
@@ -206,6 +337,76 @@ def api_review_grade(body: dict = Body(...)) -> JSONResponse:
     return JSONResponse(
         {
             "conceptKey": concept_key,
+            "due": next_state["due"],
+            "intervalDays": next_state["interval"],
+            "state": next_state["state"],
+        }
+    )
+
+
+def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -> JSONResponse:
+    """Advance (or seed) the SM-2 state of one skeleton item and log a ``recall`` study event.
+
+    The chapter walk creates the row (doc + sectionKey + structure snapshot); queue re-grades
+    address the existing row by its ``skel-…`` key, so no snapshot is needed then.
+    """
+    doc_id = str(body.get("doc") or "").strip()
+    section_key = str(body.get("sectionKey") or "").strip()
+    try:
+        db = connect_arango()
+        _ensure_reviews(db)
+        reviews = db.collection(REVIEWS)
+        if doc_id and section_key:
+            key = skeleton_review_key(doc_id, section_key)
+            existing = reviews.get(key)
+        elif concept_key.startswith(SKELETON_KEY_PREFIX):
+            key = concept_key
+            existing = reviews.get(key)
+            if not existing:
+                return JSONResponse({"error": "unknown skeleton item"}, status_code=404)
+            doc_id = existing.get("docId")
+            section_key = existing.get("sectionKey")
+        else:
+            return JSONResponse(
+                {"error": "doc and sectionKey are required for a skeleton grade"}, status_code=400
+            )
+        state = existing if existing else srs.new_state(now)
+        next_state = srs.schedule(state, grade, now)
+        row = {
+            **next_state,
+            "_key": key,
+            "itemType": "skeleton",
+            "docId": doc_id,
+            "sectionKey": section_key,
+        }
+        if not existing:
+            row["firstReview"] = now
+        heading = str(body.get("heading") or "").strip()
+        if heading:
+            row["heading"] = heading
+        chapter_scope = str(body.get("chapterScope") or "").strip()
+        if chapter_scope:
+            row["chapterScope"] = chapter_scope
+        children = clean_skeleton_children(body.get("children"))
+        if children:
+            row["children"] = children
+        reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per skeleton item)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    # Append to the mastery floor (best-effort; never breaks the grade flow).
+    record_quiz_event(
+        section_key,
+        None,
+        correct=(grade >= 3),
+        doc=doc_id,
+        stem=row.get("heading") or section_key,
+        expected="; ".join(c["heading"] for c in (row.get("children") or [])) or None,
+        kind="recall",
+    )
+    return JSONResponse(
+        {
+            "conceptKey": key,
             "due": next_state["due"],
             "intervalDays": next_state["interval"],
             "state": next_state["state"],
