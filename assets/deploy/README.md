@@ -15,7 +15,6 @@ This directory contains all deployment-related configuration for the txt2kg proj
   - **ollama/**: Ollama LLM inference service (default)
   - **vllm/**: vLLM inference service with GPU support (via `--vllm` flag)
   - **sentence-transformers/**: Sentence transformer service for embeddings (via `--vector-search` flag)
-  - **gpu-viz/**: GPU-accelerated graph visualization services (run separately)
   - **gnn_model/**: Graph Neural Network model service (experimental)
 
 ## Usage
@@ -70,7 +69,6 @@ docker compose -f deploy/compose/docker-compose.vllm.yml --profile vector-search
 - **Sentence Transformers**: Embedding generation on port 8000
 
 ### Optional Services (run separately)
-- **GPU-Viz Services**: See `services/gpu-viz/README.md` for GPU-accelerated visualization
 - **GNN Model Service**: See `services/gnn_model/README.md` for experimental GNN-based RAG
 
 ## Architecture
