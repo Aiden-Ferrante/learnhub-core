@@ -13,10 +13,13 @@ downloads the MP3 from ``/file``.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import threading
 import time
 
 import numpy as np
@@ -276,6 +279,32 @@ def audiobook_path(doc_id: str, scope: str | None, source: str) -> str:
     return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.mp3")
 
 
+# One narration synthesizes at a time: every chunk goes through the single shared GPU
+# (Orpheus via Ollama), so concurrent jobs would interleave and all finish late. Extra
+# jobs queue on this gate and run in POST order.
+_TTS_GATE = threading.Semaphore(1)
+
+
+def _work_dir(doc_id: str, scope: str | None, source: str) -> str:
+    return os.path.join(AUDIO_DIR, doc_id, f".{_slug(scope)}__{source}.work")
+
+
+def _load_manifest(work: str) -> dict | None:
+    try:
+        with open(os.path.join(work, "manifest.json")) as f:
+            manifest = json.load(f)
+    except (OSError, ValueError):
+        return None
+    segments = manifest.get("segments")
+    return manifest if isinstance(segments, list) and segments else None
+
+
+def _save_chunk(path: str, wav: np.ndarray) -> None:
+    tmp = f"{path}.tmp.npy"
+    np.save(tmp, wav)
+    os.replace(tmp, path)
+
+
 def _encode_mp3(wav: np.ndarray, out_path: str) -> None:
     import soundfile as sf
 
@@ -294,7 +323,11 @@ def _encode_mp3(wav: np.ndarray, out_path: str) -> None:
 
 def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
                    voice: str = DEFAULT_VOICE, on_progress=None) -> dict:
-    """Render a chapter to an MP3. Blocking + GPU-bound — call from a worker thread."""
+    """Render a chapter to an MP3. Blocking + GPU-bound — call from a worker thread.
+
+    Every synthesized chunk is checkpointed to a work dir, so a job that dies mid-way
+    (service restart, crash) resumes from the last finished chunk on the next request
+    instead of losing hours of GPU time."""
     t0 = time.time()
     db = connect_arango()
     if doc_id is None:
@@ -305,29 +338,60 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
     if voice not in VOICES:
         voice = DEFAULT_VOICE
 
-    segments = chapter_segments(db, doc_id, scope, source)
-    # Drop consecutive duplicates (e.g. a heading that the section body repeats).
-    deduped: list[str] = []
-    for seg in segments:
-        if deduped and seg.strip().lower() == deduped[-1].strip().lower():
-            continue
-        deduped.append(seg)
-    segments = deduped
-    if not segments:
-        return {"docId": doc_id, "scope": scope, "error": "no narratable text in this scope"}
+    # Resume from the checkpointed segment list when one exists — it pins the exact
+    # narration script (guided scripts are LLM-written, so recomputing would drift)
+    # and the voice, so resumed chunks match the ones already on disk.
+    work = _work_dir(doc_id, scope, source)
+    manifest = _load_manifest(work)
+    if manifest:
+        segments = manifest["segments"]
+        if manifest.get("voice") in VOICES:
+            voice = manifest["voice"]
+    else:
+        segments = chapter_segments(db, doc_id, scope, source, on_progress=on_progress)
+        # Drop consecutive duplicates (e.g. a heading that the section body repeats).
+        deduped: list[str] = []
+        for seg in segments:
+            if deduped and seg.strip().lower() == deduped[-1].strip().lower():
+                continue
+            deduped.append(seg)
+        segments = deduped
+        if not segments:
+            return {"docId": doc_id, "scope": scope, "error": "no narratable text in this scope"}
+        os.makedirs(work, exist_ok=True)
+        tmp = os.path.join(work, "manifest.json.tmp")
+        with open(tmp, "w") as f:
+            json.dump({"segments": segments, "voice": voice}, f)
+        os.replace(tmp, os.path.join(work, "manifest.json"))
 
     total = len(segments)
-    if on_progress:
-        on_progress(0, total, None)
 
-    pieces: list[np.ndarray] = []
-    for i, seg in enumerate(segments):
-        wav = synthesize(seg, voice=voice)
-        if wav.size:
-            pieces.append(wav)
-            pieces.append(_GAP)
+    if not _TTS_GATE.acquire(blocking=False):
         if on_progress:
-            on_progress(i + 1, total, seg[:60])
+            on_progress(0, total, "queued — another narration is synthesizing")
+        _TTS_GATE.acquire()
+    try:
+        if on_progress:
+            on_progress(0, total, "resuming from checkpoint" if manifest else None)
+        pieces: list[np.ndarray] = []
+        for i, seg in enumerate(segments):
+            chunk = os.path.join(work, f"{i:05d}.npy")
+            wav = None
+            if os.path.exists(chunk):
+                try:
+                    wav = np.load(chunk)
+                except (OSError, ValueError):
+                    wav = None  # unreadable checkpoint → resynthesize
+            if wav is None:
+                wav = synthesize(seg, voice=voice)
+                _save_chunk(chunk, wav)
+            if wav.size:
+                pieces.append(wav)
+                pieces.append(_GAP)
+            if on_progress:
+                on_progress(i + 1, total, seg[:60])
+    finally:
+        _TTS_GATE.release()
 
     if not pieces:
         return {"docId": doc_id, "scope": scope, "error": "synthesis produced no audio"}
@@ -335,6 +399,7 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
     full = np.concatenate(pieces)
     out_path = audiobook_path(doc_id, scope, source)
     _encode_mp3(full, out_path)
+    shutil.rmtree(work, ignore_errors=True)
 
     return {
         "docId": doc_id,
@@ -415,6 +480,16 @@ def audiobook_status(doc_id: str | None, scope: str | None, source: str = "text"
     if os.path.exists(path):
         return {"status": "done", "scope": scope, "docId": doc_id, "source": source,
                 "summary": {"file": path, "exists": True}}
+    # A checkpoint work dir without a job means a run died (e.g. service restart);
+    # starting the narration again resumes from the last finished chunk.
+    work = _work_dir(doc_id, scope, source)
+    manifest = _load_manifest(work)
+    if manifest:
+        done = sum(1 for fn in os.listdir(work)
+                   if fn.endswith(".npy") and not fn.endswith(".tmp.npy"))
+        return {"status": "interrupted", "scope": scope, "docId": doc_id, "source": source,
+                "progress": {"done": done, "total": len(manifest["segments"]), "current": None},
+                "resume": "start this narration again to continue from the checkpoint"}
     return {"status": "idle", "scope": scope, "docId": doc_id, "source": source}
 
 
