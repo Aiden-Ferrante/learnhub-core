@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.audiobook import (
     audiobook_path,
     audiobook_status,
+    audiobook_timeline,
     list_audiobooks,
     start_audiobook,
     _resolve_doc_id,
@@ -49,6 +50,13 @@ def api_status(doc: str | None = None, scope: str | None = None, source: str = "
 @router.get("/api/audiobook/list")
 def api_list(doc: str | None = None) -> JSONResponse:
     return JSONResponse(list_audiobooks(doc))
+
+
+@router.get("/api/audiobook/timeline")
+def api_timeline(doc: str | None = None, scope: str | None = None, source: str = "text") -> JSONResponse:
+    """Chunk→time map for read-along highlighting (exact sidecar, or estimated for older MP3s)."""
+    data = audiobook_timeline(doc, scope, source)
+    return JSONResponse(data, status_code=404 if data.get("error") else 200)
 
 
 @router.get("/api/audiobook/file", response_model=None)

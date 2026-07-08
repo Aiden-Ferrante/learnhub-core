@@ -15,12 +15,23 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
   audiobookFileUrl,
+  fetchAudiobookTimeline,
   fetchAudiobookVoices,
   getAudiobookStatus,
   startAudiobook,
   type AudiobookSource,
   type AudiobookStatusResponse,
+  type AudiobookTimeline,
 } from "@/lib/learn-service"
+import {
+  buildStripIndex,
+  clearReadAlongHighlights,
+  locateChunks,
+  rangeFor,
+  setHighlight,
+  type ChunkSpan,
+  type StripIndex,
+} from "@/lib/read-along"
 import { cn } from "@/lib/utils"
 
 type AudiobookPanelProps = {
@@ -77,6 +88,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
     } catch {
       /* ignore */
     }
+    buildSync() // estimated timelines need the real MP3 duration to scale their weights
   }
   const onAudioTime = () => {
     const el = audioRef.current
@@ -87,6 +99,134 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
       /* ignore */
     }
   }
+
+  // ── Read-along: highlight what the narration is speaking, live in the prose ──
+  const [follow, setFollow] = useState(true)
+  useEffect(() => {
+    try {
+      setFollow(localStorage.getItem("txt2k:audio-follow") !== "0")
+    } catch {
+      /* ignore */
+    }
+  }, [])
+  const [timeline, setTimeline] = useState<AudiobookTimeline | null>(null)
+  // Chunk boundaries in seconds + located DOM spans, rebuilt when the timeline loads.
+  const syncRef = useRef<{
+    bounds: { start: number; end: number }[]
+    spans: ChunkSpan[]
+    index: StripIndex
+    lastChunk: number
+    lastWord: number
+  } | null>(null)
+  const rafRef = useRef<number | null>(null)
+
+  const ready = status?.status === "done"
+
+  useEffect(() => {
+    setTimeline(null)
+    syncRef.current = null
+    clearReadAlongHighlights()
+    if (!ready) return
+    fetchAudiobookTimeline(scope, docId, source).then(setTimeline)
+  }, [ready, scope, docId, source])
+
+  // Resolve chunk times (exact, or weights scaled to the real MP3 duration) and locate each
+  // chunk's span in the prose. The article lives behind this drawer in the deep chapter.
+  const buildSync = useCallback(() => {
+    const el = audioRef.current
+    const article = document.querySelector<HTMLElement>(".markdown-reader")
+    if (!timeline || !el || !article || !Number.isFinite(el.duration) || !el.duration) return
+    let bounds: { start: number; end: number }[]
+    if (timeline.exact) {
+      bounds = timeline.chunks.map((c) => ({ start: c.start ?? 0, end: c.end ?? 0 }))
+    } else {
+      const total = timeline.chunks.reduce((a, c) => a + (c.weight ?? 1), 0)
+      let t = 0
+      bounds = timeline.chunks.map((c) => {
+        const dur = ((c.weight ?? 1) / total) * el.duration
+        const b = { start: t, end: t + dur }
+        t += dur
+        return b
+      })
+    }
+    const index = buildStripIndex(article)
+    const spans = locateChunks(index, timeline.chunks.map((c) => c.text))
+    syncRef.current = { bounds, spans, index, lastChunk: -1, lastWord: -1 }
+  }, [timeline])
+
+  useEffect(() => {
+    buildSync()
+  }, [buildSync])
+
+  // Follower while playing: sentence-chunk wash + an interpolated moving word. Driven by
+  // the audio's `timeupdate` (~4 Hz — keeps working in a hidden tab, where rAF is fully
+  // suspended) with an rAF loop on top for smooth word movement while the tab is visible.
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el || !follow || !timeline) {
+      clearReadAlongHighlights()
+      return
+    }
+    const update = () => {
+      const sync = syncRef.current
+      if (!sync || el.paused) return
+      const t = el.currentTime
+      // Chunks are ordered; scan from the last known position (cheap either direction).
+      let i = sync.lastChunk >= 0 ? sync.lastChunk : 0
+      while (i > 0 && t < sync.bounds[i].start) i--
+      while (i < sync.bounds.length - 1 && t >= sync.bounds[i + 1].start) i++
+      const span = sync.spans[i]
+      if (i !== sync.lastChunk) {
+        sync.lastChunk = i
+        sync.lastWord = -1
+        setHighlight("txt2k-read-chunk", span ? rangeFor(sync.index, span.start, span.end) : null)
+        if (span) {
+          const r = rangeFor(sync.index, span.start, span.start + 1)
+          const target = r?.startContainer.parentElement
+          // Smooth scrolling is suspended in hidden tabs — jump instantly there instead.
+          target?.scrollIntoView({
+            block: "center",
+            behavior: document.visibilityState === "visible" ? "smooth" : "auto",
+          })
+        }
+      }
+      if (span && span.wordStarts.length) {
+        const { start, end } = sync.bounds[i]
+        const frac = end > start ? Math.min(0.999, Math.max(0, (t - start) / (end - start))) : 0
+        const w = Math.min(span.wordStarts.length - 1, Math.floor(frac * span.wordStarts.length))
+        if (w !== sync.lastWord) {
+          sync.lastWord = w
+          setHighlight(
+            "txt2k-read-word",
+            rangeFor(sync.index, span.start + span.wordStarts[w], span.start + span.wordStarts[w] + span.wordLens[w]),
+          )
+        }
+      }
+    }
+    const tick = () => {
+      rafRef.current = requestAnimationFrame(tick)
+      update()
+    }
+    // Coming back to the tab mid-chunk: force a fresh highlight + scroll to wherever the
+    // narration has reached while the tab was hidden.
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && syncRef.current) {
+        syncRef.current.lastChunk = -1
+        update()
+      }
+    }
+    el.addEventListener("timeupdate", update)
+    el.addEventListener("seeked", update)
+    document.addEventListener("visibilitychange", onVisible)
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      el.removeEventListener("timeupdate", update)
+      el.removeEventListener("seeked", update)
+      document.removeEventListener("visibilitychange", onVisible)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      clearReadAlongHighlights()
+    }
+  }, [follow, timeline])
 
   useEffect(() => {
     fetchAudiobookVoices().then((v) => {
@@ -149,7 +289,6 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
     )
   }
 
-  const ready = status?.status === "done"
   const running = status?.status === "running" || busy
   const p = status?.progress
   const pct = p && p.total ? Math.round((100 * p.done) / p.total) : 0
@@ -270,6 +409,23 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="flex cursor-pointer items-center gap-1" title={timeline ? "Highlight the narrated words in the text as they play" : "No sync data for this narration — regenerate it to enable"}>
+                <input
+                  type="checkbox"
+                  checked={follow && !!timeline}
+                  disabled={!timeline}
+                  onChange={(e) => {
+                    setFollow(e.target.checked)
+                    try {
+                      localStorage.setItem("txt2k:audio-follow", e.target.checked ? "1" : "0")
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className="h-3 w-3 accent-nvidia-green"
+                />
+                Follow in text
               </label>
               <span>
                 {mins ? `· ${mins} min` : ""}

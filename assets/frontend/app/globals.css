@@ -524,3 +524,13 @@ body {
 .markdown-reader .hljs-strong {
   font-weight: 700;
 }
+
+/* Read-along: what the audiobook is currently speaking (CSS Custom Highlight API —
+   no DOM mutation, so concept underlines/tints keep working underneath). */
+::highlight(txt2k-read-chunk) {
+  background-color: rgb(118 185 0 / 0.14);
+}
+::highlight(txt2k-read-word) {
+  background-color: rgb(118 185 0 / 0.45);
+  color: inherit;
+}

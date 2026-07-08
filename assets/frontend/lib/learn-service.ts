@@ -909,6 +909,33 @@ export async function getAudiobookStatus(
   return parseJsonResponse<AudiobookStatusResponse>(res)
 }
 
+export type AudiobookTimeline = {
+  /** true = exact per-chunk seconds from synthesis; false = estimated weights the client
+   *  scales to the real MP3 duration (narrations that predate timeline sidecars). */
+  exact: boolean
+  source?: string
+  chunks: { text: string; start?: number; end?: number; weight?: number }[]
+  error?: string
+}
+
+/** Chunk→playback-time map for read-along highlighting. Null when unavailable (e.g. a
+ *  guided narration generated before timelines existed). */
+export async function fetchAudiobookTimeline(
+  scope: string | null,
+  doc: string | undefined,
+  source: AudiobookSource,
+): Promise<AudiobookTimeline | null> {
+  try {
+    const params = audiobookParams(scope, doc, source)
+    const res = await fetch(`/api/learn/audiobook/timeline?${params}`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await parseJsonResponse<AudiobookTimeline>(res)
+    return data.error || !data.chunks?.length ? null : data
+  } catch {
+    return null
+  }
+}
+
 /** URL for the generated MP3 — for the <audio> player (inline) or download (?download=1). */
 export function audiobookFileUrl(
   scope: string | null,

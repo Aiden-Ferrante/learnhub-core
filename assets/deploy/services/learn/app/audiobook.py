@@ -279,6 +279,18 @@ def audiobook_path(doc_id: str, scope: str | None, source: str) -> str:
     return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.mp3")
 
 
+def timeline_path(doc_id: str, scope: str | None, source: str) -> str:
+    """Sidecar mapping narration chunks to playback times — the read-along data."""
+    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.timeline.json")
+
+
+def estimate_weights(segments: list[str], gap_sec: float = 0.35, chars_per_sec: float = 14.0) -> list[float]:
+    """Relative duration weights for chunks whose real audio timing is unknown (MP3s
+    generated before timelines existed). Speech time ≈ chars/rate, plus the fixed
+    inter-chunk gap — the client scales these to the actual MP3 duration."""
+    return [max(1.0, len(s)) / chars_per_sec + gap_sec for s in segments]
+
+
 # One narration synthesizes at a time: every chunk goes through the single shared GPU
 # (Orpheus via Ollama), so concurrent jobs would interleave and all finish late. Extra
 # jobs queue on this gate and run in POST order.
@@ -374,6 +386,10 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
         if on_progress:
             on_progress(0, total, "resuming from checkpoint" if manifest else None)
         pieces: list[np.ndarray] = []
+        # Exact per-chunk playback times (the read-along timeline) fall out of the concat
+        # for free — capture them here, while the sample counts are in hand.
+        chunk_times: list[dict] = []
+        cursor = 0
         for i, seg in enumerate(segments):
             chunk = os.path.join(work, f"{i:05d}.npy")
             wav = None
@@ -386,6 +402,11 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
                 wav = synthesize(seg, voice=voice)
                 _save_chunk(chunk, wav)
             if wav.size:
+                start = cursor / SAMPLE_RATE
+                cursor += wav.size
+                chunk_times.append({"text": seg, "start": round(start, 3),
+                                    "end": round(cursor / SAMPLE_RATE, 3)})
+                cursor += _GAP.size
                 pieces.append(wav)
                 pieces.append(_GAP)
             if on_progress:
@@ -399,6 +420,11 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
     full = np.concatenate(pieces)
     out_path = audiobook_path(doc_id, scope, source)
     _encode_mp3(full, out_path)
+    tl_path = timeline_path(doc_id, scope, source)
+    tmp_tl = f"{tl_path}.tmp"
+    with open(tmp_tl, "w") as f:
+        json.dump({"exact": True, "source": source, "chunks": chunk_times}, f)
+    os.replace(tmp_tl, tl_path)
     shutil.rmtree(work, ignore_errors=True)
 
     return {
@@ -491,6 +517,47 @@ def audiobook_status(doc_id: str | None, scope: str | None, source: str = "text"
                 "progress": {"done": done, "total": len(manifest["segments"]), "current": None},
                 "resume": "start this narration again to continue from the checkpoint"}
     return {"status": "idle", "scope": scope, "docId": doc_id, "source": source}
+
+
+def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "text") -> dict:
+    """Chunk→playback-time map for read-along highlighting.
+
+    Narrations generated after timelines existed have an exact sidecar. Older MP3s get an
+    ESTIMATED timeline when the narration script is deterministic (text/concepts): the same
+    segmentation is recomputed and per-chunk weights (∝ text length + gap) are returned for
+    the client to scale to the real MP3 duration. Guided scripts were LLM-written and can't
+    be reconstructed — no sidecar means no read-along there."""
+    doc_id = _resolve_doc_id(doc_id)
+    if not doc_id:
+        return {"error": "no document found"}
+    tl_path = timeline_path(doc_id, scope, source)
+    try:
+        with open(tl_path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        pass
+    if not os.path.exists(audiobook_path(doc_id, scope, source)):
+        return {"error": "no audiobook for this scope"}
+    if source == "guided":
+        return {"error": "no timeline for this narration (guided script predates timelines — regenerate)"}
+    try:
+        db = connect_arango()
+        segments = chapter_segments(db, doc_id, scope, source)
+        deduped: list[str] = []
+        for seg in segments:  # same dedup make_audiobook applies before synthesis
+            if deduped and seg.strip().lower() == deduped[-1].strip().lower():
+                continue
+            deduped.append(seg)
+        if not deduped:
+            return {"error": "could not reconstruct the narration script"}
+        weights = estimate_weights(deduped)
+        return {
+            "exact": False,
+            "source": source,
+            "chunks": [{"text": s, "weight": w} for s, w in zip(deduped, weights)],
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
 
 
 def list_audiobooks(doc_id: str | None) -> dict:
