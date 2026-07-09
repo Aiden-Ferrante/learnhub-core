@@ -187,7 +187,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-3">No documents uploaded yet</h3>
                   <p className="text-sm text-muted-foreground mb-6 max-w-md leading-relaxed">
-                    Get started by uploading markdown, CSV, text, JSON, or PDF files to extract knowledge graphs
+                    Get started by uploading a PDF (or markdown/text) — Learn Hub builds a course from it
                   </p>
                   <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full border border-border/30">
                     <Info className="h-4 w-4" />

@@ -47,7 +47,7 @@ export function UploadTab({ onTabChange }: UploadTabProps) {
               <h2 className="text-lg font-semibold text-foreground">Documents Overview</h2>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Upload and manage your documents for knowledge graph extraction
+              Upload and manage the documents your courses are built from
             </p>
           </div>
           <DocumentsTable onTabChange={onTabChange} />
