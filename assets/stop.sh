@@ -30,15 +30,10 @@ else
 fi
 
 # Parse command line arguments
-USE_VLLM=false
 USE_VECTOR_SEARCH=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --vllm)
-      USE_VLLM=true
-      shift
-      ;;
     --vector-search)
       USE_VECTOR_SEARCH=true
       shift
@@ -47,7 +42,6 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: ./stop.sh [OPTIONS]"
       echo ""
       echo "Options:"
-      echo "  --vllm            Stop vLLM stack (use if you started with --vllm)"
       echo "  --vector-search   Include vector search services"
       echo "  --help, -h        Show this help message"
       echo ""
@@ -67,11 +61,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 COMPOSE_DIR="$SCRIPT_DIR/deploy/compose"
 PROFILES=""
 
-if [ "$USE_VLLM" = true ]; then
-  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.vllm.yml"
-else
-  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
-fi
+COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 
 CMD="$DOCKER_COMPOSE_CMD -f $COMPOSE_FILE"
 
