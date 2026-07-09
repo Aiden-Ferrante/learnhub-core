@@ -21,27 +21,6 @@ from typing import List, Literal
 from pydantic import BaseModel, Field
 
 # --------------------------------------------------------------------------- #
-# extract.py — EXTRACTION_JSON_SCHEMA
-# --------------------------------------------------------------------------- #
-
-
-class Triple(BaseModel):
-    subject: str
-    predicate: str
-    object: str
-
-
-class Proposition(BaseModel):
-    proposition_text: str
-    source_sentence: str
-    triples: List[Triple]
-
-
-class ExtractionResult(BaseModel):
-    propositions: List[Proposition]
-
-
-# --------------------------------------------------------------------------- #
 # concepts_extract.py — CONCEPT_JSON_SCHEMA  (mirrors _KINDS)
 # --------------------------------------------------------------------------- #
 

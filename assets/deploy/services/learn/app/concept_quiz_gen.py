@@ -1,7 +1,6 @@
 """Deterministic concept MCQ — no LLM. Given a target concept and a candidate pool, build a
 "which concept does this describe?" question: stem = the concept's signal, answer = its name,
-distractors = sibling concept names (same section → same kind → any). Pure (no DB), mirrors the
-quiz_gen choice contract.
+distractors = sibling concept names (same section → same kind → any). Pure (no DB).
 """
 
 from __future__ import annotations
@@ -10,9 +9,25 @@ import random
 import re
 from typing import Any
 
-from app.quiz_gen import _finalize_choices
-
 Concept = dict[str, Any]  # {key, name, kind, signal, source, sectionKey}
+
+
+def _finalize_choices(
+    correct: str, distractors: list[str], rng: random.Random
+) -> tuple[list[str], int]:
+    """Assemble exactly 4 unique choices (correct + up to 3 distractors), padded, shuffled."""
+    choices = [correct]
+    for d in distractors:
+        if len(choices) >= 4:
+            break
+        if d and d != correct and d not in choices:
+            choices.append(d)
+    pad = 0
+    while len(choices) < 4:
+        pad += 1
+        choices.append(f"(none of these · {pad})")
+    rng.shuffle(choices)
+    return choices, choices.index(correct)
 
 
 def _name_variants(name: str) -> list[str]:

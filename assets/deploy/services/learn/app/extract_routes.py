@@ -1,4 +1,4 @@
-"""API routes for server-side KG extraction (propositions + triples).
+"""API routes for server-side concept extraction.
 
 Extraction is long (~15-20 min/chapter), so ``POST /api/extract`` starts a background
 job and returns immediately; the client polls ``GET /api/extract/status``.
@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from app.concepts_extract import fetch_document_concepts, fetch_section_concepts
-from app.extract import extraction_status, fetch_section_propositions, start_extraction
+from app.extract import extraction_status, start_extraction
 
 router = APIRouter()
 
@@ -53,10 +53,4 @@ def api_document_concepts(doc: str | None = None) -> JSONResponse:
 def api_section_concepts(key: str, doc: str | None = None) -> JSONResponse:
     """Concept-lessons for a section (the course view)."""
     data = fetch_section_concepts(key, doc)
-    return JSONResponse(data, status_code=503 if data.get("error") else 200)
-
-
-@router.get("/api/section/{key:path}/propositions")
-def api_section_propositions(key: str, doc: str | None = None) -> JSONResponse:
-    data = fetch_section_propositions(key, doc)
     return JSONResponse(data, status_code=503 if data.get("error") else 200)

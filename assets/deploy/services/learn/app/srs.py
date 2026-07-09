@@ -1,5 +1,5 @@
 """Spaced-repetition scheduler (SM-2 lite) — pure functions, no DB/HTTP imports so the
-scheduling logic is unit-testable in isolation (same discipline as quiz_gen.py).
+scheduling logic is unit-testable in isolation.
 
 A *review state* is a plain dict carrying the scheduler fields; ``schedule(state, grade, now)``
 returns the next state. Grades are 1-4: 1=Again, 2=Hard, 3=Good, 4=Easy. Isolated here so a

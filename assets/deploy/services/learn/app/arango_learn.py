@@ -1,4 +1,6 @@
-"""AQL helpers for graph-grounded study (flashcards, quiz, Socratic context)."""
+"""AQL helpers over the legacy triple KG — the /api/deck flashcards (MCP) and the
+triple branch of mastery still read it. The quiz/exam/Socratic consumers were removed
+with the triple pipeline."""
 
 from __future__ import annotations
 
@@ -199,48 +201,6 @@ def triples_for_study_scope(
     return sample_triples(limit=limit, skip_predicates=skip if skip else (), doc=doc)
 
 
-def triples_for_exam_scope(
-    scope: str | None,
-    limit: int = 200,
-    include_structural: bool = False,
-    doc: str | None = None,
-) -> list[dict[str, str]]:
-    """Exam-grade triple selection.
-
-    For a TOC section, prefer content triples among the section's mentioned
-    entities; fall back to the generic scope query when that yields nothing
-    (e.g. no section_mentions). For a null scope, a global random sample.
-    """
-    if scope and scope.strip():
-        rows = content_triples_for_section(
-            scope.strip(), limit=max(limit, MAX_EDGES_SECTION), doc=doc
-        )
-        if rows:
-            return rows[:limit] if len(rows) > limit else rows
-    return triples_for_study_scope(
-        scope, limit=limit, include_structural=include_structural, doc=doc
-    )
-
-
-def entity_distractor_pool(triples: list[dict[str, str]], exclude: set[str]) -> list[str]:
-    """Distinct entity strings from subjects/objects for MCQ distractors."""
-    pool: set[str] = set()
-    for t in triples:
-        pool.add(t["subject"])
-        pool.add(t["object"])
-    pool -= exclude
-    return sorted(pool, key=str.casefold)
-
-
-def predicate_distractor_pool(triples: list[dict[str, str]], exclude: set[str]) -> list[str]:
-    """Distinct predicate strings for predicate-style MCQ distractors."""
-    pool: set[str] = set()
-    for t in triples:
-        pool.add(t["predicate"])
-    pool -= exclude
-    return sorted(pool, key=str.casefold)
-
-
 def triple_line(t: dict[str, str]) -> str:
     return f'{t["subject"]} | {t["predicate"]} | {t["object"]}'
 
@@ -249,36 +209,12 @@ def triple_id(t: dict[str, str]) -> str:
     return hashlib.sha256(triple_line(t).encode()).hexdigest()[:16]
 
 
-def format_triples_block(triples: list[dict[str, str]], max_lines: int = 120) -> str:
-    lines = [triple_line(t) for t in triples[:max_lines]]
-    body = "\n".join(lines)
-    if len(triples) > max_lines:
-        body += f"\n... ({len(triples) - max_lines} more triples omitted)"
-    return body
-
-
 def fetch_triples_or_error(
     scope: str | None, limit: int, include_structural: bool, doc: str | None = None
 ) -> tuple[list[dict[str, str]], str | None]:
     try:
         return (
             triples_for_study_scope(
-                scope, limit=limit, include_structural=include_structural, doc=doc
-            ),
-            None,
-        )
-    except ArangoError as e:
-        return [], str(e)
-    except Exception as e:
-        return [], str(e)
-
-
-def fetch_exam_triples_or_error(
-    scope: str | None, limit: int, include_structural: bool, doc: str | None = None
-) -> tuple[list[dict[str, str]], str | None]:
-    try:
-        return (
-            triples_for_exam_scope(
                 scope, limit=limit, include_structural=include_structural, doc=doc
             ),
             None,

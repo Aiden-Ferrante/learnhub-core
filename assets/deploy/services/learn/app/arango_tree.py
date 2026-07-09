@@ -13,7 +13,7 @@ from arango import ArangoClient
 from arango.database import StandardDatabase
 from arango.exceptions import ArangoError
 
-# Matches TOC_SUBSECTION_PREDICATE / SECTION_MENTIONS_PREDICATE in toc-processing.ts
+# The structural-edge predicates in the relationships collection.
 HIERARCHY_PREDICATE = "has_subsection"
 MENTIONS_PREDICATE = "section_mentions"
 

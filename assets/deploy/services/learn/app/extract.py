@@ -1,16 +1,15 @@
-"""Server-side, section-aware KG extraction: context-rich propositions + SPO triples.
+"""Section loading + scope resolution for extraction, and the extraction job runner.
 
-Replaces the old client-side per-512-char extraction. For each TOC section of a stored
-document we read its ``section_content`` markdown (a whole heading-delimited span, not a
-fragment) and run Ollama with a domain-aware prompt + JSON-schema structured output to
-extract (a) propositions — self-contained claims with their verbatim source sentence —
-and (b) normalized triples. Everything is tagged with ``{docId, sectionKey, pageStart,
-pageEnd}``: propositions in a new ``propositions`` collection, content edges with
-``sectionKeys[]``/page provenance. Structural (``has_subsection``) and ``section_mentions``
-edges are produced here too (they used to come from the frontend).
+Historically this module ran the triple/proposition KG extraction; that pipeline was
+removed with the concept-layer pivot (see docs/aposd-review-2026-07-09.md). What remains
+is the shared infrastructure the concept pipeline and every study surface still use:
 
-The parse/normalize/assemble/provenance logic is pure (unit-tested); the Ollama call and
-ArangoDB writes are thin wrappers around it.
+- scope resolution (``_scope_keys_from_outline`` / ``_blocks_in_scope`` /
+  ``_load_section_blocks``): which ``section_content`` rows a TOC scope spans;
+- structural ``has_subsection`` edges (``structural_subsection_triples`` +
+  ``upsert_structural_edges``) that keep the TOC tree renderable;
+- the in-memory background-job wrapper around ``concepts_extract`` (``start_extraction``
+  / ``extraction_status``) behind ``/api/extract``.
 """
 
 from __future__ import annotations
@@ -19,22 +18,15 @@ import asyncio
 import hashlib
 import os
 import re
-import time
 from dataclasses import dataclass
 
 from app.arango_content import _clean_heading_markup, fetch_latest_document, is_ancestor_section_key
-from app.arango_learn import triple_id
 from app.arango_tree import connect_arango, get_toc_tree
-from app.llm import ollama_structured_completion
-from app.llm_schemas import ExtractionResult
 
 ENTITIES = "entities"
 RELATIONSHIPS = "relationships"
-PROPOSITIONS = "propositions"
-SECTION_CONTENT = "section_content"
 
 HAS_SUBSECTION = "has_subsection"
-SECTION_MENTIONS = "section_mentions"
 TOC_ROOT = "toc:root"
 
 _NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
@@ -43,32 +35,6 @@ _MIN_SECTION_BODY_CHARS = 80  # skip heading-only / structural blocks with no re
 _JUNK_HEADING = re.compile(r"(https?://|www\.|isbn|cambridge\.org|\b\d{9,}\b)", re.IGNORECASE)
 
 _DEFAULT_DOMAIN = "a mathematics / causal-inference textbook"
-
-EXTRACTION_SYSTEM_PROMPT = (
-    "You are a knowledge extractor for a personal study tool. You are given one section "
-    "of {domain}. Extract the *teachable claims* of the section as structured data.\n\n"
-    "Extract two things:\n\n"
-    "1. PROPOSITIONS — each a single, self-contained statement of one definition, claim, "
-    "theorem, property, or relation the section asserts. Each proposition must:\n"
-    "   - be understandable on its own, with no \"this\", \"it\", \"the above\", \"we\", "
-    "\"the author\", or section/page references;\n"
-    "   - name its concepts in full (write \"conditional independence\", not \"it\");\n"
-    "   - quote, verbatim, the source sentence or span it came from.\n\n"
-    "2. TRIPLES — for each proposition, the normalized subject-predicate-object facts it "
-    "encodes. Subjects and objects are canonical concept names (noun phrases, singular); "
-    "predicates are short verb phrases (e.g. \"is defined as\", \"implies\", \"is a special "
-    "case of\", \"is denoted by\"). A proposition may yield one or several triples.\n\n"
-    "Rules:\n"
-    "- Cover ONLY the section's substantive content. Skip running heads, page numbers, "
-    "figure/table captions with no claim, bibliographic citations, exercise numbering, and "
-    "cross-references (\"see Chapter 3\").\n"
-    "- Do not invent facts not stated in the text.\n"
-    "- Canonicalize: collapse \"Conditional Independence\", \"conditionally independent\", "
-    "\"cond. indep.\" to one name \"conditional independence\".\n"
-    "- Single-letter variables (X, Y, Z) are kept only when the section defines them; "
-    "otherwise prefer the concept they denote.\n"
-    "- Return ONLY data conforming to the schema. No commentary."
-)
 
 # --------------------------------------------------------------------------- #
 # Dataclasses
@@ -91,33 +57,12 @@ class ExtractedTriple:
     object: str
 
 
-@dataclass(frozen=True)
-class ExtractedProposition:
-    text: str
-    source_sentence: str
-    triples: tuple[ExtractedTriple, ...]
-
-
-@dataclass(frozen=True)
-class SectionExtraction:
-    doc_id: str
-    section_key: str
-    page_start: int | None
-    page_end: int | None
-    propositions: tuple[ExtractedProposition, ...]
-    triples: tuple[ExtractedTriple, ...]  # deduped union across this section's propositions
-
-
 # --------------------------------------------------------------------------- #
 # Pure functions (unit-testable; no LLM, no DB)
 # --------------------------------------------------------------------------- #
 
 def _domain() -> str:
     return os.environ.get("LEARN_EXTRACT_DOMAIN") or _DEFAULT_DOMAIN
-
-
-def build_system_prompt() -> str:
-    return EXTRACTION_SYSTEM_PROMPT.format(domain=_domain())
 
 
 def build_user_prompt(inp: SectionExtractInput) -> str:
@@ -139,75 +84,6 @@ def normalize_entity(name: object) -> str:
 
 def _norm_part(s: object) -> str:
     return re.sub(r"\s+", " ", str(s or "")).strip()
-
-
-def normalize_triple(subject: object, predicate: object, object_: object) -> ExtractedTriple | None:
-    s, p, o = normalize_entity(subject), _norm_part(predicate), normalize_entity(object_)
-    if not s or not p or not o:
-        return None
-    return ExtractedTriple(subject=s, predicate=p, object=o)
-
-
-def parse_extraction_response(obj: object) -> list[dict]:
-    """Validate the model's structured output into raw proposition dicts (drop malformed)."""
-    if not isinstance(obj, dict):
-        return []
-    props = obj.get("propositions")
-    if not isinstance(props, list):
-        return []
-    out: list[dict] = []
-    for p in props:
-        if not isinstance(p, dict):
-            continue
-        text = _norm_part(p.get("proposition_text"))
-        if not text:
-            continue
-        triples: list[ExtractedTriple] = []
-        for t in p.get("triples") or []:
-            if isinstance(t, dict):
-                nt = normalize_triple(t.get("subject"), t.get("predicate"), t.get("object"))
-                if nt is not None:
-                    triples.append(nt)
-        out.append(
-            {"text": text, "source_sentence": _norm_part(p.get("source_sentence")), "triples": triples}
-        )
-    return out
-
-
-def assemble_section_extraction(inp: SectionExtractInput, raw_props: list[dict]) -> SectionExtraction:
-    """Build the section extraction: propositions keep their own triples; the section's
-    ``triples`` are the case-insensitive dedupe union, with provenance attached."""
-    propositions: list[ExtractedProposition] = []
-    seen: dict[tuple[str, str, str], ExtractedTriple] = {}
-    for rp in raw_props:
-        trips = tuple(rp["triples"])
-        propositions.append(
-            ExtractedProposition(text=rp["text"], source_sentence=rp["source_sentence"], triples=trips)
-        )
-        for t in trips:
-            key = (t.subject.lower(), t.predicate.lower(), t.object.lower())
-            seen.setdefault(key, t)
-    return SectionExtraction(
-        doc_id=inp.doc_id,
-        section_key=inp.section_key,
-        page_start=inp.page_start,
-        page_end=inp.page_end,
-        propositions=tuple(propositions),
-        triples=tuple(seen.values()),
-    )
-
-
-def section_mention_entities(extraction: SectionExtraction) -> list[str]:
-    """Distinct subject/object names (first-seen order) — the section's mentioned entities."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for t in extraction.triples:
-        for name in (t.subject, t.object):
-            k = name.lower()
-            if k not in seen:
-                seen.add(k)
-                out.append(name)
-    return out
 
 
 def structural_subsection_triples(section_keys: list[str]) -> list[ExtractedTriple]:
@@ -235,19 +111,6 @@ def structural_subsection_triples(section_keys: list[str]) -> list[ExtractedTrip
     return out
 
 
-def edge_provenance_merge(old: dict, new: dict) -> dict:
-    """Merge content-edge provenance (the pure form of the UPSERT clause): union sectionKeys,
-    min pageStart, max pageEnd, tolerating nulls."""
-    keys = list(dict.fromkeys([*(old.get("sectionKeys") or []), *(new.get("sectionKeys") or [])]))
-    starts = [v for v in (old.get("pageStart"), new.get("pageStart")) if v is not None]
-    ends = [v for v in (old.get("pageEnd"), new.get("pageEnd")) if v is not None]
-    return {
-        "sectionKeys": keys,
-        "pageStart": min(starts) if starts else None,
-        "pageEnd": max(ends) if ends else None,
-    }
-
-
 def section_body_len(markdown: str) -> int:
     """Length of a section block's body (markdown minus its leading heading line)."""
     parts = (markdown or "").split("\n", 1)
@@ -255,7 +118,7 @@ def section_body_len(markdown: str) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# Deterministic keys (mirror lib/arangodb.ts importTriples + arango_learn.triple_id)
+# Deterministic keys (historical contract of the KG collections)
 # --------------------------------------------------------------------------- #
 
 def entity_key(name: str) -> str:
@@ -266,12 +129,8 @@ def edge_key(from_key: str, predicate: str, to_key: str) -> str:
     return hashlib.md5(f"{from_key}|{predicate.lower().strip()}|{to_key}".encode()).hexdigest()[:16]
 
 
-def proposition_key(doc_id: str, section_key: str, text: str) -> str:
-    return hashlib.sha256(f"{doc_id}|{section_key}|{text}".encode()).hexdigest()[:16]
-
-
 # --------------------------------------------------------------------------- #
-# ArangoDB write path (python-arango UPSERT, mirrors importTriples semantics)
+# ArangoDB structural-edge writes (python-arango UPSERT)
 # --------------------------------------------------------------------------- #
 
 def ensure_kg_collections(db) -> None:
@@ -279,10 +138,6 @@ def ensure_kg_collections(db) -> None:
         db.create_collection(ENTITIES)
     if not db.has_collection(RELATIONSHIPS):
         db.create_collection(RELATIONSHIPS, edge=True)
-    if not db.has_collection(PROPOSITIONS):
-        col = db.create_collection(PROPOSITIONS)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["sectionKey"])
 
 
 def upsert_entities(db, names: list[str], doc_id: str, batch: int = 1000) -> None:
@@ -305,49 +160,6 @@ def upsert_entities(db, names: list[str], doc_id: str, batch: int = 1000) -> Non
               IN entities
             """,
             bind_vars={"batch": items[i : i + batch], "docIds": doc_ids},
-        )
-
-
-def upsert_content_edges(
-    db,
-    triples: list[ExtractedTriple],
-    doc_id: str,
-    section_key: str,
-    page_start: int | None,
-    page_end: int | None,
-    batch: int = 1000,
-) -> None:
-    seen: set[str] = set()
-    edges: list[dict] = []
-    for t in triples:
-        fk, tk = entity_key(t.subject), entity_key(t.object)
-        ek = edge_key(fk, t.predicate, tk)
-        if ek in seen:
-            continue
-        seen.add(ek)
-        edges.append({"_key": ek, "_from": f"entities/{fk}", "_to": f"entities/{tk}", "type": t.predicate})
-    binds = {
-        "docIds": [doc_id] if doc_id else [],
-        "sectionKeys": [section_key] if section_key else [],
-        "pageStart": page_start,
-        "pageEnd": page_end,
-    }
-    for i in range(0, len(edges), batch):
-        db.aql.execute(
-            """
-            FOR item IN @batch
-              UPSERT { _key: item._key }
-              INSERT MERGE(item, { docIds: @docIds, sectionKeys: @sectionKeys,
-                                   pageStart: @pageStart, pageEnd: @pageEnd })
-              UPDATE {
-                docIds:      UNION_DISTINCT(NOT_NULL(OLD.docIds, []), @docIds),
-                sectionKeys: UNION_DISTINCT(NOT_NULL(OLD.sectionKeys, []), @sectionKeys),
-                pageStart:   MIN([NOT_NULL(OLD.pageStart, @pageStart), @pageStart]),
-                pageEnd:     MAX([NOT_NULL(OLD.pageEnd, @pageEnd), @pageEnd])
-              }
-              IN relationships
-            """,
-            bind_vars={**binds, "batch": edges[i : i + batch]},
         )
 
 
@@ -382,32 +194,8 @@ def upsert_structural_edges(db, triples: list[ExtractedTriple], doc_id: str, bat
         )
 
 
-def write_propositions(db, extraction: SectionExtraction, batch: int = 500) -> None:
-    rows = []
-    for p in extraction.propositions:
-        tids = [
-            triple_id({"subject": t.subject, "predicate": t.predicate, "object": t.object})
-            for t in p.triples
-        ]
-        rows.append(
-            {
-                "_key": proposition_key(extraction.doc_id, extraction.section_key, p.text),
-                "docId": extraction.doc_id,
-                "sectionKey": extraction.section_key,
-                "pageStart": extraction.page_start,
-                "pageEnd": extraction.page_end,
-                "text": p.text,
-                "sourceSentence": p.source_sentence,
-                "tripleIds": tids,
-                "createdAt": int(time.time()),
-            }
-        )
-    if rows:
-        db.collection(PROPOSITIONS).import_bulk(rows, on_duplicate="replace")
-
-
 # --------------------------------------------------------------------------- #
-# Orchestration
+# Scope resolution
 # --------------------------------------------------------------------------- #
 
 _CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")
@@ -572,91 +360,6 @@ def _extract_model() -> str | None:
     return os.environ.get("LEARN_EXTRACT_MODEL") or None
 
 
-def _extract_one_section(inp: SectionExtractInput, retries: int = 2) -> tuple[SectionExtraction | None, str | None]:
-    messages = [
-        {"role": "system", "content": build_system_prompt()},
-        {"role": "user", "content": build_user_prompt(inp)},
-    ]
-    last_err: str | None = None
-    for _ in range(retries + 1):
-        obj, err = ollama_structured_completion(
-            messages, ExtractionResult, temperature=0.2, model=_extract_model()
-        )
-        if obj is not None:
-            return assemble_section_extraction(inp, parse_extraction_response(obj)), None
-        last_err = err
-    return None, last_err
-
-
-async def extract_document(
-    doc_id: str | None = None,
-    section_keys: list[str] | None = None,
-    scope: str | None = None,
-    concurrency: int = 3,
-) -> dict:
-    """Extract propositions + triples for a document into the KG.
-
-    ``scope`` (e.g. ``toc:1``) extracts one chapter/section and everything under it —
-    the intended "one chapter at a time" batch. ``section_keys`` extracts an exact set.
-    Neither → the whole document. Bounded concurrency (Ollama is the bottleneck); a
-    failed section is isolated and recorded in ``errors[]``.
-    """
-    t0 = time.time()
-    db = connect_arango()
-    if doc_id is None:
-        doc = (fetch_latest_document() or {}).get("document")
-        doc_id = doc.get("id") if doc else None
-    if not doc_id:
-        return {"error": "no document found"}
-
-    ensure_kg_collections(db)
-    sections = _load_section_blocks(db, doc_id, section_keys=section_keys, scope=scope)
-    if not sections:
-        return {"docId": doc_id, "sections": 0, "propositions": 0, "triples": 0, "errors": ["no sections with content"]}
-
-    sem = asyncio.Semaphore(max(1, concurrency))
-    extractions: list[SectionExtraction] = []
-    errors: list[str] = []
-
-    async def run(inp: SectionExtractInput) -> None:
-        async with sem:
-            ext, err = await asyncio.to_thread(_extract_one_section, inp)
-            if err:
-                errors.append(f"{inp.section_key}: {err}")
-            elif ext is not None:
-                extractions.append(ext)
-
-    await asyncio.gather(*(run(s) for s in sections))
-
-    total_props = 0
-    total_triples = 0
-    for ext in extractions:
-        mentions = section_mention_entities(ext)
-        upsert_entities(db, mentions, doc_id)
-        upsert_content_edges(db, list(ext.triples), doc_id, ext.section_key, ext.page_start, ext.page_end)
-        mention_edges = [
-            ExtractedTriple(subject=ext.section_key, predicate=SECTION_MENTIONS, object=e) for e in mentions
-        ]
-        upsert_structural_edges(db, mention_edges, doc_id)
-        write_propositions(db, ext)
-        total_props += len(ext.propositions)
-        total_triples += len(ext.triples)
-
-    # Document-wide has_subsection hierarchy (once, from every section key).
-    upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
-
-    return {
-        "docId": doc_id,
-        "scope": scope,
-        "sections": len(sections),
-        "extracted": len(extractions),
-        "propositions": total_props,
-        "triples": total_triples,
-        "seconds": round(time.time() - t0, 1),
-        "errors": errors,
-    }
-
-
 # --------------------------------------------------------------------------- #
 # Background jobs (extraction is 15-20 min — never block the HTTP request)
 # --------------------------------------------------------------------------- #
@@ -742,27 +445,3 @@ def extraction_status(doc_id: str | None, scope: str | None) -> dict:
     if not doc_id:
         return {"status": "idle", "scope": scope}
     return _JOBS.get(_job_key(doc_id, scope), {"status": "idle", "scope": scope, "docId": doc_id})
-
-
-def fetch_section_propositions(section_key: str, doc_id: str | None = None) -> dict:
-    """Stored propositions for a section (drill-down + verification)."""
-    try:
-        db = connect_arango()
-        if not db.has_collection(PROPOSITIONS):
-            return {"sectionKey": section_key, "propositions": []}
-        if doc_id is None:
-            doc = (fetch_latest_document() or {}).get("document")
-            doc_id = doc.get("id") if doc else None
-        if not doc_id:
-            return {"sectionKey": section_key, "propositions": []}
-        rows = list(
-            db.aql.execute(
-                "FOR p IN propositions FILTER p.docId == @d AND p.sectionKey == @s "
-                "RETURN { text: p.text, sourceSentence: p.sourceSentence, "
-                "pageStart: p.pageStart, pageEnd: p.pageEnd, tripleIds: p.tripleIds }",
-                bind_vars={"d": doc_id, "s": section_key},
-            )
-        )
-        return {"sectionKey": section_key, "docId": doc_id, "propositions": rows}
-    except Exception as exc:
-        return {"sectionKey": section_key, "propositions": [], "error": str(exc)}

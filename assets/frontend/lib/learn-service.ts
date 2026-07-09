@@ -19,14 +19,6 @@ export type TocTreeResponse = {
   error?: string
 }
 
-export type SectionStatsResponse = {
-  scope: string
-  tripleCount: number
-  entityCount: number
-  mentionCount?: number
-  error?: string
-}
-
 export type SectionMastery = {
   mastery: number
   coverage?: number
@@ -207,16 +199,6 @@ export async function fetchSectionContent(
   const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
   const res = await fetch(`/api/learn/section/content/${segs}${qs}`, { cache: 'no-store' })
   return parseJsonResponse<SectionContentResponse>(res)
-}
-
-export async function fetchSectionStats(
-  scope: string,
-  doc?: string,
-): Promise<SectionStatsResponse> {
-  const params = new URLSearchParams({ scope })
-  if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/section-stats?${params}`, { cache: 'no-store' })
-  return parseJsonResponse<SectionStatsResponse>(res)
 }
 
 export type ConceptProvenance = {
