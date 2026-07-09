@@ -355,43 +355,54 @@ def _concept_passage(db, concept: dict[str, Any]) -> str:
     return text[start : start + window].strip()
 
 
+def author_scope_sync(db, doc: str | None, section_keys: list[str], limit: int = 1000,
+                      on_progress=None) -> dict:
+    """Author questions for every un-authored concept in scope, sequentially (a single
+    GPU-resident model is compute-bound — concurrency just time-slices it). Synchronous so
+    the build queue can run it as a ledgered job; returns an {authored, total} receipt."""
+    rows = list(
+        db.aql.execute(
+            "FOR c IN concepts FILTER (@doc == null OR c.docId == @doc) "
+            "AND c.sectionKey IN @ks AND c.signal != null "
+            f"AND (c.{QFIELD} == null OR LENGTH(c.{QFIELD}) == 0) "
+            "LIMIT @lim "
+            "RETURN {key: c._key, name: c.name, signal: c.signal, source: c.source, "
+            "docId: c.docId, sectionKey: c.sectionKey}",
+            bind_vars={"doc": doc, "ks": section_keys, "lim": limit},
+        )
+    )
+    if not rows:
+        return {"authored": 0, "total": 0}
+    # Sibling names per section, for distractor grounding.
+    sibs: dict[str, list[str]] = {}
+    for sk in {r.get("sectionKey") for r in rows}:
+        sibs[sk] = [
+            r["name"]
+            for r in db.aql.execute(
+                "FOR c IN concepts FILTER c.sectionKey == @sk RETURN {name: c.name}",
+                bind_vars={"sk": sk},
+            )
+            if r.get("name")
+        ]
+    col = db.collection(CONCEPTS)
+    authored = 0
+    for i, r in enumerate(rows):
+        passage = _concept_passage(db, r)
+        qs = author_concept_questions(
+            r, sibs.get(r.get("sectionKey"), []), passage=passage, model=_AUTHOR_MODEL
+        )
+        if qs:
+            col.update({"_key": r["key"], QFIELD: qs})
+            authored += 1
+        if on_progress:
+            on_progress(i + 1, len(rows), r.get("name"))
+    return {"authored": authored, "total": len(rows)}
+
+
 def _ensure_worker(doc: str | None, section_keys: list[str], limit: int, sig: str) -> None:
     try:
         db = connect_arango()
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER (@doc == null OR c.docId == @doc) "
-                "AND c.sectionKey IN @ks AND c.signal != null "
-                f"AND (c.{QFIELD} == null OR LENGTH(c.{QFIELD}) == 0) "
-                "LIMIT @lim "
-                "RETURN {key: c._key, name: c.name, signal: c.signal, source: c.source, "
-                "docId: c.docId, sectionKey: c.sectionKey}",
-                bind_vars={"doc": doc, "ks": section_keys, "lim": limit},
-            )
-        )
-        if not rows:
-            return
-        # Sibling names per section, for distractor grounding.
-        sibs: dict[str, list[str]] = {}
-        for sk in {r.get("sectionKey") for r in rows}:
-            sibs[sk] = [
-                r["name"]
-                for r in db.aql.execute(
-                    "FOR c IN concepts FILTER c.sectionKey == @sk RETURN {name: c.name}",
-                    bind_vars={"sk": sk},
-                )
-                if r.get("name")
-            ]
-        col = db.collection(CONCEPTS)
-        # Sequential: a single GPU-resident model is compute-bound, so concurrent requests just
-        # time-slice the GPU (no speedup, lumpier progress). Steady cadence reads better.
-        for r in rows:
-            passage = _concept_passage(db, r)
-            qs = author_concept_questions(
-                r, sibs.get(r.get("sectionKey"), []), passage=passage, model=_AUTHOR_MODEL
-            )
-            if qs:
-                col.update({"_key": r["key"], QFIELD: qs})
+        author_scope_sync(db, doc, section_keys, limit=limit)
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:

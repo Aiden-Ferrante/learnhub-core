@@ -98,21 +98,32 @@ def author_reading_guide(section: dict[str, Any], model: str | None = None) -> d
     return {"focus": focus, "checks": checks[:3]}
 
 
-def _ensure_worker(doc: str | None, scope: str | None, sig: str) -> None:
-    try:
-        db = connect_arango()
-        _ensure_col(db)
-        col = db.collection(GUIDE_COL)
-        for b in _blocks(db, doc, scope):
-            k = _key(doc, b["sectionKey"])
-            if col.has(k):
-                continue
+def author_guides_sync(db, doc: str | None, scope: str | None, on_progress=None) -> dict:
+    """Author guides for every un-guided section in scope, sequentially. Synchronous so the
+    build queue can run it as a ledgered job; returns an {authored, total} receipt."""
+    _ensure_col(db)
+    col = db.collection(GUIDE_COL)
+    blocks = _blocks(db, doc, scope)
+    authored = 0
+    for i, b in enumerate(blocks):
+        k = _key(doc, b["sectionKey"])
+        if not col.has(k):
             g = author_reading_guide(b, model=_AUTHOR_MODEL)
             if g:
                 col.insert(
                     {"_key": k, "docId": doc, "sectionKey": b["sectionKey"], **g, "createdAt": int(time.time())},
                     overwrite=True,
                 )
+                authored += 1
+        if on_progress:
+            on_progress(i + 1, len(blocks), b.get("heading"))
+    return {"authored": authored, "total": len(blocks)}
+
+
+def _ensure_worker(doc: str | None, scope: str | None, sig: str) -> None:
+    try:
+        db = connect_arango()
+        author_guides_sync(db, doc, scope)
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:

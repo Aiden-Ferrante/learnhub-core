@@ -164,8 +164,43 @@ def generate_skeleton(db, doc_id: str, scope: str | None, model: str | None = No
     return out
 
 
+def refresh_skeleton(db, doc_id: str, scope: str | None) -> dict:
+    """Generate the skeleton NOW and write the cache (the build queue's runner; also used
+    by explicit ``regenerate`` requests). Returns a small receipt."""
+    ensure_path_collections(db)
+    sections = generate_skeleton(db, doc_id, scope)
+    if not sections:
+        return {"sections": 0, "error": "no sections in this scope"}
+    db.collection(SKELETONS).insert(
+        {
+            "_key": _key(doc_id, scope),
+            "docId": doc_id,
+            "scope": scope,
+            "sections": sections,
+            "promptVersion": SKELETON_PROMPT_VERSION,
+            "createdAt": int(time.time()),
+        },
+        overwrite=True,
+    )
+    return {"sections": len(sections)}
+
+
+def _enqueue_refresh(kind: str, doc_id: str, scope: str | None) -> None:
+    """Queue a background regeneration (never generate inside a read request — the reader
+    would hang for the LLM). Lazy import: build_queue imports this module's runners."""
+    try:
+        from app.build_queue import enqueue_build
+
+        enqueue_build(doc_id, scope or "", kind=kind)
+    except Exception:  # noqa: BLE001 — refresh is best-effort; the read path must not break
+        pass
+
+
 def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenerate: bool = False) -> dict:
-    """Cached chapter skeleton (generate on first request)."""
+    """Cached chapter skeleton. NEVER generates in-request: a stale cache (older prompt
+    version) is served as-is with ``stale: true`` while a refresh is queued; a cache miss
+    returns ``pending: true`` with the refresh queued. ``regenerate=True`` (an explicit,
+    caller-owned ask) is the one synchronous path."""
     try:
         db = connect_arango()
         if doc_id is None:
@@ -174,35 +209,23 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
         if not doc_id:
             return {"error": "no document found"}
         ensure_path_collections(db)
-        k = _key(doc_id, scope)
-        col = db.collection(SKELETONS)
-        if not regenerate:
-            existing = col.get(k)
-            if (
-                existing
-                and existing.get("sections")
-                and existing.get("promptVersion") == SKELETON_PROMPT_VERSION
-            ):
-                return {
-                    "docId": doc_id,
-                    "scope": scope,
-                    "sections": _attach_depths(db, doc_id, existing["sections"]),
-                }
-        sections = generate_skeleton(db, doc_id, scope)
-        if not sections:
-            return {"docId": doc_id, "scope": scope, "sections": [], "error": "no sections in this scope"}
-        col.insert(
-            {
-                "_key": k,
+        if regenerate:
+            receipt = refresh_skeleton(db, doc_id, scope)
+            if receipt.get("error"):
+                return {"docId": doc_id, "scope": scope, "sections": [], "error": receipt["error"]}
+        existing = db.collection(SKELETONS).get(_key(doc_id, scope))
+        if existing and existing.get("sections"):
+            stale = existing.get("promptVersion") != SKELETON_PROMPT_VERSION
+            if stale:
+                _enqueue_refresh("skeleton", doc_id, scope)
+            return {
                 "docId": doc_id,
                 "scope": scope,
-                "sections": sections,
-                "promptVersion": SKELETON_PROMPT_VERSION,
-                "createdAt": int(time.time()),
-            },
-            overwrite=True,
-        )
-        return {"docId": doc_id, "scope": scope, "sections": _attach_depths(db, doc_id, sections)}
+                "stale": stale,
+                "sections": _attach_depths(db, doc_id, existing["sections"]),
+            }
+        _enqueue_refresh("skeleton", doc_id, scope)
+        return {"docId": doc_id, "scope": scope, "pending": True, "sections": []}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
 
@@ -250,7 +273,22 @@ def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None
     }
 
 
+def refresh_orient(db, doc_id: str, scope: str | None) -> dict:
+    """Generate the orientation NOW and write the cache (build-queue runner)."""
+    ensure_path_collections(db)
+    data = generate_orient(db, doc_id, scope)
+    if data is None:
+        return {"objectives": 0, "error": "no sections in this scope"}
+    db.collection(ORIENT).insert(
+        {"_key": _key(doc_id, scope), "docId": doc_id, "scope": scope, **data, "createdAt": int(time.time())},
+        overwrite=True,
+    )
+    return {"objectives": len(data.get("objectives") or []), "watchFor": len(data.get("watchFor") or [])}
+
+
 def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate: bool = False) -> dict:
+    """Cached chapter orientation — same serve-stale contract as fetch_skeleton: reads never
+    generate; a cache miss queues the work and reports ``pending``."""
     try:
         db = connect_arango()
         if doc_id is None:
@@ -259,17 +297,15 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
         if not doc_id:
             return {"error": "no document found"}
         ensure_path_collections(db)
-        k = _key(doc_id, scope)
-        col = db.collection(ORIENT)
-        if not regenerate:
-            existing = col.get(k)
-            if existing and (existing.get("objectives") or existing.get("watchFor")):
-                return {"docId": doc_id, "scope": scope, "objectives": existing["objectives"], "watchFor": existing["watchFor"]}
-        data = generate_orient(db, doc_id, scope)
-        if data is None:
-            return {"docId": doc_id, "scope": scope, "objectives": [], "watchFor": [], "error": "no sections in this scope"}
-        col.insert({"_key": k, "docId": doc_id, "scope": scope, **data, "createdAt": int(time.time())}, overwrite=True)
-        return {"docId": doc_id, "scope": scope, **data}
+        if regenerate:
+            receipt = refresh_orient(db, doc_id, scope)
+            if receipt.get("error"):
+                return {"docId": doc_id, "scope": scope, "objectives": [], "watchFor": [], "error": receipt["error"]}
+        existing = db.collection(ORIENT).get(_key(doc_id, scope))
+        if existing and (existing.get("objectives") or existing.get("watchFor")):
+            return {"docId": doc_id, "scope": scope, "objectives": existing["objectives"], "watchFor": existing["watchFor"]}
+        _enqueue_refresh("orient", doc_id, scope)
+        return {"docId": doc_id, "scope": scope, "pending": True, "objectives": [], "watchFor": []}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
 

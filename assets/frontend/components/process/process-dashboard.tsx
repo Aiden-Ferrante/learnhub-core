@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PipelineGrid } from "@/components/process/pipeline-grid"
 import { cleanCourseTitle } from "@/lib/courses"
 import {
   cancelChapterBuild,
@@ -330,6 +331,9 @@ export function ProcessDashboard() {
           </button>
         ))}
       </div>
+
+      {/* Coverage grid + ledger — every chapter × every artifact, live states, one-click builds. */}
+      {docId && <PipelineGrid docId={docId} />}
 
       {loading ? (
         <div className="space-y-2">

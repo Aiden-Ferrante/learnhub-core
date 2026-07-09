@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
 from app.arango_tree import connect_arango
-from app.reading_guide import fetch_reading_guide, guide_status, prepare_guides
+from app.reading_guide import fetch_reading_guide, guide_status
 
 router = APIRouter()
 
@@ -34,13 +34,19 @@ def api_reading_guide_prepare_status(
 
 @router.post("/api/reading-guide/prepare")
 def api_reading_guide_prepare(body: dict = Body(default=None)) -> JSONResponse:
-    """Author ALL of a chapter's guidance up front (background). Returns status."""
+    """Author ALL of a chapter's guidance — enqueued on the processing ledger (visible in
+    the pipeline grid, survives restarts). Returns current status."""
     body = body or {}
     doc, scope = body.get("doc"), body.get("scope")
     if not scope:
         return JSONResponse({"error": "scope required"}, status_code=400)
     try:
+        from app.build_queue import enqueue_build
+
         db = connect_arango()
-        return JSONResponse(prepare_guides(db, doc, scope))
+        enqueue_build(doc, scope, kind="guides")
+        status = guide_status(db, doc, scope)
+        status["running"] = True
+        return JSONResponse(status)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=500)

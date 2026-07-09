@@ -1399,18 +1399,65 @@ export type ChapterReadiness = {
   build: Pick<ChapterBuildJob, 'status' | 'notBefore' | 'phase' | 'done' | 'total' | 'error'> | null
 }
 
+/** Every artifact the processing queue can produce. "build" = extraction + deep overlay;
+ *  the rest regenerate one artifact for one chapter. */
+export type BuildKind = 'build' | 'quizzes' | 'guides' | 'skeleton' | 'orient'
+
 export async function enqueueChapterBuild(
   doc: string,
   scope: string,
   at?: number | null,
+  kind: BuildKind = 'build',
 ): Promise<ChapterBuildJob & { error?: string }> {
   const params = new URLSearchParams({ doc, scope })
   const res = await fetch(`/api/learn/build?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(at ? { at } : {}),
+    body: JSON.stringify({ ...(at ? { at } : {}), ...(kind !== 'build' ? { kind } : {}) }),
   })
   return parseJsonResponse<ChapterBuildJob>(res)
+}
+
+// ----- Processing ledger + coverage grid (the de-black-boxed pipeline) -----
+
+export type PipelineJobState = {
+  status: 'queued' | 'running' | 'done' | 'error'
+  notBefore?: number | null
+  phase?: string | null
+  done?: number
+  total?: number
+  error?: string | null
+}
+
+export type ChapterCoverage = {
+  scope: string
+  title: string
+  sections: number
+  concepts: number
+  quizzes: { authored: number; total: number }
+  skeleton: 'fresh' | 'stale' | 'missing'
+  orient: boolean
+  briefing: boolean
+  guides: { authored: number; total: number }
+  audiobooks: string[]
+  readAlong: boolean
+  jobs: Partial<Record<BuildKind, PipelineJobState>>
+}
+
+export async function fetchCoverage(
+  doc: string,
+): Promise<{ docId?: string; chapters: ChapterCoverage[]; error?: string }> {
+  const res = await fetch(`/api/learn/coverage?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; chapters: ChapterCoverage[] }>(res)
+}
+
+export type PipelineLedgerRow = ChapterBuildJob & { kind: BuildKind; receipt?: Record<string, unknown> | null }
+
+export async function fetchJobsLedger(
+  doc: string,
+): Promise<{ docId?: string; builds: PipelineLedgerRow[]; error?: string }> {
+  const res = await fetch(`/api/learn/jobs?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; builds: PipelineLedgerRow[] }>(res)
 }
 
 export async function cancelChapterBuild(

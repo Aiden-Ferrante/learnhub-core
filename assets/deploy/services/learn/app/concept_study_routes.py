@@ -30,7 +30,6 @@ from app.cards import is_quizzable, nearest_distractor_names
 from app.concept_quiz_gen import build_concept_question, public_concept_question
 from app.concept_quiz_llm import (
     ensure_questions_async,
-    prepare_scope,
     scope_question_status,
     servable_from_cached,
 )
@@ -53,14 +52,16 @@ def _sweep(sessions: dict[str, dict[str, Any]], now: float) -> None:
 
 
 def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | None:
-    """The set of section keys a chapter scope spans (chapter → all its sub-sections), using
-    the same reading-order span as the reader/concepts view. None = whole course (no filter)."""
+    """The set of section keys a chapter scope spans (chapter → all its sub-sections).
+    Outline nesting first (bridges mixed keyspaces — a numbered chapter whose sub-sections
+    carry slug keys), then the reading-order span — the same resolution order as the reader,
+    so study scoping can't disagree with it. None = whole course (no filter)."""
     if not scope:
         return None
     if not doc:
         return {scope}
     try:
-        from app.extract import _blocks_in_scope, _section_level_fn
+        from app.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 
         rows = list(
             db.aql.execute(
@@ -68,8 +69,12 @@ def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | No
                 bind_vars={"d": doc},
             )
         )
-        matched = _blocks_in_scope(rows, scope, _section_level_fn(db, doc))
-        keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
+        block_keys = {b.get("sectionKey") for b in rows if b.get("sectionKey")}
+        okeys = _scope_keys_from_outline(db, doc, scope)
+        keys = (okeys & block_keys) if okeys else set()
+        if not keys:
+            matched = _blocks_in_scope(rows, scope, _section_level_fn(db, doc))
+            keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
         return keys or {scope}
     except Exception:  # noqa: BLE001
         return {scope}
@@ -629,30 +634,53 @@ def api_concept_quiz_session(body: dict = Body(default=None)) -> JSONResponse:
     return JSONResponse({"sessionId": session_id, "stem": pub["stem"], "choices": pub["choices"]})
 
 
+def _quiz_job_running(doc: str | None, scope: str | None) -> bool:
+    """Is a ledgered quiz-authoring job queued/running for this scope?"""
+    try:
+        from app.build_queue import list_builds
+
+        for j in list_builds(doc, kind="quizzes").get("builds", []):
+            if j.get("scope") == scope and j.get("status") in ("queued", "running"):
+                return True
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
 @router.get("/api/concept-quiz/prepare")
 def api_concept_quiz_prepare_status(
     doc: str | None = Query(None), scope: str | None = Query(None)
 ) -> JSONResponse:
-    """How many of a scope's concepts have LLM quiz questions authored yet (+ running flag)."""
+    """How many of a scope's concepts have LLM quiz questions authored yet (+ running flag,
+    covering both the inline backfill thread and a ledgered queue job)."""
     try:
         db = connect_arango()
         keys = _scope_section_keys(db, doc, scope)
-        return JSONResponse(scope_question_status(db, doc, keys))
+        status = scope_question_status(db, doc, keys)
+        status["running"] = bool(status.get("running")) or _quiz_job_running(doc, scope)
+        return JSONResponse(status)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.post("/api/concept-quiz/prepare")
 def api_concept_quiz_prepare(body: dict = Body(default=None)) -> JSONResponse:
-    """Author ALL of a chapter's application questions up front (background). Returns status."""
+    """Author ALL of a chapter's application questions up front — enqueued on the processing
+    ledger (visible in the pipeline grid, survives restarts) rather than a fire-and-forget
+    thread. Returns current status."""
     body = body or {}
     doc, scope = body.get("doc"), body.get("scope")
     if not scope:
         return JSONResponse({"error": "scope required"}, status_code=400)
     try:
+        from app.build_queue import enqueue_build
+
         db = connect_arango()
+        enqueue_build(doc, scope, kind="quizzes")
         keys = _scope_section_keys(db, doc, scope)
-        return JSONResponse(prepare_scope(db, doc, keys))
+        status = scope_question_status(db, doc, keys)
+        status["running"] = True
+        return JSONResponse(status)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=500)
 
