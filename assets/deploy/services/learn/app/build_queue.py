@@ -31,6 +31,7 @@ from app.arango_content import fetch_latest_document, fetch_section_content
 from app.arango_tree import connect_arango
 
 BUILDS = "chapter_builds"
+META = "learn_meta"
 
 KINDS = ("build", "quizzes", "guides", "skeleton", "orient")
 
@@ -38,11 +39,37 @@ _worker_lock = threading.Lock()
 _worker_started = False
 
 
+class JobCancelled(Exception):
+    """Raised inside a running job when its cancelRequested flag is set —
+    unwinds the runner between sections so completed work is kept."""
+
+
 def ensure_builds_collection(db) -> None:
     if not db.has_collection(BUILDS):
         col = db.create_collection(BUILDS)
         col.add_persistent_index(fields=["docId"])
         col.add_persistent_index(fields=["status"])
+
+
+def ensure_meta_collection(db) -> None:
+    if not db.has_collection(META):
+        db.create_collection(META)
+
+
+def queue_paused(db) -> bool:
+    try:
+        ensure_meta_collection(db)
+        row = db.collection(META).get("queue")
+        return bool(row and row.get("paused"))
+    except Exception:  # noqa: BLE001 — a broken flag must never stall the queue
+        return False
+
+
+def set_queue_paused(paused: bool) -> dict[str, Any]:
+    db = connect_arango()
+    ensure_meta_collection(db)
+    db.collection(META).insert({"_key": "queue", "paused": bool(paused)}, overwrite=True)
+    return {"paused": bool(paused)}
 
 
 def _bkey(doc_id: str, scope: str, kind: str = "build") -> str:
@@ -114,8 +141,9 @@ def enqueue_build(doc_id: str | None, scope: str, not_before: int | None = None,
 
 
 def cancel_build(doc_id: str | None, scope: str, kind: str = "build") -> dict[str, Any]:
-    """Cancel a QUEUED job. A running job finishes — mid-extraction interruption
-    would leave partial LLM work with nothing to show for the GPU time spent."""
+    """Cancel a job. Queued jobs are removed outright. Running jobs get a cooperative
+    cancelRequested flag — the runner checks it between sections and stops there, so
+    already-completed sections are kept (no GPU work is thrown away mid-section)."""
     db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
@@ -124,10 +152,24 @@ def cancel_build(doc_id: str | None, scope: str, kind: str = "build") -> dict[st
     job = db.collection(BUILDS).get(_bkey(doc_id, scope, kind))
     if not job:
         return {"cancelled": False, "reason": "no job"}
-    if job.get("status") != "queued":
-        return {"cancelled": False, "reason": job.get("status")}
-    db.collection(BUILDS).delete(job["_key"])
-    return {"cancelled": True}
+    if job.get("status") == "queued":
+        db.collection(BUILDS).delete(job["_key"])
+        return {"cancelled": True}
+    if job.get("status") == "running":
+        _update_job(db, job["_key"], {"cancelRequested": True})
+        return {"cancelled": False, "cancelling": True}
+    return {"cancelled": False, "reason": job.get("status")}
+
+
+def _check_cancel(db, key: str) -> None:
+    """Raise JobCancelled if this job's cancel flag was set. Called at section and
+    phase boundaries — the coarsest granularity that never wastes finished work."""
+    try:
+        row = db.collection(BUILDS).get(key)
+    except Exception:  # noqa: BLE001 — a read hiccup must not kill the job
+        return
+    if row and row.get("cancelRequested"):
+        raise JobCancelled()
 
 
 def list_builds(doc_id: str | None, kind: str | None = "build") -> dict[str, Any]:
@@ -298,6 +340,44 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
     return {"docId": doc_id, "chapters": chapters}
 
 
+def queue_summary() -> dict[str, Any]:
+    """Live queue state across ALL documents — powers the Process tab's machine strip.
+    One running job max (single worker), so `running` is a row, not a list."""
+    db = connect_arango()
+    ensure_builds_collection(db)
+    now = int(time.time())
+    rows = list(
+        db.aql.execute(
+            "FOR b IN @@col FILTER b.status IN ['queued','running'] RETURN "
+            "{status: b.status, notBefore: b.notBefore, docId: b.docId, scope: b.scope, "
+            "kind: b.kind, phase: b.phase, done: b.done, total: b.total, "
+            "startedAt: b.startedAt, cancelRequested: b.cancelRequested}",
+            bind_vars={"@col": BUILDS},
+        )
+    )
+    running = next((r for r in rows if r["status"] == "running"), None)
+    scheduled = [r for r in rows if r["status"] == "queued" and r.get("notBefore") and r["notBefore"] > now]
+    queued = [r for r in rows if r["status"] == "queued" and r not in scheduled]
+    if running:
+        running["kind"] = running.get("kind") or "build"
+        try:
+            doc_row = db.collection("documents").get(running["docId"]) or {}
+            running["docTitle"] = doc_row.get("title")
+            for e in doc_row.get("outline") or []:
+                if e.get("sectionKey") == running["scope"]:
+                    running["chapterTitle"] = e.get("title")
+                    break
+        except Exception:  # noqa: BLE001 — titles are cosmetic
+            pass
+    return {
+        "paused": queue_paused(db),
+        "running": running,
+        "queuedCount": len(queued),
+        "scheduledCount": len(scheduled),
+        "nextScheduledAt": min((r["notBefore"] for r in scheduled), default=None),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Worker
 # --------------------------------------------------------------------------- #
@@ -338,6 +418,9 @@ def _worker_loop() -> None:
         try:
             db = connect_arango()
             ensure_builds_collection(db)
+            if queue_paused(db):
+                time.sleep(10)
+                continue
             job = _next_job(db)
             if not job:
                 time.sleep(20)
@@ -357,6 +440,7 @@ def _progress_writer(db, key: str, phase: str):
         if now - last_write < 5 and done < total:
             return
         last_write = now
+        _check_cancel(db, key)
         _update_job(db, key, {"phase": phase, "done": done, "total": total})
 
     return on_progress
@@ -400,6 +484,9 @@ def _dispatch(db, job: dict[str, Any]) -> None:
             return
         _update_job(db, key, {"status": "done", "finishedAt": int(time.time()),
                               "phase": None, "receipt": receipt})
+    except JobCancelled:
+        _update_job(db, key, {"status": "canceled", "finishedAt": int(time.time()),
+                              "phase": None, "cancelRequested": None})
     except Exception as exc:  # noqa: BLE001
         _update_job(db, key, {"status": "error", "finishedAt": int(time.time()), "error": str(exc)})
 
@@ -422,6 +509,7 @@ def _run_build(db, job: dict[str, Any]) -> None:
 
         if _concept_count(db, doc_id, list(section_keys)) > 0:
             # Already extracted — go straight to the deep overlay (briefing + explanations).
+            _check_cancel(db, key)
             _update_job(db, key, {"phase": "deep", "done": 0, "total": 0})
             generate_deep_chapter_artifacts(db, doc_id, scope, list(section_keys))
             _update_job(db, key, {"outcomes": None})
@@ -435,6 +523,7 @@ def _run_build(db, job: dict[str, Any]) -> None:
                 if now - last_write < 5 and done < total:
                     return
                 last_write = now
+                _check_cancel(db, key)
                 _update_job(db, key, {"phase": "extract", "done": done, "total": total})
 
             res = asyncio.run(
@@ -453,5 +542,8 @@ def _run_build(db, job: dict[str, Any]) -> None:
             })
 
         _update_job(db, key, {"status": "done", "finishedAt": int(time.time()), "phase": None})
+    except JobCancelled:
+        _update_job(db, key, {"status": "canceled", "finishedAt": int(time.time()),
+                              "phase": None, "cancelRequested": None})
     except Exception as exc:  # noqa: BLE001
         _update_job(db, key, {"status": "error", "finishedAt": int(time.time()), "error": str(exc)})

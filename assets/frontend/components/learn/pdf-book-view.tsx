@@ -101,13 +101,15 @@ export function PdfBookView({ course, tree, loading, mastery, onBack, onSectionR
       <div className="flex items-center gap-2 border-b bg-card/80 px-3 py-2">
         <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onBack}>
           <ChevronLeft className="h-3.5 w-3.5" />
-          {course.title}
+          Back to course
         </Button>
-        <span className="flex items-center gap-1.5 rounded-full border border-nvidia-green/40 bg-nvidia-green/10 px-2 py-0.5 text-[11px] text-nvidia-green">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={course.title}>
+          {course.title}
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-nvidia-green/40 bg-nvidia-green/10 px-2 py-0.5 text-[11px] text-nvidia-green">
           <FileText className="h-3 w-3" />
           Original PDF
         </span>
-        <div className="min-w-0 flex-1" />
         <Button
           type="button"
           variant="ghost"

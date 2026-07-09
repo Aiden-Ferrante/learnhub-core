@@ -29,6 +29,7 @@ from app.mastery import compute_activity, compute_calibration, compute_forecast,
 from app.reading_routes import router as reading_router
 from app.search_routes import router as search_router
 from app.study_routes import router as study_router
+from app.system_routes import router as system_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -45,6 +46,7 @@ app.include_router(build_router)
 app.include_router(reading_router)
 app.include_router(search_router)
 app.include_router(admin_router)
+app.include_router(system_router)
 
 
 @app.middleware("http")

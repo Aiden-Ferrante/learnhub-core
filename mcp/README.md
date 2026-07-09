@@ -27,8 +27,8 @@ Already registered at **user scope** (in `~/.claude.json`). To re-add elsewhere:
 ```bash
 claude mcp add --scope user learn-hub \
   -e LEARN_URL=http://localhost:8010 -e LEARN_USER_DB=txt2kg \
-  -- /home/mooteo/Desktop/dgx-spark-playbooks/nvidia/txt2kg/mcp/.venv/bin/python \
-     /home/mooteo/Desktop/dgx-spark-playbooks/nvidia/txt2kg/mcp/server.py
+  -- /home/mooteo/Desktop/code/dgx-spark-playbooks/nvidia/txt2kg/mcp/.venv/bin/python \
+     /home/mooteo/Desktop/code/dgx-spark-playbooks/nvidia/txt2kg/mcp/server.py
 ```
 
 **Env:** `LEARN_URL` (default `http://localhost:8010`), `LEARN_USER_DB` (default `txt2kg`,

@@ -1362,7 +1362,8 @@ export type SectionOutcome = {
 export type ChapterBuildJob = {
   key?: string
   scope: string
-  status: 'queued' | 'running' | 'done' | 'error'
+  status: 'queued' | 'running' | 'done' | 'error' | 'canceled'
+  cancelRequested?: boolean | null
   notBefore?: number | null
   requestedAt?: number
   startedAt?: number | null
@@ -1421,7 +1422,7 @@ export async function enqueueChapterBuild(
 // ----- Processing ledger + coverage grid (the de-black-boxed pipeline) -----
 
 export type PipelineJobState = {
-  status: 'queued' | 'running' | 'done' | 'error'
+  status: 'queued' | 'running' | 'done' | 'error' | 'canceled'
   notBefore?: number | null
   phase?: string | null
   done?: number
@@ -1463,14 +1464,63 @@ export async function fetchJobsLedger(
 export async function cancelChapterBuild(
   doc: string,
   scope: string,
-): Promise<{ cancelled: boolean; reason?: string; error?: string }> {
-  const params = new URLSearchParams({ doc, scope })
+  kind: BuildKind = 'build',
+): Promise<{ cancelled: boolean; cancelling?: boolean; reason?: string; error?: string }> {
+  const params = new URLSearchParams({ doc, scope, ...(kind !== 'build' ? { kind } : {}) })
   const res = await fetch(`/api/learn/build/cancel?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{}',
   })
-  return parseJsonResponse<{ cancelled: boolean; reason?: string }>(res)
+  return parseJsonResponse<{ cancelled: boolean; cancelling?: boolean; reason?: string }>(res)
+}
+
+// ----- System status (the Process tab's machine strip) -----
+
+export type OllamaLoadedModel = {
+  name: string
+  size?: number
+  sizeVram?: number
+  expiresAt?: string
+}
+
+export type RunningJobInfo = {
+  docId: string
+  scope: string
+  kind: BuildKind
+  phase?: string | null
+  done?: number
+  total?: number
+  startedAt?: number | null
+  cancelRequested?: boolean | null
+  docTitle?: string
+  chapterTitle?: string
+}
+
+export type SystemStatus = {
+  ollama: { ok: boolean; models: OllamaLoadedModel[]; error?: string }
+  memory: { totalBytes: number; usedBytes: number } | null
+  queue: {
+    paused: boolean
+    running: RunningJobInfo | null
+    queuedCount: number
+    scheduledCount: number
+    nextScheduledAt: number | null
+  }
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatus & { error?: string }> {
+  const res = await fetch('/api/learn/system', { cache: 'no-store' })
+  return parseJsonResponse<SystemStatus>(res)
+}
+
+export async function setQueuePaused(paused: boolean): Promise<{ paused: boolean; error?: string }> {
+  const res = await fetch('/api/learn/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused }),
+  })
+  return parseJsonResponse<{ paused: boolean }>(res)
 }
 
 export async function fetchChaptersReadiness(

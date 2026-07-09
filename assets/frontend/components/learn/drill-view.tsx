@@ -130,7 +130,7 @@ export function DrillView({ scope, docId, title, onBack, onDone }: DrillViewProp
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back
+          Back to course
         </button>
         <span className="flex items-center gap-2 text-sm font-medium">
           <Target className="h-4 w-4 text-brand" />

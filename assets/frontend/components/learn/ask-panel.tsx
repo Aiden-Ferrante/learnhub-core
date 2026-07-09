@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ArrowLeft, Loader2, Search, Sparkles } from "lucide-react"
+import { ChevronLeft, Loader2, Search, Sparkles } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
@@ -78,8 +78,8 @@ export function AskPanel({ course, onBack, onOpenSection }: AskPanelProps) {
           onClick={onBack}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Course
+          <ChevronLeft className="h-4 w-4" />
+          Back to course
         </button>
         <span className="text-sm font-medium">{course.title}</span>
       </div>

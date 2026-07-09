@@ -21,9 +21,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DocumentProvider } from "@/contexts/document-context"
 import { ClientInitializer } from "@/components/client-init"
-import Link from "next/link"
-import { BookOpen } from "lucide-react"
-import { BrandMark } from "@/components/brand-mark"
+import { HeaderBrand, HeaderProcessLink } from "@/components/header-brand"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { InfoModal } from "@/components/info-modal"
 import { SettingsModal } from "@/components/settings-modal"
@@ -56,20 +54,9 @@ export default function RootLayout({
             {/* Modern Gradient Header */}
             <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
               <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <BrandMark className="h-8 w-8 text-nvidia-green" />
-                  <div>
-                    <span className="text-xl font-bold gradient-text">Learn Hub</span>
-                  </div>
-                </div>
+                <HeaderBrand />
                 <div className="flex items-center gap-4">
-                  <Link
-                    href="/#learn"
-                    className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-border text-foreground/90 bg-muted/40 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50"
-                  >
-                    <BookOpen className="h-4 w-4 text-current" />
-                    <span>Learn</span>
-                  </Link>
+                  <HeaderProcessLink />
                   <InfoModal />
                   <SettingsModal />
                   <ThemeToggle />

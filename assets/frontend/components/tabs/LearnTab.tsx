@@ -142,12 +142,19 @@ export function LearnTab({ onTabChange }: LearnTabProps) {
     }
   }
 
-  const backToShelf = () => {
+  const backToShelf = useCallback(() => {
     setView("shelf")
     setSelectedCourseId(null)
     loadTree()
     loadMastery()
-  }
+  }, [loadTree, loadMastery])
+
+  // The header brand broadcasts this when clicked while the Learn tab is already
+  // active (no hashchange fires) — reset to the course shelf.
+  useEffect(() => {
+    window.addEventListener("learnhub:home", backToShelf)
+    return () => window.removeEventListener("learnhub:home", backToShelf)
+  }, [backToShelf])
 
   const continueSectionKey = selectedCourseId
     ? readingProgress[selectedCourseId]

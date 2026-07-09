@@ -72,7 +72,10 @@ export default function Home() {
   }, [handleTabChange]);
   
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    // No min-h-screen: the sticky header sits above this in flow, so viewport-height
+    // here forces 63px of dead scroll under every viewport-pinned view (PDF read, deep
+    // chapter). The body carries the background, so nothing is lost visually.
+    <div className="bg-background text-foreground">
       {/* Add style element for global styles */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
       

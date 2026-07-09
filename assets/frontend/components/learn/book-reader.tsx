@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ExternalLink, PictureInPicture2 } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import {
@@ -80,6 +80,22 @@ export function BookReader({
 
   useEffect(() => {
     setPipOk(typeof window !== "undefined" && "documentPictureInPicture" in window)
+  }, [])
+
+  // Pin the reader pane to the viewport (same trick as the PDF view and deep chapter)
+  // instead of a fixed 640px letterbox — the reader owns whatever height the screen has.
+  const paneRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = paneRef.current
+    if (!el) return
+    const size = () => {
+      window.scrollTo(0, 0)
+      const top = Math.max(0, Math.round(el.getBoundingClientRect().top))
+      el.style.height = `calc(100dvh - ${top}px - 12px)`
+    }
+    size()
+    window.addEventListener("resize", size)
+    return () => window.removeEventListener("resize", size)
   }, [])
 
   useEffect(() => {
@@ -164,10 +180,10 @@ export function BookReader({
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Course outline
+          Back to course
         </button>
         <div className="flex items-center gap-2">
-          <span className="mr-1 text-sm font-medium">{course.title}</span>
+          <span className="mr-1 truncate text-sm font-medium" title={course.title}>{course.title}</span>
           {pipOk && (
             <button
               type="button"
@@ -198,7 +214,7 @@ export function BookReader({
         </div>
       </div>
 
-      <div className="h-[640px] overflow-hidden rounded-lg border bg-card">
+      <div ref={paneRef} className="overflow-hidden rounded-lg border bg-card">
         <PanelGroup direction="horizontal">
           {!focus && (
             <>

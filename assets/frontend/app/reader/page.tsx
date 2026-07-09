@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { PanelLeft } from "lucide-react"
+import { PanelLeft, X } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import {
   ChapterReader,
@@ -101,8 +101,22 @@ function ReaderInner() {
         >
           <PanelLeft className="h-4 w-4" />
         </button>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
           <ReadingThemeToggle />
+          <button
+            type="button"
+            onClick={() => {
+              // Popped-out windows close; a reader opened as a normal tab goes home instead.
+              window.close()
+              setTimeout(() => {
+                if (!window.closed) window.location.href = "/"
+              }, 150)
+            }}
+            aria-label="Close reader"
+            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
       <div className="min-h-0 flex-1">

@@ -56,7 +56,7 @@ export function DumpView({ chapters, docId, onBack, onDone }: DumpViewProps) {
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back
+          Back to course
         </button>
         <span className="flex items-center gap-2 text-sm font-medium">
           <Brain className="h-4 w-4 text-brand" />

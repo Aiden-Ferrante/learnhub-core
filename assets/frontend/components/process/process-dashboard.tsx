@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { MachineStrip } from "@/components/process/machine-strip"
 import { PipelineGrid } from "@/components/process/pipeline-grid"
 import { cleanCourseTitle } from "@/lib/courses"
 import {
@@ -312,6 +313,9 @@ export function ProcessDashboard() {
         </Button>
       </div>
 
+      {/* Machine strip: Ollama, memory, queue state, the running job. */}
+      <MachineStrip />
+
       {/* Book picker */}
       <div className="flex flex-wrap items-center gap-2">
         {docs.map((d) => (
@@ -431,7 +435,7 @@ export function ProcessDashboard() {
                       </span>
                     ) : null}
 
-                    {(!job || job.status === "done" || job.status === "error") && !deep && (
+                    {(!job || job.status === "done" || job.status === "error" || job.status === "canceled") && !deep && (
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
                           type="button"

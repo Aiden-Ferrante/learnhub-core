@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Check, Clock, Loader2, Minus, TriangleAlert } from "lucide-react"
+import { Check, Clock, Loader2, Minus, RotateCcw, TriangleAlert, X } from "lucide-react"
 import {
+  cancelChapterBuild,
   enqueueChapterBuild,
   fetchCoverage,
   fetchJobsLedger,
@@ -26,7 +27,8 @@ const COLUMNS: { key: string; label: string; kind: BuildKind | null; hint: strin
 ]
 
 function jobBadge(job: PipelineJobState | undefined) {
-  if (!job || job.status === "done") return null
+  // Canceled reads like done in the grid — the cell shows the artifact's actual state.
+  if (!job || job.status === "done" || job.status === "canceled") return null
   if (job.status === "queued")
     return (
       <span title={job.notBefore ? "scheduled" : "queued"}>
@@ -222,10 +224,11 @@ export function PipelineGrid({ docId }: { docId: string }) {
     () => ledger.filter((j) => j.status === "queued" || j.status === "running"),
     [ledger],
   )
+  // Poll fast while jobs are active, slow when idle — jobs can be enqueued from
+  // anywhere (course home, the MCP server), so the grid must notice them on its own.
   useEffect(() => {
     if (timer.current) window.clearInterval(timer.current)
-    if (!active.length) return
-    timer.current = window.setInterval(load, 6000)
+    timer.current = window.setInterval(load, active.length ? 6000 : 20000)
     return () => {
       if (timer.current) window.clearInterval(timer.current)
     }
@@ -234,6 +237,15 @@ export function PipelineGrid({ docId }: { docId: string }) {
   const build = useCallback(
     (scope: string, kind: BuildKind) => {
       enqueueChapterBuild(docId, scope, null, kind)
+        .catch(() => {})
+        .finally(load)
+    },
+    [docId, load],
+  )
+
+  const cancel = useCallback(
+    (scope: string, kind: BuildKind) => {
+      cancelChapterBuild(docId, scope, kind)
         .catch(() => {})
         .finally(load)
     },
@@ -251,7 +263,7 @@ export function PipelineGrid({ docId }: { docId: string }) {
 
   const history = [...ledger]
     .sort((a, b) => (b.requestedAt ?? 0) - (a.requestedAt ?? 0))
-    .slice(0, 8)
+    .slice(0, 12)
 
   return (
     <div className="space-y-3">
@@ -297,15 +309,34 @@ export function PipelineGrid({ docId }: { docId: string }) {
                 <span className="min-w-0 flex-1 truncate" title={j.scope}>
                   {titleOf(j.scope)}
                 </span>
-                {j.status === "running" && (
-                  <span className="flex items-center gap-1 text-nvidia-green">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {j.total ? `${j.done}/${j.total}` : "running"}
-                  </span>
-                )}
+                {j.status === "running" &&
+                  (j.cancelRequested ? (
+                    <span className="text-muted-foreground">stopping after this section…</span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-nvidia-green">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {j.total ? `${j.done}/${j.total}` : "running"}
+                      <button
+                        type="button"
+                        className="ml-0.5 text-muted-foreground hover:text-destructive"
+                        onClick={() => cancel(j.scope, j.kind)}
+                        title="Stop after the current section — completed sections are kept"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
                 {j.status === "queued" && (
-                  <span className="text-muted-foreground">
+                  <span className="flex items-center gap-1 text-muted-foreground">
                     {j.notBefore ? `scheduled ${new Date(j.notBefore * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "queued"}
+                    <button
+                      type="button"
+                      className="ml-0.5 hover:text-foreground"
+                      onClick={() => cancel(j.scope, j.kind)}
+                      title="Remove from queue"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </span>
                 )}
                 {j.status === "done" && (
@@ -315,9 +346,32 @@ export function PipelineGrid({ docId }: { docId: string }) {
                     {since(j) && ` · ${since(j)}`}
                   </span>
                 )}
+                {j.status === "canceled" && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    canceled{since(j) && ` · ${since(j)}`}
+                    <button
+                      type="button"
+                      className="ml-0.5 hover:text-foreground"
+                      onClick={() => build(j.scope, j.kind)}
+                      title="Re-run — picks up where it left off (finished sections are skipped)"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
                 {j.status === "error" && (
-                  <span className="max-w-64 truncate text-destructive" title={j.error || undefined}>
-                    {j.error || "failed"}
+                  <span className="flex max-w-64 items-center gap-1 text-destructive">
+                    <span className="truncate" title={j.error || undefined}>
+                      {j.error || "failed"}
+                    </span>
+                    <button
+                      type="button"
+                      className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => build(j.scope, j.kind)}
+                      title="Retry"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </button>
                   </span>
                 )}
               </li>

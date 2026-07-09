@@ -156,7 +156,7 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-          <ChevronLeft className="h-4 w-4" /> Back
+          <ChevronLeft className="h-4 w-4" /> Back to course
         </Button>
         <span className="text-sm font-medium">{course.title} · Concepts</span>
         <div className="ml-auto flex items-center gap-3">
