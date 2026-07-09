@@ -20,11 +20,9 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DocumentProvider } from "@/contexts/document-context"
-import { ClientInitializer } from "@/components/client-init"
 import { HeaderBrand, HeaderProcessLink } from "@/components/header-brand"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { InfoModal } from "@/components/info-modal"
-import { SettingsModal } from "@/components/settings-modal"
 import { Toaster } from "@/components/ui/toaster"
 import { UserMenu } from "@/components/user-menu"
 import { ShortcutsHelp } from "@/components/learn/shortcuts-help"
@@ -50,7 +48,6 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider defaultTheme="dark">
           <DocumentProvider>
-            <ClientInitializer />
             {/* Modern Gradient Header */}
             <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
               <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -58,7 +55,6 @@ export default function RootLayout({
                 <div className="flex items-center gap-4">
                   <HeaderProcessLink />
                   <InfoModal />
-                  <SettingsModal />
                   <ThemeToggle />
                   <UserMenu />
                 </div>

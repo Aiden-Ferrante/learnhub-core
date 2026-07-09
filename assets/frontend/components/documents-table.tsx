@@ -17,17 +17,9 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle, AlertCircle, Loader2, Trash2, FileText, Table, Edit, Eye, Network, Download, Info, Pencil } from "lucide-react"
+import { CheckCircle, AlertCircle, Loader2, Trash2, FileText, Download, Info, Pencil } from "lucide-react"
 import { useDocuments } from "@/contexts/document-context"
-import { DocumentActions } from "@/components/document-actions"
 import { useShiftSelect } from "@/hooks/use-shift-select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,9 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import type { Triple } from "@/utils/text-processing"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { downloadDocument } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -49,14 +38,10 @@ export interface DocumentsTableProps {
 }
 
 export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
-  const { documents, deleteDocuments, updateTriples, renameDocument } = useDocuments()
+  const { documents, deleteDocuments, renameDocument } = useDocuments()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
-  const [showTriplesDialog, setShowTriplesDialog] = useState(false)
-  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
-  const [editableTriples, setEditableTriples] = useState<Triple[]>([])
-  const [editingTripleIndex, setEditingTripleIndex] = useState<number | null>(null)
-  
+
   // Delete confirmation dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'single' | 'multiple', docId?: string, docName?: string } | null>(null)
@@ -107,42 +92,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
     setDeleteTarget(null)
   }
   
-  const openTriplesDialog = (documentId: string) => {
-    const document = documents.find(doc => doc.id === documentId);
-    if (document && document.triples) {
-      setCurrentDocumentId(documentId);
-      setEditableTriples([...document.triples]);
-      setShowTriplesDialog(true);
-    }
-  }
-  
-  const saveTriples = () => {
-    if (currentDocumentId) {
-      updateTriples(currentDocumentId, editableTriples);
-      setShowTriplesDialog(false);
-    }
-  }
-  
-  const updateTriple = (index: number, field: 'subject' | 'predicate' | 'object', value: string) => {
-    const newTriples = [...editableTriples];
-    newTriples[index] = {
-      ...newTriples[index],
-      [field]: value
-    };
-    setEditableTriples(newTriples);
-  }
-  
-  const deleteTriple = (index: number) => {
-    const newTriples = [...editableTriples];
-    newTriples.splice(index, 1);
-    setEditableTriples(newTriples);
-  }
-  
-  const addNewTriple = () => {
-    setEditableTriples([...editableTriples, { subject: '', predicate: '', object: '' }]);
-    setEditingTripleIndex(editableTriples.length);
-  }
-
   const startRename = (id: string, name: string) => {
     setEditingId(id)
     setEditingName(name)
@@ -173,11 +122,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
         return <span className="h-1.5 w-1.5 rounded-full bg-gray-400 mr-2"></span>
     }
   }
-
-  // Show different columns based on document processing state
-  const showTriplesColumn = documents.some(doc => doc.status === 'Processed')
-
-
 
   return (
     <div className="relative">
@@ -230,14 +174,13 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Status</th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Upload Status</th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right py-3 pr-4">Size (KB)</th>
-              {showTriplesColumn && <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center py-3">Triples</th>}
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center py-3 pr-6">Actions</th>
             </tr>
           </thead>
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan={showTriplesColumn ? 7 : 6} className="py-16">
+              <td colSpan={6} className="py-16">
                 <div className="flex flex-col items-center justify-center text-center">
                   <div className="w-24 h-24 rounded-2xl bg-nvidia-green/10 flex items-center justify-center mb-6 border-2 border-dashed border-nvidia-green/20">
                     <FileText className="h-12 w-12 text-nvidia-green" />
@@ -312,30 +255,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                 <td className="py-4 text-right pr-4">
                   <span className="text-xs font-mono bg-muted/50 px-2 py-1 rounded">{doc.size}</span>
                 </td>
-                {showTriplesColumn && (
-                  <td className="py-4 text-center">
-                    {doc.status === "Processed" && doc.triples ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="text-xs font-bold text-nvidia-green bg-nvidia-green/15 px-2.5 py-1 rounded-full">{doc.triples.length}</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openTriplesDialog(doc.id);
-                          }}
-                          className="p-2 text-nvidia-green hover:bg-nvidia-green/10 rounded-lg transition-colors"
-                          aria-label={`View and edit ${doc.triples?.length || 0} triples for ${doc.name}`}
-                          title="View and edit triples"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : doc.status === "Error" ? (
-                      <span className="text-xs text-destructive font-medium">Error</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </td>
-                )}
                 <td className="py-4 pr-6">
                   <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -395,122 +314,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
         </tbody>
         </table>
       </div>
-      
-      <Dialog open={showTriplesDialog} onOpenChange={setShowTriplesDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="nvidia-build-h3">Edit Knowledge Graph Triples</DialogTitle>
-            <DialogDescription className="nvidia-build-body text-muted-foreground">
-              View and edit the extracted triples before processing into your graph database
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="mt-6">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <span className="nvidia-build-h3">{editableTriples.length} Triples</span>
-                <p className="nvidia-build-caption text-muted-foreground mt-1">Subject-Predicate-Object relationships</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={addNewTriple} className="nvidia-build-button">
-                <Edit className="h-4 w-4 mr-2" />
-                Add Triple
-              </Button>
-            </div>
-            
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50 border-b border-border">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">Subject</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">Predicate</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">Object</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground w-20">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editableTriples.map((triple, index) => (
-                    <tr key={index} className="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-2">
-                        {editingTripleIndex === index ? (
-                          <input
-                            type="text"
-                            value={triple.subject}
-                            onChange={(e) => updateTriple(index, 'subject', e.target.value)}
-                            className="w-full bg-background border border-input rounded p-2 text-sm text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        ) : (
-                          <span className="text-sm text-foreground">{triple.subject}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {editingTripleIndex === index ? (
-                          <input
-                            type="text"
-                            value={triple.predicate}
-                            onChange={(e) => updateTriple(index, 'predicate', e.target.value)}
-                            className="w-full bg-background border border-input rounded p-2 text-sm text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        ) : (
-                          <span className="text-sm text-foreground">{triple.predicate}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {editingTripleIndex === index ? (
-                          <input
-                            type="text"
-                            value={triple.object}
-                            onChange={(e) => updateTriple(index, 'object', e.target.value)}
-                            className="w-full bg-background border border-input rounded p-2 text-sm text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        ) : (
-                          <span className="text-sm text-foreground">{triple.object}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-1">
-                          {editingTripleIndex === index ? (
-                            <button
-                              onClick={() => setEditingTripleIndex(null)}
-                              className="p-1.5 text-primary hover:text-primary/80 hover:bg-primary/10 rounded-full transition-colors"
-                              aria-label={`Save changes to triple: ${triple.subject} ${triple.predicate} ${triple.object}`}
-                              title="Save"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setEditingTripleIndex(index)}
-                              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
-                              aria-label={`Edit triple: ${triple.subject} ${triple.predicate} ${triple.object}`}
-                              title="Edit"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => deleteTriple(index)}
-                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
-                            aria-label={`Delete triple: ${triple.subject} ${triple.predicate} ${triple.object}`}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="flex justify-end mt-4">
-              <Button onClick={saveTriples}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

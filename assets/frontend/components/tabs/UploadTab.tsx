@@ -14,10 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-import { AlertCircle, Upload, Database, Table } from "lucide-react"
+import { Upload, Table } from "lucide-react"
 import { UploadDocuments } from "@/components/upload-documents"
-import { S3UploadContainer } from "@/components/s3-upload-container"
-import { DatabaseConnection } from "@/components/database-connection"
 import { DocumentsTable } from "@/components/documents-table"
 
 interface UploadTabProps {
@@ -36,20 +34,6 @@ export function UploadTab({ onTabChange }: UploadTabProps) {
             <h2 className="text-lg font-semibold text-foreground">Upload Documents</h2>
           </div>
           <UploadDocuments />
-          
-          <S3UploadContainer />
-        </div>
-        
-        <div className="nvidia-build-card">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-nvidia-green/15 flex items-center justify-center">
-              <Database className="h-4 w-4 text-nvidia-green" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground">Storage Connections</h2>
-          </div>
-          <div className="space-y-6">
-            <DatabaseConnection />
-          </div>
         </div>
       </div>
       
