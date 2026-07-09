@@ -1,7 +1,7 @@
 """Emit seedlings from the Learn hub into the host Obsidian vault.
 
 The Learn service runs in Docker and can't see the host filesystem, so it goes
-through the vaultwriter HTTP seam (~/Desktop/vaultwriter/server.py) which owns
+through the vaultwriter HTTP seam (~/Desktop/code/vaultwriter/server.py) which owns
 the vault and the one canonical write contract. This is the wiring point for
 synergy #1 (distilled Learn content -> review seedlings): a caller hands a
 distilled insight here and it lands in _Review/Seedlings/ for the owner.

@@ -1,0 +1,15 @@
+# Learn Hub (txt2kg) — first project ported into shipyard, 2026-07-09.
+id: learn-hub
+name: Learn Hub
+stage: product
+description: PDF → knowledge-graph → study hub; concept decks, quizzes, spaced repetition.
+links:
+  app: http://localhost:3001
+  github: https://github.com/Aiden-Ferrante/txt2kg
+  readme: README.md
+  adr: docs/adr/
+  extra:
+    process-tab: http://localhost:3001/process
+    mcp-server: mcp/server.py
+mc: [txt2kg, learn-hub-mcp, ollama]
+tags: [learning, knowledge-graph, mcp, channel-brand]
