@@ -75,4 +75,9 @@ def run_convert(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
             "elementCount": result.element_count,
         }
     })
+    # Lifecycle auto-chain: converted → extract, so an upload yields a studyable document
+    # without a manual build. Enrichment stays on-demand. (No-op when LEARN_AUTOCHAIN=0.)
+    from app.pipeline.lifecycle import on_converted
+
+    on_converted(result.doc_id or doc_id)
     return None
