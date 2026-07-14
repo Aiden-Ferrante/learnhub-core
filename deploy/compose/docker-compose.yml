@@ -152,6 +152,27 @@ services:
     networks:
       - default
 
+  # PostgreSQL + pgvector — ArangoDB migration target (runs alongside Arango during transition).
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      - POSTGRES_DB=learnhub
+      - POSTGRES_USER=learnhub
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set in compose/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - default
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U learnhub -d learnhub']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # Ollama - Local LLM inference (first build mostly pulls ollama/ollama base image; can take many minutes)
   ollama:
     build:
@@ -269,6 +290,7 @@ volumes:
   ollama_data:
   qdrant_data:
   learnhub_shared:
+  postgres_data:
 
 networks:
   default:
