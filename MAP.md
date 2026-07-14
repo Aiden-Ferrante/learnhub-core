@@ -104,6 +104,8 @@ flowchart TD
 Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, routers, and
 `install_job_runners()`.
 
+<!-- GEN:backend START — auto-managed by scripts/gen_map.py; edit descriptions inline, they're preserved across regens -->
+
 ### platform/ — the floor (everything depends on this)
 
 | File | Purpose |
@@ -206,6 +208,73 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
 | [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
+
+<!-- GEN:backend END -->
+
+---
+
+## 3. Frontend (inside the `app` container)
+
+The frontend is a layered data flow. Everything ultimately reaches the backend through the
+**proxy layer**: a component calls `/api/learn/*`, a thin route handler forwards it via
+[`lib/learn-proxy.ts`](frontend/lib/learn-proxy.ts), which stamps the `X-User-Db` tenancy
+header. Auth is the one path that talks to ArangoDB directly.
+
+```mermaid
+flowchart TD
+  browser["browser"]
+
+  subgraph client["client · runs in the browser"]
+    pages["app/ — pages<br/>router · login · reader"]
+    components["components/<br/>learn · tabs · process · ui"]
+    state["contexts/ + hooks/<br/>document scope · prefs"]
+    libc["lib/ — client helpers<br/>courses · learn-path · read-along"]
+  end
+
+  subgraph server["server · Next.js runtime"]
+    apiroutes["app/api/learn/*<br/>~40 route handlers"]
+    proxy["lib/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
+    authlib["lib/auth*.ts + auth-db.ts<br/>NextAuth · arangojs"]
+  end
+
+  backend["learn backend<br/>:8010"]
+  arango["ArangoDB<br/>:8529"]
+
+  browser --> pages
+  pages --> components
+  components --> state
+  components --> libc
+  libc --> apiroutes
+  apiroutes --> proxy
+  proxy --> backend
+  authlib --> arango
+
+  click pages "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app"
+  click components "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/components"
+  click state "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/contexts"
+  click libc "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/lib"
+  click apiroutes "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app/api/learn"
+  click proxy "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/learn-proxy.ts"
+  click authlib "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/auth-db.ts"
+```
+
+| Layer | Location | What it is |
+|---|---|---|
+| pages | [`app/`](frontend/app) | Route entry points: the `#learn`/`#process` router, `login/`, `reader/` |
+| components | [`components/`](frontend/components) | UI: `learn/` (study surfaces), `tabs/`, `process/`, `ui/` (primitives) |
+| client state | [`contexts/`](frontend/contexts) + [`hooks/`](frontend/hooks) | Selected course scope + reading prefs/theme |
+| client helpers | [`lib/`](frontend/lib) | Typed helpers the components call (table below) |
+| proxy routes | [`app/api/learn/`](frontend/app/api/learn) | ~40 thin handlers → backend (one per backend endpoint) |
+
+Key `lib/` seams:
+
+| File | Purpose |
+|---|---|
+| [`learn-proxy.ts`](frontend/lib/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
+| [`learn-service.ts`](frontend/lib/learn-service.ts) | Shared response type definitions |
+| [`user-db.ts`](frontend/lib/user-db.ts) | Resolves the session's per-user database name (tenancy) |
+| [`auth.ts`](frontend/lib/auth.ts) + [`auth-db.ts`](frontend/lib/auth-db.ts) | NextAuth setup + arangojs user/auth reads |
+| [`courses.ts`](frontend/lib/courses.ts) · [`learn-path.ts`](frontend/lib/learn-path.ts) · [`read-along.ts`](frontend/lib/read-along.ts) | Course listing · prereq path · audiobook/text sync |
 
 ---
 
