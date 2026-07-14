@@ -12,7 +12,6 @@ downloads the MP3 from ``/file``.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
@@ -440,15 +439,8 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
 
 
 # --------------------------------------------------------------------------- #
-# Background job (mirrors extract._JOBS)
+# Background job (on the persistent queue — the "audiobook" kind)
 # --------------------------------------------------------------------------- #
-
-_JOBS: dict[str, dict] = {}
-
-
-def _job_key(doc_id: str, scope: str | None, source: str) -> str:
-    return f"{doc_id}:{scope or 'ALL'}:{source}"
-
 
 def _resolve_doc_id(doc_id: str | None) -> str | None:
     if doc_id:
@@ -457,57 +449,71 @@ def _resolve_doc_id(doc_id: str | None) -> str | None:
     return doc.get("id") if doc else None
 
 
-async def _run_job(key: str, doc_id: str, scope: str | None, source: str, voice: str) -> None:
-    def on_progress(done: int, total: int, current: str | None) -> None:
-        job = _JOBS.get(key)
-        if job and job.get("status") == "running":
-            job["progress"] = {"done": done, "total": total, "current": current}
+def _audio_scope(scope: str | None, source: str) -> str:
+    """Queue key scope for an audiobook — carries the ``source`` dimension the queue's
+    (doc, scope, kind) keying doesn't model, so each source is its own job row."""
+    return f"{scope or ''}::{source}"
 
-    try:
-        summary = await asyncio.to_thread(
-            make_audiobook, doc_id, scope, source, voice, on_progress
-        )
-        if summary.get("error"):
-            _JOBS[key] = {"status": "error", "scope": scope, "docId": doc_id,
-                          "source": source, "error": summary["error"]}
-        else:
-            _JOBS[key] = {"status": "done", "scope": scope, "docId": doc_id,
-                          "source": source, "summary": summary}
-    except Exception as exc:  # noqa: BLE001 — surface in status, never crash the loop
-        _JOBS[key] = {"status": "error", "scope": scope, "docId": doc_id,
-                      "source": source, "error": str(exc)}
+
+def _find_audiobook_job(doc_id: str, scope: str | None, source: str) -> dict | None:
+    from app.platform.jobs import list_builds
+
+    for b in list_builds(doc_id, kind="audiobook").get("builds", []):
+        if b.get("source") == source and (b.get("realScope") or None) == (scope or None):
+            return b
+    return None
+
+
+def run_audiobook(db, job: dict, ctx) -> dict:
+    """``audiobook`` queue runner. make_audiobook keeps its own checkpoint/resume — the
+    queue just dispatches and records status."""
+    doc_id = job["docId"]
+    scope = job.get("realScope")
+    source = job.get("source") or "text"
+    voice = job.get("voice") or DEFAULT_VOICE
+    summary = make_audiobook(doc_id, scope, source, voice, on_progress=ctx.progress)
+    if summary.get("error"):
+        return {"error": summary["error"]}
+    return summary
 
 
 def start_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
                     voice: str = DEFAULT_VOICE) -> dict:
+    from app.platform.jobs import enqueue_build
+
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "error", "error": "no document found"}
-    key = _job_key(doc_id, scope, source)
-    current = _JOBS.get(key)
-    if current and current.get("status") == "running":
-        return {"status": "running", "scope": scope, "docId": doc_id, "source": source,
-                "alreadyRunning": True}
-    _JOBS[key] = {"status": "running", "scope": scope, "docId": doc_id, "source": source}
-    asyncio.create_task(_run_job(key, doc_id, scope, source, voice))
-    return {"status": "running", "scope": scope, "docId": doc_id, "source": source}
+    res = enqueue_build(doc_id, _audio_scope(scope, source), kind="audiobook",
+                        payload={"realScope": scope, "source": source, "voice": voice})
+    if res.get("error"):
+        return {"status": "error", "error": res["error"]}
+    out = {"status": "running", "scope": scope, "docId": doc_id, "source": source}
+    if res.get("already"):
+        out["alreadyRunning"] = True
+    return out
 
 
 def audiobook_status(doc_id: str | None, scope: str | None, source: str = "text") -> dict:
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "idle", "scope": scope, "source": source}
-    key = _job_key(doc_id, scope, source)
-    job = _JOBS.get(key)
-    if job:
-        return job
-    # Not running this session, but a file may already exist from a prior run.
+    # Live queue state (queued / running / error) takes precedence.
+    job = _find_audiobook_job(doc_id, scope, source)
+    if job and job.get("status") in ("queued", "running"):
+        out = {"status": "running", "scope": scope, "docId": doc_id, "source": source}
+        if job.get("total"):
+            out["progress"] = {"done": job.get("done"), "total": job.get("total"), "current": job.get("phase")}
+        return out
+    if job and job.get("status") == "error":
+        return {"status": "error", "scope": scope, "docId": doc_id, "source": source,
+                "error": job.get("error")}
+    # Done or no live job → the MP3 on disk is the source of truth (covers prior-run files).
     path = audiobook_path(doc_id, scope, source)
     if os.path.exists(path):
         return {"status": "done", "scope": scope, "docId": doc_id, "source": source,
                 "summary": {"file": path, "exists": True}}
-    # A checkpoint work dir without a job means a run died (e.g. service restart);
-    # starting the narration again resumes from the last finished chunk.
+    # A checkpoint work dir without a finished file means a run died; re-starting resumes.
     work = _work_dir(doc_id, scope, source)
     manifest = _load_manifest(work)
     if manifest:

@@ -29,7 +29,7 @@ from app.platform.arango import connect_arango
 BUILDS = "chapter_builds"
 META = "learn_meta"
 
-KINDS = ("convert", "build", "extract", "deep", "quizzes", "guides", "skeleton", "orient")
+KINDS = ("convert", "build", "extract", "deep", "quizzes", "guides", "skeleton", "orient", "audiobook")
 
 _worker_lock = threading.Lock()
 _worker_started = False

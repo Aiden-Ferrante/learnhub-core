@@ -14,6 +14,7 @@ from app.pipeline.build import run_build, run_deep, run_extract
 from app.pipeline.ingest import run_convert
 from app.extraction.reading_guide import author_guides_sync
 from app.extraction.skeleton import refresh_orient, refresh_skeleton
+from app.media.audiobook import run_audiobook
 from app.platform import jobs
 from app.study.concept_quiz_llm import author_scope_sync
 
@@ -50,3 +51,4 @@ def install() -> None:
     jobs.register_runner("guides", _run_guides)
     jobs.register_runner("skeleton", _run_skeleton)
     jobs.register_runner("orient", _run_orient)
+    jobs.register_runner("audiobook", run_audiobook)
