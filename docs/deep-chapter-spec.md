@@ -42,7 +42,7 @@ studying.
 
 ## 2. Current-state map (what to reuse)
 
-### Backend (`assets/deploy/services/learn/app/`)
+### Backend (`backend/app/`)
 - Ingest → concepts: `extract_routes.py` → `extract.py::start_extraction` /
   `_run_job` → `concepts_extract.py::extract_concepts_document` (bounded via
   `asyncio.Semaphore(concurrency)`).
@@ -63,7 +63,7 @@ studying.
 - Typed elements: `elements` collection (figure/table/equation/code, page + bbox +
   sectionKey), toggled by `LEARN_EXTRACT_ELEMENTS`.
 
-### Frontend (`assets/frontend/`)
+### Frontend (`frontend/`)
 - Router: `components/tabs/LearnTab.tsx` (views: shelf|home|lesson|read|concepts|
   drill|dump|ask). Study surface: `components/learn/lesson-view.tsx` (9 conditional
   modes). Readers: `guided-reader.tsx`, `chapter-reader.tsx`, `book-reader.tsx`,

@@ -1,0 +1,279 @@
+# Learn Hub Docker Compose - ArangoDB + Ollama (Default)
+#
+# Default stack tested and working on DGX Spark
+#
+# Usage:
+#   ./start.sh                    # Default: ArangoDB + Ollama
+#   ./start.sh --vector-search    # Add Qdrant + Sentence Transformers
+#
+# For Neo4j + vLLM, use: ./start.sh --vllm
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/app/Dockerfile
+    ports:
+      - '3001:3000'
+    environment:
+      # ArangoDB configuration
+      - ARANGODB_URL=http://arangodb:8529
+      - ARANGODB_DB=learnhub
+      - ARANGODB_USER=root
+      - ARANGODB_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
+      - GRAPH_DB_TYPE=arangodb
+      # Auth.js (login sessions)
+      - AUTH_SECRET=${AUTH_SECRET:?set in compose/.env}
+      - AUTH_TRUST_HOST=true
+      # Disable Neo4j
+      - NEO4J_URI=bolt://localhost:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password123
+      # Ollama configuration
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - OLLAMA_MODEL=nemotron-3-nano:30b
+      # vLLM disabled in default Ollama mode
+      # - VLLM_BASE_URL=http://localhost:8001/v1
+      - VLLM_MODEL=disabled
+      # Vector DB configuration
+      - QDRANT_URL=http://qdrant:6333
+      - VECTOR_DB_TYPE=qdrant
+      # Embeddings configuration
+      - LANGCHAIN_TRACING_V2=true
+      - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
+      - MODEL_NAME=all-MiniLM-L6-v2
+      - EMBEDDINGS_API_URL=http://sentence-transformers:80
+      # Other settings
+      - GRPC_SSL_CIPHER_SUITES=HIGH+ECDSA:HIGH+aRSA
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NODE_OPTIONS=--max-http-header-size=80000
+      - UV_THREADPOOL_SIZE=128
+      - HTTP_TIMEOUT=1800000
+      - REQUEST_TIMEOUT=1800000
+      - LEARN_SERVICE_URL=http://learn:8000
+    volumes:
+      - learnhub_shared:/shared
+    networks:
+      - default
+      - learnhub-network
+      - qdrant-net
+    depends_on:
+      arangodb:
+        condition: service_started
+      ollama:
+        condition: service_started
+      learn:
+        condition: service_started
+
+  # Python learning app (placeholder UI; same ArangoDB + shared volume as the learn service)
+  learn:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    ports:
+      - '127.0.0.1:8010:8000'
+    environment:
+      - ARANGODB_URL=http://arangodb:8529
+      - ARANGODB_DB=learnhub
+      - ARANGODB_USER=root
+      - ARANGODB_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
+      - SHARED_DIR=/shared
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - OLLAMA_MODEL=nemotron-3-nano:30b
+      # Quizzes use the deterministic triple-based builder (no LLM) so studying never loads a
+      # model — concept extraction is the only LLM workload. Set to 1 to re-enable LLM quizzes.
+      - LEARN_QUIZ_LLM=0
+      # Model that authors the higher-order concept quiz MCQs (apply/distinguish/why) + the critic
+      # revision pass. A fast 8B instruct model keeps one-time background authoring practical
+      # (~1 min/concept); the big reasoning default would be ~10 min/concept. Empty = OLLAMA_MODEL.
+      - LEARN_QUIZ_AUTHOR_MODEL=gemma4:latest
+      # PDF->Markdown converter: "docling" (higher fidelity) | "pymupdf" (lightweight fallback)
+      - LEARN_CONVERTER=docling
+      # Docling's torch/table/layout models run on the GB10 GPU (cu130 wheel in the image).
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Vault seam (synergy #1): where to POST distilled seedlings. Empty by
+      # default = the learn-hub seedling_client no-ops. Set VAULTWRITER_URL in
+      # compose/.env (e.g. http://host.docker.internal:8799) once the vaultwriter
+      # service is running on the host, then `docker compose build learn && up -d learn`.
+      - VAULTWRITER_URL=${VAULTWRITER_URL:-}
+    extra_hosts:
+      # lets the container reach the host's localhost vaultwriter seam on Linux
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - learnhub_shared:/shared
+    networks:
+      - default
+    depends_on:
+      arangodb:
+        condition: service_started
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ArangoDB - Graph database
+  arangodb:
+    image: arangodb:latest
+    ports:
+      - '127.0.0.1:8529:8529'
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+      - arangodb_apps_data:/var/lib/arangodb3-apps
+    networks:
+      - default
+    restart: unless-stopped
+
+  # ArangoDB initialization - create database
+  arangodb-init:
+    image: arangodb:latest
+    depends_on:
+      arangodb:
+        condition: service_started
+    restart: on-failure
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
+    entrypoint: >
+      sh -c "
+        echo 'Waiting for ArangoDB to start...' &&
+        sleep 10 &&
+        echo 'Creating learnhub database...' &&
+        arangosh --server.endpoint tcp://arangodb:8529 --server.username root --server.password \"$$ARANGO_ROOT_PASSWORD\" --javascript.execute-string 'try { db._createDatabase(\"learnhub\"); console.log(\"Database learnhub created successfully!\"); } catch(e) { if(e.message.includes(\"duplicate\")) { console.log(\"Database learnhub already exists\"); } else { throw e; } }'
+      "
+    networks:
+      - default
+
+  # Ollama - Local LLM inference (first build mostly pulls ollama/ollama base image; can take many minutes)
+  ollama:
+    build:
+      context: ../services/ollama
+      dockerfile: Dockerfile
+    image: ollama-custom:latest
+    container_name: ollama-compose
+    ports:
+      - '127.0.0.1:11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_VISIBLE_DEVICES=0
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=30m
+      # KV-cache safety lives in NUM_PARALLEL=1 + the 16K context cap below (the old
+      # crash was NUM_PARALLEL=4 × a million-token context, NOT the model count).
+      # So we keep NUM_PARALLEL=1 but allow 4 resident models = 4 "slots": lets a
+      # coder + general + embed + vision model coexist warm without evict-churn.
+      # Safe on the 121GB unified pool — several small/medium weights fit in headroom,
+      # and Ollama's scheduler refuses to load a model that wouldn't fit (no OOM from
+      # slots — a too-big model just evicts an idle one or queues). Big 40GB+ weights
+      # still can't all be warm at once; use the GUI's memory readout to watch headroom.
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=4
+      # Cap the per-model context so a million-token-capable model can't size its KV cache
+      # to the full window. 16K is ample for per-section extraction; raise if needed.
+      - OLLAMA_CONTEXT_LENGTH=16384
+      - OLLAMA_KV_CACHE_TYPE=q8_0
+      - OLLAMA_GPU_LAYERS=-1
+      - OLLAMA_LLM_LIBRARY=cuda_v13
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Vector search services
+  sentence-transformers:
+    build:
+      context: ../services/sentence-transformers
+      dockerfile: Dockerfile
+    ports:
+      - '127.0.0.1:8000:80'
+    environment:
+      - MODEL_NAME=all-MiniLM-L6-v2
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - vector-search
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - qdrant-net
+    restart: unless-stopped
+    profiles:
+      - vector-search
+
+  qdrant-init:
+    image: curlimages/curl:latest
+    depends_on:
+      - qdrant
+    restart: "no"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo 'Waiting for Qdrant to start...'
+        sleep 5
+        curl -X PUT http://qdrant:6333/collections/entity-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        curl -X PUT http://qdrant:6333/collections/document-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        echo 'Collections created'
+    networks:
+      - qdrant-net
+    profiles:
+      - vector-search
+
+volumes:
+  arangodb_data:
+  arangodb_apps_data:
+  ollama_data:
+  qdrant_data:
+  learnhub_shared:
+
+networks:
+  default:
+    driver: bridge
+  learnhub-network:
+    driver: bridge
+  qdrant-net:
+    name: qdrant-network

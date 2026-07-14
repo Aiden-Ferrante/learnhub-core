@@ -4,7 +4,7 @@ A shared vocabulary for every screen, panel, button, and display in the Learn Hu
 frontend. When you want to change something, point at its **name** here and I'll know
 exactly which element and source file you mean.
 
-- Frontend root: `assets/frontend/`
+- Frontend root: `frontend/`
 - Every entry cites its **source file + approx line + component** in parentheses so a
   change request maps straight to code.
 - Naming convention: where an element has visible text I use that text in quotes
@@ -39,9 +39,9 @@ Login page  ──►  LEARN (the whole app)
                    └─ Process sub-page ........ build chapter concept layers  (via "Process" button)
 ```
 
-- The top-level router lives in [app/page.tsx](../assets/frontend/app/page.tsx); it defaults to `#learn` and
+- The top-level router lives in [app/page.tsx](../frontend/app/page.tsx); it defaults to `#learn` and
   shows a **"Back to courses" link** (top-left chevron) whenever you're on Upload/Configure.
-- `LearnTab` ([components/tabs/LearnTab.tsx](../assets/frontend/components/tabs/LearnTab.tsx)) is a **pure router** with no chrome of
+- `LearnTab` ([components/tabs/LearnTab.tsx](../frontend/components/tabs/LearnTab.tsx)) is a **pure router** with no chrome of
   its own — it just swaps between the views above based on where you clicked.
 - **Study always lands in Deep Chapter.** Every "study / quiz / review / exam" entry point
   opens the Deep Chapter surface, sometimes with a side **drawer** already open.
@@ -64,7 +64,7 @@ Login page  ──►  LEARN (the whole app)
 
 ## 1. Login page
 
-Route [app/login/page.tsx](../assets/frontend/app/login/page.tsx). A single centered card.
+Route [app/login/page.tsx](../frontend/app/login/page.tsx). A single centered card.
 
 - **Login card** — the bordered, centered box holding everything. (`login/page.tsx` ~46, `LoginForm`)
 - **Brand mark + "Learn Hub" heading** — the graph logo over the gradient "Learn Hub" wordmark and "Sign in to your workspace" subtitle. (`login/page.tsx` ~48)
@@ -102,7 +102,7 @@ Titled **"Settings"**, opened by the gear. A **category dropdown** switches pane
 ## 3. Course Shelf
 
 The landing grid of all courses. Two columns: **groups sidebar** (left) + **course grid** (right).
-([components/learn/course-shelf.tsx](../assets/frontend/components/learn/course-shelf.tsx), `CourseShelf`)
+([components/learn/course-shelf.tsx](../frontend/components/learn/course-shelf.tsx), `CourseShelf`)
 
 ### Shelf header (top bar)
 - **"Learn" title + subtitle** — cap icon + "Learn" + "Your courses — each one built from a document you processed." (`course-shelf.tsx` ~321)
@@ -136,7 +136,7 @@ The landing grid of all courses. Two columns: **groups sidebar** (left) + **cour
 
 ## 4. Course Home
 
-One course's dashboard. ([components/learn/course-home.tsx](../assets/frontend/components/learn/course-home.tsx), `CourseHome`)
+One course's dashboard. ([components/learn/course-home.tsx](../frontend/components/learn/course-home.tsx), `CourseHome`)
 
 ### Breadcrumb
 - **"Courses" back link** (top-left chevron → shelf) + **course-title breadcrumb**. (`course-home.tsx` ~270)
@@ -178,7 +178,7 @@ Header "Practice" over up to three tiles. (`PracticeTile`, `course-home.tsx` ~36
 
 The richest surface: header chrome, a **path rail**, the annotated **reader spine**, margin
 notes, popovers, and slide-in **study drawers**. Every "study" action lands here.
-([components/learn/deep-chapter.tsx](../assets/frontend/components/learn/deep-chapter.tsx), `DeepChapter`)
+([components/learn/deep-chapter.tsx](../frontend/components/learn/deep-chapter.tsx), `DeepChapter`)
 
 ### Header
 - **Course back button** — chevron + course title → back to course. (`deep-chapter.tsx` ~1040)
@@ -221,7 +221,7 @@ notes, popovers, and slide-in **study drawers**. Every "study" action lands here
 ## 6. Other reading surfaces
 
 ### Book Reader (lighter chapter reader with syllabus sidebar)
-([components/learn/book-reader.tsx](../assets/frontend/components/learn/book-reader.tsx), `BookReader`)
+([components/learn/book-reader.tsx](../frontend/components/learn/book-reader.tsx), `BookReader`)
 - **"Course outline" back button** (chevron + text) / **course-title label**. (`book-reader.tsx` ~161)
 - **Float reader button** — picture-in-picture icon; always-on-top floating window. (`book-reader.tsx` ~172)
 - **Pop out reader button** — external-link icon; opens the `/reader` route in a new window. (`book-reader.tsx` ~182)
@@ -229,20 +229,20 @@ notes, popovers, and slide-in **study drawers**. Every "study" action lands here
 - **Syllabus sidebar (left pane)** + **pane resize handle** + **reader pane**. (`book-reader.tsx` ~205)
 
 ### Chapter Reader (the shared chapter pane; also the pop-out /reader window)
-([components/learn/chapter-reader.tsx](../assets/frontend/components/learn/chapter-reader.tsx), `ChapterReader`)
+([components/learn/chapter-reader.tsx](../frontend/components/learn/chapter-reader.tsx), `ChapterReader`)
 - **Sticky "you are here" bar** — **Prev / Next chapter buttons**, **chapter title/breadcrumb**, **page badge ("p.N")**, **chapter counter ("3/12")**, **Find button**, and a thin **reading-progress bar**. (`chapter-reader.tsx` ~217)
 - **Find-in-chapter box** — floating "Find in chapter" input + **match counter** + up/down/close. (`chapter-reader.tsx` ~273)
 - **Chapter content area** + **"Top" scroll-to-top button**. (`chapter-reader.tsx` ~301, ~331)
-- The pop-out window ([app/reader/page.tsx](../assets/frontend/app/reader/page.tsx)) wraps this with a **"Toggle outline" button** and the theme toggle in its own top bar.
+- The pop-out window ([app/reader/page.tsx](../frontend/app/reader/page.tsx)) wraps this with a **"Toggle outline" button** and the theme toggle in its own top bar.
 
 ### PDF Book View (the raw source PDF)
-([components/learn/pdf-book-view.tsx](../assets/frontend/components/learn/pdf-book-view.tsx), `PdfBookView`)
+([components/learn/pdf-book-view.tsx](../frontend/components/learn/pdf-book-view.tsx), `PdfBookView`)
 - **Course back button** + **"Original PDF" badge**. (`pdf-book-view.tsx` ~102)
 - **"Window" button** (open PDF in its own window) + **"Full screen" / "Exit" button**. (`pdf-book-view.tsx` ~111)
 - **PDF iframe** — the native viewer. Falls back to Book Reader when no PDF exists. (`pdf-book-view.tsx` ~134)
 
 ### Chapter Walk (the top-down "learn the chapter" walkthrough)
-The **walk drawer** opened by "Learn top-down". ([components/learn/chapter-walk.tsx](../assets/frontend/components/learn/chapter-walk.tsx), `ChapterWalk`)
+The **walk drawer** opened by "Learn top-down". ([components/learn/chapter-walk.tsx](../frontend/components/learn/chapter-walk.tsx), `ChapterWalk`)
 - **Step title** + **step counter ("Step N / M")**. (`chapter-walk.tsx` ~215)
 - **Recall step** — **recall prompt**, **recall textarea**, **"Reveal" button**, **revealed section list**, and **self-grade buttons** ("Missed a lot" / "Partial" / "Most of it" / "Nailed it") + **"Try again"**. (`chapter-walk.tsx` ~241)
 - **Concept step** — embeds the **Section concepts panel** (§9). (`chapter-walk.tsx` ~324)
@@ -267,13 +267,13 @@ A shared **AnswerFeedback banner** (brand-tinted callout with the concept's "why
 (`answer-feedback.tsx`, `AnswerFeedback`)
 
 ### Concept Quiz ("which concept matches this description?")
-([components/learn/concept-quiz-panel.tsx](../assets/frontend/components/learn/concept-quiz-panel.tsx), `ConceptQuizPanel`)
+([components/learn/concept-quiz-panel.tsx](../frontend/components/learn/concept-quiz-panel.tsx), `ConceptQuizPanel`)
 - **Question stem** + **answer choice buttons** (numbered 1–9 key badges). (`~154`)
 - **Application-questions status strip** ("Writing application questions… n/total") + **"Prepare all" button**. (`~127`)
 - **Result verdict line** ("✓ Correct" / "✗ Answer: …") + **feedback banner** + **"Next" button** (↵). (`~184`)
 
 ### Review (spaced repetition)
-([components/learn/review-panel.tsx](../assets/frontend/components/learn/review-panel.tsx), `ReviewPanel`)
+([components/learn/review-panel.tsx](../frontend/components/learn/review-panel.tsx), `ReviewPanel`)
 - **Queue counter** ("N due · N new") + **position counter** + **progress bar**. (`~140`)
 - **Concept name heading** + **kind badge** + **recall prompt** ("Recall what this concept means."). (`~157`)
 - **"Reveal" button** (space) → **revealed signal + source**. (`~169`)
@@ -281,32 +281,32 @@ A shared **AnswerFeedback banner** (brand-tinted callout with the concept's "why
 - **Empty/done state** — "🎉 Session done — N reviewed" + **"Review again" button**. (`~109`)
 
 ### Drill (adaptive weak-spot practice)
-([components/learn/drill-view.tsx](../assets/frontend/components/learn/drill-view.tsx), `DrillView`)
+([components/learn/drill-view.tsx](../frontend/components/learn/drill-view.tsx), `DrillView`)
 - **"Back" button** + header "Practice your weak spots". (`~127`)
 - **Question stem** + **answer choice buttons** (pick = *pending*, not submitted). (`~257`)
 - **Confidence buttons** — "Guessing" (1) / "Shaky" (2) / "Confident" (3) commit the answer. (`~283`)
 - **Result** — **score line**, **calibration panel** ("how often each confidence level was actually right"), **missed-concepts list**, **"Drill again"** / **"Done"**. (`~178`)
 
 ### Exam (chapter exam)
-([components/learn/exam-panel.tsx](../assets/frontend/components/learn/exam-panel.tsx), `ExamPanel`)
+([components/learn/exam-panel.tsx](../frontend/components/learn/exam-panel.tsx), `ExamPanel`)
 - **Start header** "Chapter exam" + **"Start exam" button** (shows "Pass mark is N%"). (`~198`)
 - **Question counter** + **"Chapter exam · pass N%" label** + **progress bar** + **answer choices** (no per-question feedback). (`~162`)
 - **Result score dial** (green pass / amber fail) + **verdict line** + **per-question result list** (✓/✗, wrong answers show the feedback banner) + **"Retake exam" button**. (`~114`)
 
 ### Free Recall / Brain Dump
-([components/learn/dump-view.tsx](../assets/frontend/components/learn/dump-view.tsx), `DumpView`)
+([components/learn/dump-view.tsx](../frontend/components/learn/dump-view.tsx), `DumpView`)
 - **"Back" button** + header "Free recall" + optional **chapter selector**. (`~53`)
 - **Brain-dump textarea** ("Brain-dump here…") + **"Check what I remembered" button**. (`~100`)
 - **Coverage score** ("N% of M concepts recalled") + **Gaps section** (amber chips) + **Recalled section** (emerald chips) + **"Try again"** / **"Done"**. (`~115`)
 
 ### Lesson Panel (guided per-concept walkthrough)
-([components/learn/lesson-panel.tsx](../assets/frontend/components/learn/lesson-panel.tsx), `LessonPanel`)
+([components/learn/lesson-panel.tsx](../frontend/components/learn/lesson-panel.tsx), `LessonPanel`)
 - **"Lesson" label** + **position counter** + **concept card** (name / kind badge / signal / source). (`~90`)
 - **"Needs review" button** (grade Again) / **"Got it" button** (grade Good). (`~112`)
 - **Lesson-complete state** + **"Start over" button**. (`~74`)
 
 ### Lock-In Panel (chapter wrap-up)
-([components/learn/lockin-panel.tsx](../assets/frontend/components/learn/lockin-panel.tsx), `LockInPanel`)
+([components/learn/lockin-panel.tsx](../frontend/components/learn/lockin-panel.tsx), `LockInPanel`)
 - Header "Lock it in" + **prerequisite checklist** ("Skeleton recalled" / "Chapter exam passed"). (`~68`)
 - **"Into spaced review" card** + **"Up next" card** (with **"Continue"**). (`~78`)
 - **"Mark chapter complete" button** → **locked confirmation banner** ("Chapter complete — nice work."). (`~103`)
@@ -316,30 +316,30 @@ A shared **AnswerFeedback banner** (brand-tinted callout with the concept's "why
 ## 9. Concepts & side panels
 
 ### Concepts View (browse every concept in a course)
-([components/learn/concepts-view.tsx](../assets/frontend/components/learn/concepts-view.tsx), `ConceptsView`)
+([components/learn/concepts-view.tsx](../frontend/components/learn/concepts-view.tsx), `ConceptsView`)
 - **"Back" button** + **breadcrumb** ("<course> · Concepts") + **concept-count chip** + **"Study" button** (→ review session). (`~145`)
 - **"Ready to learn" panel** — concepts whose prereqs are all mastered, as **ready-to-learn chips**. (`~171`)
 - **Section group heading** + a list of **concept cards**. (`~194`)
 
 ### Concept Card (one expandable concept row)
-([components/learn/concept-card.tsx](../assets/frontend/components/learn/concept-card.tsx), `ConceptCard`)
+([components/learn/concept-card.tsx](../frontend/components/learn/concept-card.tsx), `ConceptCard`)
 - Colored left-edge by kind; **card expand/collapse toggle**, **mastery dot**, **concept name**, **kind badge**, **"also in …" badge**, **page badge**, **"Open concept lesson" button**, **signal line**, and (expanded) **source passage** / **"Prerequisites:" line** / **Q&A list**. (`~56`)
 
 ### Concept Detail (focused single-concept lesson)
-([components/learn/concept-detail.tsx](../assets/frontend/components/learn/concept-detail.tsx), `ConceptDetail`)
+([components/learn/concept-detail.tsx](../frontend/components/learn/concept-detail.tsx), `ConceptDetail`)
 - **"Back" button**, **concept title** + **kind badge** + **location subline**. (`~64`)
 - **"Learn first:" locked banner** (amber, clickable prereq links) when gated. (`~84`)
 - **Explanation body** + **"From the text" passage** + **"Prerequisites" chips** + **"Test yourself" cards** (each with **"Show answer"**). (`~105`)
 - **"How well did you recall this?" grader** — "Again" / "Hard" / "Good" / "Easy". (`~163`)
 
 ### Section Concepts Panel (active recall for one section)
-([components/learn/section-concepts-panel.tsx](../assets/frontend/components/learn/section-concepts-panel.tsx), `SectionConceptsPanel`)
+([components/learn/section-concepts-panel.tsx](../frontend/components/learn/section-concepts-panel.tsx), `SectionConceptsPanel`)
 - **Recall prompt header** + **marked-count badge** ("3/8"). (`~411`)
 - **Concept recall row** — **row toggle** reveals the definition; **status marker** (check / "~" fuzzy / hollow); **"Described it" button** + **"Fuzzy" button**. (`ConceptRecallRow`, `~231`)
 - **Quick Check** — dashed **"Quick check" launch button** → a 2-question inline MCQ with **answer choices**, **result marker**, **"Next"**, and the feedback banner. (`ConceptQuickCheck`, `~101`)
 
 ### Ask this book (semantic search / grounded Q&A)
-([components/learn/ask-panel.tsx](../assets/frontend/components/learn/ask-panel.tsx), `AskPanel`)
+([components/learn/ask-panel.tsx](../frontend/components/learn/ask-panel.tsx), `AskPanel`)
 - **"Course" back button** + **"Ask this book" heading**. (`~76`)
 - **Mode toggle** — "Ask" (grounded answer) / "Search" (semantic). (`~95`)
 - **Query input box** + **Run button** ("Ask" / "Search"). (`~113`)
@@ -348,33 +348,33 @@ A shared **AnswerFeedback banner** (brand-tinted callout with the concept's "why
 - **Search-results list** — **search-result cards** with snippet → open section. (`~192`)
 
 ### Audiobook Panel (chapter narration → MP3)
-([components/learn/audiobook-panel.tsx](../assets/frontend/components/learn/audiobook-panel.tsx), `AudiobookPanel`)
+([components/learn/audiobook-panel.tsx](../frontend/components/learn/audiobook-panel.tsx), `AudiobookPanel`)
 - **"Audiobook" header** ("narrated locally by Orpheus"). (`~162`)
 - **"Narrate" source toggle** — "Full text" / "Guided" / "Concept summary". (`~168`)
 - **"Voice" dropdown** + **Generate button** ("Generate audiobook" / "Generating…" / "Regenerate"). (`~193`)
 - **Progress bar + status** + **audio player** + **"Speed" selector** + **"Download MP3" link**. (`~224`)
 
 ### Syllabus Tree (the course outline sidebar)
-([components/learn/syllabus-tree.tsx](../assets/frontend/components/learn/syllabus-tree.tsx), `SyllabusTree`)
+([components/learn/syllabus-tree.tsx](../frontend/components/learn/syllabus-tree.tsx), `SyllabusTree`)
 - **"Filter sections…" search box** + scrollable **tree rows**. (`~336`)
 - **Tree row** — **expand/collapse chevron**, **section mastery dot**, **row title button** (selects the section), **concept-count badge**, **mastery-% badge**. (`TreeRow`, `~141`)
 - **Extract button** — per-section sparkles/loader/check/warning icon; kicks off background concept extraction. (`ExtractButton`, `~30`)
 - **"Clear selection (study whole graph)" button** at the bottom. (`~365`)
 
 ### TOC Section Selector (choose which sections to process)
-([components/toc-section-selector.tsx](../assets/frontend/components/toc-section-selector.tsx), `TocSectionSelector`)
+([components/toc-section-selector.tsx](../frontend/components/toc-section-selector.tsx), `TocSectionSelector`)
 - **"Select all" / "Select none" / "Expand all" / "Collapse all"** + **selection-count text**. (`~182`)
 - **Node rows** — **expand/collapse chevron** + tri-state **section checkbox** (indeterminate for partial subtrees) + **section label**. (`TreeNodeRow`, `~63`)
 
 ### Shortcuts Help (keyboard cheat-sheet)
-([components/learn/shortcuts-help.tsx](../assets/frontend/components/learn/shortcuts-help.tsx), `ShortcutsHelp`)
+([components/learn/shortcuts-help.tsx](../frontend/components/learn/shortcuts-help.tsx), `ShortcutsHelp`)
 - **Shortcuts dialog** — opened by pressing **"?"**; title "Keyboard shortcuts", grouped "Learning path / Review / Quiz / Reader / General". (`~84`)
 
 ---
 
 ## 10. Upload sub-page
 
-Reached via the **"Upload" button**; return via **"Back to courses"**. ([components/tabs/UploadTab.tsx](../assets/frontend/components/tabs/UploadTab.tsx), `UploadTab`)
+Reached via the **"Upload" button**; return via **"Back to courses"**. ([components/tabs/UploadTab.tsx](../frontend/components/tabs/UploadTab.tsx), `UploadTab`)
 
 - **"Upload Documents" card** (top-left) — holds the **file drop zone**: dashed target with "Drag & Drop Files" / "or browse files" and the accepted-types chip ".md, .csv, .txt, .json, .pdf (auto-convert)". Shows a **"Converting PDF…" state** and an **error banner**. (`upload-documents.tsx` ~96, `UploadDocuments`)
 - **"Storage Connections" card** (left rail) — wraps the DB-connection widget. (`UploadTab.tsx` ~43)
@@ -385,7 +385,7 @@ Reached via the **"Upload" button**; return via **"Back to courses"**. ([compone
 ## 11. Process / Configure sub-page
 
 The nav "Configure" opens a screen titled **"Process"**. Reached via the **"Process" button**.
-([components/process/process-dashboard.tsx](../assets/frontend/components/process/process-dashboard.tsx), `ProcessDashboard`; wrapped by `ConfigureTab`)
+([components/process/process-dashboard.tsx](../frontend/components/process/process-dashboard.tsx), `ProcessDashboard`; wrapped by `ConfigureTab`)
 
 - **Process header** — lightning tile + "Process" + subtitle; **"Refresh" button** top-right. (`~205`)
 - **Book picker** — a row of pill buttons, one per document; active pill highlighted. (`~221`)
@@ -412,6 +412,6 @@ Recurring pieces worth naming once so we mean the same thing everywhere:
 
 ---
 
-*Generated by walking every frontend component under `assets/frontend/`. If a name here
+*Generated by walking every frontend component under `frontend/`. If a name here
 feels wrong, tell me the better name and I'll update this file — it's meant to be the
 canonical vocabulary we both use.*

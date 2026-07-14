@@ -217,7 +217,7 @@ A/B distilled cards vs raw-triple cards using the existing mastery metric as the
 ## 7. Sequencing, rebuild & test notes
 
 - All backend work is in the **Learn service** (Python). Code is COPIED into the image —
-  each change needs `docker compose build learn && up -d learn` from `assets/deploy/compose`.
+  each change needs `docker compose build learn && up -d learn` from `deploy/compose`.
   Recreating `learn` does **not** touch Ollama.
 - Clustering/mastery math goes in **pure functions** with `tests/` (no DB), matching the
   existing test style (`test_arango_tree.py`, `test_mastery.py`).
