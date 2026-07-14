@@ -307,6 +307,63 @@ Key `lib/` seams:
 
 ---
 
+## 4. Inside the extraction package
+
+Extraction is the app's core feature, so here is the folder one level deeper. The pipeline
+itself is only three files (teal): [`extract.py`](backend/app/extraction/extract.py) loads a
+chapter's sections and builds the prompt, [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
+calls the LLM and writes concepts, and [`concept_store.py`](backend/app/extraction/concept_store.py)
+is the read side. Two entry points (purple) trigger it. Four other LLM *generation passes*
+(coral) live in the folder but are triggered independently — only `deep_chapter` runs as part
+of extraction, as the eager overlay after concepts are written.
+[`arango_learn.py`](backend/app/extraction/arango_learn.py) (gray) is dead legacy from the
+pruned triple pipeline. Two dependencies live outside the folder: `concepts_extract` calls
+`platform/llm.py` for the model, and `build_job` is invoked by `platform/jobs.py` (the queue).
+
+```mermaid
+flowchart TD
+  build["build_job.py<br/>build job runner"]
+  runner["runner.py<br/>legacy extract job"]
+  extract["extract.py<br/>sections + prompt"]
+  concepts["concepts_extract.py<br/>LLM → concepts"]
+  store["concept_store.py<br/>read concepts"]
+  deep["deep_chapter.py<br/>briefing + explain"]
+  skeleton["skeleton.py<br/>chapter essences"]
+  guide["reading_guide.py<br/>section guides"]
+  augment["augment.py<br/>objectives + recap"]
+  legacy["arango_learn.py<br/>legacy triple layer"]
+
+  build --> concepts
+  runner --> concepts
+  extract --> concepts
+  concepts -->|concepts| store
+  concepts -->|eager| deep
+
+  classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
+  classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+  classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
+  classDef old fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+  class build,runner trig;
+  class extract,concepts,store core;
+  class deep,skeleton,guide,augment pass;
+  class legacy old;
+
+  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/build_job.py"
+  click runner "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/runner.py"
+  click extract "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/extract.py"
+  click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concepts_extract.py"
+  click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concept_store.py"
+  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/deep_chapter.py"
+  click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/skeleton.py"
+  click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/reading_guide.py"
+  click augment "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/augment.py"
+  click legacy "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/arango_learn.py"
+```
+
+Color key: purple = triggers · teal = extraction core · coral = generation passes · gray = legacy.
+
+---
+
 ## Where to start reading
 
 Floor first (small, everything builds on these), then trace one journey:
