@@ -12,7 +12,7 @@ import random
 import time
 import uuid
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import ensure_questions_async, servable_from_cached

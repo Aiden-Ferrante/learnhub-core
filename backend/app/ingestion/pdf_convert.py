@@ -41,7 +41,7 @@ def find_existing_ingest(data: bytes) -> dict | None:
     """The already-ingested document with this exact content, or None. Best-effort:
     any DB trouble reads as "no duplicate" so ingestion never breaks on the check."""
     try:
-        from app.content.arango_tree import connect_arango
+        from app.platform.arango import connect_arango
 
         db = connect_arango()
         if not db.has_collection("documents"):

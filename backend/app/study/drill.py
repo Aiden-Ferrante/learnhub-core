@@ -12,7 +12,7 @@ import random
 import time
 import uuid
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.exam import _doc_pool
 from app.extraction.extract import _load_section_blocks

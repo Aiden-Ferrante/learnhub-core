@@ -25,7 +25,7 @@ from pathlib import Path
 
 from arango.database import StandardDatabase
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 
 DOCUMENTS = "documents"
 SECTION_CONTENT = "section_content"

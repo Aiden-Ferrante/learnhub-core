@@ -20,7 +20,8 @@ from typing import Any
 from arango.database import StandardDatabase
 
 from app.extraction.arango_learn import content_triples_for_section, triple_id
-from app.content.arango_tree import connect_arango, get_toc_tree
+from app.content.arango_tree import get_toc_tree
+from app.platform.arango import connect_arango
 
 EVENTS_COLLECTION = "study_events"
 

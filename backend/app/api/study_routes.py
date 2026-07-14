@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.extraction.arango_learn import (
     fetch_triples_or_error,
     triple_id,

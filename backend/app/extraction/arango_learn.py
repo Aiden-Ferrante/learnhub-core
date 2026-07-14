@@ -13,9 +13,9 @@ from arango.exceptions import ArangoError
 from app.content.arango_tree import (
     HIERARCHY_PREDICATE,
     MENTIONS_PREDICATE,
-    connect_arango,
     fetch_section_mentions_by_section,
 )
+from app.platform.arango import connect_arango
 
 DEFAULT_SKIP_PREDICATES = (HIERARCHY_PREDICATE, MENTIONS_PREDICATE)
 MAX_EDGES_SECTION = 200

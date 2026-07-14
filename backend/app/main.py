@@ -15,7 +15,8 @@ from app.content.arango_content import (
     figure_path,
 )
 from app.api.admin_routes import router as admin_router
-from app.content.arango_tree import get_toc_tree, set_request_db_name
+from app.content.arango_tree import get_toc_tree
+from app.platform.arango import set_request_db_name
 from app.api.audiobook_routes import router as audiobook_router
 from app.api.learning_path_routes import router as learning_path_router
 from app.api.build_routes import router as build_router

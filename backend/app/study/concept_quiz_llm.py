@@ -24,7 +24,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.study.concept_quiz_gen import _name_variants
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import AuthoredSet

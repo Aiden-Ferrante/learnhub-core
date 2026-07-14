@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import html
-import os
 import re
-from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
-from arango import ArangoClient
 from arango.database import StandardDatabase
 from arango.exceptions import ArangoError
+
+from app.platform.arango import _get_db
 
 # The structural-edge predicates in the relationships collection.
 HIERARCHY_PREDICATE = "has_subsection"
@@ -43,27 +42,6 @@ class TreeNode:
             "concepts": self.concepts if is_section else [],
             "children": [c.as_dict() for c in self.children],
         }
-
-
-# Per-request database override (multi-tenancy). Set from the X-User-Db header
-# by middleware in main.py; falls back to the env default when absent.
-_REQUEST_DB_NAME: ContextVar[str | None] = ContextVar("request_db_name", default=None)
-_DB_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
-
-
-def set_request_db_name(db_name: str | None) -> None:
-    if db_name and not _DB_NAME_RE.match(db_name):
-        db_name = None
-    _REQUEST_DB_NAME.set(db_name)
-
-
-def _get_db() -> StandardDatabase:
-    url = (os.environ.get("ARANGODB_URL") or "http://localhost:8529").rstrip("/")
-    db_name = _REQUEST_DB_NAME.get() or os.environ.get("ARANGODB_DB") or "learnhub"
-    user = os.environ.get("ARANGODB_USER") or "root"
-    password = os.environ.get("ARANGODB_PASSWORD") or ""
-    client = ArangoClient(hosts=url)
-    return client.db(db_name, username=user, password=password)
 
 
 TOC_NUMERIC = re.compile(r"^toc:(\d+(?:\.\d+)*)$")
@@ -545,7 +523,3 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     enrich_tree_with_section_mentions(forest_nodes, mentions_by_section)
     return [n.as_dict() for n in forest_nodes], section_count, None, mention_edge_count
 
-
-def connect_arango() -> StandardDatabase:
-    """Return database handle for other learn modules (e.g. study / AQL)."""
-    return _get_db()

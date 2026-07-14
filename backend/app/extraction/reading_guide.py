@@ -16,7 +16,7 @@ import time
 from typing import Any
 
 from app.content.arango_content import fetch_latest_document
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ReadingGuide

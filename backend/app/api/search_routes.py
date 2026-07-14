@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.content.arango_tree import connect_arango
+from app.platform.arango import connect_arango
 from app.search.semantic_search import ask, ensure_index, index_status, semantic_search
 
 router = APIRouter()

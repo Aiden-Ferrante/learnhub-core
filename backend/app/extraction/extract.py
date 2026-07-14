@@ -21,7 +21,8 @@ import re
 from dataclasses import dataclass
 
 from app.content.arango_content import _clean_heading_markup, fetch_latest_document, is_ancestor_section_key
-from app.content.arango_tree import connect_arango, get_toc_tree
+from app.content.arango_tree import get_toc_tree
+from app.platform.arango import connect_arango
 
 ENTITIES = "entities"
 RELATIONSHIPS = "relationships"
@@ -404,7 +405,7 @@ async def _run_job(
         try:
             import asyncio as _asyncio
 
-            from app.content.arango_tree import connect_arango
+            from app.platform.arango import connect_arango
             from app.search.semantic_search import ensure_index
 
             await _asyncio.to_thread(lambda: ensure_index(connect_arango(), doc_id))
