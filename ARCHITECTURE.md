@@ -4,6 +4,8 @@ Learn Hub is a **domain-partitioned modular monolith** (per *Fundamentals of Sof
 Architecture*, Richards & Ford): one Python deployable organized by domain, inside a
 service-based system topology (frontend / backend / tools as separate containers).
 
+> For a clickable, file-level index of everything below, see [MAP.md](MAP.md).
+
 ## System topology
 
 ```
