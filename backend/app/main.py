@@ -15,6 +15,7 @@ from app.content.arango_content import (
     figure_path,
 )
 from app.api.admin_routes import router as admin_router
+from app.api.wiring import install as install_job_runners
 from app.content.arango_tree import get_toc_tree
 from app.platform.arango import set_request_db_name
 from app.api.audiobook_routes import router as audiobook_router
@@ -31,6 +32,9 @@ from app.api.study_routes import router as study_router
 from app.api.system_routes import router as system_router
 
 app = FastAPI(title="Learn Hub", version="0.2.0")
+
+# Connect the platform jobs ledger to its domain runners (composition root).
+install_job_runners()
 app.include_router(study_router)
 app.include_router(ingest_router)
 app.include_router(extract_router)

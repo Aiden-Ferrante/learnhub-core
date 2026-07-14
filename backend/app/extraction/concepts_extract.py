@@ -20,7 +20,7 @@ import os
 import time
 from dataclasses import dataclass, replace
 
-from app.content.arango_content import fetch_latest_document
+from app.content.documents import fetch_latest_document
 from app.platform.arango import connect_arango
 from app.extraction.extract import (
     _domain,

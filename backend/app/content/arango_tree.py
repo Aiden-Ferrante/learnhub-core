@@ -480,7 +480,7 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     """
     try:
         db = _get_db()
-        from app.content.arango_content import fetch_latest_document
+        from app.content.documents import fetch_latest_document
 
         doc_obj = fetch_latest_document(doc).get("document")
         if doc_obj is None:

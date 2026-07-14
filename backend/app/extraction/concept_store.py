@@ -7,10 +7,19 @@ here, keeping readers decoupled from the extraction pipeline.
 
 from __future__ import annotations
 
-from app.content.arango_content import fetch_latest_document
+from app.content.documents import fetch_latest_document
 from app.platform.arango import connect_arango
 
 CONCEPTS = "concepts"
+
+
+def concept_count(db, doc_id: str, section_keys: list[str]) -> int:
+    if not section_keys:
+        return 0
+    return db.aql.execute(
+        "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks RETURN 1)",
+        bind_vars={"d": doc_id, "ks": section_keys},
+    ).next()
 
 
 def _concept_reading_ranks(db, doc_id: str, rows: list[dict]) -> dict[str, int]:

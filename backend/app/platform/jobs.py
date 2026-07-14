@@ -5,29 +5,25 @@ now the ONE registry for all artifact kinds, so generation is never a black box:
 what's running, what's queued, how long it took, and why it failed all live in the
 ``chapter_builds`` collection and survive restarts (a restart re-queues "running" rows).
 
-Kinds and their runners:
-  - "build":    concept extraction (skipped when present) + deep overlay (briefing/explanations)
-  - "quizzes":  author application questions for the scope's concepts
-  - "guides":   author per-section reading guides
-  - "skeleton": (re)generate the chapter skeleton essences
-  - "orient":   (re)generate the chapter orientation
+This module is pure mechanics: ledger CRUD, the single daemon worker, and a runner
+registry. It knows nothing about the domains — each kind's runner (and the "latest
+document" resolver) is registered at startup by the composition root (``api/wiring.py``),
+so domains can enqueue jobs without the queue importing them back.
 
 A single daemon worker drains the queue one job at a time — the GPU is compute-bound, so
 concurrent jobs would only time-slice it. ``notBefore`` (epoch seconds, optional) is the
 whole scheduling model: "build tonight" is just a job with a future timestamp.
-(Audiobooks keep their own checkpointed job system in audiobook.py — hour-long TTS runs
-need resumability, not just a ledger row; coverage reports them separately.)
+(Audiobooks keep their own checkpointed job system in media/audiobook.py — hour-long TTS
+runs need resumability, not just a ledger row; coverage reports them separately.)
 """
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
-from app.content.arango_content import fetch_latest_document, fetch_section_content
 from app.platform.arango import connect_arango
 
 BUILDS = "chapter_builds"
@@ -37,6 +33,20 @@ KINDS = ("build", "quizzes", "guides", "skeleton", "orient")
 
 _worker_lock = threading.Lock()
 _worker_started = False
+
+# Registered by api/wiring.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
+# plus the "no doc id given" resolver. The queue never imports domain modules.
+_RUNNERS: dict[str, Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
+_doc_resolver: Callable[[], str | None] | None = None
+
+
+def register_runner(kind: str, fn: Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]) -> None:
+    _RUNNERS[kind] = fn
+
+
+def set_doc_resolver(fn: Callable[[], str | None]) -> None:
+    global _doc_resolver
+    _doc_resolver = fn
 
 
 class JobCancelled(Exception):
@@ -81,17 +91,7 @@ def _bkey(doc_id: str, scope: str, kind: str = "build") -> str:
 def _resolve_doc_id(doc_id: str | None) -> str | None:
     if doc_id:
         return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
-
-
-def _concept_count(db, doc_id: str, section_keys: list[str]) -> int:
-    if not section_keys:
-        return 0
-    return db.aql.execute(
-        "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks RETURN 1)",
-        bind_vars={"d": doc_id, "ks": section_keys},
-    ).next()
+    return _doc_resolver() if _doc_resolver else None
 
 
 def _update_job(db, key: str, patch: dict[str, Any]) -> None:
@@ -99,6 +99,31 @@ def _update_job(db, key: str, patch: dict[str, Any]) -> None:
         db.collection(BUILDS).update({"_key": key, **patch})
     except Exception:  # noqa: BLE001 — progress writes are best-effort
         pass
+
+
+class JobCtx:
+    """What a runner may do to its own ledger row: report progress (throttled),
+    honor cancellation, and patch extra fields (e.g. extraction outcomes)."""
+
+    def __init__(self, db, key: str, kind: str) -> None:
+        self._db = db
+        self._key = key
+        self.phase = kind
+        self._last_write = 0.0
+
+    def check_cancel(self) -> None:
+        _check_cancel(self._db, self._key)
+
+    def patch(self, fields: dict[str, Any]) -> None:
+        _update_job(self._db, self._key, fields)
+
+    def progress(self, done: int, total: int, current: str | None = None) -> None:
+        now = time.time()
+        if now - self._last_write < 5 and done < total:
+            return
+        self._last_write = now
+        self.check_cancel()
+        self.patch({"phase": self.phase, "done": done, "total": total})
 
 
 # --------------------------------------------------------------------------- #
@@ -194,152 +219,6 @@ def list_builds(doc_id: str | None, kind: str | None = "build") -> dict[str, Any
     return {"docId": doc_id, "builds": rows}
 
 
-def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
-    """Readiness ladder per chapter: concept coverage + deep coverage + any build job.
-    Loads the doc's section blocks ONCE and spans each scope over them."""
-    from app.extraction.deep_chapter import BRIEFING, _bkey as briefing_key, ensure_deep_collections
-    from app.content.scope import _blocks_in_scope, _section_level_fn
-
-    db = connect_arango()
-    doc_id = _resolve_doc_id(doc_id)
-    if not doc_id:
-        return {"error": "no document found"}
-    ensure_builds_collection(db)
-    ensure_deep_collections(db)
-
-    rows = list(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-            bind_vars={"d": doc_id},
-        )
-    )
-    level_of = _section_level_fn(db, doc_id)
-    jobs = {j["scope"]: j for j in list_builds(doc_id).get("builds", [])}
-
-    out: dict[str, Any] = {}
-    for scope in scopes:
-        keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(rows, scope, level_of) if b.get("sectionKey")})
-        concepts = _concept_count(db, doc_id, list(keys))
-        explained = 0
-        if keys:
-            explained = db.aql.execute(
-                "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-                "AND c.deepExplanation != null AND c.deepExplanation != '' RETURN 1)",
-                bind_vars={"d": doc_id, "ks": list(keys)},
-            ).next()
-        briefing = db.collection(BRIEFING).get(briefing_key(doc_id, scope)) is not None
-        job = jobs.get(scope)
-        out[scope] = {
-            "concepts": concepts,
-            "explained": explained,
-            "briefing": briefing,
-            "build": {
-                "status": job.get("status"),
-                "notBefore": job.get("notBefore"),
-                "phase": job.get("phase"),
-                "done": job.get("done"),
-                "total": job.get("total"),
-                "error": job.get("error"),
-            }
-            if job
-            else None,
-        }
-    return {"docId": doc_id, "chapters": out}
-
-
-def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
-    """The black-box killer: every chapter × every artifact kind, with its state.
-
-    Per chapter: concept count, quiz-authoring x/y, skeleton fresh/stale/missing,
-    orient/briefing presence, guide x/y, generated audiobook sources, and any
-    queued/running/failed job per kind. One call answers "what state is my library in"."""
-    import os
-
-    from app.media.audiobook import audiobook_path, timeline_path
-    from app.study.concept_quiz_llm import scope_question_status
-    from app.extraction.deep_chapter import BRIEFING, _bkey as briefing_key, ensure_deep_collections
-    from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
-    from app.extraction.reading_guide import guide_status
-    from app.extraction.skeleton import (
-        ORIENT,
-        SKELETON_PROMPT_VERSION,
-        SKELETONS,
-        _key as chapter_cache_key,
-        ensure_path_collections,
-    )
-
-    db = connect_arango()
-    doc_id = _resolve_doc_id(doc_id)
-    if not doc_id:
-        return {"error": "no document found"}
-    ensure_builds_collection(db)
-    ensure_deep_collections(db)
-    ensure_path_collections(db)
-
-    doc_row = db.collection("documents").get(doc_id) or {}
-    top = [e for e in (doc_row.get("outline") or []) if (e.get("listDepth") or 0) == 0]
-    numbered = [e for e in top if e.get("numberKey")]
-    chapter_entries = [e for e in (numbered or top) if e.get("sectionKey")]
-
-    blocks = list(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-            bind_vars={"d": doc_id},
-        )
-    )
-    level_of = _section_level_fn(db, doc_id)
-    jobs_by = {
-        (j["scope"], j.get("kind") or "build"): j
-        for j in list_builds(doc_id, kind=None).get("builds", [])
-    }
-
-    def job_state(scope: str, kind: str) -> dict[str, Any] | None:
-        j = jobs_by.get((scope, kind))
-        if not j:
-            return None
-        return {k: j.get(k) for k in ("status", "notBefore", "phase", "done", "total", "error")}
-
-    block_keys = {b.get("sectionKey") for b in blocks if b.get("sectionKey")}
-
-    chapters: list[dict[str, Any]] = []
-    for e in chapter_entries:
-        scope = e["sectionKey"]
-        # Outline nesting first — it bridges mixed keyspaces (numbered chapter toc:2 whose
-        # sub-sections carry slug keys); reading-order span is the fallback. Same resolution
-        # order as fetch_section_content, so the grid can't disagree with the reader.
-        okeys = _scope_keys_from_outline(db, doc_id, scope)
-        keys = sorted((okeys & block_keys) if okeys else set())
-        if not keys:
-            keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(blocks, scope, level_of) if b.get("sectionKey")})
-        skel_row = db.collection(SKELETONS).get(chapter_cache_key(doc_id, scope))
-        skeleton = (
-            "missing" if not (skel_row and skel_row.get("sections"))
-            else ("fresh" if skel_row.get("promptVersion") == SKELETON_PROMPT_VERSION else "stale")
-        )
-        orient_row = db.collection(ORIENT).get(chapter_cache_key(doc_id, scope))
-        quiz = scope_question_status(db, doc_id, set(keys)) if keys else {"total": 0, "authored": 0, "running": False}
-        chapters.append(
-            {
-                "scope": scope,
-                "title": e.get("title") or scope,
-                "sections": len(keys),
-                "concepts": _concept_count(db, doc_id, keys),
-                "quizzes": {"authored": quiz["authored"], "total": quiz["total"]},
-                "skeleton": skeleton,
-                "orient": bool(orient_row and (orient_row.get("objectives") or orient_row.get("watchFor"))),
-                "briefing": db.collection(BRIEFING).get(briefing_key(doc_id, scope)) is not None,
-                "guides": {k: v for k, v in guide_status(db, doc_id, scope).items() if k != "running"},
-                "audiobooks": [
-                    src for src in ("text", "guided", "concepts")
-                    if os.path.exists(audiobook_path(doc_id, scope, src))
-                ],
-                "readAlong": os.path.exists(timeline_path(doc_id, scope, "text")),
-                "jobs": {k: js for k in KINDS if (js := job_state(scope, k))},
-            }
-        )
-    return {"docId": doc_id, "chapters": chapters}
-
-
 def queue_summary() -> dict[str, Any]:
     """Live queue state across ALL documents — powers the Process tab's machine strip.
     One running job max (single worker), so `running` is a row, not a list."""
@@ -430,118 +309,28 @@ def _worker_loop() -> None:
             time.sleep(20)
 
 
-def _progress_writer(db, key: str, phase: str):
-    """Throttled progress callback bound to one job row."""
-    last_write = 0.0
-
-    def on_progress(done: int, total: int, current: str | None = None) -> None:
-        nonlocal last_write
-        now = time.time()
-        if now - last_write < 5 and done < total:
-            return
-        last_write = now
-        _check_cancel(db, key)
-        _update_job(db, key, {"phase": phase, "done": done, "total": total})
-
-    return on_progress
-
-
 def _dispatch(db, job: dict[str, Any]) -> None:
-    """Run one job by kind, bracketing it with honest ledger writes."""
+    """Run one job via its registered runner, bracketing it with honest ledger writes.
+    A runner returns a receipt dict (persisted on the row), ``{"error": ...}`` for a
+    failure, or None for kinds whose results live elsewhere (build writes its own
+    fields via ctx.patch)."""
     key, kind = job["_key"], job.get("kind") or "build"
-    if kind == "build":
-        _run_build(db, job)
+    runner = _RUNNERS.get(kind)
+    if runner is None:
+        _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
+                              "error": f"unknown kind {kind!r}"})
         return
-    doc_id, scope = job["docId"], job["scope"]
     _update_job(db, key, {"status": "running", "startedAt": int(time.time()), "error": None})
     try:
-        receipt: dict[str, Any]
-        if kind == "quizzes":
-            from app.study.concept_quiz_llm import author_scope_sync
-            from app.content.scope import _scope_section_keys
-
-            keys = sorted(_scope_section_keys(db, doc_id, scope) or {scope})
-            receipt = author_scope_sync(db, doc_id, keys, on_progress=_progress_writer(db, key, kind))
-        elif kind == "guides":
-            from app.extraction.reading_guide import author_guides_sync
-
-            receipt = author_guides_sync(db, doc_id, scope, on_progress=_progress_writer(db, key, kind))
-        elif kind == "skeleton":
-            from app.extraction.skeleton import refresh_skeleton
-
-            receipt = refresh_skeleton(db, doc_id, scope)
-        elif kind == "orient":
-            from app.extraction.skeleton import refresh_orient
-
-            receipt = refresh_orient(db, doc_id, scope)
-        else:
-            _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
-                                  "error": f"unknown kind {kind!r}"})
-            return
-        if receipt.get("error"):
+        receipt = runner(db, job, JobCtx(db, key, kind))
+        if isinstance(receipt, dict) and receipt.get("error"):
             _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
                                   "error": str(receipt["error"])})
             return
-        _update_job(db, key, {"status": "done", "finishedAt": int(time.time()),
-                              "phase": None, "receipt": receipt})
-    except JobCancelled:
-        _update_job(db, key, {"status": "canceled", "finishedAt": int(time.time()),
-                              "phase": None, "cancelRequested": None})
-    except Exception as exc:  # noqa: BLE001
-        _update_job(db, key, {"status": "error", "finishedAt": int(time.time()), "error": str(exc)})
-
-
-def _run_build(db, job: dict[str, Any]) -> None:
-    from app.extraction.concepts_extract import extract_concepts_document
-    from app.extraction.deep_chapter import generate_deep_chapter_artifacts
-
-    key, doc_id, scope = job["_key"], job["docId"], job["scope"]
-    _update_job(db, key, {"status": "running", "startedAt": int(time.time()), "error": None})
-    try:
-        content = fetch_section_content(scope, doc_id)
-        section_keys = sorted(
-            {b.get("sectionKey") for b in content.get("blocks", []) if b.get("sectionKey")}
-        )
-        if not section_keys:
-            _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
-                                  "error": "no readable content in this scope"})
-            return
-
-        if _concept_count(db, doc_id, list(section_keys)) > 0:
-            # Already extracted — go straight to the deep overlay (briefing + explanations).
-            _check_cancel(db, key)
-            _update_job(db, key, {"phase": "deep", "done": 0, "total": 0})
-            generate_deep_chapter_artifacts(db, doc_id, scope, list(section_keys))
-            _update_job(db, key, {"outcomes": None})
-        else:
-            # Extraction; its eager hook generates the deep overlay in the same pass.
-            last_write = 0.0
-
-            def on_progress(done: int, total: int, current: str | None) -> None:
-                nonlocal last_write
-                now = time.time()
-                if now - last_write < 5 and done < total:
-                    return
-                last_write = now
-                _check_cancel(db, key)
-                _update_job(db, key, {"phase": "extract", "done": done, "total": total})
-
-            res = asyncio.run(
-                extract_concepts_document(doc_id=doc_id, scope=scope, on_progress=on_progress)
-            )
-            if res.get("error"):
-                _update_job(db, key, {"status": "error", "finishedAt": int(time.time()),
-                                      "error": str(res["error"])})
-                return
-            # Persist the per-section extraction report on the job so the Process
-            # dashboard can show WHY sections produced 0 concepts (capped for sanity).
-            _update_job(db, key, {
-                "outcomes": (res.get("outcomes") or [])[:200],
-                "concepts": res.get("concepts"),
-                "prereqEdges": res.get("prereqEdges"),
-            })
-
-        _update_job(db, key, {"status": "done", "finishedAt": int(time.time()), "phase": None})
+        patch: dict[str, Any] = {"status": "done", "finishedAt": int(time.time()), "phase": None}
+        if isinstance(receipt, dict):
+            patch["receipt"] = receipt
+        _update_job(db, key, patch)
     except JobCancelled:
         _update_job(db, key, {"status": "canceled", "finishedAt": int(time.time()),
                               "phase": None, "cancelRequested": None})

@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.content.arango_content import fetch_latest_document
+from app.content.documents import fetch_latest_document
 from app.content.arango_tree import get_toc_tree
 from app.platform.arango import connect_arango
 

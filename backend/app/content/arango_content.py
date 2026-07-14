@@ -25,6 +25,7 @@ from pathlib import Path
 
 from arango.database import StandardDatabase
 
+from app.content.documents import fetch_latest_document
 from app.platform.arango import connect_arango
 from app.content.scope import (
     _blocks_in_scope,
@@ -685,41 +686,6 @@ def persist_document(
         return doc_id
     except Exception:
         return None
-
-
-def fetch_latest_document(doc_id: str | None = None) -> dict:
-    """Latest stored document metadata + full markdown (or a specific id)."""
-    try:
-        db = connect_arango()
-        if not db.has_collection(DOCUMENTS):
-            return {"document": None}
-        if doc_id:
-            aql = "FOR d IN documents FILTER d._key == @id LIMIT 1 RETURN d"
-            binds = {"id": doc_id}
-        else:
-            aql = "FOR d IN documents SORT d.createdAt DESC LIMIT 1 RETURN d"
-            binds = {}
-        rows = list(db.aql.execute(aql, bind_vars=binds))
-        if not rows:
-            return {"document": None}
-        d = rows[0]
-        return {
-            "document": {
-                "id": d.get("_key"),
-                "title": d.get("title"),
-                "sourceFilename": d.get("sourceFilename"),
-                "markdown": d.get("markdown", ""),
-                "pageCount": d.get("pageCount", 0),
-                "charCount": d.get("charCount", 0),
-                "sectionCount": d.get("sectionCount", 0),
-                "pageBlockCount": d.get("pageBlockCount", 0),
-                "hasPageProvenance": d.get("hasPageProvenance", False),
-                "outline": d.get("outline", []),
-                "createdAt": d.get("createdAt", 0),
-            }
-        }
-    except Exception as exc:
-        return {"document": None, "error": str(exc)}
 
 
 def fetch_outline(doc_id: str | None = None) -> dict:

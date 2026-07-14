@@ -7,11 +7,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
+from app.overview.coverage import chapters_coverage, chapters_readiness
 from app.platform.jobs import (
     KINDS,
     cancel_build,
-    chapters_coverage,
-    chapters_readiness,
     enqueue_build,
     ensure_worker,
     list_builds,

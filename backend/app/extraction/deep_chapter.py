@@ -24,7 +24,8 @@ import threading
 import time
 from typing import Any
 
-from app.content.arango_content import fetch_latest_document, fetch_section_content
+from app.content.documents import fetch_latest_document
+from app.content.arango_content import fetch_section_content
 from app.platform.arango import connect_arango
 from app.platform.llm import _ollama_model, ollama_chat_completion
 

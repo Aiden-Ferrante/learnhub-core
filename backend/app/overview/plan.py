@@ -15,7 +15,9 @@ import re
 import time
 from typing import Any
 
-from app.content.arango_content import fetch_latest_document
+from app.content.documents import fetch_latest_document
+from app.content.chapters import chapter_units
+from app.overview.coverage import chapters_readiness
 from app.platform.arango import connect_arango
 
 # Mirrors lib/learn-path.ts PATH_STAGES — keep in sync (stage keys are the contract).
@@ -40,9 +42,6 @@ def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, A
     """Assemble the Today plan. ``hint_scope`` is the client's reading position
     (stored client-side), which wins over inferred recency when it maps to a chapter."""
     try:
-        from app.platform.jobs import chapters_readiness
-        from app.content.chapters import chapter_units
-
         db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:

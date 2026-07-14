@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 
-from app.content.arango_content import fetch_latest_document
+from app.content.documents import fetch_latest_document
 from app.extraction.concepts_extract import extract_concepts_document
 
 _JOBS: dict[str, dict] = {}
