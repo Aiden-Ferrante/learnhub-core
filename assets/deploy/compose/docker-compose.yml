@@ -169,11 +169,16 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_KEEP_ALIVE=30m
-      # Single inference slot + one loaded model. NUM_PARALLEL=4 pre-allocated 4 KV-cache
-      # slots which, combined with large-context models (nemotron-3-nano:30b advertises a
-      # 1,048,576-token context), exhausted unified memory and crashed the runner.
+      # KV-cache safety lives in NUM_PARALLEL=1 + the 16K context cap below (the old
+      # crash was NUM_PARALLEL=4 × a million-token context, NOT the model count).
+      # So we keep NUM_PARALLEL=1 but allow 4 resident models = 4 "slots": lets a
+      # coder + general + embed + vision model coexist warm without evict-churn.
+      # Safe on the 121GB unified pool — several small/medium weights fit in headroom,
+      # and Ollama's scheduler refuses to load a model that wouldn't fit (no OOM from
+      # slots — a too-big model just evicts an idle one or queues). Big 40GB+ weights
+      # still can't all be warm at once; use the GUI's memory readout to watch headroom.
       - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_MAX_LOADED_MODELS=4
       # Cap the per-model context so a million-token-capable model can't size its KV cache
       # to the full window. 16K is ample for per-section extraction; raise if needed.
       - OLLAMA_CONTEXT_LENGTH=16384
