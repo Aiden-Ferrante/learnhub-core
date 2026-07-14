@@ -11,6 +11,7 @@ from typing import Any
 from app.content.documents import fetch_latest_document
 from app.content.scope import _scope_section_keys
 from app.pipeline.build import run_build, run_deep, run_extract
+from app.pipeline.ingest import run_convert
 from app.extraction.reading_guide import author_guides_sync
 from app.extraction.skeleton import refresh_orient, refresh_skeleton
 from app.platform import jobs
@@ -41,6 +42,7 @@ def _run_orient(db, job: dict[str, Any], ctx) -> dict[str, Any]:
 
 def install() -> None:
     jobs.set_doc_resolver(_latest_doc_id)
+    jobs.register_runner("convert", run_convert)
     jobs.register_runner("build", run_build)
     jobs.register_runner("extract", run_extract)
     jobs.register_runner("deep", run_deep)

@@ -1,65 +1,27 @@
-"""Ingestion: PDF -> Markdown as a background job.
+"""Ingestion: PDF -> Markdown as a persistent queue job.
 
 Converting a large book takes minutes (Docling layout + formula models), which is longer
 than the ~5-min undici fetch timeout on the app->learn hop. So ``POST /api/convert-pdf``
-starts a background job and returns a ``jobId`` immediately; the client polls
-``GET /api/convert-pdf/status``. This never holds a request open for the whole conversion
-and survives an app restart (the browser just keeps polling).
+stashes the upload on the shared volume, enqueues a ``convert`` job, and returns a
+``jobId`` immediately; the client polls ``GET /api/convert-pdf/status``. The job lives on
+the persistent queue (pipeline/build worker), so it survives an app restart.
+
+The ``jobId`` is the document id minted at upload — the queue keys the convert job by it.
 """
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.pipeline.ingest import (
-    PdfConvertError,
-    find_existing_ingest,
-    ingest_pdf,
-    pdf_convert_health,
-)
+from app.content.documents import fetch_latest_document
+from app.pipeline.ingest import find_existing_ingest, pdf_convert_health, prepare_upload
+from app.platform.jobs import enqueue_build, list_builds
 
 router = APIRouter()
 
-# In-memory conversion jobs: jobId -> {status, filename, result?|error?}.
-_CONVERT_JOBS: dict[str, dict] = {}
-_MAX_JOBS = 50
-
-
-def _result_payload(result) -> dict:
-    return {
-        "markdown": result.markdown,
-        "sourceFilename": result.source_filename,
-        "outputFilename": result.output_filename,
-        "pageCount": result.page_count,
-        "savedPath": result.saved_path,
-        "docId": result.doc_id,
-        "engine": result.engine,
-        "hasPageProvenance": result.has_page_provenance,
-        "elementCount": result.element_count,
-    }
-
-
-def _prune_jobs() -> None:
-    """Bound the jobs map: drop the oldest finished jobs (dict keeps insertion order)."""
-    if len(_CONVERT_JOBS) <= _MAX_JOBS:
-        return
-    for key in list(_CONVERT_JOBS)[: len(_CONVERT_JOBS) - _MAX_JOBS]:
-        if _CONVERT_JOBS[key].get("status") in ("done", "error"):
-            _CONVERT_JOBS.pop(key, None)
-
-
-async def _run_convert(job_id: str, data: bytes, filename: str) -> None:
-    try:
-        result = await asyncio.to_thread(ingest_pdf, data, filename)
-        _CONVERT_JOBS[job_id] = {"status": "done", "filename": filename, "result": _result_payload(result)}
-    except PdfConvertError as e:
-        _CONVERT_JOBS[job_id] = {"status": "error", "filename": filename, "error": str(e), "statusCode": e.status_code}
-    except Exception as e:  # noqa: BLE001 — surface in status, never crash the loop
-        _CONVERT_JOBS[job_id] = {"status": "error", "filename": filename, "error": str(e), "statusCode": 500}
+_STATUS = {"queued": "running", "running": "running", "done": "done",
+           "error": "error", "canceled": "error"}
 
 
 @router.get("/api/convert-pdf/health")
@@ -71,8 +33,7 @@ def convert_pdf_health() -> JSONResponse:
 async def convert_pdf(file: UploadFile = File(...), force: int = Query(0)) -> JSONResponse:
     """Start a background PDF->markdown conversion; returns ``{jobId, status:"running"}``.
     If this exact PDF (by content hash) was already ingested, returns
-    ``{status:"duplicate", docId, ...}`` instead — pass ``?force=1`` to re-ingest anyway
-    (e.g. after a pipeline fix)."""
+    ``{status:"duplicate", docId, ...}`` instead — pass ``?force=1`` to re-ingest anyway."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
     if not file.filename.lower().endswith(".pdf"):
@@ -94,17 +55,30 @@ async def convert_pdf(file: UploadFile = File(...), force: int = Query(0)) -> JS
                 }
             )
 
-    job_id = uuid.uuid4().hex
-    _prune_jobs()
-    _CONVERT_JOBS[job_id] = {"status": "running", "filename": file.filename}
-    asyncio.create_task(_run_convert(job_id, data, file.filename))
-    return JSONResponse({"jobId": job_id, "status": "running", "filename": file.filename})
+    prep = prepare_upload(data, file.filename)  # mint docId + stash the PDF on /shared
+    enqueue_build(prep["docId"], "", kind="convert",
+                  payload={"pdfPath": prep["pdfPath"], "filename": file.filename})
+    return JSONResponse({"jobId": prep["docId"], "status": "running", "filename": file.filename})
 
 
 @router.get("/api/convert-pdf/status")
 def convert_pdf_status(jobId: str) -> JSONResponse:
-    """Poll a conversion job: ``running`` | ``done`` (+result) | ``error`` (+error) | ``unknown``."""
-    job = _CONVERT_JOBS.get(jobId)
-    if job is None:
+    """Poll a conversion job: ``running`` | ``done`` (+result) | ``error`` (+error) | ``unknown``.
+    ``jobId`` is the document id. On ``done`` the result's markdown is read from the stored
+    document (kept off the job ledger row)."""
+    builds = list_builds(jobId, kind="convert").get("builds", [])
+    job = builds[0] if builds else None
+    if not job:
         return JSONResponse({"status": "unknown", "error": "job not found"}, status_code=404)
-    return JSONResponse(job)
+    status = _STATUS.get(job.get("status"), "running")
+    out: dict = {"status": status, "filename": job.get("filename")}
+    if status == "done" and job.get("result"):
+        result = dict(job["result"])
+        doc = (fetch_latest_document(jobId) or {}).get("document") or {}
+        result["markdown"] = doc.get("markdown", "")
+        out["result"] = result
+    elif status == "error":
+        out["error"] = job.get("error") or "conversion failed"
+        if job.get("statusCode"):
+            out["statusCode"] = job["statusCode"]
+    return JSONResponse(out)
