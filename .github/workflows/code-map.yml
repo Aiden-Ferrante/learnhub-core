@@ -11,6 +11,7 @@ on:
     paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
   pull_request:
     paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,8 +29,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: python scripts/gen_map.py --check
 
-      - name: Regenerate and commit (push to main)
-        if: github.event_name == 'push'
+      - name: Regenerate and commit (push to main / manual run)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           python scripts/gen_map.py
           if ! git diff --quiet MAP.md; then
