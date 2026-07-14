@@ -10,7 +10,7 @@ from typing import Any
 
 from app.content.documents import fetch_latest_document
 from app.content.scope import _scope_section_keys
-from app.extraction.build_job import run_build, run_deep, run_extract
+from app.pipeline.build import run_build, run_deep, run_extract
 from app.extraction.reading_guide import author_guides_sync
 from app.extraction.skeleton import refresh_orient, refresh_skeleton
 from app.platform import jobs

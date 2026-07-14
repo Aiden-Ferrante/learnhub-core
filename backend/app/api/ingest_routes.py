@@ -15,10 +15,10 @@ import uuid
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.ingestion.pdf_convert import (
+from app.pipeline.ingest import (
     PdfConvertError,
-    convert_pdf_bytes,
     find_existing_ingest,
+    ingest_pdf,
     pdf_convert_health,
 )
 
@@ -54,7 +54,7 @@ def _prune_jobs() -> None:
 
 async def _run_convert(job_id: str, data: bytes, filename: str) -> None:
     try:
-        result = await asyncio.to_thread(convert_pdf_bytes, data, filename)
+        result = await asyncio.to_thread(ingest_pdf, data, filename)
         _CONVERT_JOBS[job_id] = {"status": "done", "filename": filename, "result": _result_payload(result)}
     except PdfConvertError as e:
         _CONVERT_JOBS[job_id] = {"status": "error", "filename": filename, "error": str(e), "statusCode": e.status_code}

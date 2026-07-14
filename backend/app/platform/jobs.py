@@ -7,7 +7,7 @@ what's running, what's queued, how long it took, and why it failed all live in t
 
 This module is pure mechanics: ledger CRUD, the single daemon worker, and a runner
 registry. It knows nothing about the domains — each kind's runner (and the "latest
-document" resolver) is registered at startup by the composition root (``api/wiring.py``),
+document" resolver) is registered at startup by the composition root (``pipeline/registry.py``),
 so domains can enqueue jobs without the queue importing them back.
 
 A single daemon worker drains the queue one job at a time — the GPU is compute-bound, so
@@ -34,7 +34,7 @@ KINDS = ("build", "extract", "deep", "quizzes", "guides", "skeleton", "orient")
 _worker_lock = threading.Lock()
 _worker_started = False
 
-# Registered by api/wiring.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
+# Registered by pipeline/registry.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
 # plus the "no doc id given" resolver. The queue never imports domain modules.
 _RUNNERS: dict[str, Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
 _doc_resolver: Callable[[], str | None] | None = None

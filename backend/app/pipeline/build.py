@@ -1,6 +1,6 @@
 """Job runners for the extraction phase: core ``extract`` + ``deep`` enrichment.
 
-Runs inside the platform jobs worker; registered by api/wiring.py. Ledger writes go
+Runs inside the platform jobs worker; registered by pipeline/registry.py. Ledger writes go
 through the JobCtx — extraction outcomes are patched onto the job row so the Process
 dashboard can show WHY sections produced 0 concepts.
 
