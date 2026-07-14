@@ -6,14 +6,9 @@ from pathlib import Path
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from app.content.arango_content import (
-    fetch_elements,
-    fetch_latest_document,
-    fetch_outline,
-    fetch_page,
-    fetch_section_content,
-    figure_path,
-)
+from app.content.store import fetch_outline, fetch_page, fetch_section_content
+from app.content.documents import fetch_latest_document
+from app.content.elements import fetch_elements, figure_path
 from app.api.admin_routes import router as admin_router
 from app.api.wiring import install as install_job_runners
 from app.content.arango_tree import get_toc_tree

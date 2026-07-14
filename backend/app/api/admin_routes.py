@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.content.arango_content import fetch_outline
+from app.content.store import fetch_outline
 from app.platform.arango import connect_arango
 
 router = APIRouter()

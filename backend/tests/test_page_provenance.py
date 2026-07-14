@@ -1,13 +1,13 @@
 """Tests for page-primary provenance math (pure, no ArangoDB)."""
 
-from app.content.arango_content import (
-    SectionBlock,
+from app.content.pages import (
     build_page_blocks,
     headings_starting_on_page,
     match_section_start_pages,
     page_section_paths,
     section_page_ranges,
 )
+from app.content.sections import SectionBlock
 
 
 def _sec(order, key, heading, level):

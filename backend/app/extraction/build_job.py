@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from app.content.arango_content import fetch_section_content
+from app.content.store import fetch_section_content
 from app.extraction.concept_store import concept_count
 from app.extraction.concepts_extract import extract_concepts_document
 from app.extraction.deep_chapter import generate_deep_chapter_artifacts

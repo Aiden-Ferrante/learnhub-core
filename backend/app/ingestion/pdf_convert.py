@@ -11,7 +11,7 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from app.content.arango_content import persist_document
+from app.content.store import persist_document
 from app.content.math_markdown import normalize_math_in_markdown
 from app.ingestion.reader import PdfConvertError, convert_document
 

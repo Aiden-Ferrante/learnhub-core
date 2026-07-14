@@ -19,7 +19,7 @@ import os
 import re
 from dataclasses import dataclass
 
-from app.content.arango_content import _clean_heading_markup
+from app.content.sections import _clean_heading_markup
 from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 from app.content.arango_tree import get_toc_tree
 from app.platform.arango import connect_arango
