@@ -635,7 +635,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
                         bind_vars={"d": doc_id},
                     )
                 )
-                from app.extraction.extract import _blocks_in_scope, _section_level_fn  # avoid import cycle
+                from app.content.scope import _blocks_in_scope, _section_level_fn
 
                 matched = _blocks_in_scope(blocks, section_key, _section_level_fn(db, doc_id))
                 ranked: dict[str, int] = {}

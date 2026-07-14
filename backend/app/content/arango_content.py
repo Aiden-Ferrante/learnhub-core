@@ -26,6 +26,12 @@ from pathlib import Path
 from arango.database import StandardDatabase
 
 from app.platform.arango import connect_arango
+from app.content.scope import (
+    _blocks_in_scope,
+    _scope_keys_from_outline,
+    _section_level_fn,
+    is_ancestor_section_key,
+)
 
 DOCUMENTS = "documents"
 SECTION_CONTENT = "section_content"
@@ -266,19 +272,6 @@ def build_page_blocks(
             )
         )
     return blocks
-
-
-def is_ancestor_section_key(ancestor: str, child: str) -> bool:
-    """True when ``ancestor`` is the same section or a numeric parent of ``child``."""
-    if ancestor == child:
-        return True
-    if ancestor == TOC_ROOT_KEY:
-        return True
-    a = ancestor[4:] if ancestor.startswith("toc:") else ancestor
-    c = child[4:] if child.startswith("toc:") else child
-    if _NUMERIC_KEY.match(a) and _NUMERIC_KEY.match(c):
-        return c == a or c.startswith(f"{a}.")
-    return child.startswith(f"{ancestor}/")
 
 
 def _ensure_collections(db: StandardDatabase) -> None:
@@ -810,8 +803,6 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
         # ancestor walk can't see, so chapters whose heading block isn't keyed toc:N
         # would read as EMPTY (DDIA ch.3+, AI-Eng ch.2-9). Reading-order span remains
         # the fallback. Local import avoids an arango_content <-> extract module cycle.
-        from app.extraction.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
-
         okeys = _scope_keys_from_outline(db, doc_id, section_key)
         matched = [r for r in rows if r.get("sectionKey") in okeys] if okeys else []
         if not matched:

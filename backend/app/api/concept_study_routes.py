@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 
 from app.study import srs
 from app.platform.arango import connect_arango
+from app.content.scope import _scope_section_keys
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import (
@@ -49,35 +50,6 @@ _CQ_TTL = 3600.0
 def _sweep(sessions: dict[str, dict[str, Any]], now: float) -> None:
     for sid in [s for s, v in sessions.items() if now - float(v.get("created", 0)) > _CQ_TTL]:
         del sessions[sid]
-
-
-def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | None:
-    """The set of section keys a chapter scope spans (chapter → all its sub-sections).
-    Outline nesting first (bridges mixed keyspaces — a numbered chapter whose sub-sections
-    carry slug keys), then the reading-order span — the same resolution order as the reader,
-    so study scoping can't disagree with it. None = whole course (no filter)."""
-    if not scope:
-        return None
-    if not doc:
-        return {scope}
-    try:
-        from app.extraction.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
-
-        rows = list(
-            db.aql.execute(
-                "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-                bind_vars={"d": doc},
-            )
-        )
-        block_keys = {b.get("sectionKey") for b in rows if b.get("sectionKey")}
-        okeys = _scope_keys_from_outline(db, doc, scope)
-        keys = (okeys & block_keys) if okeys else set()
-        if not keys:
-            matched = _blocks_in_scope(rows, scope, _section_level_fn(db, doc))
-            keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
-        return keys or {scope}
-    except Exception:  # noqa: BLE001
-        return {scope}
 
 
 def _pool(db, doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

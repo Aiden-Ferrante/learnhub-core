@@ -37,7 +37,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
         if err:
             return {"docId": doc_id, "chapters": [], "error": err}
 
-        from app.extraction.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
+        from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 
         rows = list(
             db.aql.execute(

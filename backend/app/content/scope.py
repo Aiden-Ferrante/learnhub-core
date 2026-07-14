@@ -1,0 +1,164 @@
+"""Scope resolution — which sections a TOC scope spans.
+
+The ONE answer to "what's inside chapter X": outline nesting first (bridges mixed
+keyspaces — a numbered chapter whose sub-sections carry slug keys), then the
+reading-order span. Extraction, study scoping, coverage reports and the reader all
+resolve scopes through here, so no two surfaces can disagree about a chapter's extent.
+"""
+
+from __future__ import annotations
+
+import re
+
+from app.content.arango_tree import get_toc_tree
+
+TOC_ROOT_KEY = "toc:root"
+
+_NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
+_CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")
+
+
+def is_ancestor_section_key(ancestor: str, child: str) -> bool:
+    """True when ``ancestor`` is the same section or a numeric parent of ``child``."""
+    if ancestor == child:
+        return True
+    if ancestor == TOC_ROOT_KEY:
+        return True
+    a = ancestor[4:] if ancestor.startswith("toc:") else ancestor
+    c = child[4:] if child.startswith("toc:") else child
+    if _NUMERIC.match(a) and _NUMERIC.match(c):
+        return c == a or c.startswith(f"{a}.")
+    return child.startswith(f"{ancestor}/")
+
+
+def _is_chapter_marker(sk: str, heading: str) -> bool:
+    return sk.startswith("toc:chapter-") or bool(_CHAPTER_HEADING.match(heading or ""))
+
+
+def _walk_tree_depths(nodes, depth: int, out: dict[str, int]) -> None:
+    for n in nodes or []:
+        nid = getattr(n, "id", None)
+        if nid:
+            out.setdefault(nid, depth)
+        _walk_tree_depths(getattr(n, "children", None), depth + 1, out)
+
+
+def _section_level_fn(db, doc_id: str):
+    """Build ``level_of(sectionKey, heading)`` — a 1-based outline level where chapters are
+    level 1. Robust across numbering schemes:
+      - numeric keys ``toc:1.2`` → numeric depth;
+      - ``toc:chapter-*`` keys or "CHAPTER N" headings → level 1;
+      - otherwise the node's TOC-tree depth (root=level 1) if known, else a deep leaf level.
+    The TOC tree only partially nests slug books, so the chapter-marker signal is what makes a
+    chapter scope expand to the whole chapter."""
+    tree_depth: dict[str, int] = {}
+    try:
+        forest = get_toc_tree(doc_id)[0]
+        _walk_tree_depths(forest, 0, tree_depth)
+    except Exception:  # noqa: BLE001 — tree is a best-effort signal; markers carry the rest
+        tree_depth = {}
+
+    def level_of(sk: str, heading: str = "") -> int:
+        body = sk[4:] if sk.startswith("toc:") else sk
+        if _NUMERIC.match(body):
+            return body.count(".") + 1
+        if _is_chapter_marker(sk, heading):
+            return 1
+        d = tree_depth.get(sk)
+        if d is not None:
+            return d + 1
+        return 99
+
+    return level_of
+
+
+def _blocks_in_scope(rows: list[dict], scope: str, level_of=None) -> list[dict]:
+    """All section_content rows under a chapter/section ``scope``, by reading-order span:
+    from the scope's first block to the next block at the SAME-OR-SHALLOWER outline level.
+
+    Captures the scope's subsections AND interspersed slug blocks (theorems, definitions,
+    untitled prose) that a pure numeric-descendant match would miss — and works for books
+    keyed by chapter slugs, not just ``toc:1.2`` numbering.
+    """
+    ordered = sorted(rows, key=lambda r: r.get("order", 0))
+    start_idx = next(
+        (i for i, r in enumerate(ordered) if is_ancestor_section_key(scope, r.get("sectionKey", ""))),
+        None,
+    )
+    if start_idx is None:
+        return []
+    if level_of is None:
+        level_of = lambda sk, h="": (sk[4:].count(".") + 1) if (sk.startswith("toc:") and _NUMERIC.match(sk[4:])) else 99  # noqa: E731
+    scope_lvl = level_of(scope, ordered[start_idx].get("heading", ""))
+    # A block sitting right after a chapter marker is the chapter title → treat it as a chapter.
+    if start_idx > 0:
+        prev = ordered[start_idx - 1]
+        if _is_chapter_marker(prev.get("sectionKey", ""), prev.get("heading", "")):
+            scope_lvl = min(scope_lvl, 1)
+    end_idx = len(ordered)
+    for j in range(start_idx + 1, len(ordered)):
+        r = ordered[j]
+        sk = r.get("sectionKey", "")
+        if sk == scope or is_ancestor_section_key(scope, sk):
+            continue
+        if level_of(sk, r.get("heading", "")) <= scope_lvl:
+            end_idx = j
+            break
+    return ordered[start_idx:end_idx]
+
+
+def _scope_keys_from_outline(db, doc_id: str, scope: str) -> set[str] | None:
+    """Section keys under ``scope`` via the outline's ``listDepth`` nesting — ``scope`` plus
+    everything nested beneath it until a same-or-shallower (sibling) entry. Key-scheme-agnostic:
+    works when a numbered chapter (``toc:2``) contains slug sub-sections (``toc:modeling``) that
+    aren't numeric descendants of the chapter. Returns None if ``scope`` isn't an outline entry
+    (caller falls back to the reading-order span)."""
+    try:
+        rows = list(
+            db.aql.execute(
+                "FOR d IN documents FILTER d._key == @doc RETURN d.outline", bind_vars={"doc": doc_id}
+            )
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    outline = rows[0] if rows else None
+    if not outline:
+        return None
+    idx = next((i for i, e in enumerate(outline) if e.get("sectionKey") == scope), None)
+    if idx is None:
+        return None
+    base = int(outline[idx].get("listDepth") or 0)
+    keys = {scope}
+    for e in outline[idx + 1 :]:
+        if int(e.get("listDepth") or 0) <= base:
+            break
+        if e.get("sectionKey"):
+            keys.add(e["sectionKey"])
+    return keys
+
+
+def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | None:
+    """The set of section keys a chapter scope spans (chapter → all its sub-sections).
+    Outline nesting first (bridges mixed keyspaces — a numbered chapter whose sub-sections
+    carry slug keys), then the reading-order span — the same resolution order as the reader,
+    so study scoping can't disagree with it. None = whole course (no filter)."""
+    if not scope:
+        return None
+    if not doc:
+        return {scope}
+    try:
+        rows = list(
+            db.aql.execute(
+                "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
+                bind_vars={"d": doc},
+            )
+        )
+        block_keys = {b.get("sectionKey") for b in rows if b.get("sectionKey")}
+        okeys = _scope_keys_from_outline(db, doc, scope)
+        keys = (okeys & block_keys) if okeys else set()
+        if not keys:
+            matched = _blocks_in_scope(rows, scope, _section_level_fn(db, doc))
+            keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
+        return keys or {scope}
+    except Exception:  # noqa: BLE001
+        return {scope}

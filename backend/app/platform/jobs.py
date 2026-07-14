@@ -198,7 +198,7 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
     """Readiness ladder per chapter: concept coverage + deep coverage + any build job.
     Loads the doc's section blocks ONCE and spans each scope over them."""
     from app.extraction.deep_chapter import BRIEFING, _bkey as briefing_key, ensure_deep_collections
-    from app.extraction.extract import _blocks_in_scope, _section_level_fn
+    from app.content.scope import _blocks_in_scope, _section_level_fn
 
     db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
@@ -258,7 +258,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
     from app.media.audiobook import audiobook_path, timeline_path
     from app.study.concept_quiz_llm import scope_question_status
     from app.extraction.deep_chapter import BRIEFING, _bkey as briefing_key, ensure_deep_collections
-    from app.extraction.extract import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
+    from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
     from app.extraction.reading_guide import guide_status
     from app.extraction.skeleton import (
         ORIENT,
@@ -458,7 +458,7 @@ def _dispatch(db, job: dict[str, Any]) -> None:
         receipt: dict[str, Any]
         if kind == "quizzes":
             from app.study.concept_quiz_llm import author_scope_sync
-            from app.api.concept_study_routes import _scope_section_keys
+            from app.content.scope import _scope_section_keys
 
             keys = sorted(_scope_section_keys(db, doc_id, scope) or {scope})
             receipt = author_scope_sync(db, doc_id, keys, on_progress=_progress_writer(db, key, kind))
