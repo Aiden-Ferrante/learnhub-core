@@ -2,7 +2,7 @@
 import asyncio
 import importlib
 
-import app.seedling_client as sc
+import app.platform.seedling_client as sc
 
 
 def _reload(monkeypatch, url):

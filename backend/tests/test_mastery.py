@@ -5,7 +5,7 @@ Pure functions only — no ArangoDB. A fixed ``now`` makes decay deterministic.
 
 import math
 
-from app.mastery import (
+from app.study.mastery import (
     collect_sections,
     compute_leaf_mastery,
     descendant_leaves,
@@ -104,7 +104,7 @@ def test_descendant_leaves_terminates_on_cycle():
 # --- Retrievability from spaced-rep stability (decay ← SM-2 interval) ----------
 
 def test_stability_tau_scales_with_interval():
-    from app.mastery import _stability_tau, _retention_k
+    from app.study.mastery import _stability_tau, _retention_k
 
     k = _retention_k()  # tau = k * interval, so retrievability = R at the due date
     # Never-reviewed unit falls back to the global default tau.
@@ -118,7 +118,7 @@ def test_stability_tau_scales_with_interval():
 
 
 def test_decay_hits_retention_target_at_due_date():
-    from app.mastery import _stability_tau
+    from app.study.mastery import _stability_tau
 
     # By construction, retrievability exp(-interval/tau) == retention target (0.9 default)
     # when dt equals the concept's SM-2 interval.

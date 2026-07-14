@@ -1,7 +1,7 @@
 """Tests for the extraction infrastructure (pure functions, no LLM, no DB)."""
 
-from app.arango_learn import triple_id
-from app.extract import (
+from app.extraction.arango_learn import triple_id
+from app.extraction.extract import (
     ExtractedTriple,
     SectionExtractInput,
     _blocks_in_scope,
@@ -73,7 +73,7 @@ _SCOPE_ROWS = [
 def test_section_depth():
     # The pure helper was folded into _section_level_fn; assert the same contract
     # through the default level rule _blocks_in_scope uses (numeric depth, slug=leaf).
-    from app.extract import _NUMERIC
+    from app.extraction.extract import _NUMERIC
 
     def depth(sk: str) -> int:
         body = sk[4:]

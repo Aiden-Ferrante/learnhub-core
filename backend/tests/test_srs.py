@@ -1,6 +1,6 @@
 """Unit tests for the SM-2-lite scheduler (pure, no DB)."""
 
-from app import srs
+from app.study import srs
 
 NOW = 1_000_000.0
 DAY = srs.DAY

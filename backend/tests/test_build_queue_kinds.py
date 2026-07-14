@@ -1,6 +1,6 @@
 """The generalized processing ledger — kind-aware keys and back-compat."""
 
-from app.build_queue import KINDS, _bkey
+from app.platform.jobs import KINDS, _bkey
 
 
 def test_build_kind_keeps_the_pre_kind_key():

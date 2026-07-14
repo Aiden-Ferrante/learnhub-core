@@ -1,6 +1,6 @@
 """Skeleton items in the review system — the pure helpers behind the walk→SRS wiring."""
 
-from app.concept_study_routes import (
+from app.api.concept_study_routes import (
     SKELETON_KEY_PREFIX,
     clean_skeleton_children,
     skeleton_card,
@@ -72,7 +72,7 @@ def test_skeleton_card_shape_and_fallbacks():
 
 # ---- figure-recall items (same review envelope, image front / caption reveal) ----
 
-from app.concept_study_routes import (  # noqa: E402
+from app.api.concept_study_routes import (  # noqa: E402
     FIGURE_KEY_PREFIX,
     figure_card,
     figure_review_key,

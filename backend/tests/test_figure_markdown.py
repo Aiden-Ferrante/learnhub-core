@@ -1,6 +1,6 @@
 """Figures woven into section markdown — the pure rendering helper."""
 
-from app.arango_content import figure_markdown
+from app.content.arango_content import figure_markdown
 
 
 def test_figure_markdown_image_plus_caption():

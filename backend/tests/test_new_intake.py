@@ -2,7 +2,7 @@
 
 import time
 
-from app.concept_study_routes import day_start, new_allowance
+from app.api.concept_study_routes import day_start, new_allowance
 
 
 def test_new_allowance_counts_down_and_floors_at_zero():

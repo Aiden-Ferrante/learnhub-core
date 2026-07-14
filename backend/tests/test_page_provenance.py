@@ -1,6 +1,6 @@
 """Tests for page-primary provenance math (pure, no ArangoDB)."""
 
-from app.arango_content import (
+from app.content.arango_content import (
     SectionBlock,
     build_page_blocks,
     headings_starting_on_page,

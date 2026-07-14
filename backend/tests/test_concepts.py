@@ -1,6 +1,6 @@
 """Tests for concept-course extraction (pure functions, no LLM, no DB)."""
 
-from app.concepts_extract import (
+from app.extraction.concepts_extract import (
     concept_key,
     normalize_concept_name,
     parse_concepts_response,
@@ -84,7 +84,7 @@ def test_parse_concepts_stats_accounting():
 
 
 def test_split_markdown_chunks_lossless():
-    from app.concepts_extract import _split_markdown_chunks
+    from app.extraction.concepts_extract import _split_markdown_chunks
 
     md = "\n\n".join(f"para {i} " + "x" * 50 for i in range(10))
     chunks = _split_markdown_chunks(md, 120)

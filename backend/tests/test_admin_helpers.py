@@ -1,7 +1,7 @@
 """Tests for pure helpers behind the admin/course-status endpoints."""
 
-from app.admin_routes import chapter_key_of
-from app.pdf_convert import source_hash_of
+from app.api.admin_routes import chapter_key_of
+from app.ingestion.pdf_convert import source_hash_of
 
 
 def test_chapter_key_of_numeric_sections():
