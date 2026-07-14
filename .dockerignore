@@ -41,4 +41,13 @@ __tests__
 .env.local
 .env.*.local
 README.md
-.eslintcache 
+.eslintcache
+
+# Repo dirs irrelevant to the app image (build context = repo root; only frontend/ is copied)
+backend
+mcp
+docs
+deploy
+.loop_concept_quality
+.understand-anything
+.cursor 
