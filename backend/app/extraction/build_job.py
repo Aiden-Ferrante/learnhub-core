@@ -45,6 +45,5 @@ def run_build(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     ctx.patch({
         "outcomes": (res.get("outcomes") or [])[:200],
         "concepts": res.get("concepts"),
-        "prereqEdges": res.get("prereqEdges"),
     })
     return None

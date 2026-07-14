@@ -24,7 +24,7 @@ def concept_count(db, doc_id: str, section_keys: list[str]) -> int:
 
 def _concept_reading_ranks(db, doc_id: str, rows: list[dict]) -> dict[str, int]:
     """Global reading rank per concept: section reading order, then within-section order.
-    A strict unique rank makes the oriented prereq graph provably acyclic."""
+    A strict unique rank gives every concept a stable global reading order."""
     sec_order: dict[str, int] = {}
     for r in db.aql.execute(
         "FOR s IN section_content FILTER s.docId == @d RETURN {k: s.sectionKey, o: s.order}",
@@ -95,7 +95,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
             db.aql.execute(
                 "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
                 "RETURN { conceptKey: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-                "source: c.source, questions: c.questions, prereqNames: c.prereqNames, "
+                "source: c.source, questions: c.questions, "
                 "sectionKey: c.sectionKey, order: c.order, "
                 "pageStart: c.pageStart, pageEnd: c.pageEnd }",
                 bind_vars={"d": doc_id, "ks": scope_keys},
@@ -159,7 +159,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
             db.aql.execute(
                 "FOR c IN concepts FILTER c.docId == @d RETURN {key: c._key, canon: c.canonicalKey, "
                 "name: c.name, kind: c.kind, signal: c.signal, source: c.source, questions: c.questions, "
-                "prereqNames: c.prereqNames, sectionKey: c.sectionKey, pageStart: c.pageStart, "
+                "sectionKey: c.sectionKey, pageStart: c.pageStart, "
                 "pageEnd: c.pageEnd, order: c.order}",
                 bind_vars={"d": doc_id},
             )
@@ -186,7 +186,6 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
                     "signal": rep["signal"],
                     "source": rep.get("source"),
                     "questions": rep.get("questions") or [],
-                    "prereqNames": rep.get("prereqNames") or [],
                     "sectionKey": rep["sectionKey"],
                     "pageStart": rep.get("pageStart"),
                     "pageEnd": rep.get("pageEnd"),

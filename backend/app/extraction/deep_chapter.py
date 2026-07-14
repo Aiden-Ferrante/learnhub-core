@@ -73,23 +73,20 @@ def _scope_section_keys(doc_id: str, scope: str) -> list[str]:
 
 DEEP_SYSTEM = (
     "You expand a textbook concept into a short deep explanation for a learner who just met "
-    "it in the text. You are given the concept's name, kind, a one-line signal, the verbatim "
-    "source passage, and sometimes prerequisite concept names. Write 1-2 short paragraphs of "
+    "it in the text. You are given the concept's name, kind, a one-line signal, and the "
+    "verbatim source passage. Write 1-2 short paragraphs of "
     "plain prose that: state what the concept is in the learner's own terms, unpack how it "
-    "works or why it holds, and say when or why it matters. If prerequisites are given, "
-    "connect to them in one sentence. Ground every claim in the source passage — never invent "
+    "works or why it holds, and say when or why it matters. Ground every claim in the source passage — never invent "
     "facts, numbers, or scope beyond it. No headings, no bullet points, no 'the author' or "
     "'this section' — output only the explanation prose."
 )
 
 
 def _explain_one(concept: dict[str, Any], model: str | None = None) -> str | None:
-    prereqs = ", ".join(concept.get("prereqNames") or [])
     user = (
         f"Concept: {concept.get('name')}\n"
         f"Kind: {concept.get('kind')}\n"
         f"Signal: {concept.get('signal')}\n"
-        + (f"Prerequisites: {prereqs}\n" if prereqs else "")
         + f"Source passage:\n{(concept.get('source') or '').strip()}"
     )
     for _ in range(2):
@@ -119,7 +116,7 @@ def generate_deep_explanations(
             "AND (c.deepExplanation == null OR c.deepExplanation == '') "
             "SORT c.sectionKey, c.order "
             "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-            "source: c.source, prereqNames: c.prereqNames}",
+            "source: c.source}",
             bind_vars={"d": doc_id, "ks": section_keys},
         )
     )
