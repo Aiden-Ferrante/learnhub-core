@@ -330,13 +330,18 @@ async def extract_concepts_document(
     concurrency: int = 3,
     model: str | None = None,
     on_progress=None,
+    generate_deep: bool | None = None,
 ) -> dict:
     """Build concept-lessons for a document (``scope=toc:1`` = one chapter). Background-job
     friendly; failures are isolated per section. ``model`` overrides the extraction model
     (the UI-selected Ollama model); falls back to LEARN_EXTRACT_MODEL / OLLAMA_MODEL.
 
     ``on_progress(done, total, current_section_key)`` is invoked (if given) as each section
-    finishes, so a polling client can render a live progress bar."""
+    finishes, so a polling client can render a live progress bar.
+
+    ``generate_deep`` controls the eager Deep Chapter overlay: the pipeline runs deep as its
+    own enrichment job and passes ``False``; the legacy ``/api/extract`` path passes ``None``,
+    which falls back to the ``LEARN_DEEP_PREGEN`` env (default on) to preserve its behavior."""
     t0 = time.time()
     db = connect_arango()
     if doc_id is None:
@@ -399,10 +404,13 @@ async def extract_concepts_document(
     # Keep the structural TOC tree (drives the syllabus view).
     upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
-    # Eagerly pre-generate the Deep Chapter overlay (assembled briefing + per-section
-    # recaps + per-concept deep explanations) so opening the chapter is instant.
+    # Deep Chapter overlay (assembled briefing + per-section recaps + per-concept deep
+    # explanations). The pipeline runs this as a separate "deep" enrichment job, so
+    # ``generate_deep=False`` skips it here; when None, the legacy LEARN_DEEP_PREGEN env
+    # decides (default on) so the /api/extract path keeps its eager overlay.
     # Idempotent and error-isolated: a failure here never fails the extraction.
-    if os.environ.get("LEARN_DEEP_PREGEN", "1") != "0":
+    do_deep = generate_deep if generate_deep is not None else os.environ.get("LEARN_DEEP_PREGEN", "1") != "0"
+    if do_deep:
         try:
             from app.extraction.deep_chapter import generate_deep_chapter_artifacts
 
