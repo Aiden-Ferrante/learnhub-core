@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from app.extraction.concepts_extract import fetch_section_concepts
+from app.extraction.concept_store import fetch_section_concepts
 from app.study.mastery import record_engagement
 
 

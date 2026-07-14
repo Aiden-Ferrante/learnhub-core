@@ -173,7 +173,7 @@ def build_briefing(db, doc_id: str, scope: str | None, allow_generate: bool = Fa
     key_concepts: list[dict[str, Any]] = []
     concept_count = 0
     if scope:
-        from app.extraction.concepts_extract import fetch_section_concepts
+        from app.extraction.concept_store import fetch_section_concepts
 
         rows = fetch_section_concepts(scope, doc_id).get("concepts", [])
         concept_count = len(rows)
@@ -275,7 +275,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
         blocks = content.get("blocks", [])
         section_keys = sorted({b.get("sectionKey") for b in blocks if b.get("sectionKey")})
 
-        from app.extraction.concepts_extract import fetch_section_concepts
+        from app.extraction.concept_store import fetch_section_concepts
 
         sec = fetch_section_concepts(scope, doc_id)
         concepts = sec.get("concepts", [])

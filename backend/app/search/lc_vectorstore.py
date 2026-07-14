@@ -19,6 +19,21 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
 
 
+def _load_matrix(db, doc: str | None):
+    rows = list(
+        db.aql.execute(
+            "FOR v IN content_vectors FILTER (@doc == null OR v.docId == @doc) "
+            "RETURN {sectionKey: v.sectionKey, heading: v.heading, pageStart: v.pageStart, "
+            "pageEnd: v.pageEnd, text: v.text, embedding: v.embedding}",
+            bind_vars={"doc": doc},
+        )
+    )
+    if not rows:
+        return [], None
+    mat = np.asarray([r["embedding"] for r in rows], dtype=np.float32)
+    return rows, mat
+
+
 class ArangoContentVectorStore(VectorStore):
     """Read-only LangChain vector store over ``content_vectors`` (in-memory cosine)."""
 
@@ -34,10 +49,6 @@ class ArangoContentVectorStore(VectorStore):
     def similarity_search_with_score(
         self, query: str, k: int = 6, **kwargs: Any
     ) -> list[tuple[Document, float]]:
-        # Function-level import: semantic_search imports this module (for ask()), so a
-        # top-level import would be circular.
-        from app.search.semantic_search import _load_matrix
-
         if not (query or "").strip():
             return []
         rows, mat = _load_matrix(self._db, self._doc)

@@ -9,8 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.extraction.concepts_extract import fetch_document_concepts, fetch_section_concepts
-from app.extraction.extract import extraction_status, start_extraction
+from app.extraction.concept_store import fetch_document_concepts, fetch_section_concepts
+from app.extraction.runner import extraction_status, start_extraction
 
 router = APIRouter()
 

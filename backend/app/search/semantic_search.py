@@ -17,7 +17,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.search.concept_resolve import embed_texts
 from app.search.lc_embeddings import SentenceTransformerEmbeddings
-from app.search.lc_vectorstore import ArangoContentVectorStore
+from app.search.lc_vectorstore import ArangoContentVectorStore, _load_matrix
 from app.platform.llm import get_chat_model
 
 VECTORS = "content_vectors"
@@ -99,21 +99,6 @@ def ensure_index(db, doc: str | None = None, limit: int = 100000) -> dict[str, A
         )
         indexed += len(batch)
     return {**index_status(db, doc), "indexed_now": indexed}
-
-
-def _load_matrix(db, doc: str | None):
-    rows = list(
-        db.aql.execute(
-            "FOR v IN content_vectors FILTER (@doc == null OR v.docId == @doc) "
-            "RETURN {sectionKey: v.sectionKey, heading: v.heading, pageStart: v.pageStart, "
-            "pageEnd: v.pageEnd, text: v.text, embedding: v.embedding}",
-            bind_vars={"doc": doc},
-        )
-    )
-    if not rows:
-        return [], None
-    mat = np.asarray([r["embedding"] for r in rows], dtype=np.float32)
-    return rows, mat
 
 
 def semantic_search(db, query: str, doc: str | None = None, k: int = 8) -> dict[str, Any]:

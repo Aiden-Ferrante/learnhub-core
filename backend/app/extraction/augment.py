@@ -10,7 +10,7 @@ import os
 from typing import Any
 
 from app.platform.arango import connect_arango
-from app.extraction.concepts_extract import fetch_section_concepts
+from app.extraction.concept_store import fetch_section_concepts
 from app.platform.llm import _ollama_model, ollama_structured_completion
 from app.platform.llm_schemas import Augment
 
