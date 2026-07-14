@@ -1,0 +1,51 @@
+# Architecture
+
+Learn Hub is a **domain-partitioned modular monolith** (per *Fundamentals of Software
+Architecture*, Richards & Ford): one Python deployable organized by domain, inside a
+service-based system topology (frontend / backend / tools as separate containers).
+
+## System topology
+
+```
+frontend/  Next.js 15 app (:3001) — auth, UI, and a proxy layer that forwards
+           /api/learn/* to the backend with the X-User-Db tenancy header
+backend/   FastAPI service (:8010) — everything below
+mcp/       FastMCP server driving the backend over REST only (no DB access)
+deploy/    docker-compose + service images (app, learn, ollama, sentence-transformers)
+           Tools: ArangoDB :8529, Ollama :11434, optional Qdrant/embeddings
+```
+
+## Backend packages (`backend/app/`)
+
+Dependency rule: **`platform` ← `content` ← domains ← `overview` ← `api`**.
+Domains may import `platform`, `content`, and another domain's *public* functions;
+never each other's internals, never anything above them. `api` is thin routers only.
+There are **zero import cycles** (checked by AST; keep it that way).
+
+| Package | Owns |
+|---|---|
+| `platform/` | ArangoDB connection + X-User-Db tenancy (`arango.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
+| `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`arango_tree.py`), chapter units (`chapters.py`) |
+| `ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
+| `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`), concept reads (`concept_store.py`), deep-chapter overlay, skeleton, reading guides, the "build" job runner (`build_job.py`), legacy in-memory extract wrapper (`runner.py`) |
+| `study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, SM-2 (`srs.py`) |
+| `search/` | Embeddings + semantic search over content vectors |
+| `media/` | Audiobook TTS (own checkpointed job system) |
+| `overview/` | Cross-domain read models: Today plan (`plan.py`), chapter readiness/coverage grids (`coverage.py`) |
+| `api/` | One router module per surface + `wiring.py`, the composition root that registers job runners with `platform/jobs` at startup |
+
+`app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, wiring.
+
+## Conventions
+
+- New backend code goes in the domain package it belongs to; if a route handler grows
+  logic, move the logic into the domain and keep the handler thin.
+- The jobs queue never imports domains — new job kinds register a runner in
+  `api/wiring.py`.
+- Scope resolution (chapter → section keys) always goes through `content/scope.py`,
+  so no two surfaces can disagree about a chapter's extent.
+- Rebuild the affected image after backend/frontend changes:
+  `docker compose -f deploy/compose/docker-compose.yml build learn && ... up -d learn`
+  (same for `app`, which serves :3001).
+- Tests: `docker run --rm -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
+  compose-learn:latest sh -c "pip install -q pytest; python -m pytest tests -q"`
