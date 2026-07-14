@@ -27,7 +27,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
  */
 export async function getUserDbName(): Promise<string> {
   const user = await getSessionUser()
-  const dbName = user?.dbName || process.env.ARANGODB_DB || 'txt2kg'
+  const dbName = user?.dbName || process.env.ARANGODB_DB || 'learnhub'
   if (!/^[a-zA-Z0-9_-]+$/.test(dbName)) {
     throw new Error(`Invalid database name: ${dbName}`)
   }

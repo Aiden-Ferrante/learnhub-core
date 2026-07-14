@@ -1,4 +1,4 @@
-# txt2kg Docker Compose - ArangoDB + Ollama (Default)
+# Learn Hub Docker Compose - ArangoDB + Ollama (Default)
 #
 # Default stack tested and working on DGX Spark
 #
@@ -18,7 +18,7 @@ services:
     environment:
       # ArangoDB configuration
       - ARANGODB_URL=http://arangodb:8529
-      - ARANGODB_DB=txt2kg
+      - ARANGODB_DB=learnhub
       - ARANGODB_USER=root
       - ARANGODB_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
       - GRAPH_DB_TYPE=arangodb
@@ -53,10 +53,10 @@ services:
       - REQUEST_TIMEOUT=1800000
       - LEARN_SERVICE_URL=http://learn:8000
     volumes:
-      - txt2kg_shared:/shared
+      - learnhub_shared:/shared
     networks:
       - default
-      - txt2kg-network
+      - learnhub-network
       - qdrant-net
     depends_on:
       arangodb:
@@ -66,7 +66,7 @@ services:
       learn:
         condition: service_started
 
-  # Python learning app (placeholder UI; same ArangoDB + shared volume as txt2kg)
+  # Python learning app (placeholder UI; same ArangoDB + shared volume as the learn service)
   learn:
     build:
       context: ../services/learn
@@ -75,7 +75,7 @@ services:
       - '127.0.0.1:8010:8000'
     environment:
       - ARANGODB_URL=http://arangodb:8529
-      - ARANGODB_DB=txt2kg
+      - ARANGODB_DB=learnhub
       - ARANGODB_USER=root
       - ARANGODB_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
       - SHARED_DIR=/shared
@@ -102,7 +102,7 @@ services:
       # lets the container reach the host's localhost vaultwriter seam on Linux
       - "host.docker.internal:host-gateway"
     volumes:
-      - txt2kg_shared:/shared
+      - learnhub_shared:/shared
     networks:
       - default
     depends_on:
@@ -146,8 +146,8 @@ services:
       sh -c "
         echo 'Waiting for ArangoDB to start...' &&
         sleep 10 &&
-        echo 'Creating txt2kg database...' &&
-        arangosh --server.endpoint tcp://arangodb:8529 --server.username root --server.password \"$$ARANGO_ROOT_PASSWORD\" --javascript.execute-string 'try { db._createDatabase(\"txt2kg\"); console.log(\"Database txt2kg created successfully!\"); } catch(e) { if(e.message.includes(\"duplicate\")) { console.log(\"Database txt2kg already exists\"); } else { throw e; } }'
+        echo 'Creating learnhub database...' &&
+        arangosh --server.endpoint tcp://arangodb:8529 --server.username root --server.password \"$$ARANGO_ROOT_PASSWORD\" --javascript.execute-string 'try { db._createDatabase(\"learnhub\"); console.log(\"Database learnhub created successfully!\"); } catch(e) { if(e.message.includes(\"duplicate\")) { console.log(\"Database learnhub already exists\"); } else { throw e; } }'
       "
     networks:
       - default
@@ -268,12 +268,12 @@ volumes:
   arangodb_apps_data:
   ollama_data:
   qdrant_data:
-  txt2kg_shared:
+  learnhub_shared:
 
 networks:
   default:
     driver: bridge
-  txt2kg-network:
+  learnhub-network:
     driver: bridge
   qdrant-net:
     name: qdrant-network

@@ -118,7 +118,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         if (serverDocs.length > 0) {
           if (!cancelled) setDocuments(reviveDocuments(serverDocs))
         } else {
-          const saved = localStorage.getItem('txt2kg_documents')
+          const saved = localStorage.getItem('learnhub_documents')
           if (saved) {
             const parsed = JSON.parse(saved)
             if (Array.isArray(parsed) && parsed.length > 0 && !cancelled) {
@@ -126,7 +126,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
               setDocuments(reviveDocuments(parsed))
             }
             // Remove so another account on this browser can't re-import them.
-            localStorage.removeItem('txt2kg_documents')
+            localStorage.removeItem('learnhub_documents')
           }
         }
       } catch (error) {

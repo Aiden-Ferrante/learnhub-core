@@ -1,20 +1,20 @@
-// Seed (or update) a user account in the shared txt2kg_auth database.
+// Seed (or update) a user account in the shared learnhub_auth database.
 //
 // Usage (credentials come from env so they never land in code or shell history files):
-//   SEED_USERNAME=Mooteo SEED_PASSWORD='...' SEED_DB_NAME=txt2kg node scripts/seed-user.mjs
+//   SEED_USERNAME=Mooteo SEED_PASSWORD='...' SEED_DB_NAME=learnhub node scripts/seed-user.mjs
 //
 // Env:
 //   SEED_USERNAME   required — login name (stored lowercase, display name keeps casing)
 //   SEED_PASSWORD   required — plaintext password, stored only as a bcrypt hash
 //   SEED_DB_NAME    optional — ArangoDB database for this user's data
-//                   (defaults to txt2kg_u_<username>; use "txt2kg" to adopt existing data)
+//                   (defaults to learnhub_u_<username>; use "learnhub" to adopt existing data)
 //   SEED_ROLE       optional — defaults to "user"
 //   ARANGODB_URL / ARANGODB_USER / ARANGODB_PASSWORD — Arango connection (same as the app)
 
 import { Database } from 'arangojs'
 import bcrypt from 'bcryptjs'
 
-const AUTH_DB_NAME = 'txt2kg_auth'
+const AUTH_DB_NAME = 'learnhub_auth'
 const USERS_COLLECTION = 'users'
 
 const displayName = (process.env.SEED_USERNAME || '').trim()
@@ -35,7 +35,7 @@ if (password.length < 8) {
   process.exit(1)
 }
 
-const dbName = (process.env.SEED_DB_NAME || `txt2kg_u_${username.replace(/[^a-z0-9_]/g, '_')}`).trim()
+const dbName = (process.env.SEED_DB_NAME || `learnhub_u_${username.replace(/[^a-z0-9_]/g, '_')}`).trim()
 if (!/^[a-zA-Z0-9_-]+$/.test(dbName)) {
   console.error(`Invalid SEED_DB_NAME: ${dbName}`)
   process.exit(1)

@@ -23,7 +23,7 @@ export type GroupTreeNode = {
   children: GroupTreeNode[]
 }
 
-const STORAGE_KEY = "txt2kg_course_groups"
+const STORAGE_KEY = "learnhub_course_groups"
 
 export const EMPTY_GROUPS_STATE: GroupsState = { groups: [], membership: {} }
 

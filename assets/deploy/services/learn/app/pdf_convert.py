@@ -1,4 +1,4 @@
-"""PDF to Markdown conversion for txt2kg ingestion (digital/text PDFs)."""
+"""PDF to Markdown conversion for Learn Hub ingestion (digital/text PDFs)."""
 
 from __future__ import annotations
 

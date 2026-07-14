@@ -59,7 +59,7 @@ def set_request_db_name(db_name: str | None) -> None:
 
 def _get_db() -> StandardDatabase:
     url = (os.environ.get("ARANGODB_URL") or "http://localhost:8529").rstrip("/")
-    db_name = _REQUEST_DB_NAME.get() or os.environ.get("ARANGODB_DB") or "txt2kg"
+    db_name = _REQUEST_DB_NAME.get() or os.environ.get("ARANGODB_DB") or "learnhub"
     user = os.environ.get("ARANGODB_USER") or "root"
     password = os.environ.get("ARANGODB_PASSWORD") or ""
     client = ArangoClient(hosts=url)

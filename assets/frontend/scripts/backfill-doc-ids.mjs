@@ -5,18 +5,18 @@
 // entity/relationship that has no docIds yet with a single document id.
 //
 // Usage:
-//   BACKFILL_DB=txt2kg node scripts/backfill-doc-ids.mjs            # auto-pick if exactly 1 processed doc
-//   BACKFILL_DB=txt2kg BACKFILL_DOC_ID=<uuid> node scripts/backfill-doc-ids.mjs
+//   BACKFILL_DB=learnhub node scripts/backfill-doc-ids.mjs            # auto-pick if exactly 1 processed doc
+//   BACKFILL_DB=learnhub BACKFILL_DOC_ID=<uuid> node scripts/backfill-doc-ids.mjs
 //
 // Env:
-//   BACKFILL_DB      optional — target database (defaults to ARANGODB_DB or "txt2kg")
+//   BACKFILL_DB      optional — target database (defaults to ARANGODB_DB or "learnhub")
 //   BACKFILL_DOC_ID  optional — document id to stamp; when omitted, the script reads
 //                    app_documents and proceeds only if exactly one Processed doc exists
 //   ARANGODB_URL / ARANGODB_USER / ARANGODB_PASSWORD — Arango connection (same as the app)
 
 import { Database } from 'arangojs'
 
-const dbName = (process.env.BACKFILL_DB || process.env.ARANGODB_DB || 'txt2kg').trim()
+const dbName = (process.env.BACKFILL_DB || process.env.ARANGODB_DB || 'learnhub').trim()
 
 const db = new Database({
   url: process.env.ARANGODB_URL || 'http://localhost:8529',

@@ -1,7 +1,7 @@
 import { Database } from 'arangojs'
 
 // Shared auth database (separate from per-user data databases).
-export const AUTH_DB_NAME = 'txt2kg_auth'
+export const AUTH_DB_NAME = 'learnhub_auth'
 export const USERS_COLLECTION = 'users'
 
 export type UserRecord = {

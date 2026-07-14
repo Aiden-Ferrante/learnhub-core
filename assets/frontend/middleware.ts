@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server'
 // uncomment everything under "ORIGINAL AUTH GATE" (including its imports).
 //
 // While disabled: pages and APIs are open, getUserDbName() falls back to the
-// env default database (ARANGODB_DB, 'txt2kg'), and the header UserMenu
+// env default database (ARANGODB_DB, 'learnhub'), and the header UserMenu
 // renders nothing (it returns null without a session). /login still exists
 // but nothing redirects to it.
 // ---------------------------------------------------------------------------

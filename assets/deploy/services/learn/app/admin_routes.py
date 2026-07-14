@@ -1,6 +1,6 @@
 """Small admin/read endpoints that round out the REST surface for the learn-hub MCP server.
 
-The MCP server (txt2kg/mcp/server.py) talks ONLY to this REST API — it holds no DB credentials.
+The MCP server (mcp/server.py) talks ONLY to this REST API — it holds no DB credentials.
 These three routes fill the gaps the study UI never needed: list the processed courses, and
 edit a concept / its quiz questions for curation. Everything else the MCP needs already exists
 (outline, concepts, mastery, review queue, quiz, extract, prepare).

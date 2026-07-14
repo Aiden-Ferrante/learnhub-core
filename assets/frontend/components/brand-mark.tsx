@@ -1,4 +1,4 @@
-// Channel brand mark for txt2kg — a small knowledge graph (text → nodes → learn).
+// Channel brand mark for Learn Hub.
 // Uses currentColor so callers set the hue (brand blue via text-brand / text-primary).
 export function BrandMark({ className }: { className?: string }) {
   return (

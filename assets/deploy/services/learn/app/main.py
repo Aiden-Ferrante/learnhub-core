@@ -1,6 +1,7 @@
 """Learn Hub backend: concept-grounded study over ingested textbooks."""
 
 import os
+from pathlib import Path
 
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse

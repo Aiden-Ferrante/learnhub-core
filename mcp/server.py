@@ -8,7 +8,7 @@ of the stack.
 
 Env:
   LEARN_URL      base URL of the learn service   (default http://localhost:8010)
-  LEARN_USER_DB  the ArangoDB user db to scope to (default txt2kg) — sent as the X-User-Db header
+  LEARN_USER_DB  the ArangoDB user db to scope to (default learnhub) — sent as the X-User-Db header
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ except Exception:  # noqa: BLE001
     Image = None  # type: ignore[assignment]
 
 LEARN_URL = (os.environ.get("LEARN_URL") or "http://localhost:8010").rstrip("/")
-USER_DB = os.environ.get("LEARN_USER_DB") or "txt2kg"
+USER_DB = os.environ.get("LEARN_USER_DB") or "learnhub"
 _HEADERS = {"X-User-Db": USER_DB}
 
 mcp = FastMCP(
