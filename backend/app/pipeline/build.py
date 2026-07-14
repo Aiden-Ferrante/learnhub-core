@@ -8,6 +8,10 @@ The phases are separable job kinds:
   - ``extract``: core concept extraction only (no overlay).
   - ``deep``:    the Deep Chapter enrichment overlay for an already-extracted scope.
   - ``build``:   compatibility — ``extract`` then ``deep``, the pre-split behavior.
+
+Extraction inputs may ride on the job row as a payload: ``sectionKeys`` (an exact set,
+the TOC-preview selection), ``model`` (override), and ``force`` (re-extract even when the
+scope already has concepts). This is how ``/api/extract`` reaches the queue.
 """
 
 from __future__ import annotations
@@ -28,36 +32,67 @@ def _scope_keys(db, doc_id: str, scope: str) -> list[str] | None:
     return keys or None
 
 
+def _all_section_keys(db, doc_id: str) -> list[str]:
+    """Every section key stored for a document (whole-doc scope)."""
+    if not db.has_collection("section_content"):
+        return []
+    return sorted(
+        db.aql.execute(
+            "FOR b IN section_content FILTER b.docId == @d AND b.sectionKey != null "
+            "RETURN DISTINCT b.sectionKey",
+            bind_vars={"d": doc_id},
+        )
+    )
+
+
 def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
-    """Core concept extraction for a scope — no overlay. Idempotent: skips if the scope
-    already has concepts (re-extraction is an explicit re-run of a fresh job)."""
-    doc_id, scope = job["docId"], job["scope"]
-    section_keys = _scope_keys(db, doc_id, scope)
-    if not section_keys:
-        return {"error": "no readable content in this scope"}
-    if concept_count(db, doc_id, section_keys) > 0:
-        ctx.patch({"outcomes": None})
-        return None
+    """Core concept extraction — no overlay. ``sectionKeys``/``model`` come from the job
+    payload. Idempotent: skips a whole scope that already has concepts unless ``force`` is
+    set (or an exact ``sectionKeys`` set is requested). Refreshes the semantic index after."""
+    doc_id, scope = job["docId"], (job.get("scope") or None)
+    section_keys = job.get("sectionKeys")
+    model = job.get("model")
+    force = bool(job.get("force"))
+    if scope and not section_keys:
+        keys = _scope_keys(db, doc_id, scope)
+        if not keys:
+            return {"error": "no readable content in this scope"}
+        if not force and concept_count(db, doc_id, keys) > 0:
+            ctx.patch({"outcomes": None})
+            return None
     ctx.phase = "extract"
     res = asyncio.run(
-        extract_concepts_document(doc_id=doc_id, scope=scope, on_progress=ctx.progress, generate_deep=False)
+        extract_concepts_document(
+            doc_id=doc_id, scope=scope, section_keys=section_keys, model=model,
+            on_progress=ctx.progress, generate_deep=False,
+        )
     )
     if res.get("error"):
         return {"error": str(res["error"])}
-    # Persist the per-section extraction report so the Process dashboard can show WHY
-    # sections produced 0 concepts (capped for sanity).
+    # Persist the per-section report + a summary the /api/extract/status poller reads.
     ctx.patch({
         "outcomes": (res.get("outcomes") or [])[:200],
         "concepts": res.get("concepts"),
+        "summary": {k: res.get(k) for k in ("sections", "extracted", "concepts", "questions", "seconds", "errors")},
     })
+    # Best-effort: keep semantic search current with the freshly-extracted content.
+    try:
+        from app.search.semantic_search import ensure_index
+
+        ensure_index(db, doc_id)
+    except Exception:  # noqa: BLE001 — indexing must never fail the extraction
+        pass
     return None
 
 
 def run_deep(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     """Deep Chapter enrichment overlay (briefing + per-section recaps + per-concept deep
-    explanations) for a scope. Assumes concepts already exist; idempotent."""
-    doc_id, scope = job["docId"], job["scope"]
-    section_keys = _scope_keys(db, doc_id, scope)
+    explanations). Section set: the job's ``sectionKeys``, else the scope's span, else the
+    whole document. Assumes concepts already exist; idempotent."""
+    doc_id, scope = job["docId"], (job.get("scope") or None)
+    section_keys = job.get("sectionKeys")
+    if not section_keys:
+        section_keys = _scope_keys(db, doc_id, scope) if scope else _all_section_keys(db, doc_id)
     if not section_keys:
         return {"error": "no readable content in this scope"}
     ctx.check_cancel()

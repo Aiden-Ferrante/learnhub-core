@@ -131,9 +131,12 @@ class JobCtx:
 # --------------------------------------------------------------------------- #
 
 def enqueue_build(doc_id: str | None, scope: str, not_before: int | None = None,
-                  kind: str = "build") -> dict[str, Any]:
+                  kind: str = "build", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     """Queue a processing job. Re-queuing a queued/running job just returns it;
-    re-queuing a finished one starts a fresh run (idempotent underneath)."""
+    re-queuing a finished one starts a fresh run (idempotent underneath).
+
+    ``payload`` carries kind-specific inputs onto the job row (e.g. ``sectionKeys`` /
+    ``model`` / ``force`` for extraction); it never overrides the control fields."""
     if kind not in KINDS:
         return {"error": f"unknown kind {kind!r}"}
     db = connect_arango()
@@ -160,6 +163,8 @@ def enqueue_build(doc_id: str | None, scope: str, not_before: int | None = None,
         "total": 0,
         "error": None,
     }
+    for k, v in (payload or {}).items():
+        job.setdefault(k, v)  # extra inputs only; never clobber control fields
     db.collection(BUILDS).insert(job, overwrite=True)
     ensure_worker()
     return {k: v for k, v in job.items() if not k.startswith("_")}

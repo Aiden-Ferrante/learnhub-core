@@ -1,4 +1,4 @@
-"""Section loading + scope resolution for extraction, and the extraction job runner.
+"""Section loading + scope resolution for extraction.
 
 Historically this module ran the triple/proposition KG extraction; that pipeline was
 removed with the concept-layer pivot (see docs/aposd-review-2026-07-09.md). What remains
@@ -7,9 +7,10 @@ is the shared infrastructure the concept pipeline and every study surface still 
 - scope resolution (``_scope_keys_from_outline`` / ``_blocks_in_scope`` /
   ``_load_section_blocks``): which ``section_content`` rows a TOC scope spans;
 - structural ``has_subsection`` edges (``structural_subsection_triples`` +
-  ``upsert_structural_edges``) that keep the TOC tree renderable;
-- the in-memory background-job wrapper around ``concepts_extract`` (``start_extraction``
-  / ``extraction_status``) behind ``/api/extract``.
+  ``upsert_structural_edges``) that keep the TOC tree renderable.
+
+Background extraction now runs on the persistent queue (pipeline/build.py) behind
+``/api/extract`` — the old in-memory runner is retired.
 """
 
 from __future__ import annotations
