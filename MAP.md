@@ -5,9 +5,15 @@ A navigable map of the codebase. Two levels:
 1. **System topology** — the running containers and which top-level directory each is.
 2. **Backend packages** — the 9 domain packages inside `backend/`, and every file in them.
 
-**How to use it:** the boxes in the Mermaid diagrams are clickable on GitHub (they jump to
-the directory). The **tables** below each diagram are the reliable file-level index — every
-file name is a link. For the *why* behind the structure, see [ARCHITECTURE.md](ARCHITECTURE.md).
+**How to use it:** the **tables** below each diagram are the file-level index — every file
+name is a link that opens the file. The diagrams are color-coded to match and render with
+color on GitHub; note that GitHub sandboxes Mermaid and strips node click-through, so the
+tables (not the diagram boxes) are the reliable way to jump to a file there. The `click`
+directives do work in Mermaid-aware editors (VS Code, Obsidian, mermaid.live). For the *why*
+behind the structure, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+Color key (all three diagrams): gray = clients / structural floor · teal = your code ·
+coral = off-the-shelf services.
 
 ---
 
@@ -28,19 +34,26 @@ flowchart LR
 
   mcp["mcp server<br/>FastMCP · stdio"]
 
-  browser -->|":3001"| app
+  browser -->|:3001| app
   claude -->|stdio| mcp
-  mcp -->|":8010"| learn
-  app -->|"learn:8000"| learn
+  mcp -->|:8010| learn
+  app -->|learn:8000| learn
   app -->|auth| arango
   learn --> arango
   learn --> ollama
   learn --> embed
 
+  classDef client fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+  classDef built fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+  classDef tool fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
+  class browser,claude client;
+  class app,learn,mcp built;
+  class arango,ollama,embed tool;
+  style compose fill:none,stroke:#888780,stroke-dasharray:4 3;
+
   click app "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend" "frontend/"
   click learn "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend" "backend/"
   click mcp "https://github.com/Aiden-Ferrante/learnhub/blob/main/mcp/server.py" "mcp/server.py"
-  click compose "https://github.com/Aiden-Ferrante/learnhub/tree/main/deploy/compose" "deploy/compose/"
 ```
 
 | Box | Directory | What it is |
@@ -89,6 +102,13 @@ flowchart TD
   search --> platform
   study --> content
   overview --> content
+
+  classDef floor fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+  classDef data fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+  classDef behavior fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
+  class platform floor;
+  class content,ingestion,search data;
+  class api,overview,study,extraction,media behavior;
 
   click api "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/api"
   click overview "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/overview"
@@ -248,6 +268,15 @@ flowchart TD
   apiroutes --> proxy
   proxy --> backend
   authlib --> arango
+
+  classDef ext fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+  classDef code fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+  classDef svc fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
+  class browser ext;
+  class pages,components,state,libc,apiroutes,proxy,authlib code;
+  class backend,arango svc;
+  style client fill:none,stroke:#888780,stroke-dasharray:4 3;
+  style server fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click pages "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app"
   click components "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/components"
