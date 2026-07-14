@@ -1,0 +1,41 @@
+name: code map
+
+# Keeps MAP.md in sync with the codebase:
+#  - on push to main: regenerate the file index and commit it back if it changed
+#  - on PRs: fail if MAP.md is stale or has dead links (so drift is caught in review)
+# The push-back uses GITHUB_TOKEN, whose commits do not retrigger workflows — no loop.
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
+  pull_request:
+    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
+
+permissions:
+  contents: write
+
+jobs:
+  code-map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check map is current (pull requests)
+        if: github.event_name == 'pull_request'
+        run: python scripts/gen_map.py --check
+
+      - name: Regenerate and commit (push to main)
+        if: github.event_name == 'push'
+        run: |
+          python scripts/gen_map.py
+          if ! git diff --quiet MAP.md; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add MAP.md
+            git commit -m "chore: sync MAP.md file index [skip ci]"
+            git push
+          fi
