@@ -7,7 +7,7 @@ what's running, what's queued, how long it took, and why it failed all live in t
 
 This module is pure mechanics: ledger CRUD, the single daemon worker, and a runner
 registry. It knows nothing about the domains — each kind's runner (and the "latest
-document" resolver) is registered at startup by the composition root (``api/wiring.py``),
+document" resolver) is registered at startup by the composition root (``pipeline/registry.py``),
 so domains can enqueue jobs without the queue importing them back.
 
 A single daemon worker drains the queue one job at a time — the GPU is compute-bound, so
@@ -29,12 +29,12 @@ from app.platform.arango import connect_arango
 BUILDS = "chapter_builds"
 META = "learn_meta"
 
-KINDS = ("build", "quizzes", "guides", "skeleton", "orient")
+KINDS = ("convert", "build", "extract", "deep", "quizzes", "guides", "skeleton", "orient", "audiobook")
 
 _worker_lock = threading.Lock()
 _worker_started = False
 
-# Registered by api/wiring.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
+# Registered by pipeline/registry.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
 # plus the "no doc id given" resolver. The queue never imports domain modules.
 _RUNNERS: dict[str, Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
 _doc_resolver: Callable[[], str | None] | None = None
@@ -131,9 +131,12 @@ class JobCtx:
 # --------------------------------------------------------------------------- #
 
 def enqueue_build(doc_id: str | None, scope: str, not_before: int | None = None,
-                  kind: str = "build") -> dict[str, Any]:
+                  kind: str = "build", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     """Queue a processing job. Re-queuing a queued/running job just returns it;
-    re-queuing a finished one starts a fresh run (idempotent underneath)."""
+    re-queuing a finished one starts a fresh run (idempotent underneath).
+
+    ``payload`` carries kind-specific inputs onto the job row (e.g. ``sectionKeys`` /
+    ``model`` / ``force`` for extraction); it never overrides the control fields."""
     if kind not in KINDS:
         return {"error": f"unknown kind {kind!r}"}
     db = connect_arango()
@@ -160,6 +163,8 @@ def enqueue_build(doc_id: str | None, scope: str, not_before: int | None = None,
         "total": 0,
         "error": None,
     }
+    for k, v in (payload or {}).items():
+        job.setdefault(k, v)  # extra inputs only; never clobber control fields
     db.collection(BUILDS).insert(job, overwrite=True)
     ensure_worker()
     return {k: v for k, v in job.items() if not k.startswith("_")}

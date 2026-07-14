@@ -9,10 +9,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
+from app.content.documents import fetch_latest_document
 from app.extraction.concept_store import fetch_document_concepts, fetch_section_concepts
-from app.extraction.runner import extraction_status, start_extraction
+from app.platform.jobs import enqueue_build, list_builds
 
 router = APIRouter()
+
+# Map the persistent queue's job status onto the legacy extract-status vocabulary the
+# client polls (idle | running | done | error). Extraction now runs as a queue "build"
+# job (concepts + deep overlay) — same net behavior as the retired in-memory runner.
+_STATUS = {"queued": "running", "running": "running", "done": "done",
+           "error": "error", "canceled": "idle"}
 
 
 @router.post("/api/extract")
@@ -21,25 +28,43 @@ async def api_extract(
     scope: str | None = None,
     body: dict | None = Body(default=None),
 ) -> JSONResponse:
-    """Start a background concept extraction. ``?scope=toc:1`` = one chapter (and everything
-    under it); body ``sectionKeys`` = an exact set (the TOC-preview selection); neither =
-    the whole document (slow). Returns immediately with ``status:running``."""
+    """Start a background concept extraction (queued). ``?scope=toc:1`` = one chapter (and
+    everything under it); body ``sectionKeys`` = an exact set (the TOC-preview selection);
+    neither = the whole document (slow). Returns immediately with ``status:running``."""
     body = body or {}
-    concurrency = int(body.get("concurrency") or 3)
     raw_keys = body.get("sectionKeys")
     section_keys = [str(k) for k in raw_keys if k] if isinstance(raw_keys, list) else None
     model = body.get("model")
     model = str(model).strip() if model else None
-    data = start_extraction(
-        doc, scope, concurrency=concurrency, section_keys=section_keys or None, model=model
-    )
-    return JSONResponse(data, status_code=503 if data.get("status") == "error" else 200)
+    payload: dict = {"force": True}  # /api/extract is an explicit re-extract request
+    if section_keys:
+        payload["sectionKeys"] = section_keys
+    if model:
+        payload["model"] = model
+    data = enqueue_build(doc, scope or "", kind="build", payload=payload)
+    if data.get("error"):
+        return JSONResponse({"status": "error", "error": data["error"]}, status_code=503)
+    return JSONResponse({"status": "running", "docId": data.get("docId"), "scope": scope})
 
 
 @router.get("/api/extract/status")
 def api_extract_status(doc: str | None = None, scope: str | None = None) -> JSONResponse:
     """Poll a background extraction's status (idle | running | done | error)."""
-    return JSONResponse(extraction_status(doc, scope))
+    doc_id = doc or ((fetch_latest_document() or {}).get("document") or {}).get("id")
+    if not doc_id:
+        return JSONResponse({"status": "idle", "scope": scope})
+    builds = list_builds(doc_id, kind="build").get("builds", [])
+    job = next((b for b in builds if (b.get("scope") or "") == (scope or "")), None)
+    if not job:
+        return JSONResponse({"status": "idle", "scope": scope, "docId": doc_id})
+    out: dict = {"status": _STATUS.get(job.get("status"), "idle"), "scope": scope, "docId": doc_id}
+    if job.get("total"):
+        out["progress"] = {"done": job.get("done"), "total": job.get("total"), "current": job.get("phase")}
+    if job.get("summary"):
+        out["summary"] = job["summary"]
+    if job.get("status") == "error":
+        out["error"] = job.get("error")
+    return JSONResponse(out)
 
 
 @router.get("/api/concepts")

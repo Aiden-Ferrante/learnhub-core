@@ -101,7 +101,13 @@ def _save_artifacts(data: bytes, markdown: str, source_filename: str, job_id: st
         return None
 
 
-def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> ConvertResult:
+def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True,
+                      doc_id: str | None = None) -> ConvertResult:
+    """Convert a PDF's bytes to markdown and (when ``save``) persist the structured content.
+
+    ``doc_id`` lets the caller pre-assign the document id — the pipeline mints it at upload
+    so a queued ``convert`` job is addressable before the document exists. Omitted → a fresh
+    uuid (the legacy behavior)."""
     if not data.startswith(PDF_MAGIC):
         raise PdfConvertError("File does not look like a PDF (%PDF header missing).", 400)
     if MAX_PDF_BYTES and len(data) > MAX_PDF_BYTES:
@@ -157,7 +163,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True) -> Conve
     ]
 
     output_filename = _output_name(filename or "document.pdf")
-    doc_id = str(uuid.uuid4())
+    doc_id = doc_id or str(uuid.uuid4())
     saved_path = _save_artifacts(data, markdown, filename, doc_id) if save else None
     persisted_id = (
         persist_document(

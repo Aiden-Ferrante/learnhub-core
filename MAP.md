@@ -3,7 +3,7 @@
 A navigable map of the codebase. Two levels:
 
 1. **System topology** — the running containers and which top-level directory each is.
-2. **Backend packages** — the 9 domain packages inside `backend/`, and every file in them.
+2. **Backend packages** — the domain packages + the pipeline conductor inside `backend/`, and every file in them.
 
 **How to use it:** the **tables** below each diagram are the file-level index — every file
 name is a link that opens the file. The diagrams are color-coded to match and render with
@@ -75,7 +75,7 @@ simplified to the main edges; the file tables are complete.
 
 ```mermaid
 flowchart TD
-  api["api<br/>routers + wiring"]
+  api["api<br/>thin routers"]
   overview["overview<br/>plan · coverage"]
   study["study"]
   extraction["extraction"]
@@ -165,8 +165,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`extract.py`](backend/app/extraction/extract.py) | Section loading + structural edges for extraction |
 | [`concepts_extract.py`](backend/app/extraction/concepts_extract.py) | Concept extraction (the write side) |
 | [`concept_store.py`](backend/app/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
-| [`build_job.py`](backend/app/extraction/build_job.py) | The "build" job runner (extraction + deep overlay) |
-| [`runner.py`](backend/app/extraction/runner.py) | Legacy in-memory `/api/extract` background wrapper |
 | [`deep_chapter.py`](backend/app/extraction/deep_chapter.py) | Chapter briefing + per-section explanations |
 | [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
@@ -211,11 +209,19 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`plan.py`](backend/app/overview/plan.py) | Today plan (resume point, reviews due, next chapter) |
 | [`coverage.py`](backend/app/overview/coverage.py) | Chapter × artifact-kind readiness/coverage grids |
 
+### pipeline/ — the conductor — document lifecycle + job runners
+
+| File | Purpose |
+|---|---|
+| [`build.py`](backend/app/pipeline/build.py) | Phase 2 runners: `extract` (core) / `deep` (overlay) / `build` |
+| [`ingest.py`](backend/app/pipeline/ingest.py) | Phase 1: stash upload + `convert` job runner |
+| [`lifecycle.py`](backend/app/pipeline/lifecycle.py) | Per-document state + auto-chain `converted → extract` |
+| [`registry.py`](backend/app/pipeline/registry.py) | Composition root — registers every job-kind runner |
+
 ### api/ — thin routers + composition root
 
 | File | Purpose |
 |---|---|
-| [`wiring.py`](backend/app/api/wiring.py) | Composition root — registers job runners with `platform/jobs` |
 | [`concept_study_routes.py`](backend/app/api/concept_study_routes.py) | Review queue, grading, quiz endpoints |
 | [`admin_routes.py`](backend/app/api/admin_routes.py) | Curation / CRUD |
 | [`build_routes.py`](backend/app/api/build_routes.py) | Job queue + coverage/readiness endpoints |
@@ -313,17 +319,18 @@ Extraction is the app's core feature, so here is the folder one level deeper. Th
 itself is only three files (teal): [`extract.py`](backend/app/extraction/extract.py) loads a
 chapter's sections and builds the prompt, [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
 calls the LLM and writes concepts, and [`concept_store.py`](backend/app/extraction/concept_store.py)
-is the read side. Two entry points (purple) trigger it. Four other LLM *generation passes*
+is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/pipeline/build.py))
+runs these as queue jobs (`extract` / `deep` / `build`). Four other LLM *generation passes*
 (coral) live in the folder but are triggered independently — only `deep_chapter` runs as part
-of extraction, as the eager overlay after concepts are written.
+of the `build` job, as the overlay after concepts are written.
 [`arango_learn.py`](backend/app/extraction/arango_learn.py) (gray) is dead legacy from the
 pruned triple pipeline. Two dependencies live outside the folder: `concepts_extract` calls
-`platform/llm.py` for the model, and `build_job` is invoked by `platform/jobs.py` (the queue).
+`platform/llm.py` for the model, and the pipeline runners are dispatched by
+`platform/jobs.py` (the one queue).
 
 ```mermaid
 flowchart TD
-  build["build_job.py<br/>build job runner"]
-  runner["runner.py<br/>legacy extract job"]
+  build["pipeline/build.py<br/>extract · deep · build runners"]
   extract["extract.py<br/>sections + prompt"]
   concepts["concepts_extract.py<br/>LLM → concepts"]
   store["concept_store.py<br/>read concepts"]
@@ -334,22 +341,20 @@ flowchart TD
   legacy["arango_learn.py<br/>legacy triple layer"]
 
   build --> concepts
-  runner --> concepts
+  build --> deep
   extract --> concepts
   concepts -->|concepts| store
-  concepts -->|eager| deep
 
   classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
   classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   classDef old fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
-  class build,runner trig;
+  class build trig;
   class extract,concepts,store core;
   class deep,skeleton,guide,augment pass;
   class legacy old;
 
-  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/build_job.py"
-  click runner "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/runner.py"
+  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
   click extract "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/extract.py"
   click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concepts_extract.py"
   click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concept_store.py"
@@ -360,7 +365,7 @@ flowchart TD
   click legacy "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/arango_learn.py"
 ```
 
-Color key: purple = triggers · teal = extraction core · coral = generation passes · gray = legacy.
+Color key: purple = conductor · teal = extraction core · coral = generation passes · gray = legacy.
 
 ---
 
@@ -370,4 +375,5 @@ Floor first (small, everything builds on these), then trace one journey:
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md) — the map's legend
 2. [`platform/arango.py`](backend/app/platform/arango.py) → [`platform/llm.py`](backend/app/platform/llm.py) → [`content/scope.py`](backend/app/content/scope.py) → [`platform/jobs.py`](backend/app/platform/jobs.py)
-3. Then a vertical slice — e.g. **build a chapter**: [`api/build_routes.py`](backend/app/api/build_routes.py) → [`platform/jobs.py`](backend/app/platform/jobs.py) → [`api/wiring.py`](backend/app/api/wiring.py) → [`extraction/build_job.py`](backend/app/extraction/build_job.py) → [`extraction/concepts_extract.py`](backend/app/extraction/concepts_extract.py)
+3. Then a vertical slice — e.g. **build a chapter**: [`api/build_routes.py`](backend/app/api/build_routes.py) → [`platform/jobs.py`](backend/app/platform/jobs.py) → [`pipeline/registry.py`](backend/app/pipeline/registry.py) → [`pipeline/build.py`](backend/app/pipeline/build.py) → [`extraction/concepts_extract.py`](backend/app/extraction/concepts_extract.py)
+4. Or the **document lifecycle**: an upload flows [`api/ingest_routes.py`](backend/app/api/ingest_routes.py) → [`pipeline/ingest.py`](backend/app/pipeline/ingest.py) (convert job) → auto-chained [`pipeline/build.py`](backend/app/pipeline/build.py) (extract) → studyable, tracked by [`pipeline/lifecycle.py`](backend/app/pipeline/lifecycle.py)

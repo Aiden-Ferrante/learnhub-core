@@ -33,6 +33,7 @@ PACKAGES = [
     ("search", "embeddings + semantic search"),
     ("media", "audiobooks"),
     ("overview", "cross-domain read models"),
+    ("pipeline", "the conductor — document lifecycle + job runners"),
     ("api", "thin routers + composition root"),
 ]
 

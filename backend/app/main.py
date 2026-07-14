@@ -10,7 +10,7 @@ from app.content.store import fetch_outline, fetch_page, fetch_section_content
 from app.content.documents import fetch_latest_document
 from app.content.elements import fetch_elements, figure_path
 from app.api.admin_routes import router as admin_router
-from app.api.wiring import install as install_job_runners
+from app.pipeline.registry import install as install_job_runners
 from app.content.arango_tree import get_toc_tree
 from app.platform.arango import set_request_db_name
 from app.api.audiobook_routes import router as audiobook_router

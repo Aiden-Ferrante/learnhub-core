@@ -19,7 +19,7 @@ deploy/    docker-compose + service images (app, learn, ollama, sentence-transfo
 
 ## Backend packages (`backend/app/`)
 
-Dependency rule: **`platform` ← `content` ← domains ← `overview` ← `api`**.
+Dependency rule: **`platform` ← `content` ← domains ← `overview` ← `pipeline` ← `api`**.
 Domains may import `platform`, `content`, and another domain's *public* functions;
 never each other's internals, never anything above them. `api` is thin routers only.
 There are **zero import cycles** (checked by AST; keep it that way).
@@ -29,14 +29,25 @@ There are **zero import cycles** (checked by AST; keep it that way).
 | `platform/` | ArangoDB connection + X-User-Db tenancy (`arango.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
 | `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`arango_tree.py`), chapter units (`chapters.py`) |
 | `ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
-| `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`), concept reads (`concept_store.py`), deep-chapter overlay, skeleton, reading guides, the "build" job runner (`build_job.py`), legacy in-memory extract wrapper (`runner.py`) |
+| `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`), concept reads (`concept_store.py`), deep-chapter overlay, skeleton, reading guides |
 | `study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, SM-2 (`srs.py`) |
 | `search/` | Embeddings + semantic search over content vectors |
-| `media/` | Audiobook TTS (own checkpointed job system) |
+| `media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
 | `overview/` | Cross-domain read models: Today plan (`plan.py`), chapter readiness/coverage grids (`coverage.py`) |
-| `api/` | One router module per surface + `wiring.py`, the composition root that registers job runners with `platform/jobs` at startup |
+| `pipeline/` | The **conductor** over the document lifecycle: phase-1 ingest (`ingest.py`), phase-2 build runners `extract`/`deep`/`build` (`build.py`), per-document state + auto-chain `converted → extract` (`lifecycle.py`), and the composition root that registers every job-kind runner with `platform/jobs` (`registry.py`) |
+| `api/` | One thin router module per surface |
 
-`app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, wiring.
+`app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, and
+`pipeline/registry.install()` (job-runner wiring).
+
+## The pipeline (document lifecycle)
+
+A document flows `uploaded → converted → extracted → studyable`, with enrichment
+(deep / skeleton / guides / quizzes / audiobook) as a lazy overlay on top. All background
+work — conversion, extraction, every enrichment pass, and audiobook TTS — runs on the
+**one persistent queue** (`platform/jobs`) as a registered *kind*; there are no in-memory
+job systems. An upload auto-chains to core extraction (`LEARN_AUTOCHAIN`, default on), so a
+converted document becomes studyable without a manual build. See [MAP.md](MAP.md) § 4.
 
 ## Conventions
 
