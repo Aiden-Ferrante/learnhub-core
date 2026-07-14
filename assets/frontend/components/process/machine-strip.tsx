@@ -123,7 +123,7 @@ export function MachineStrip() {
               <span
                 className={cn(
                   "block h-full rounded-full",
-                  memPct > 85 ? "bg-amber-400" : "bg-nvidia-green",
+                  memPct > 85 ? "bg-amber-400" : "bg-brand",
                 )}
                 style={{ width: `${memPct}%` }}
               />
@@ -173,7 +173,7 @@ export function MachineStrip() {
 
       {running && (
         <div className="flex items-center gap-3 border-t px-3 py-2">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-nvidia-green" />
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
               <span className="font-medium">
@@ -191,7 +191,7 @@ export function MachineStrip() {
             {!!running.total && (
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-nvidia-green transition-all"
+                  className="h-full rounded-full bg-brand transition-all"
                   style={{ width: `${Math.round(((running.done ?? 0) / running.total) * 100)}%` }}
                 />
               </div>

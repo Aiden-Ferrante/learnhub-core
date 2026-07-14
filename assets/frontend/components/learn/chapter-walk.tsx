@@ -298,7 +298,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
       </div>
       <div className="h-0.5 w-full bg-muted">
         <div
-          className="h-full bg-nvidia-green transition-all"
+          className="h-full bg-brand transition-all"
           style={{ width: `${(stepIdx / Math.max(1, steps.length - 1)) * 100}%` }}
         />
       </div>

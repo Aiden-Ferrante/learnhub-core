@@ -163,7 +163,7 @@ function OutcomeReport({ job, docId }: { job: ChapterBuildJob; docId: string }) 
   return (
     <div className="space-y-2 px-3 py-2">
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="text-nvidia-green">{counts.ok} extracted</span>
+        <span className="text-brand">{counts.ok} extracted</span>
         {counts.empty > 0 && <span>{counts.empty} empty</span>}
         {counts.skipped > 0 && <span>{counts.skipped} skipped</span>}
         {counts.error > 0 && <span className="text-destructive">{counts.error} errors</span>}
@@ -298,8 +298,8 @@ export function ProcessDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-nvidia-green/15">
-          <Zap className="h-4 w-4 text-nvidia-green" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand/15">
+          <Zap className="h-4 w-4 text-brand" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold leading-tight">Process</h2>
@@ -326,7 +326,7 @@ export function ProcessDashboard() {
             className={cn(
               "max-w-[22rem] truncate rounded-md border px-3 py-1.5 text-xs transition-colors",
               d.docId === docId
-                ? "border-nvidia-green/50 bg-nvidia-green/10 text-foreground"
+                ? "border-brand/50 bg-brand/10 text-foreground"
                 : "text-muted-foreground hover:border-border hover:text-foreground",
             )}
             title={d.title}
@@ -388,9 +388,9 @@ export function ProcessDashboard() {
                       className={cn(
                         "h-2 w-2 shrink-0 rounded-full",
                         deep
-                          ? "bg-nvidia-green"
+                          ? "bg-brand"
                           : partial
-                            ? "border border-nvidia-green bg-nvidia-green/30"
+                            ? "border border-brand bg-brand/30"
                             : "border border-muted-foreground/40",
                       )}
                     />
@@ -430,7 +430,7 @@ export function ProcessDashboard() {
                         <AlertTriangle className="h-3.5 w-3.5" /> failed
                       </span>
                     ) : deep ? (
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-nvidia-green">
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-brand">
                         <Check className="h-3.5 w-3.5" /> deep
                       </span>
                     ) : null}

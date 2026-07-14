@@ -7,7 +7,7 @@ export async function UserMenu() {
 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-      <UserCircle2 className="h-4 w-4 text-nvidia-green" />
+      <UserCircle2 className="h-4 w-4 text-brand" />
       <span className="text-sm font-medium">{session.user.name}</span>
       <form
         action={async () => {

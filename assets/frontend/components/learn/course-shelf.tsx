@@ -82,7 +82,7 @@ function MiniRing({ pct }: { pct: number }) {
     <div
       className="relative h-12 w-12 shrink-0 rounded-full"
       style={{
-        background: `conic-gradient(hsl(var(--nvidia-green)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
+        background: `conic-gradient(hsl(var(--brand)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
       }}
     >
       <div className="absolute inset-[5px] flex items-center justify-center rounded-full bg-card">
@@ -117,7 +117,7 @@ function CourseCard({
 }) {
   const badge = STATUS_BADGE[course.status]
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-nvidia-green/50">
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-brand/50">
       {/* Move-to-group menu */}
       <div className="absolute right-2 top-2 z-10">
         <DropdownMenu>
@@ -355,8 +355,8 @@ export function CourseShelf({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-nvidia-green/15">
-          <GraduationCap className="h-4 w-4 text-nvidia-green" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand/15">
+          <GraduationCap className="h-4 w-4 text-brand" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold leading-tight">Learn</h2>
@@ -370,7 +370,7 @@ export function CourseShelf({
             <button
               type="button"
               onClick={onNewCourse}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-nvidia-green/50 hover:text-foreground"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground"
             >
               <Plus className="h-3.5 w-3.5" />
               Upload
@@ -380,7 +380,7 @@ export function CourseShelf({
             <button
               type="button"
               onClick={onProcess}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-nvidia-green/50 hover:text-foreground"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground"
             >
               <Zap className="h-3.5 w-3.5" />
               Process
@@ -393,8 +393,8 @@ export function CourseShelf({
 
       {courses.length === 0 ? (
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-card/40 px-6 py-16 text-center">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-nvidia-green/10 ring-1 ring-nvidia-green/25">
-            <GraduationCap className="h-7 w-7 text-nvidia-green" />
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 ring-1 ring-brand/25">
+            <GraduationCap className="h-7 w-7 text-brand" />
           </div>
           <h3 className="text-xl font-semibold">Start your first course</h3>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
@@ -406,13 +406,13 @@ export function CourseShelf({
             <span aria-hidden>→</span>
             <span className="rounded-full bg-muted/60 px-2.5 py-1">2 · Process</span>
             <span aria-hidden>→</span>
-            <span className="rounded-full bg-nvidia-green/15 px-2.5 py-1 text-nvidia-green">3 · Study</span>
+            <span className="rounded-full bg-brand/15 px-2.5 py-1 text-brand">3 · Study</span>
           </div>
           {onNewCourse && (
             <button
               type="button"
               onClick={onNewCourse}
-              className="mt-7 inline-flex items-center gap-2 rounded-lg border border-nvidia-green/40 bg-nvidia-green/10 px-4 py-2.5 text-sm font-medium text-nvidia-green transition-colors hover:bg-nvidia-green/20 focus:outline-none focus:ring-2 focus:ring-nvidia-green/50"
+              className="mt-7 inline-flex items-center gap-2 rounded-lg border border-brand/40 bg-brand/10 px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
             >
               <Plus className="h-4 w-4" />
               Upload a document
@@ -478,7 +478,7 @@ export function CourseShelf({
               <button
                 type="button"
                 onClick={onNewCourse}
-                className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:border-nvidia-green/50 hover:text-foreground"
+                className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground"
               >
                 <Plus className="h-6 w-6" />
                 <span className="text-sm font-medium">New course</span>

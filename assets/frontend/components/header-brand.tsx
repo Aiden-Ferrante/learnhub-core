@@ -25,9 +25,9 @@ export function HeaderBrand() {
       type="button"
       onClick={goHome}
       aria-label="Learn Hub home"
-      className="flex items-center gap-3 rounded-lg transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50"
+      className="flex items-center gap-3 rounded-lg transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand/50"
     >
-      <BrandMark className="h-8 w-8 text-nvidia-green" />
+      <BrandMark className="h-8 w-8 text-brand" />
       <span className="text-xl font-bold gradient-text">Learn Hub</span>
     </button>
   )
@@ -51,7 +51,7 @@ export function HeaderProcessLink() {
     <button
       type="button"
       onClick={goProcess}
-      className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-border text-foreground/90 bg-muted/40 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50"
+      className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-border text-foreground/90 bg-muted/40 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand/50"
     >
       <Zap className="h-4 w-4 text-current" />
       <span>Process</span>

@@ -159,20 +159,20 @@ function relevelHeadings(markdown: string, outline: OutlineEntry[], chapterKey: 
 /** Underline tint = live mastery state: unseen (quiet invite), learning, due again (amber),
  *  mastered (solid). This is where the reader meets the retention loop. */
 function masteryTint(m: ConceptMastery | undefined, threshold: number): string {
-  if (!m || !m.attempts) return "border-dotted border-nvidia-green/50"
-  if (m.mastery >= threshold) return "border-solid border-nvidia-green/60"
+  if (!m || !m.attempts) return "border-dotted border-brand/50"
+  if (m.mastery >= threshold) return "border-solid border-brand/60"
   if (m.due != null && m.due <= Date.now() / 1000) return "border-dotted border-amber-400/80"
-  return "border-dotted border-nvidia-green/90"
+  return "border-dotted border-brand/90"
 }
 
 /** Highlighter wash (toggleable in reading settings): brightest on unseen concepts,
  *  amber when due, nearly invisible once mastered — the chapter fades as you learn it. */
 function masteryWash(m: ConceptMastery | undefined, threshold: number): string {
   if (m && m.attempts) {
-    if (m.mastery >= threshold) return "rounded-[3px] bg-nvidia-green/[0.05]"
+    if (m.mastery >= threshold) return "rounded-[3px] bg-brand/[0.05]"
     if (m.due != null && m.due <= Date.now() / 1000) return "rounded-[3px] bg-amber-400/10"
   }
-  return "rounded-[3px] bg-nvidia-green/10"
+  return "rounded-[3px] bg-brand/10"
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ function annotateNode(
             type="button"
             data-concept={idx}
             className={cn(
-              "dc-term cursor-pointer rounded-sm border-b bg-transparent p-0 text-inherit hover:bg-nvidia-green/10",
+              "dc-term cursor-pointer rounded-sm border-b bg-transparent p-0 text-inherit hover:bg-brand/10",
               classForIdx(idx),
             )}
           >
@@ -258,7 +258,7 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-1 text-nvidia-green hover:underline"
+          className="mt-1 text-brand hover:underline"
         >
           Reveal answer
         </button>
@@ -1057,7 +1057,7 @@ export function DeepChapter({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-sm font-medium hover:text-nvidia-green"
+              className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-sm font-medium hover:text-brand"
               title="Jump to a chapter"
             >
               <span className="truncate">{title}</span>
@@ -1071,13 +1071,13 @@ export function DeepChapter({
               // Readiness ladder dot: building / queued / deep / partial / raw.
               const dot =
                 b?.status === "running" ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-nvidia-green" />
+                  <Loader2 className="h-3 w-3 animate-spin text-brand" />
                 ) : b?.status === "queued" ? (
                   <Clock className="h-3 w-3 text-muted-foreground" />
                 ) : r && r.concepts > 0 && r.explained >= r.concepts && r.briefing ? (
-                  <span className="h-2 w-2 rounded-full bg-nvidia-green" title="Deep — ready" />
+                  <span className="h-2 w-2 rounded-full bg-brand" title="Deep — ready" />
                 ) : r && r.concepts > 0 ? (
-                  <span className="h-2 w-2 rounded-full border border-nvidia-green bg-nvidia-green/30" title="Partially built" />
+                  <span className="h-2 w-2 rounded-full border border-brand bg-brand/30" title="Partially built" />
                 ) : (
                   <span className="h-2 w-2 rounded-full border border-muted-foreground/40" title="Not built yet" />
                 )
@@ -1085,7 +1085,7 @@ export function DeepChapter({
                 <DropdownMenuItem
                   key={c.key}
                   onSelect={() => goChapter(c.key)}
-                  className={cn("gap-2", c.key === chapterKey && "text-nvidia-green")}
+                  className={cn("gap-2", c.key === chapterKey && "text-brand")}
                 >
                   <span className="flex w-3 shrink-0 items-center justify-center">{dot}</span>
                   <span className="truncate">{c.title}</span>
@@ -1198,7 +1198,7 @@ export function DeepChapter({
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
                     done
-                      ? "border-nvidia-green/40 bg-nvidia-green/10 text-nvidia-green"
+                      ? "border-brand/40 bg-brand/10 text-brand"
                       : isNext
                         ? "border-foreground/30 text-foreground"
                         : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
@@ -1207,7 +1207,7 @@ export function DeepChapter({
                   {done ? (
                     <Check className="h-3 w-3" />
                   ) : (
-                    <span className={cn("h-1.5 w-1.5 rounded-full", isNext ? "bg-nvidia-green" : "bg-muted-foreground/40")} />
+                    <span className={cn("h-1.5 w-1.5 rounded-full", isNext ? "bg-brand" : "bg-muted-foreground/40")} />
                   )}
                   {s.label}
                 </button>
@@ -1293,7 +1293,7 @@ export function DeepChapter({
                     className={cn(
                       "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
                       j === activeRail
-                        ? "bg-nvidia-green/10 font-medium text-nvidia-green"
+                        ? "bg-brand/10 font-medium text-brand"
                         : cn(mutedCls, paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/50", "hover:opacity-100"),
                       it.target < 0 && "cursor-default opacity-60",
                     )}
@@ -1335,7 +1335,7 @@ export function DeepChapter({
                     <BookOpen className="h-3.5 w-3.5" />
                     <span>Chapter briefing</span>
                     {stages.orient && (
-                      <span className="flex items-center gap-1 text-nvidia-green">
+                      <span className="flex items-center gap-1 text-brand">
                         <Check className="h-3 w-3" /> oriented
                       </span>
                     )}
@@ -1350,7 +1350,7 @@ export function DeepChapter({
                       <ul className="space-y-1 text-sm opacity-90">
                         {briefing.objectives.map((o, i) => (
                           <li key={i} className="flex gap-2">
-                            <span className="text-nvidia-green">•</span>
+                            <span className="text-brand">•</span>
                             <MathText text={o} />
                           </li>
                         ))}
@@ -1576,7 +1576,7 @@ export function DeepChapter({
           style={{ left: selChip.x, top: selChip.y }}
           onClick={() => runExplain(selChip.text)}
         >
-          <Sparkles className="h-3 w-3 text-nvidia-green" />
+          <Sparkles className="h-3 w-3 text-brand" />
           Explain this
         </button>
       )}
@@ -1590,7 +1590,7 @@ export function DeepChapter({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <blockquote className="mb-3 border-l-2 border-nvidia-green/40 pl-2 text-xs italic text-muted-foreground">
+          <blockquote className="mb-3 border-l-2 border-brand/40 pl-2 text-xs italic text-muted-foreground">
             {explain.q}
           </blockquote>
           {explain.loading ? (

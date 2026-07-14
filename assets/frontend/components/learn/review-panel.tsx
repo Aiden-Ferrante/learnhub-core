@@ -169,7 +169,7 @@ export function ReviewPanel({
         </div>
         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-nvidia-green transition-all"
+            className="h-full rounded-full bg-brand transition-all"
             style={{ width: `${(idx / Math.max(1, cards.length)) * 100}%` }}
           />
         </div>

@@ -260,7 +260,7 @@ export function ChapterReader({
           <Search className="h-4 w-4" />
         </button>
         <div
-          className="absolute inset-x-0 bottom-0 h-0.5 bg-nvidia-green transition-[width] duration-150"
+          className="absolute inset-x-0 bottom-0 h-0.5 bg-brand transition-[width] duration-150"
           style={{ width: `${progress}%` }}
           aria-hidden
         />

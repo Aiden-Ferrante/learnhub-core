@@ -55,7 +55,7 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
   const Row = ({ ok, label }: { ok: boolean; label: string }) => (
     <p className="flex items-center gap-2 text-sm">
       {ok ? (
-        <CheckCircle2 className="h-4 w-4 text-nvidia-green" />
+        <CheckCircle2 className="h-4 w-4 text-brand" />
       ) : (
         <Circle className="h-4 w-4 text-muted-foreground/40" />
       )}
@@ -66,7 +66,7 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
   return (
     <div className="space-y-5 p-6">
       <div className="flex items-center gap-2">
-        <PartyPopper className="h-4 w-4 text-nvidia-green" />
+        <PartyPopper className="h-4 w-4 text-brand" />
         <span className="text-sm font-medium">Lock it in</span>
       </div>
 
@@ -77,7 +77,7 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
 
       <div className="rounded-lg border bg-card p-3">
         <p className="flex items-center gap-2 text-sm font-medium">
-          <Repeat className="h-4 w-4 text-nvidia-green" /> Into spaced review
+          <Repeat className="h-4 w-4 text-brand" /> Into spaced review
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           This chapter&rsquo;s concepts are now in your review rotation — they&rsquo;ll resurface
@@ -101,8 +101,8 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
       )}
 
       {locked ? (
-        <div className="flex items-center gap-2.5 rounded-lg border border-nvidia-green/40 bg-nvidia-green/10 p-3 animate-in fade-in-0 zoom-in-95 duration-300">
-          <PartyPopper className="h-5 w-5 shrink-0 text-nvidia-green" />
+        <div className="flex items-center gap-2.5 rounded-lg border border-brand/40 bg-brand/10 p-3 animate-in fade-in-0 zoom-in-95 duration-300">
+          <PartyPopper className="h-5 w-5 shrink-0 text-brand" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">Chapter complete — nice work.</p>
             <p className="text-xs text-muted-foreground">

@@ -299,7 +299,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
   return (
     <div className="space-y-5 p-6">
       <div className="flex items-center gap-2">
-        <Headphones className="h-4 w-4 text-nvidia-green" />
+        <Headphones className="h-4 w-4 text-brand" />
         <span className="text-sm font-medium">Audiobook</span>
         <span className="text-xs text-muted-foreground">· narrated locally by Orpheus</span>
       </div>
@@ -423,7 +423,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
                       /* ignore */
                     }
                   }}
-                  className="h-3 w-3 accent-nvidia-green"
+                  className="h-3 w-3 accent-brand"
                 />
                 Follow in text
               </label>
@@ -435,7 +435,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
             <a
               href={downloadUrl}
               download
-              className="inline-flex items-center gap-1 font-medium text-nvidia-green hover:underline"
+              className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
             >
               <Download className="h-3.5 w-3.5" />
               Download MP3

@@ -19,7 +19,7 @@ export function ConceptMasteryDot({
   const m = Math.min(1, Math.max(0, mastery))
   return (
     <span
-      className="h-2 w-2 shrink-0 rounded-full bg-nvidia-green"
+      className="h-2 w-2 shrink-0 rounded-full bg-brand"
       style={{ opacity: 0.2 + 0.8 * m }}
       title={`Mastery ${Math.round(m * 100)}%`}
     />

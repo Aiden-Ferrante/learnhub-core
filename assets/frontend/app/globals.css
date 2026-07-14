@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* Inter typography patterns (Channel brand) */
-@import url('../styles/nvidia-build-typography.css');
+@import url('../styles/build-typography.css');
 
 :root {
   /* Off-white, not pure white — calmer reading contrast (premium-tool restraint). */
@@ -42,14 +42,14 @@ body {
     animation: fadeIn 0.3s ease-in-out;
   }
 
-  /* NVIDIA green utility text color */
-  .text-nvidia-green {
-    color: hsl(var(--nvidia-green));
+  /* Brand accent utility text color */
+  .text-brand {
+    color: hsl(var(--brand));
   }
 
   /* Accent color for native form controls (checkbox/radio) */
   .selection-accent {
-    accent-color: hsl(var(--nvidia-green));
+    accent-color: hsl(var(--brand));
   }
 
   @keyframes fadeIn {
@@ -100,14 +100,14 @@ body {
     --radius: 0.75rem;
 
     /* Channel brand accent (#4da3ff). New code should use --brand-accent or the
-       `brand` Tailwind color (text-brand / bg-brand). --nvidia-green is a
-       deprecated alias kept for the ~50 legacy `text-nvidia-green` call-sites. */
+       `brand` Tailwind color (text-brand / bg-brand). --brand is a
+       deprecated alias kept for the ~50 legacy `text-brand` call-sites. */
     --brand-accent: 211 100% 65%;
     --brand-accent-dark: 211 90% 55%;
     --brand-accent-light: 211 100% 74%;
-    --nvidia-green: var(--brand-accent);
-    --nvidia-green-dark: var(--brand-accent-dark);
-    --nvidia-green-light: var(--brand-accent-light);
+    --brand: var(--brand-accent);
+    --brand-dark: var(--brand-accent-dark);
+    --brand-light: var(--brand-accent-light);
   }
 
   .light {
@@ -145,9 +145,9 @@ body {
     --brand-accent: 211 90% 52%;
     --brand-accent-dark: 211 90% 44%;
     --brand-accent-light: 211 95% 60%;
-    --nvidia-green: var(--brand-accent);
-    --nvidia-green-dark: var(--brand-accent-dark);
-    --nvidia-green-light: var(--brand-accent-light);
+    --brand: var(--brand-accent);
+    --brand-dark: var(--brand-accent-dark);
+    --brand-light: var(--brand-accent-light);
   }
 }
 
@@ -210,12 +210,12 @@ body {
   color: #1c1714;
 }
 
-/* Concept source sentences highlighted in the reader — subtle nvidia-green wash + underline,
+/* Concept source sentences highlighted in the reader — subtle brand wash + underline,
    inviting a click (the click/hover is handled by use-concept-highlights via caret hit-test). */
 ::highlight(concept-source) {
-  background-color: hsl(var(--nvidia-green) / 0.16);
+  background-color: hsl(var(--brand) / 0.16);
   text-decoration: underline;
-  text-decoration-color: hsl(var(--nvidia-green) / 0.5);
+  text-decoration-color: hsl(var(--brand) / 0.5);
   text-underline-offset: 2px;
 }
 
@@ -227,7 +227,7 @@ body {
 /* Glossary terms — every occurrence of a concept name; subtle dotted underline, hover for def. */
 ::highlight(concept-term) {
   text-decoration: underline dotted;
-  text-decoration-color: hsl(var(--nvidia-green) / 0.55);
+  text-decoration-color: hsl(var(--brand) / 0.55);
   text-underline-offset: 3px;
 }
 
@@ -262,7 +262,7 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(to right, hsl(var(--nvidia-green)), hsl(var(--nvidia-green-light)));
+  background: linear-gradient(to right, hsl(var(--brand)), hsl(var(--brand-light)));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -293,11 +293,11 @@ body {
 
 /* Light mode row selection highlight using the brand accent */
 .light .row-selected {
-  background-color: hsl(var(--nvidia-green) / 0.08);
+  background-color: hsl(var(--brand) / 0.08);
 }
 
 .light .row-selected:hover {
-  background-color: hsl(var(--nvidia-green) / 0.12);
+  background-color: hsl(var(--brand) / 0.12);
 }
 
 /* Slider Styles */
@@ -306,7 +306,7 @@ body {
   height: 18px;
   width: 18px;
   border-radius: 50%;
-  background: hsl(var(--nvidia-green));
+  background: hsl(var(--brand));
   border: 2px solid hsl(var(--background));
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
@@ -322,7 +322,7 @@ body {
   height: 18px;
   width: 18px;
   border-radius: 50%;
-  background: hsl(var(--nvidia-green));
+  background: hsl(var(--brand));
   border: 2px solid hsl(var(--background));
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
@@ -493,7 +493,7 @@ body {
 .markdown-reader .hljs-selector-tag,
 .markdown-reader .hljs-built_in,
 .markdown-reader .hljs-meta {
-  color: hsl(var(--nvidia-green));
+  color: hsl(var(--brand));
 }
 .markdown-reader .hljs-string,
 .markdown-reader .hljs-regexp,

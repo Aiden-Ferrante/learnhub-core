@@ -1,19 +1,3 @@
-//
-// SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
 "use client"
 
 import { useState } from "react"
@@ -138,7 +122,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
             <div className="flex flex-col">
               <span className="text-sm font-medium">
                 {selectedDocuments.length > 0 ? (
-                  <span className="text-nvidia-green">{selectedDocuments.length} selected</span>
+                  <span className="text-brand">{selectedDocuments.length} selected</span>
                 ) : (
                   <span className="text-foreground">Select all documents</span>
                 )}
@@ -182,8 +166,8 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
             <tr>
               <td colSpan={6} className="py-16">
                 <div className="flex flex-col items-center justify-center text-center">
-                  <div className="w-24 h-24 rounded-2xl bg-nvidia-green/10 flex items-center justify-center mb-6 border-2 border-dashed border-nvidia-green/20">
-                    <FileText className="h-12 w-12 text-nvidia-green" />
+                  <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-6 border-2 border-dashed border-brand/20">
+                    <FileText className="h-12 w-12 text-brand" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-3">No documents uploaded yet</h3>
                   <p className="text-sm text-muted-foreground mb-6 max-w-md leading-relaxed">
@@ -198,7 +182,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
             </tr>
           ) : (
             documents.map((doc) => (
-               <tr key={doc.id} className={`transition-all duration-200 hover:bg-nvidia-green/5 cursor-pointer group border-b border-border/10 last:border-b-0 ${isSelected(doc.id) ? 'bg-nvidia-green/8 border-l-4 border-l-nvidia-green' : 'hover:border-l-4 hover:border-l-nvidia-green/40'}`}
+               <tr key={doc.id} className={`transition-all duration-200 hover:bg-brand/5 cursor-pointer group border-b border-border/10 last:border-b-0 ${isSelected(doc.id) ? 'bg-brand/8 border-l-4 border-l-brand' : 'hover:border-l-4 hover:border-l-brand/40'}`}
                    onClick={(e) => handleItemClick(doc, e)}>
                 <td className="pl-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -210,7 +194,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                 </td>
                  <td className="py-4" onClick={editingId === doc.id ? (e) => e.stopPropagation() : undefined}>
                   <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-nvidia-green flex-shrink-0" />
+                    <FileText className="h-4 w-4 text-brand flex-shrink-0" />
                     {editingId === doc.id ? (
                       <input
                         type="text"
@@ -248,7 +232,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                 </td>
                 <td className="py-4">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-nvidia-green" />
+                    <CheckCircle className="h-4 w-4 text-brand" />
                     <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">{doc.uploadStatus}</span>
                   </div>
                 </td>
@@ -262,7 +246,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                         e.stopPropagation()
                         startRename(doc.id, doc.name)
                       }}
-                      className="p-2 text-muted-foreground hover:text-nvidia-green hover:bg-nvidia-green/10 rounded-lg transition-colors"
+                      className="p-2 text-muted-foreground hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                       aria-label={`Rename ${doc.name}`}
                       title="Rename document"
                     >
@@ -288,7 +272,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                           })
                         }
                       }}
-                      className="p-2 text-muted-foreground hover:text-nvidia-green hover:bg-nvidia-green/10 rounded-lg transition-colors"
+                      className="p-2 text-muted-foreground hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                       aria-label={`Download ${doc.name}`}
                       title="Download document"
                     >

@@ -74,13 +74,13 @@ function relativeTime(ts: number): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-/** A low-ink circular progress ring tinted nvidia-green over the muted track. */
+/** A low-ink circular progress ring tinted brand over the muted track. */
 function MasteryRing({ pct }: { pct: number }) {
   return (
     <div
       className="relative h-20 w-20 shrink-0 rounded-full"
       style={{
-        background: `conic-gradient(hsl(var(--nvidia-green)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
+        background: `conic-gradient(hsl(var(--brand)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
       }}
     >
       <div className="absolute inset-[6px] flex items-center justify-center rounded-full bg-card">
@@ -118,7 +118,7 @@ function PracticeTile({
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-nvidia-green/50 hover:bg-nvidia-green/5"
+      className="group flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand/5"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -277,12 +277,12 @@ export function CourseHome({
     }
   } else if (studied === 0) {
     headline = {
-      icon: <Sparkles className="h-4 w-4 text-nvidia-green" />,
+      icon: <Sparkles className="h-4 w-4 text-brand" />,
       text: "Pick any section below and start a quiz to begin tracking mastery.",
     }
   } else {
     headline = {
-      icon: <Sparkles className="h-4 w-4 text-nvidia-green" />,
+      icon: <Sparkles className="h-4 w-4 text-brand" />,
       text: "You're on top of your material — keep the streak going.",
     }
   }
@@ -305,8 +305,8 @@ export function CourseHome({
       {/* Hero / overview */}
       <div className="rounded-lg border bg-card p-4">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-nvidia-green/15">
-            <GraduationCap className="h-5 w-5 text-nvidia-green" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/15">
+            <GraduationCap className="h-5 w-5 text-brand" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold leading-tight">{course.title}</h2>
@@ -327,13 +327,13 @@ export function CourseHome({
         {pipeline?.exists && (
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <span className="text-nvidia-green">✓</span> Converted
+              <span className="text-brand">✓</span> Converted
               {pipeline.pageCount ? ` · ${pipeline.pageCount}p` : ""}
             </span>
             <span aria-hidden>·</span>
             {(pipeline.outlineEntries ?? 0) > 0 ? (
               <span className="flex items-center gap-1">
-                <span className="text-nvidia-green">✓</span> Outline
+                <span className="text-brand">✓</span> Outline
               </span>
             ) : (
               <span className="text-amber-500">No outline</span>
@@ -343,7 +343,7 @@ export function CourseHome({
               className={
                 (pipeline.chaptersWithConcepts ?? 0) === (pipeline.chaptersTotal ?? 0) &&
                 (pipeline.chaptersTotal ?? 0) > 0
-                  ? "text-nvidia-green"
+                  ? "text-brand"
                   : undefined
               }
             >
@@ -432,7 +432,7 @@ export function CourseHome({
             <div className="grid gap-2 p-3 sm:grid-cols-3">
               {onReviewAll && (
                 <PracticeTile
-                  icon={<RotateCcw className="h-4 w-4 text-nvidia-green" />}
+                  icon={<RotateCcw className="h-4 w-4 text-brand" />}
                   title="Review"
                   desc="Spaced-repetition cards that have come due — keeps what you learned from fading."
                   badge={dueCount > 0 ? `${dueCount} due` : "Caught up"}
@@ -574,7 +574,7 @@ export function CourseHome({
                   key={w.sectionKey}
                   type="button"
                   onClick={() => onReview(w)}
-                  className="group flex min-w-[11rem] flex-1 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-nvidia-green/50 hover:bg-nvidia-green/5"
+                  className="group flex min-w-[11rem] flex-1 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand/5"
                 >
                   <span className="text-xs text-muted-foreground">Review section</span>
                   <span className="truncate text-sm font-medium">
@@ -583,7 +583,7 @@ export function CourseHome({
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-nvidia-green"
+                        className="h-full rounded-full bg-brand"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -621,7 +621,7 @@ export function CourseHome({
                       mastery: 0,
                     })
                   }
-                  className="flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-nvidia-green/5"
+                  className="flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-brand/5"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{sectionTitle}</div>

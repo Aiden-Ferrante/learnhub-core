@@ -119,7 +119,7 @@ export function ExamPanel({ scope, docId, onGraded, onDrillMisses, onLockIn }: E
           <div
             className={cn(
               "flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold tabular-nums",
-              result.pass ? "bg-nvidia-green/15 text-nvidia-green" : "bg-amber-500/15 text-amber-400",
+              result.pass ? "bg-brand/15 text-brand" : "bg-amber-500/15 text-amber-400",
             )}
           >
             {result.score}%
@@ -135,7 +135,7 @@ export function ExamPanel({ scope, docId, onGraded, onDrillMisses, onLockIn }: E
           {result.results?.map((r, i) => (
             <li key={i} className="text-sm">
               <div className="flex gap-2">
-                <span className={cn("mt-0.5", r.correct ? "text-nvidia-green" : "text-destructive")}>
+                <span className={cn("mt-0.5", r.correct ? "text-brand" : "text-destructive")}>
                   {r.correct ? "✓" : "✗"}
                 </span>
                 <span className={r.correct ? "text-muted-foreground" : "text-foreground/90"}>
@@ -225,7 +225,7 @@ export function ExamPanel({ scope, docId, onGraded, onDrillMisses, onLockIn }: E
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center gap-2">
-        <ClipboardCheck className="h-4 w-4 text-nvidia-green" />
+        <ClipboardCheck className="h-4 w-4 text-brand" />
         <span className="text-sm font-medium">Chapter exam</span>
       </div>
       <p className="text-sm text-muted-foreground">

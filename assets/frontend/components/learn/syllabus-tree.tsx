@@ -71,13 +71,13 @@ function ExtractButton({
       className={cn(
         "mt-0.5 shrink-0 transition-opacity",
         state ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100",
-        state === "error" ? "text-destructive" : "text-muted-foreground hover:text-nvidia-green",
+        state === "error" ? "text-destructive" : "text-muted-foreground hover:text-brand",
       )}
     >
       {state === "running" ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
       ) : state === "done" ? (
-        <Check className="h-3.5 w-3.5 text-nvidia-green" />
+        <Check className="h-3.5 w-3.5 text-brand" />
       ) : state === "error" ? (
         <TriangleAlert className="h-3.5 w-3.5" />
       ) : (
@@ -100,7 +100,7 @@ function MasteryDot({ mastery }: { mastery: SectionMastery | undefined }) {
   const pct = Math.round(mastery.mastery * 100)
   return (
     <span
-      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-nvidia-green"
+      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand"
       style={{ opacity: 0.2 + 0.8 * Math.min(1, Math.max(0, mastery.mastery)) }}
       title={`Mastery ${pct}%${mastery.isRollup ? " (rolled up)" : ""}`}
     />
@@ -164,7 +164,7 @@ function TreeRow({
         className={cn(
           "group flex items-start gap-1 rounded-md py-1 pl-1 pr-1 text-sm",
           isChapter && "py-1.5",
-          isSelected && "bg-nvidia-green/15 text-foreground",
+          isSelected && "bg-brand/15 text-foreground",
           isSection && "cursor-pointer hover:bg-muted/60",
         )}
       >
@@ -211,7 +211,7 @@ function TreeRow({
         </button>
         {isSection && (node.conceptCount ?? 0) > 0 ? (
           <span
-            className="shrink-0 rounded-full bg-nvidia-green/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-nvidia-green"
+            className="shrink-0 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-brand"
             title={`${node.conceptCount} concept${node.conceptCount === 1 ? "" : "s"}`}
           >
             {node.conceptCount}
@@ -251,12 +251,12 @@ function TreeRow({
               <li key={c.key ?? c.name} className="list-none">
                 <button
                   type="button"
-                  className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-left text-xs text-muted-foreground hover:bg-nvidia-green/5 hover:text-foreground"
+                  className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-left text-xs text-muted-foreground hover:bg-brand/5 hover:text-foreground"
                   onClick={() => c.key && onSelectConcept?.(c.key)}
                   disabled={!c.key}
                   title={c.kind ? `${c.kind} — open concept` : "open concept"}
                 >
-                  <Sparkles className="h-3 w-3 shrink-0 text-nvidia-green/60" />
+                  <Sparkles className="h-3 w-3 shrink-0 text-brand/60" />
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
                   {c.kind && (
                     <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] opacity-0 transition-opacity group-hover/concept:opacity-100">

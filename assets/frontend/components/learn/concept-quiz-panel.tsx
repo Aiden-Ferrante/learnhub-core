@@ -152,7 +152,7 @@ export function ConceptQuizPanel({
           const isCorrect = result && c === result.expected
           const isPicked = picked === i
           const cls = !result
-            ? "border-border hover:border-nvidia-green/50"
+            ? "border-border hover:border-brand/50"
             : isCorrect
               ? "border-emerald-500/60 bg-emerald-500/10"
               : isPicked

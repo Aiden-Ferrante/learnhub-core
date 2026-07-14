@@ -1,5 +1,5 @@
 // Channel brand mark for txt2kg — a small knowledge graph (text → nodes → learn).
-// Uses currentColor so callers set the hue (brand blue via text-nvidia-green / text-primary).
+// Uses currentColor so callers set the hue (brand blue via text-brand / text-primary).
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg

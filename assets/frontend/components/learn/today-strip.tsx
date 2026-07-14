@@ -37,16 +37,16 @@ export function TodayStrip() {
     <>
       <div
         className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${
-          caughtUp ? "border-border/60 bg-card/40" : "border-nvidia-green/30 bg-nvidia-green/5"
+          caughtUp ? "border-border/60 bg-card/40" : "border-brand/30 bg-brand/5"
         }`}
       >
         <div
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
-            caughtUp ? "bg-muted" : "bg-nvidia-green/15"
+            caughtUp ? "bg-muted" : "bg-brand/15"
           }`}
         >
           <CalendarCheck2
-            className={`h-4 w-4 ${caughtUp ? "text-muted-foreground" : "text-nvidia-green"}`}
+            className={`h-4 w-4 ${caughtUp ? "text-muted-foreground" : "text-brand"}`}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -55,7 +55,7 @@ export function TodayStrip() {
               "Caught up — nothing due across your library."
             ) : (
               <>
-                <span className="text-nvidia-green">{due}</span> to review today
+                <span className="text-brand">{due}</span> to review today
                 {topCourses.length > 0 && (
                   <span className="font-normal text-muted-foreground">
                     {" "}

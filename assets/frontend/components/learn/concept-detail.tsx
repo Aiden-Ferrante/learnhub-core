@@ -160,7 +160,7 @@ export function ConceptDetail({
                   <button
                     type="button"
                     onClick={() => setRevealed((r) => ({ ...r, [i]: true }))}
-                    className="mt-2 text-xs font-medium text-nvidia-green hover:underline"
+                    className="mt-2 text-xs font-medium text-brand hover:underline"
                   >
                     Show answer
                   </button>

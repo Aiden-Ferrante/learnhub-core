@@ -112,10 +112,10 @@ export function MarkdownReader({
               // Premium-calm tuning: accent only for links, hairline surfaces for code/tables.
               "prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground",
               "prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground",
-              "prose-a:text-nvidia-green prose-a:no-underline hover:prose-a:underline",
+              "prose-a:text-brand prose-a:no-underline hover:prose-a:underline",
               "prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none",
               "prose-pre:border prose-pre:bg-muted/40 prose-pre:text-foreground/90 prose-pre:leading-relaxed",
-              "prose-blockquote:border-l-nvidia-green/40 prose-blockquote:text-muted-foreground",
+              "prose-blockquote:border-l-brand/40 prose-blockquote:text-muted-foreground",
               "prose-hr:border-border prose-img:rounded-lg",
               "prose-th:text-foreground prose-td:border-border prose-th:border-border",
             ),

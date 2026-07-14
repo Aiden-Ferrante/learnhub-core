@@ -140,7 +140,7 @@ function ReaderInner() {
                     />
                   </div>
                 </Panel>
-                <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-nvidia-green/40" />
+                <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-brand/40" />
               </>
             )}
             <Panel defaultSize={showTree ? 74 : 100} minSize={40}>

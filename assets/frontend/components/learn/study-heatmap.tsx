@@ -36,7 +36,7 @@ function levelFor(count: number, max: number): number {
 function cellStyle(count: number, max: number): React.CSSProperties {
   const level = levelFor(count, max)
   if (level === 0) return { backgroundColor: "hsl(var(--muted))" }
-  return { backgroundColor: `hsl(var(--nvidia-green) / ${LEVEL_OPACITY[level]})` }
+  return { backgroundColor: `hsl(var(--brand) / ${LEVEL_OPACITY[level]})` }
 }
 
 export function StudyHeatmap({ doc }: { doc?: string }) {
@@ -168,7 +168,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
                   style={
                     lvl === 0
                       ? { backgroundColor: "hsl(var(--muted))" }
-                      : { backgroundColor: `hsl(var(--nvidia-green) / ${LEVEL_OPACITY[lvl]})` }
+                      : { backgroundColor: `hsl(var(--brand) / ${LEVEL_OPACITY[lvl]})` }
                   }
                 />
               ))}

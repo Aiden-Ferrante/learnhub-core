@@ -45,7 +45,7 @@ function LoginForm() {
   return (
     <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
-        <BrandMark className="h-10 w-10 text-nvidia-green" />
+        <BrandMark className="h-10 w-10 text-brand" />
         <h1 className="text-xl font-bold gradient-text">Learn Hub</h1>
         <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
       </div>

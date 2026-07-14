@@ -11,8 +11,8 @@ exactly which element and source file you mean.
   (e.g. the **"Build chapter" button**); where it doesn't I give it a short descriptive
   name (e.g. the **mastery ring**).
 
-> **Two legacy-token gotchas, true everywhere below:**
-> - `nvidia-green` in the code is actually the **brand blue** (#4da3ff). The token name is stale.
+> **Naming gotcha, true everywhere below:**
+> - The brand accent is **brand blue** (#4da3ff), exposed as the `brand` token (`text-brand` / `bg-brand`).
 > - The nav item labeled **"Configure"** shows a screen titled **"Process"**. Same page.
 
 ---

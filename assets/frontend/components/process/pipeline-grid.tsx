@@ -37,7 +37,7 @@ function jobBadge(job: PipelineJobState | undefined) {
     )
   if (job.status === "running")
     return (
-      <span className="flex items-center gap-1 text-[10px] tabular-nums text-nvidia-green">
+      <span className="flex items-center gap-1 text-[10px] tabular-nums text-brand">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         {job.total ? `${job.done}/${job.total}` : null}
       </span>
@@ -79,7 +79,7 @@ function Cell({
     case "deep":
       actionable = chapter.concepts > 0 && !chapter.briefing
       content = chapter.briefing ? (
-        <Check className="h-3.5 w-3.5 text-nvidia-green" />
+        <Check className="h-3.5 w-3.5 text-brand" />
       ) : (
         <Minus className="h-3.5 w-3.5 opacity-40" />
       )
@@ -91,7 +91,7 @@ function Cell({
         total === 0 ? (
           <Minus className="h-3.5 w-3.5 opacity-40" />
         ) : authored >= total ? (
-          <Check className="h-3.5 w-3.5 text-nvidia-green" />
+          <Check className="h-3.5 w-3.5 text-brand" />
         ) : (
           <span className={cn("tabular-nums", authored ? "text-amber-400" : "opacity-40")}>
             {authored}/{total}
@@ -103,7 +103,7 @@ function Cell({
       actionable = chapter.skeleton !== "fresh" && chapter.sections > 0
       content =
         chapter.skeleton === "fresh" ? (
-          <Check className="h-3.5 w-3.5 text-nvidia-green" />
+          <Check className="h-3.5 w-3.5 text-brand" />
         ) : chapter.skeleton === "stale" ? (
           <span className="text-[10px] font-medium uppercase text-amber-400">stale</span>
         ) : (
@@ -113,7 +113,7 @@ function Cell({
     case "orient":
       actionable = !chapter.orient && chapter.sections > 0
       content = chapter.orient ? (
-        <Check className="h-3.5 w-3.5 text-nvidia-green" />
+        <Check className="h-3.5 w-3.5 text-brand" />
       ) : (
         <Minus className="h-3.5 w-3.5 opacity-40" />
       )
@@ -125,7 +125,7 @@ function Cell({
         total === 0 ? (
           <Minus className="h-3.5 w-3.5 opacity-40" />
         ) : authored >= total ? (
-          <Check className="h-3.5 w-3.5 text-nvidia-green" />
+          <Check className="h-3.5 w-3.5 text-brand" />
         ) : (
           <span className={cn("tabular-nums", authored ? "text-amber-400" : "opacity-40")}>
             {authored}/{total}
@@ -138,7 +138,7 @@ function Cell({
         ? `Narrations: ${chapter.audiobooks.join(", ")}${chapter.readAlong ? " · read-along ready" : ""}`
         : col.hint
       content = chapter.audiobooks.length ? (
-        <span className="text-[10px] uppercase text-nvidia-green">{chapter.audiobooks.length}</span>
+        <span className="text-[10px] uppercase text-brand">{chapter.audiobooks.length}</span>
       ) : (
         <Minus className="h-3.5 w-3.5 opacity-40" />
       )
@@ -159,7 +159,7 @@ function Cell({
         title={clickable ? `${title} — click to build` : title}
         className={cn(
           "inline-flex h-7 min-w-9 items-center justify-center gap-1 rounded-md px-1.5",
-          clickable && "border border-dashed border-border/60 hover:border-nvidia-green/60 hover:bg-nvidia-green/5",
+          clickable && "border border-dashed border-border/60 hover:border-brand/60 hover:bg-brand/5",
           !clickable && "cursor-default",
         )}
       >
@@ -313,7 +313,7 @@ export function PipelineGrid({ docId }: { docId: string }) {
                   (j.cancelRequested ? (
                     <span className="text-muted-foreground">stopping after this section…</span>
                   ) : (
-                    <span className="flex items-center gap-1 text-nvidia-green">
+                    <span className="flex items-center gap-1 text-brand">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       {j.total ? `${j.done}/${j.total}` : "running"}
                       <button
@@ -341,7 +341,7 @@ export function PipelineGrid({ docId }: { docId: string }) {
                 )}
                 {j.status === "done" && (
                   <span className="text-muted-foreground">
-                    <span className="text-nvidia-green">done</span>
+                    <span className="text-brand">done</span>
                     {receiptLine(j) && ` · ${receiptLine(j)}`}
                     {since(j) && ` · ${since(j)}`}
                   </span>

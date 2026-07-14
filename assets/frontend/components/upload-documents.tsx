@@ -1,7 +1,3 @@
-//
-// SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-//
 "use client"
 
 import type React from "react"
@@ -111,8 +107,8 @@ export function UploadDocuments() {
 
       <div
         className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200
-                   ${busy ? "opacity-70 cursor-wait" : "cursor-pointer hover:border-nvidia-green/50 hover:bg-nvidia-green/5"}
-                   ${isDragging ? "border-nvidia-green bg-nvidia-green/10 scale-[1.02]" : "border-border/40 hover:border-nvidia-green/40"}`}
+                   ${busy ? "opacity-70 cursor-wait" : "cursor-pointer hover:border-brand/50 hover:bg-brand/5"}
+                   ${isDragging ? "border-brand bg-brand/10 scale-[1.02]" : "border-border/40 hover:border-brand/40"}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -128,11 +124,11 @@ export function UploadDocuments() {
           disabled={busy}
         />
         <div className="flex flex-col items-center">
-          <div className="w-16 h-16 rounded-2xl bg-nvidia-green/10 flex items-center justify-center mb-4 border border-nvidia-green/20">
+          <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4 border border-brand/20">
             {busy ? (
-              <Loader2 className="h-8 w-8 text-nvidia-green animate-spin" />
+              <Loader2 className="h-8 w-8 text-brand animate-spin" />
             ) : (
-              <Upload className="h-8 w-8 text-nvidia-green" />
+              <Upload className="h-8 w-8 text-brand" />
             )}
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -143,7 +139,7 @@ export function UploadDocuments() {
               "Please wait while PDFs are converted to Markdown"
             ) : (
               <>
-                or <button type="button" className="font-medium text-nvidia-green hover:text-nvidia-green/80 underline underline-offset-2">browse files</button>
+                or <button type="button" className="font-medium text-brand hover:text-brand/80 underline underline-offset-2">browse files</button>
               </>
             )}
           </p>

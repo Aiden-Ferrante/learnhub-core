@@ -65,7 +65,7 @@ function GroupRow({
       <div
         className={cn(
           "group/row flex items-center gap-1 rounded-md py-1 pr-1 text-sm",
-          isSelected ? "bg-nvidia-green/15 text-foreground" : "hover:bg-muted/60",
+          isSelected ? "bg-brand/15 text-foreground" : "hover:bg-muted/60",
         )}
         style={{ paddingLeft: `${depth * 0.75 + 0.25}rem` }}
       >
@@ -190,7 +190,7 @@ export function GroupSidebar({
               className={cn(
                 "flex w-full items-center gap-1.5 rounded-md py-1 pl-[0.25rem] pr-1 text-sm",
                 selectedGroupId === null
-                  ? "bg-nvidia-green/15 text-foreground"
+                  ? "bg-brand/15 text-foreground"
                   : "hover:bg-muted/60",
               )}
             >

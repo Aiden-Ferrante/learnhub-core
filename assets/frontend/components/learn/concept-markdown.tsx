@@ -22,7 +22,7 @@ export function ConceptMarkdown({ content, className }: { content: string; class
         "[&_p]:m-0 [&_p+p]:mt-2 [&_p]:leading-snug",
         "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em]",
         "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5",
-        "[&_strong]:font-semibold [&_em]:italic [&_a]:text-nvidia-green [&_a]:underline",
+        "[&_strong]:font-semibold [&_em]:italic [&_a]:text-brand [&_a]:underline",
         className,
       )}
     >
