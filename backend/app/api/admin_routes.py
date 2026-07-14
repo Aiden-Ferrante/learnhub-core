@@ -26,7 +26,7 @@ DOCUMENTS = "documents"
 CONCEPTS = "concepts"
 SECTION_CONTENT = "section_content"
 # Fields a curator may edit on a concept (everything else — provenance, keys — is read-only).
-_EDITABLE = {"name", "signal", "source", "kind", "prereqNames", "questions"}
+_EDITABLE = {"name", "signal", "source", "kind", "questions"}
 
 
 @router.get("/api/documents")
@@ -239,7 +239,7 @@ def api_search(
 
 @router.patch("/api/concept/{key}")
 def api_update_concept(key: str, body: dict = Body(...)) -> JSONResponse:
-    """Edit a concept's curatable fields (name, signal, source, kind, prereqNames, questions).
+    """Edit a concept's curatable fields (name, signal, source, kind, questions).
     Keys/provenance are immutable; review history is keyed by the concept ``_key`` (untouched)."""
     patch: dict[str, Any] = {k: v for k, v in (body or {}).items() if k in _EDITABLE}
     if not patch:
@@ -259,9 +259,9 @@ def api_update_concept(key: str, body: dict = Body(...)) -> JSONResponse:
 
 @router.delete("/api/concept/{key}")
 def api_delete_concept(key: str) -> JSONResponse:
-    """Curation: remove a junk concept plus its review history and prerequisite edges.
-    The concept's section/document content is untouched — re-extracting the section will
-    re-create the concept if the model still finds it."""
+    """Curation: remove a junk concept plus its review history. The concept's
+    section/document content is untouched — re-extracting the section will re-create
+    the concept if the model still finds it."""
     try:
         db = connect_arango()
         col = db.collection(CONCEPTS)
@@ -275,14 +275,6 @@ def api_delete_concept(key: str) -> JSONResponse:
                     "FOR r IN concept_reviews FILTER r.conceptKey == @k "
                     "REMOVE r IN concept_reviews COLLECT WITH COUNT INTO n RETURN n",
                     bind_vars={"k": key},
-                )
-            )[0]
-        if db.has_collection("concept_prereq"):
-            removed["prereqEdges"] = list(
-                db.aql.execute(
-                    "FOR e IN concept_prereq FILTER e._from == @cid OR e._to == @cid "
-                    "REMOVE e IN concept_prereq COLLECT WITH COUNT INTO n RETURN n",
-                    bind_vars={"cid": f"concepts/{key}"},
                 )
             )[0]
         col.delete(key)
@@ -302,7 +294,6 @@ _DOC_CASCADE: tuple[tuple[str, str], ...] = (
     ("concepts", "docId"),
     ("propositions", "docId"),
     ("concept_reviews", "docId"),
-    ("concept_prereq", "docId"),
     ("study_events", "doc"),
     ("chapter_builds", "docId"),
     ("chapter_skeletons", "docId"),

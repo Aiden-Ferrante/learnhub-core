@@ -2,14 +2,12 @@
 
 The product is a *course*, not a triple graph. Each concept is one learnable idea
 (definition / theorem / principle / result / method) carrying a self-contained lesson:
-``signal`` (distilled explanation), ``source`` (verbatim passage), ``questions``
-(retrieval practice) and ``prereqNames`` (concepts to learn first). Concepts link by a
-``concept_prereq`` edge into a learning path.
+``signal`` (distilled explanation) and ``source`` (the verbatim passage that grounds it).
 
 Reuses the extraction engine from ``app.extract`` (section loading + chapter scope, the
 domain-aware user prompt, the per-section model, structured-output transport, the
 structural ``has_subsection`` edges) and only swaps the schema / system prompt / write
-target. The pure parse/assemble/key/prereq functions are unit-tested without LLM or DB.
+target. The pure parse/assemble/key functions are unit-tested without LLM or DB.
 """
 
 from __future__ import annotations
@@ -31,11 +29,9 @@ from app.extraction.extract import (
     structural_subsection_triples,
     upsert_structural_edges,
 )
-from app.extraction.concept_store import CONCEPTS, _concept_reading_ranks
+from app.extraction.concept_store import CONCEPTS
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ConceptResult
-
-CONCEPT_PREREQ = "concept_prereq"
 
 _KINDS = ("definition", "theorem", "principle", "result", "method")
 
@@ -107,7 +103,6 @@ class ExtractedConcept:
     signal: str
     source: str
     questions: tuple[ConceptQuestion, ...]
-    prereq_names: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -129,10 +124,6 @@ def build_concept_system_prompt() -> str:
 
 def normalize_concept_name(name: object) -> str:
     return normalize_entity(name)
-
-
-def _name_norm(name: str) -> str:
-    return normalize_concept_name(name).lower()
 
 
 def parse_concepts_response(obj: object, stats: dict | None = None) -> list[ExtractedConcept]:
@@ -174,13 +165,6 @@ def parse_concepts_response(obj: object, stats: dict | None = None) -> list[Extr
                 qq, aa = _norm_part(q.get("q")), _norm_part(q.get("a"))
                 if qq and aa:
                     questions.append(ConceptQuestion(q=qq, a=aa))
-        prereqs = []
-        seen: set[str] = set()
-        for p in c.get("prerequisites") or []:
-            pn = normalize_concept_name(p)
-            if pn and pn.lower() not in seen and pn.lower() != name.lower():
-                seen.add(pn.lower())
-                prereqs.append(pn)
         out.append(
             ExtractedConcept(
                 name=name,
@@ -188,7 +172,6 @@ def parse_concepts_response(obj: object, stats: dict | None = None) -> list[Extr
                 signal=signal,
                 source=source,
                 questions=tuple(questions),
-                prereq_names=tuple(prereqs),
             )
         )
     return out
@@ -211,66 +194,6 @@ def concept_key(doc_id: str, section_key: str, name: str) -> str:
     return hashlib.sha256(f"{doc_id}|{section_key}|{name.lower()}".encode()).hexdigest()[:16]
 
 
-def resolve_prereq_pairs(
-    concepts: list[tuple[str, str, list[str]]]
-) -> list[tuple[str, str]]:
-    """``concepts`` = ``(key, name, prereq_names)`` for all of a document's concepts.
-    Returns ``(from_key, to_key)`` prerequisite pairs for names that resolve to a concept
-    (unresolved prereq names are dropped, not invented). ``from`` requires ``to``."""
-    by_name: dict[str, str] = {}
-    for key, name, _prereqs in concepts:
-        by_name.setdefault(_name_norm(name), key)
-    pairs: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for key, _name, prereqs in concepts:
-        for pn in prereqs:
-            to = by_name.get(_name_norm(pn))
-            if to and to != key and (key, to) not in seen:
-                seen.add((key, to))
-                pairs.append((key, to))
-    return pairs
-
-
-def orient_prereq_edges(
-    pairs: list[tuple[str, str]],
-    ranks: dict[str, int],
-    texts: dict[str, str],
-    names: dict[str, str],
-) -> list[tuple[str, str, int]]:
-    """Give each model-proposed prerequisite pair a DIRECTION from reading order, and a
-    mention-based RefD confidence.
-
-    The model is good at saying two concepts are *related* but unreliable about which comes
-    first; within a single text the concept introduced earlier is the prerequisite (RefD
-    intuition). Orienting every edge from the later concept to the earlier one both enforces
-    that direction and guarantees an acyclic graph (a strict reading-order rank can't cycle).
-
-    ``pairs`` = ``(dependent_key, prereq_key)`` as named by the model. ``ranks`` = global
-    reading rank per concept key; ``texts`` = lowercased signal+source per key; ``names`` =
-    normalized lowercased name per key. Returns deduped ``(from_key, to_key, refd)`` where the
-    edge means ``from`` (later) requires ``to`` (earlier). ``refd`` ∈ {-1,0,1}: +1 = the
-    dependent's text references the prerequisite (strong signal), -1 = only the reverse."""
-
-    def mentions(of_key: str, in_key: str) -> bool:
-        n = names.get(of_key, "")
-        return len(n) > 2 and n in texts.get(in_key, "")
-
-    oriented: dict[tuple[str, str], int] = {}
-    for a, b in pairs:
-        if a == b:
-            continue
-        ra, rb = ranks.get(a), ranks.get(b)
-        if ra is not None and rb is not None and ra != rb:
-            later, earlier = (a, b) if ra > rb else (b, a)
-        else:
-            later, earlier = a, b  # no order signal — keep the model's direction (a requires b)
-        refd = int(mentions(earlier, later)) - int(mentions(later, earlier))
-        edge = (later, earlier)
-        if edge not in oriented or refd > oriented[edge]:
-            oriented[edge] = refd
-    return [(f, t, r) for (f, t), r in oriented.items()]
-
-
 # --------------------------------------------------------------------------- #
 # ArangoDB write path
 # --------------------------------------------------------------------------- #
@@ -280,9 +203,6 @@ def ensure_concept_collections(db) -> None:
         col = db.create_collection(CONCEPTS)
         col.add_persistent_index(fields=["docId"])
         col.add_persistent_index(fields=["sectionKey"])
-    if not db.has_collection(CONCEPT_PREREQ):
-        col = db.create_collection(CONCEPT_PREREQ, edge=True)
-        col.add_persistent_index(fields=["docId"])
     # The structural TOC tree (has_subsection) is written by upsert_structural_edges into
     # entities/relationships so get_toc_tree still renders. Ensure they exist — on a fresh
     # DB (no prior triple run) they otherwise wouldn't, and the structural write would throw.
@@ -314,67 +234,12 @@ def write_section_concepts(db, sc: SectionConcepts, batch: int = 500) -> None:
                 "signal": c.signal,
                 "source": c.source,
                 "questions": [{"q": q.q, "a": q.a} for q in c.questions],
-                "prereqNames": list(c.prereq_names),
                 "order": idx,
                 "createdAt": int(time.time()),
             }
         )
     if rows:
         db.collection(CONCEPTS).import_bulk(rows, on_duplicate="replace")
-
-
-def rebuild_prereq_edges(db, doc_id: str, min_refd: int | None = None) -> int:
-    """Recompute ``concept_prereq`` edges from all of a document's concepts' prereqNames.
-
-    The model names *related* concepts; we resolve those to keys, then orient each edge by
-    reading order (RefD intuition — earlier concept is the prerequisite), which enforces
-    direction and guarantees acyclicity, and attach a mention-based ``refd`` confidence.
-    ``min_refd`` (env ``LEARN_PREREQ_MIN_REFD``, default -1 = keep all) drops weaker edges.
-    Idempotent: clears the doc's existing prereq edges first."""
-    db.aql.execute(
-        "FOR e IN concept_prereq FILTER e.docId == @d REMOVE e IN concept_prereq",
-        bind_vars={"d": doc_id},
-    )
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d RETURN {key: c._key, name: c.name, "
-            "sk: c.sectionKey, ord: c.order, prereqs: c.prereqNames, signal: c.signal, "
-            "source: c.source, canon: c.canonicalKey}",
-            bind_vars={"d": doc_id},
-        )
-    )
-    ranks = _concept_reading_ranks(db, doc_id, rows)
-    names = {r["key"]: _name_norm(r["name"]) for r in rows}
-    texts = {r["key"]: f"{r.get('signal') or ''} {r.get('source') or ''}".lower() for r in rows}
-    triples = [(r["key"], r["name"], list(r.get("prereqs") or [])) for r in rows]
-
-    # Collapse onto canonical concepts (within-doc dedup): edges between duplicate concepts
-    # become edges between their canonical representatives; self-loops after collapse drop out.
-    canon = {r["key"]: (r.get("canon") or r["key"]) for r in rows}
-    pairs = resolve_prereq_pairs(triples)
-    pairs = [(canon.get(a, a), canon.get(b, b)) for a, b in pairs]
-    pairs = [(a, b) for a, b in pairs if a != b]
-    edges = orient_prereq_edges(pairs, ranks, texts, names)
-    if min_refd is None:
-        env = os.environ.get("LEARN_PREREQ_MIN_REFD")
-        min_refd = int(env) if env not in (None, "") else -1
-    edges = [e for e in edges if e[2] >= min_refd]
-    if edges:
-        db.collection(CONCEPT_PREREQ).import_bulk(
-            [
-                {
-                    "_key": hashlib.md5(f"{a}|{b}".encode()).hexdigest()[:16],
-                    "_from": f"concepts/{a}",
-                    "_to": f"concepts/{b}",
-                    "type": "prerequisite",
-                    "refd": r,
-                    "docId": doc_id,
-                }
-                for a, b, r in edges
-            ],
-            on_duplicate="replace",
-        )
-    return len(edges)
 
 
 # --------------------------------------------------------------------------- #
@@ -531,15 +396,6 @@ async def extract_concepts_document(
         total_concepts += len(sc.concepts)
         total_questions += sum(len(c.questions) for c in sc.concepts)
 
-    # Prerequisite graph: resolve the concepts' prereqNames into oriented, acyclic
-    # concept_prereq edges. (The rebuild existed but was never invoked — the mastery
-    # gate and prereq displays ran on names only.) Doc-wide and idempotent.
-    prereq_edges = 0
-    try:
-        prereq_edges = rebuild_prereq_edges(db, doc_id)
-    except Exception as exc:  # noqa: BLE001 — edges are supplementary, never fail the run
-        errors.append(f"prereq-edges: {exc}")
-
     # Keep the structural TOC tree (drives the syllabus view).
     upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
@@ -562,9 +418,9 @@ async def extract_concepts_document(
         except Exception as exc:  # noqa: BLE001
             errors.append(f"deep-chapter: {exc}")
 
-    # Basic mode: no embedding-based dedup (resolution) and no prerequisite graph. Each section
-    # just contributes its key concepts (name + kind + grounded signal). The read path groups by
-    # canonicalKey OR the concept's own key, so concepts still render without a resolve pass.
+    # No embedding-based dedup (resolution): each section contributes its key concepts (name +
+    # kind + grounded signal). The read path groups by canonicalKey OR the concept's own key,
+    # so concepts still render without a resolve pass.
 
     # Reading-order outcomes read better than completion-order.
     outcomes.sort(key=lambda o: str(o.get("sectionKey") or ""))
@@ -578,7 +434,6 @@ async def extract_concepts_document(
         "questions": total_questions,
         "canonicalConcepts": total_concepts,
         "mergedConcepts": 0,
-        "prereqEdges": prereq_edges,
         "outcomes": outcomes,
         "seconds": round(time.time() - t0, 1),
         "errors": errors,

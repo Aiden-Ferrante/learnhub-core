@@ -570,36 +570,16 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
 
     overall = (sum(masteries) / len(masteries)) if masteries else 0.0
 
-    # Prerequisite gating (Knowledge Space Theory): a not-yet-mastered concept is "ready" when
-    # all its prerequisites are mastered, else "locked" (blockedBy = the unmet ones). Uses the
-    # concept_prereq DAG; an edge (from -> to) means `from` requires `to`.
+    # Concept gate for the "learn next" view: mastered (>= threshold) or ready (everything
+    # else). Concepts are independent lessons — there is no prerequisite locking, so `gate`
+    # is never "locked" and `blockedBy` is always empty (kept for response-shape stability).
     mastered_th = float(os.environ.get("MASTERY_MASTERED", "0.7"))
-    prereqs: dict[str, list[str]] = {}
-    try:
-        if db.has_collection("concept_prereq"):
-            for e in db.aql.execute(
-                "FOR e IN concept_prereq FILTER @doc == null OR e.docId == @doc "
-                "RETURN {f: e._from, t: e._to}",
-                bind_vars={"doc": doc},
-            ):
-                prereqs.setdefault(str(e["f"]).split("/")[-1], []).append(str(e["t"]).split("/")[-1])
-    except Exception:  # noqa: BLE001 — gating is supplementary
-        prereqs = {}
-
     mastered = {ck for ck, v in by_concept.items() if v["mastery"] >= mastered_th}
     counts = {"mastered": 0, "ready": 0, "locked": 0, "total": len(by_concept)}
     for ck, v in by_concept.items():
-        if ck in mastered:
-            gate, blocked = "mastered", []
-        else:
-            unmet = [p for p in prereqs.get(ck, []) if p not in mastered]
-            if unmet:
-                gate = "locked"
-                blocked = [by_concept[p]["name"] for p in unmet if p in by_concept]
-            else:
-                gate, blocked = "ready", []
+        gate = "mastered" if ck in mastered else "ready"
         v["gate"] = gate
-        v["blockedBy"] = blocked
+        v["blockedBy"] = []
         counts[gate] = counts.get(gate, 0) + 1
 
     return {
