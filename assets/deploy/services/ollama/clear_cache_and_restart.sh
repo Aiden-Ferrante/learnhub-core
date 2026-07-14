@@ -11,7 +11,7 @@ echo "Current memory status:"
 free -h
 
 echo "Stopping Ollama container..."
-docker compose -f /home/nvidia/txt2kg/txt2kg/deploy/services/ollama/docker-compose.yml down
+docker compose -f /home/nvidia/learnhub/deploy/services/ollama/docker-compose.yml down
 
 echo "Clearing buffer cache..."
 sudo sync
@@ -21,7 +21,7 @@ echo "Memory status after cache clear:"
 free -h
 
 echo "Restarting Ollama container..."
-docker compose -f /home/nvidia/txt2kg/txt2kg/deploy/services/ollama/docker-compose.yml up -d
+docker compose -f /home/nvidia/learnhub/deploy/services/ollama/docker-compose.yml up -d
 
 echo "Waiting for Ollama to start..."
 sleep 10

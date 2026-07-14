@@ -11,5 +11,5 @@ links:
   extra:
     process-tab: http://localhost:3001/process
     mcp-server: mcp/server.py
-mc: [txt2kg, learn-hub-mcp, ollama]
+mc: [learnhub, learn-hub-mcp, ollama]
 tags: [learning, knowledge-graph, mcp, channel-brand]
