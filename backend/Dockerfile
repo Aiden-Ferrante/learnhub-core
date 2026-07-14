@@ -28,7 +28,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout=1000 --retries=10 -r requirements.txt
 
 COPY app ./app
-COPY templates ./templates
 
 EXPOSE 8000
 
