@@ -78,7 +78,7 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     try:
         from app.search.semantic_search import ensure_index
 
-        ensure_index(db, doc_id)
+        ensure_index(doc_id)
     except Exception:  # noqa: BLE001 — indexing must never fail the extraction
         pass
     return None

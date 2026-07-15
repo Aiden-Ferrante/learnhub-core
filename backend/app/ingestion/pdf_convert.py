@@ -41,19 +41,15 @@ def find_existing_ingest(data: bytes) -> dict | None:
     """The already-ingested document with this exact content, or None. Best-effort:
     any DB trouble reads as "no duplicate" so ingestion never breaks on the check."""
     try:
-        from app.platform.arango import connect_arango
+        from app.platform.db import db
 
-        db = connect_arango()
-        if not db.has_collection("documents"):
-            return None
-        rows = list(
-            db.aql.execute(
-                "FOR d IN documents FILTER d.sourceHash == @h LIMIT 1 "
-                "RETURN {docId: d._key, title: d.title, sourceFilename: d.sourceFilename}",
-                bind_vars={"h": source_hash_of(data)},
-            )
-        )
-        return rows[0] if rows else None
+        with db() as conn:
+            row = conn.execute(
+                'SELECT key AS "docId", title, source_filename AS "sourceFilename" '
+                "FROM documents WHERE source_hash = %(h)s LIMIT 1",
+                {"h": source_hash_of(data)},
+            ).fetchone()
+        return row or None
     except Exception:  # noqa: BLE001
         return None
 
