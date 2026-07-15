@@ -3,7 +3,7 @@
 import { StatusPill, type DomainStatus } from "@/components/patterns/status-pill"
 import { ProgressRing } from "@/components/patterns/progress-ring"
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen, GraduationCap, Loader2, MoreVertical, Plus, Trash2, Zap } from "lucide-react"
+import { BookOpen, GraduationCap, Loader2, MoreVertical, Plus, RotateCcw, Trash2, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
@@ -35,7 +35,9 @@ import { GroupSidebar } from "@/features/learn/components/home/group-sidebar"
 import { TodayStrip } from "@/features/learn/components/home/today-strip"
 import { countSections, type LearnTreeNode } from "@/features/learn/api/outline"
 import { deleteLearnDocument } from "@/features/learn/api/pipeline"
-import { type MasteryResponse } from "@/features/learn/api/progress"
+import { fetchStudyDebt, type MasteryResponse } from "@/features/learn/api/progress"
+import { fetchReadingProgress, type ReadingProgress } from "@/features/learn/lib/reading-progress"
+import { coverGradient, coverMonogram } from "@/features/learn/lib/cover"
 import {
   addGroup,
   buildGroupTree,
@@ -61,6 +63,10 @@ type CourseShelfProps = {
    *  so other cards don't display this one's numbers as their own. */
   liveCourseId?: string | null
   onSelect: (course: Course) => void
+  /** Jump straight into the reading surface at the saved position (card quick action). */
+  onContinue?: (course: Course, sectionKey: string | null) => void
+  /** Open the whole-course review session (card quick action). */
+  onReview?: (course: Course) => void
   onNewCourse?: () => void
   /** Open the processing dashboard (extraction/TOC) — material management lives here now. */
   onProcess?: () => void
@@ -79,9 +85,13 @@ function CourseCard({
   sections,
   overallPct,
   loading,
+  dueNow,
+  continueKey,
   groups,
   courseGroupIds,
   onSelect,
+  onContinue,
+  onReview,
   onToggleMembership,
   onNewGroupForCourse,
   onDelete,
@@ -90,14 +100,19 @@ function CourseCard({
   sections: number | null
   overallPct: number | null
   loading: boolean
+  dueNow: number
+  continueKey: string | null
   groups: CourseGroup[]
   courseGroupIds: string[]
   onSelect: (course: Course) => void
+  onContinue?: (course: Course, sectionKey: string | null) => void
+  onReview?: (course: Course) => void
   onToggleMembership: (courseId: string, groupId: string) => void
   onNewGroupForCourse: (courseId: string) => void
   onDelete: (course: Course) => void
 }) {
   const badge = STATUS_BADGE[course.status]
+  const ready = course.status === "ready"
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-brand/50">
       {/* Move-to-group menu */}
@@ -152,32 +167,41 @@ function CourseCard({
         onClick={() => onSelect(course)}
         className="flex flex-1 flex-col text-left"
       >
-        {/* Cover strip — neutral surface; green is reserved for progress + focus. */}
-        <div className="flex h-20 items-center justify-center border-b bg-muted/20">
-          <BookOpen className="h-7 w-7 text-muted-foreground/60" />
+        {/* Cover strip — a deterministic gradient + monogram derived from the title, so
+            every book is recognizable at a glance without real cover art. */}
+        <div
+          className="relative flex h-20 items-end justify-between border-b px-3 pb-2"
+          style={{ background: coverGradient(course.title) }}
+        >
+          <span className="select-none font-serif text-3xl font-bold leading-none text-foreground/25">
+            {coverMonogram(course.title)}
+          </span>
+          {course.format && (
+            <span className="rounded bg-background/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+              {course.format}
+            </span>
+          )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-2 p-3">
-          <div className="flex items-start justify-between gap-2 pr-6">
-            <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{course.title}</h3>
-            {course.format && (
-              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {course.format}
-              </span>
-            )}
-          </div>
-          <p className="line-clamp-2 flex-1 text-xs text-muted-foreground">{course.description}</p>
+        <div className="flex flex-1 flex-col gap-1.5 p-3">
+          <h3 className="line-clamp-2 pr-6 text-sm font-semibold leading-snug">{course.title}</h3>
+          <p className="flex-1 truncate text-xs text-muted-foreground">{course.description}</p>
 
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <StatusPill status={badge.status} pulse={badge.pulse} className="text-[10px]">
                 {badge.label}
               </StatusPill>
+              {dueNow > 0 && (
+                <StatusPill status="due" className="text-[10px]">
+                  {dueNow} due
+                </StatusPill>
+              )}
               {sections != null &&
                 (loading ? (
                   <Skeleton className="h-3.5 w-16" />
                 ) : (
-                  <span className="text-xs tabular-nums text-muted-foreground">
+                  <span className="truncate text-xs tabular-nums text-muted-foreground">
                     {sections} sections
                   </span>
                 ))}
@@ -186,6 +210,32 @@ function CourseCard({
           </div>
         </div>
       </button>
+
+      {/* Quick actions — jump straight into studying without the course-home stop. */}
+      {ready && (onContinue || (onReview && dueNow > 0)) && (
+        <div className="flex gap-1.5 border-t px-3 py-2">
+          {onContinue && (
+            <button
+              type="button"
+              onClick={() => onContinue(course, continueKey)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand/10 px-2 py-1.5 text-xs font-medium text-brand transition-colors hover:bg-brand/20"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              {continueKey ? "Continue" : "Start reading"}
+            </button>
+          )}
+          {onReview && dueNow > 0 && (
+            <button
+              type="button"
+              onClick={() => onReview(course)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-status-due/50 hover:text-status-due"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Review {dueNow}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -196,10 +246,32 @@ export function CourseShelf({
   liveLoading,
   liveCourseId,
   onSelect,
+  onContinue,
+  onReview,
   onNewCourse,
   onProcess,
 }: CourseShelfProps) {
   const liveSections = useMemo(() => countSections(liveTree), [liveTree])
+
+  // Per-course review pressure (keyed by learnDocId) + saved reading positions — one
+  // fetch each, shared by every card.
+  const [dueByDoc, setDueByDoc] = useState<Record<string, number>>({})
+  const [positions, setPositions] = useState<ReadingProgress>({})
+  useEffect(() => {
+    let cancelled = false
+    fetchStudyDebt(7)
+      .then((d) => {
+        if (cancelled || d.error) return
+        setDueByDoc(Object.fromEntries(d.courses.map((c) => [c.doc, c.dueNow])))
+      })
+      .catch(() => {})
+    fetchReadingProgress().then((p) => {
+      if (!cancelled) setPositions(p)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const { documents, deleteDocuments } = useDocuments()
   const courses = useMemo(() => documents.map(courseFromDocument), [documents])
@@ -446,6 +518,10 @@ export function CourseShelf({
                       : null
                   }
                   loading={ready && course.id === liveCourseId ? liveLoading : false}
+                  dueNow={course.learnDocId ? (dueByDoc[course.learnDocId] ?? 0) : 0}
+                  continueKey={positions[course.id] ?? null}
+                  onContinue={onContinue}
+                  onReview={onReview}
                   groups={groupsState.groups}
                   courseGroupIds={groupsState.membership[course.id] ?? []}
                   onDelete={setDeleteTarget}

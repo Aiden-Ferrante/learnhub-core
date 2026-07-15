@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { CourseShelf } from "@/features/learn/components/home/course-shelf"
+import { chapterHref } from "@/features/learn/lib/scope-url"
 
 export default function CoursesPage() {
   const router = useRouter()
@@ -13,6 +14,8 @@ export default function CoursesPage() {
         liveLoading={false}
         liveCourseId={null}
         onSelect={(course) => router.push(`/courses/${course.id}`)}
+        onContinue={(course, sectionKey) => router.push(chapterHref(course.id, sectionKey))}
+        onReview={(course) => router.push(chapterHref(course.id, null, { drawer: "review", all: true }))}
         onNewCourse={() => router.push("/upload")}
         onProcess={() => router.push("/process")}
       />

@@ -43,15 +43,16 @@ export function AppNav() {
           <Link
             key={href}
             href={href}
+            title={label}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3",
               active
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" />
-            {label}
+            <span className="hidden sm:inline">{label}</span>
             {href === "/courses" && dueNow > 0 && (
               <span className="ml-0.5 rounded-full bg-status-due/15 px-1.5 text-[11px] font-semibold tabular-nums text-status-due">
                 {dueNow}

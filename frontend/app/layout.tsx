@@ -41,7 +41,7 @@ export default function RootLayout({
                   <HeaderBrand />
                   <Breadcrumbs />
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
                   <AppNav />
                   <InfoModal />
                   <ThemeToggle />

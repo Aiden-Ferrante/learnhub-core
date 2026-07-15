@@ -25,6 +25,7 @@ import { fetchTodayPlan, type TodayPlan } from "@/features/learn/api/chapter"
 import { fetchDocumentConcepts } from "@/features/learn/api/concepts"
 import { countSections, displaySectionTitle, findChapterForSection, findNodeBySectionKey, type LearnTreeNode } from "@/features/learn/api/outline"
 import { ProgressRing } from "@/components/patterns/progress-ring"
+import { SectionCard } from "@/components/patterns/section-card"
 import { StatTile } from "@/components/patterns/stat-tile"
 import { enqueueChapterBuild, fetchCourseStatus, type CourseStatus } from "@/features/learn/api/pipeline"
 import { fetchForecast, fetchMistakes, type ForecastResponse, type MasteryResponse, type Mistake, type WeakestSection } from "@/features/learn/api/progress"
@@ -265,15 +266,66 @@ export function CourseHome({
         <span className="text-sm font-medium">{course.title}</span>
       </div>
 
-      {/* Hero / overview */}
+      {/* Hero — title, the ONE next action, then the numbers. */}
       <div className="rounded-lg border bg-card p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/15">
-            <GraduationCap className="h-5 w-5 text-brand" />
-          </div>
+        <div className="flex flex-wrap items-start gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold leading-tight">{course.title}</h2>
-            <p className="text-sm text-muted-foreground">{course.description}</p>
+            <h2 className="text-xl font-semibold leading-tight tracking-tight">{course.title}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">{course.description}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {onDeepRead && !isEmpty && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 gap-1.5 px-3 text-xs"
+                  onClick={onDeepRead}
+                  title={plan?.resume?.nextStage ? `Next up: ${plan.resume.nextStage.label}` : "Read on the deep chapter surface"}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {plan?.resume
+                    ? `Continue · ${plan.resume.title} — ${plan.resume.nextStage.label} (${plan.resume.stagesDone}/${plan.resume.stagesTotal})`
+                    : continueNode
+                      ? `Continue reading · ${displaySectionTitle(continueNode.label, continueNode.title)}`
+                      : "Start reading"}
+                </Button>
+              )}
+              {plan && plan.reviewsDue > 0 && onReviewAll && (
+                <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onReviewAll}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Review · {plan.reviewsDue} due
+                </Button>
+              )}
+              {plan?.nextUnbuilt &&
+                (plan.nextUnbuilt.build &&
+                (plan.nextUnbuilt.build.status === "queued" || plan.nextUnbuilt.build.status === "running") ? (
+                  <span className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">
+                    {plan.nextUnbuilt.build.status === "running" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Clock className="h-3.5 w-3.5" />
+                    )}
+                    {plan.nextUnbuilt.title}
+                    {plan.nextUnbuilt.build.status === "running"
+                      ? " · building"
+                      : plan.nextUnbuilt.build.notBefore
+                        ? ` · ${new Date(plan.nextUnbuilt.build.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
+                        : " · queued"}
+                  </span>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-3 text-xs"
+                    onClick={queueTonight}
+                    disabled={queueBusy}
+                    title={`${plan.nextUnbuilt.title} has no concept layer yet — schedule its build for tonight`}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Build “{plan.nextUnbuilt.title.length > 26 ? `${plan.nextUnbuilt.title.slice(0, 26)}…` : plan.nextUnbuilt.title}” tonight
+                  </Button>
+                ))}
+            </div>
           </div>
           {mastery && <ProgressRing pct={overallPct} />}
         </div>
@@ -326,73 +378,18 @@ export function CourseHome({
           </div>
         )}
 
-        {/* Today — the course-level path: what to do NOW, assembled server-side from
-            chapter progress + spaced reviews + the build queue. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {onDeepRead && !isEmpty && (
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={onDeepRead}
-              title={plan?.resume?.nextStage ? `Next up: ${plan.resume.nextStage.label}` : "Read on the deep chapter surface"}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              {plan?.resume
-                ? `Continue · ${plan.resume.title} — ${plan.resume.nextStage.label} (${plan.resume.stagesDone}/${plan.resume.stagesTotal})`
-                : continueNode
-                  ? `Continue reading · ${displaySectionTitle(continueNode.label, continueNode.title)}`
-                  : "Start reading"}
-            </Button>
-          )}
-          {plan && plan.reviewsDue > 0 && onReviewAll && (
-            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onReviewAll}>
-              <RotateCcw className="h-3.5 w-3.5" />
-              Review · {plan.reviewsDue} due
-            </Button>
-          )}
-          {plan?.nextUnbuilt &&
-            (plan.nextUnbuilt.build &&
-            (plan.nextUnbuilt.build.status === "queued" || plan.nextUnbuilt.build.status === "running") ? (
-              <span className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">
-                {plan.nextUnbuilt.build.status === "running" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Clock className="h-3.5 w-3.5" />
-                )}
-                {plan.nextUnbuilt.title}
-                {plan.nextUnbuilt.build.status === "running"
-                  ? " · building"
-                  : plan.nextUnbuilt.build.notBefore
-                    ? ` · ${new Date(plan.nextUnbuilt.build.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
-                    : " · queued"}
-              </span>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 px-3 text-xs"
-                onClick={queueTonight}
-                disabled={queueBusy}
-                title={`${plan.nextUnbuilt.title} has no concept layer yet — schedule its build for tonight`}
-              >
-                <Wand2 className="h-3.5 w-3.5" />
-                Build “{plan.nextUnbuilt.title.length > 26 ? `${plan.nextUnbuilt.title.slice(0, 26)}…` : plan.nextUnbuilt.title}” tonight
-              </Button>
-            ))}
-        </div>
       </div>
 
       {/* Practice — strengthen what you already know. Distinct from the in-chapter assessments
           on the guided path: these are cross-chapter, self-directed, and ungraded. */}
       {!error && !isEmpty &&
         (onReviewAll || (onDrill && studied > 0) || (onBrainDump && (conceptCount ?? 0) > 0)) && (
-          <div className="rounded-lg border bg-card">
-            <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-              Practice
-            </div>
-            <div className="grid gap-2 p-3 sm:grid-cols-3">
+          <SectionCard
+            title="Practice"
+            description="Cross-chapter, self-directed, ungraded — strengthen what you already know."
+            bodyClassName="p-3"
+          >
+            <div className="grid gap-2 sm:grid-cols-3">
               {onReviewAll && (
                 <PracticeTile
                   icon={<RotateCcw className="h-4 w-4 text-brand" />}
@@ -419,7 +416,7 @@ export function CourseHome({
                 />
               )}
             </div>
-          </div>
+          </SectionCard>
         )}
 
       {/* Error state */}
@@ -427,8 +424,7 @@ export function CourseHome({
         <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
           <p className="text-destructive">{error}</p>
           <p className="text-muted-foreground">
-            The course backend may still be starting. Ensure ArangoDB is running and triples are
-            stored with TOC structure (<code className="text-xs">has_subsection</code> edges).
+            The course backend may still be starting — give it a moment and retry.
           </p>
           {onRetry && (
             <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onRetry}>
@@ -525,11 +521,8 @@ export function CourseHome({
 
       {/* Review rail */}
       {weakest.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-            Pick up where you left off
-          </div>
-          <div className="flex flex-wrap gap-2 p-3">
+        <SectionCard title="Pick up where you left off" bodyClassName="p-3">
+          <div className="flex flex-wrap gap-2">
             {weakest.map((w) => {
               const pct = Math.round(w.mastery * 100)
               return (
@@ -556,16 +549,19 @@ export function CourseHome({
               )
             })}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Recent mistakes */}
       {!error && !isEmpty && mistakes.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-            <History className="h-3.5 w-3.5" />
-            <span>Recent mistakes</span>
-          </div>
+        <SectionCard
+          title={
+            <span className="flex items-center gap-2">
+              <History className="h-3.5 w-3.5" /> Recent mistakes
+            </span>
+          }
+          bodyClassName="p-0"
+        >
           <div className="divide-y">
             {mistakes.map((m, i) => {
               const node = findNodeBySectionKey(tree, m.sectionKey)
@@ -604,7 +600,7 @@ export function CourseHome({
               )
             })}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Course outline */}
