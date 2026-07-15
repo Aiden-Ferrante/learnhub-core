@@ -54,7 +54,7 @@ CREATE TABLE concepts (
   key text PRIMARY KEY, doc_id text NOT NULL, section_key text, name text, kind text,
   signal text, source text, "order" int, page_start int, page_end int,
   deep_explanation text, deep_explained_at timestamptz,
-  prereq_names jsonb, questions jsonb, embedding vector(384), created_at timestamptz);
+  prereq_names jsonb, questions jsonb, quiz_questions jsonb, embedding vector(384), created_at timestamptz);
 CREATE INDEX ON concepts (doc_id, section_key);
 CREATE INDEX ON concepts USING hnsw (embedding vector_cosine_ops);
 

@@ -24,7 +24,9 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.study.concept_quiz_gen import _name_variants
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import AuthoredSet
@@ -321,7 +323,7 @@ def author_concept_questions(
     return state.get("accepted", [])
 
 
-def _concept_passage(db, concept: dict[str, Any]) -> str:
+def _concept_passage(concept: dict[str, Any]) -> str:
     """The concept's real surrounding text, windowed CONCEPT-TIGHT (~1.2k chars) around its own
     source sentence — not the whole section. A whole section shared by many concepts is dominated
     by one topic, so questions drift to it; centring on the source keeps each concept's questions
@@ -330,13 +332,13 @@ def _concept_passage(db, concept: dict[str, Any]) -> str:
     if not sk:
         return ""
     try:
-        blocks = list(
-            db.aql.execute(
-                "FOR b IN section_content FILTER b.sectionKey == @sk "
-                "AND (@doc == null OR b.docId == @doc) SORT b.order ASC RETURN b.markdown",
-                bind_vars={"sk": sk, "doc": concept.get("docId")},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT markdown FROM section_content WHERE section_key = %(sk)s "
+                'AND (%(doc)s::text IS NULL OR doc_id = %(doc)s) ORDER BY "order" ASC',
+                {"sk": sk, "doc": concept.get("docId")},
+            ).fetchall()
+        blocks = [r["markdown"] for r in rows]
     except Exception:  # noqa: BLE001
         return ""
     text = "\n\n".join(b for b in blocks if b).strip()
@@ -355,44 +357,41 @@ def _concept_passage(db, concept: dict[str, Any]) -> str:
     return text[start : start + window].strip()
 
 
-def author_scope_sync(db, doc: str | None, section_keys: list[str], limit: int = 1000,
+def author_scope_sync(doc: str | None, section_keys: list[str], limit: int = 1000,
                       on_progress=None) -> dict:
     """Author questions for every un-authored concept in scope, sequentially (a single
     GPU-resident model is compute-bound — concurrency just time-slices it). Synchronous so
     the build queue can run it as a ledgered job; returns an {authored, total} receipt."""
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER (@doc == null OR c.docId == @doc) "
-            "AND c.sectionKey IN @ks AND c.signal != null "
-            f"AND (c.{QFIELD} == null OR LENGTH(c.{QFIELD}) == 0) "
-            "LIMIT @lim "
-            "RETURN {key: c._key, name: c.name, signal: c.signal, source: c.source, "
-            "docId: c.docId, sectionKey: c.sectionKey}",
-            bind_vars={"doc": doc, "ks": section_keys, "lim": limit},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT key, name, signal, source, doc_id AS "docId", section_key AS "sectionKey" '
+            "FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "AND section_key = ANY(%(ks)s::text[]) AND signal IS NOT NULL "
+            "AND (quiz_questions IS NULL OR jsonb_array_length(quiz_questions) = 0) LIMIT %(lim)s",
+            {"doc": doc, "ks": section_keys, "lim": limit},
+        ).fetchall()
     if not rows:
         return {"authored": 0, "total": 0}
     # Sibling names per section, for distractor grounding.
     sibs: dict[str, list[str]] = {}
-    for sk in {r.get("sectionKey") for r in rows}:
-        sibs[sk] = [
-            r["name"]
-            for r in db.aql.execute(
-                "FOR c IN concepts FILTER c.sectionKey == @sk RETURN {name: c.name}",
-                bind_vars={"sk": sk},
-            )
-            if r.get("name")
-        ]
-    col = db.collection(CONCEPTS)
+    with db() as conn:
+        for sk in {r.get("sectionKey") for r in rows}:
+            srows = conn.execute(
+                "SELECT name FROM concepts WHERE section_key = %(sk)s", {"sk": sk}
+            ).fetchall()
+            sibs[sk] = [r["name"] for r in srows if r.get("name")]
     authored = 0
     for i, r in enumerate(rows):
-        passage = _concept_passage(db, r)
+        passage = _concept_passage(r)
         qs = author_concept_questions(
             r, sibs.get(r.get("sectionKey"), []), passage=passage, model=_AUTHOR_MODEL
         )
         if qs:
-            col.update({"_key": r["key"], QFIELD: qs})
+            with db() as conn:
+                conn.execute(
+                    "UPDATE concepts SET quiz_questions = %(q)s WHERE key = %(k)s",
+                    {"q": Json(qs), "k": r["key"]},
+                )
             authored += 1
         if on_progress:
             on_progress(i + 1, len(rows), r.get("name"))
@@ -401,8 +400,7 @@ def author_scope_sync(db, doc: str | None, section_keys: list[str], limit: int =
 
 def _ensure_worker(doc: str | None, section_keys: list[str], limit: int, sig: str) -> None:
     try:
-        db = connect_arango()
-        author_scope_sync(db, doc, section_keys, limit=limit)
+        author_scope_sync(doc, section_keys, limit=limit)
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:
@@ -425,30 +423,32 @@ def ensure_questions_async(doc: str | None, section_keys: set[str] | None, limit
     return True
 
 
-def scope_question_status(db, doc: str | None, section_keys: set[str] | None) -> dict[str, Any]:
+def scope_question_status(doc: str | None, section_keys: set[str] | None) -> dict[str, Any]:
     """Authoring progress for a scope: how many of its concepts have quiz questions yet."""
     if not section_keys:
         return {"total": 0, "authored": 0, "running": False}
     keys = sorted(section_keys)
-    total = db.aql.execute(
-        "RETURN LENGTH(FOR c IN concepts FILTER (@doc == null OR c.docId == @doc) "
-        "AND c.sectionKey IN @ks AND c.signal != null RETURN 1)",
-        bind_vars={"doc": doc, "ks": keys},
-    ).next()
-    authored = db.aql.execute(
-        f"RETURN LENGTH(FOR c IN concepts FILTER (@doc == null OR c.docId == @doc) "
-        f"AND c.sectionKey IN @ks AND c.{QFIELD} != null AND LENGTH(c.{QFIELD}) > 0 RETURN 1)",
-        bind_vars={"doc": doc, "ks": keys},
-    ).next()
+    with db() as conn:
+        total = conn.execute(
+            "SELECT count(*) AS n FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "AND section_key = ANY(%(ks)s::text[]) AND signal IS NOT NULL",
+            {"doc": doc, "ks": keys},
+        ).fetchone()["n"]
+        authored = conn.execute(
+            "SELECT count(*) AS n FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "AND section_key = ANY(%(ks)s::text[]) AND quiz_questions IS NOT NULL "
+            "AND jsonb_array_length(quiz_questions) > 0",
+            {"doc": doc, "ks": keys},
+        ).fetchone()["n"]
     with _inflight_lock:
         running = f"{doc}|{','.join(keys)}" in _inflight
     return {"total": total, "authored": authored, "running": running}
 
 
-def prepare_scope(db, doc: str | None, section_keys: set[str] | None) -> dict[str, Any]:
+def prepare_scope(doc: str | None, section_keys: set[str] | None) -> dict[str, Any]:
     """Author ALL of a scope's un-authored concepts up front (background), and report status."""
     ensure_questions_async(doc, section_keys, limit=1000)
-    return scope_question_status(db, doc, section_keys)
+    return scope_question_status(doc, section_keys)
 
 
 def servable_from_cached(
