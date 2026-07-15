@@ -88,11 +88,6 @@ CREATE TABLE deep_chapter_briefing (key text PRIMARY KEY, doc_id text, scope tex
   key_concepts jsonb, objectives jsonb, sections jsonb, watch_for jsonb, created_at timestamptz);
 CREATE TABLE reading_guides   (key text PRIMARY KEY, doc_id text, section_key text, focus text, checks jsonb, created_at timestamptz);
 CREATE TABLE section_augment  (key text PRIMARY KEY, doc_id text, section_key text, objectives jsonb, recap jsonb);
-CREATE TABLE entities         (key text PRIMARY KEY, name text, doc_ids jsonb);
-CREATE TABLE relationships    (key text PRIMARY KEY, from_key text, to_key text, type text, doc_ids jsonb);
-CREATE INDEX ON relationships (from_key);
-CREATE INDEX ON relationships (to_key);
-CREATE INDEX ON relationships (type);
 -- Schemaless per-user settings (course groups, reading progress, prompts, …) as one blob,
 -- matching the frontend's merge-arbitrary-keys contract. The legacy typed columns are kept
 -- for provenance of the migrated row; the app reads/writes only `settings`.

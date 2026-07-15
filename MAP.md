@@ -149,7 +149,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`store.py`](backend/app/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
 | [`chapters.py`](backend/app/content/chapters.py) | Canonical chapter-unit list |
 | [`math_markdown.py`](backend/app/content/math_markdown.py) | LaTeX/KaTeX math rendering |
-| [`toc_tree.py`](backend/app/content/toc_tree.py) | TOC tree from `has_subsection` edges (was `arango_tree.py`) |
+| [`toc_tree.py`](backend/app/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
 
 ### ingestion/ — PDF in
 
@@ -169,7 +169,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`augment.py`](backend/app/extraction/augment.py) | Section learning objectives + recap |
-| [`triples.py`](backend/app/extraction/triples.py) | Legacy triple KG read-layer (was `arango_learn.py`; deprecation candidate) |
 
 ### study/ — learning state
 
@@ -328,8 +327,7 @@ is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/
 runs these as queue jobs (`extract` / `deep` / `build`). Four other LLM *generation passes*
 (coral) live in the folder but are triggered independently — only `deep_chapter` runs as part
 of the `build` job, as the overlay after concepts are written.
-[`triples.py`](backend/app/extraction/triples.py) (gray) is dead legacy from the
-pruned triple pipeline. Two dependencies live outside the folder: `concepts_extract` calls
+Two dependencies live outside the folder: `concepts_extract` calls
 `platform/llm.py` for the model, and the pipeline runners are dispatched by
 `platform/jobs.py` (the one queue).
 
@@ -343,7 +341,6 @@ flowchart TD
   skeleton["skeleton.py<br/>chapter essences"]
   guide["reading_guide.py<br/>section guides"]
   augment["augment.py<br/>objectives + recap"]
-  legacy["triples.py<br/>legacy triple layer"]
 
   build --> concepts
   build --> deep
@@ -353,11 +350,9 @@ flowchart TD
   classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
   classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
-  classDef old fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   class build trig;
   class extract,concepts,store core;
   class deep,skeleton,guide,augment pass;
-  class legacy old;
 
   click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
   click extract "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/extract.py"
@@ -367,10 +362,9 @@ flowchart TD
   click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/skeleton.py"
   click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/reading_guide.py"
   click augment "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/augment.py"
-  click legacy "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/triples.py"
 ```
 
-Color key: purple = conductor · teal = extraction core · coral = generation passes · gray = legacy.
+Color key: purple = conductor · teal = extraction core · coral = generation passes.
 
 ---
 

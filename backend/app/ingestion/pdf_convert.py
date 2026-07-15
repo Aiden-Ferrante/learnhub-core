@@ -60,8 +60,7 @@ class ConvertResult:
     source_filename: str
     output_filename: str
     page_count: int
-    saved_path: str | None
-    doc_id: str | None
+    doc_id: str
     engine: str
     has_page_provenance: bool = False
     element_count: int = 0
@@ -83,27 +82,16 @@ def _output_name(source_filename: str) -> str:
     return base + ".md"
 
 
-def _save_artifacts(data: bytes, markdown: str, source_filename: str, job_id: str) -> str | None:
-    shared = os.environ.get("SHARED_DIR", "/shared")
-    ingest_root = Path(shared) / "ingest"
-    job_dir = ingest_root / job_id
-    try:
-        job_dir.mkdir(parents=True, exist_ok=True)
-        (job_dir / "original.pdf").write_bytes(data)
-        md_path = job_dir / "converted.md"
-        md_path.write_text(markdown, encoding="utf-8")
-        return str(md_path)
-    except OSError:
-        return None
-
-
-def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True,
-                      doc_id: str | None = None) -> ConvertResult:
-    """Convert a PDF's bytes to markdown and (when ``save``) persist the structured content.
+def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) -> ConvertResult:
+    """Convert a PDF's bytes to markdown and persist the structured content.
 
     ``doc_id`` lets the caller pre-assign the document id — the pipeline mints it at upload
     so a queued ``convert`` job is addressable before the document exists. Omitted → a fresh
-    uuid (the legacy behavior)."""
+    uuid. The uploaded PDF itself already lives at ``/shared/ingest/<docId>/original.pdf``
+    (written once, by ``prepare_upload``); the canonical markdown lives in ``documents``.
+
+    Raises ``PdfConvertError`` for user-facing input problems; a persistence failure raises
+    whatever went wrong so the job ledger records an honest error (never a silent "done")."""
     if not data.startswith(PDF_MAGIC):
         raise PdfConvertError("File does not look like a PDF (%PDF header missing).", 400)
     if MAX_PDF_BYTES and len(data) > MAX_PDF_BYTES:
@@ -160,22 +148,17 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True,
 
     output_filename = _output_name(filename or "document.pdf")
     doc_id = doc_id or str(uuid.uuid4())
-    saved_path = _save_artifacts(data, markdown, filename, doc_id) if save else None
-    persisted_id = (
-        persist_document(
-            doc_id=doc_id,
-            title=Path(filename or "document.pdf").stem,
-            source_filename=filename or "document.pdf",
-            markdown=markdown,
-            page_count=page_count,
-            heading_pages=heading_pages,
-            pages=pages,
-            outline=converted.outline,
-            elements=elements,
-            source_hash=source_hash_of(data),
-        )
-        if save
-        else None
+    persist_document(
+        doc_id=doc_id,
+        title=Path(filename or "document.pdf").stem,
+        source_filename=filename or "document.pdf",
+        markdown=markdown,
+        page_count=page_count,
+        heading_pages=heading_pages,
+        pages=pages,
+        outline=converted.outline,
+        elements=elements,
+        source_hash=source_hash_of(data),
     )
 
     return ConvertResult(
@@ -183,8 +166,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, save: bool = True,
         source_filename=filename or "document.pdf",
         output_filename=output_filename,
         page_count=page_count,
-        saved_path=saved_path,
-        doc_id=persisted_id,
+        doc_id=doc_id,
         engine=engine,
         has_page_provenance=has_page_provenance,
         element_count=len(elements),

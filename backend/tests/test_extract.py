@@ -1,14 +1,11 @@
 """Tests for the extraction infrastructure (pure functions, no LLM, no DB)."""
 
-from app.extraction.triples import triple_id
 from app.extraction.extract import (
-    ExtractedTriple,
     SectionExtractInput,
     _blocks_in_scope,
     build_user_prompt,
     normalize_entity,
     section_body_len,
-    structural_subsection_triples,
 )
 
 INP = SectionExtractInput(
@@ -30,24 +27,6 @@ def test_build_user_prompt_injects_heading_pages_markdown():
 def test_normalize_entity_strips_markup():
     assert normalize_entity("**Conditional Independence**") == "Conditional Independence"
     assert normalize_entity("  d-separation  ") == "d-separation"
-
-
-def test_structural_subsection_chain():
-    tr = structural_subsection_triples(["toc:1.2.3", "toc:1.2", "toc:2", "toc:preface"])
-    pairs = {(t.subject, t.object) for t in tr}
-    assert ("toc:root", "toc:1") in pairs
-    assert ("toc:1", "toc:1.2") in pairs
-    assert ("toc:1.2", "toc:1.2.3") in pairs
-    assert ("toc:root", "toc:2") in pairs
-    assert all(t.predicate == "has_subsection" for t in tr)
-    assert sum(1 for t in tr if (t.subject, t.object) == ("toc:root", "toc:1")) == 1  # deduped
-    assert not any("preface" in t.object for t in tr)  # slug keys excluded
-
-
-def test_triple_id_format():
-    t = ExtractedTriple("conditional independence", "implies", "factorization")
-    tid = triple_id({"subject": t.subject, "predicate": t.predicate, "object": t.object})
-    assert len(tid) == 16 and tid == triple_id({"subject": t.subject, "predicate": t.predicate, "object": t.object})
 
 
 def test_section_body_len():
@@ -73,11 +52,13 @@ _SCOPE_ROWS = [
 def test_section_depth():
     # The pure helper was folded into _section_level_fn; assert the same contract
     # through the default level rule _blocks_in_scope uses (numeric depth, slug=leaf).
-    from app.extraction.extract import _NUMERIC
+    import re
+
+    numeric = re.compile(r"^\d+(?:\.\d+)*$")
 
     def depth(sk: str) -> int:
         body = sk[4:]
-        return body.count(".") + 1 if _NUMERIC.match(body) else 99
+        return body.count(".") + 1 if numeric.match(body) else 99
 
     assert depth("toc:1") == 1
     assert depth("toc:1.2.3") == 3

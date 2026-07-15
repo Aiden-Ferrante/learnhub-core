@@ -32,7 +32,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
         if not doc_id:
             return {"error": "no document found"}
 
-        forest, _sections, err, _mentions = get_toc_tree(doc_id)
+        forest, _sections, err = get_toc_tree(doc_id)
         if err:
             return {"docId": doc_id, "chapters": [], "error": err}
 

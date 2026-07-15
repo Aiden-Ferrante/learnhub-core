@@ -68,7 +68,6 @@ def run_convert(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
             "sourceFilename": result.source_filename,
             "outputFilename": result.output_filename,
             "pageCount": result.page_count,
-            "savedPath": result.saved_path,
             "docId": result.doc_id,
             "engine": result.engine,
             "hasPageProvenance": result.has_page_provenance,

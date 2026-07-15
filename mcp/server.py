@@ -278,16 +278,6 @@ def prepare_reading_guide(doc: str, scope: str) -> Any:
 
 
 @mcp.tool()
-def flashcard_deck(doc: str, scope: str | None = None, count: int = 20) -> Any:
-    """A graph-grounded flashcard deck (front/back from the KG triples) for a course or chapter
-    `scope`. Read-only — for reviewing, distinct from the spaced-repetition `due_reviews` queue."""
-    params: dict[str, Any] = {"doc": doc, "count": count}
-    if scope:
-        params["scope"] = scope
-    return _req("GET", "/api/deck", params=params)
-
-
-@mcp.tool()
 def audiobook_voices() -> Any:
     """List the available text-to-speech voices for audiobook generation."""
     return _req("GET", "/api/audiobook/voices")

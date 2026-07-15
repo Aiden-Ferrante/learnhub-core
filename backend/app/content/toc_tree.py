@@ -1,17 +1,13 @@
-"""Fetch TOC hierarchy (has_subsection edges in the relationships table) and build a nested tree."""
+"""The syllabus tree: a document's stored TOC outline built into a nested forest,
+annotated with human titles and per-section concepts."""
 
 from __future__ import annotations
 
-import html
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.platform.db import db
-
-# The structural-edge predicates in the relationships collection.
-HIERARCHY_PREDICATE = "has_subsection"
-MENTIONS_PREDICATE = "section_mentions"
 
 
 @dataclass
@@ -42,52 +38,6 @@ class TreeNode:
 
 
 TOC_NUMERIC = re.compile(r"^toc:(\d+(?:\.\d+)*)$")
-
-
-def _toc_sort_key(name: str) -> tuple:
-    """Sort toc:1.2 before toc:1.10 lexicographically."""
-    if name == "toc:root":
-        return (-1,)
-    m = TOC_NUMERIC.match(name or "")
-    if m:
-        return tuple(int(p) for p in m.group(1).split("."))
-    return (10_000, name or "")
-
-
-# relationships._from / _to are stored verbatim as "entities/<key>"; join to entities
-# on the key after the slash (equivalent to Arango's DOCUMENT(edge._from)).
-_EDGE_JOIN = (
-    "relationships r "
-    "JOIN entities p ON p.key = split_part(r.from_key, '/', 2) "
-    "JOIN entities c ON c.key = split_part(r.to_key, '/', 2) "
-    "WHERE r.type = %(pred)s AND ((%(doc)s)::text IS NULL OR r.doc_ids ? (%(doc)s)::text)"
-)
-
-
-def fetch_has_subsection_edges(doc: str | None = None) -> list[dict[str, str]]:
-    with db() as conn:
-        return conn.execute(
-            'SELECT p.key AS "parentKey", p.name AS "parentName", '
-            'c.key AS "childKey", c.name AS "childName" FROM ' + _EDGE_JOIN,
-            {"pred": HIERARCHY_PREDICATE, "doc": doc},
-        ).fetchall()
-
-
-def fetch_section_mentions_by_section(doc: str | None = None) -> dict[str, list[str]]:
-    """section entity name -> sorted unique mentioned entity names."""
-    with db() as conn:
-        cursor = conn.execute(
-            'SELECT p.name AS "sectionName", c.name AS "entityName" FROM ' + _EDGE_JOIN,
-            {"pred": MENTIONS_PREDICATE, "doc": doc},
-        ).fetchall()
-    by_section: dict[str, set[str]] = {}
-    for row in cursor:
-        sec = (row.get("sectionName") or "").strip()
-        ent = (row.get("entityName") or "").strip()
-        if not sec or not ent:
-            continue
-        by_section.setdefault(sec, set()).add(ent)
-    return {k: sorted(v, key=str.casefold) for k, v in by_section.items()}
 
 
 def _resolve_section_doc_id() -> str | None:
@@ -237,86 +187,6 @@ def apply_section_titles(roots: list[TreeNode], titles_by_key: dict[str, str]) -
         visit(root)
 
 
-def enrich_tree_with_section_mentions(
-    roots: list[TreeNode], mentions_by_section: dict[str, list[str]]
-) -> None:
-    """Append each section's mentioned entities as leaf nodes (post-order on structure)."""
-
-    def visit(node: TreeNode) -> None:
-        for child in node.children:
-            visit(child)
-        for entity in mentions_by_section.get(node.label, []):
-            node.children.append(TreeNode(id=entity, label=entity, children=[]))
-
-    for root in roots:
-        visit(root)
-
-
-def build_nested_tree(edges: list[dict[str, str]]) -> list[TreeNode]:
-    """Build a forest from flat parent/child rows; multiple roots if disconnected."""
-    if not edges:
-        return []
-
-    children_by_parent: dict[str, list[str]] = {}
-    all_names: set[str] = set()
-    child_names: set[str] = set()
-
-    for row in edges:
-        p = row.get("parentName") or ""
-        c = row.get("childName") or ""
-        if not p or not c:
-            continue
-        all_names.add(p)
-        all_names.add(c)
-        child_names.add(c)
-        children_by_parent.setdefault(p, []).append(c)
-
-    for p in children_by_parent:
-        children_by_parent[p] = sorted(set(children_by_parent[p]), key=_toc_sort_key)
-
-    roots = sorted(all_names - child_names, key=_toc_sort_key)
-
-    if not roots:
-        return []
-
-    def walk(name: str, path: frozenset[str]) -> TreeNode:
-        if name in path:
-            return TreeNode(id=name, label=f"{name} (cycle)", children=[])
-        next_path = path | {name}
-        node = TreeNode(id=name, label=name)
-        for ch in children_by_parent.get(name, []):
-            node.children.append(walk(ch, next_path))
-        return node
-
-    return [walk(r, frozenset()) for r in roots]
-
-
-def render_toc_tree_html(forest: list[dict[str, Any]]) -> str:
-    """Build nested <ul> HTML (escaped); avoids Jinja recursive macros."""
-
-    def walk(nodes: list[dict[str, Any]]) -> str:
-        if not nodes:
-            return ""
-        parts: list[str] = ['<ul class="toc-tree">']
-        for node in nodes:
-            raw_label = str(node.get("label", ""))
-            label = html.escape(raw_label)
-            css = (
-                "node-label toc-node"
-                if raw_label.startswith("toc:")
-                else "node-label entity-leaf"
-            )
-            parts.append(f'<li><span class="{css}">{label}</span>')
-            children = node.get("children")
-            if isinstance(children, list) and len(children) > 0:
-                parts.append(walk(children))
-            parts.append("</li>")
-        parts.append("</ul>")
-        return "".join(parts)
-
-    return walk(forest)
-
-
 def _count_nodes(nodes: list[TreeNode]) -> int:
     return sum(1 + _count_nodes(n.children) for n in nodes)
 
@@ -425,9 +295,8 @@ def _drop_orphan_parts(nodes: list[TreeNode]) -> list[TreeNode]:
 def build_tree_from_outline(outline: list[dict[str, Any]]) -> list[TreeNode]:
     """Build the syllabus forest from a document's stored TOC outline — the SAME skeleton the
     Process-tab TOC preview shows. Each entry is ``{numberKey, title, sectionKey, listDepth}``;
-    ``listDepth`` (0-based) gives the nesting. This is the primary syllabus source because the
-    outline exists for every converted PDF, including slug-keyed books with no numbered
-    hierarchy, where the has_subsection KG tree is empty."""
+    ``listDepth`` (0-based) gives the nesting. The outline exists for every converted PDF,
+    including slug-keyed books with no numbered hierarchy."""
     roots: list[TreeNode] = []
     stack: list[tuple[int, TreeNode]] = []
     seen: set[str] = set()
@@ -447,13 +316,13 @@ def build_tree_from_outline(outline: list[dict[str, Any]]) -> list[TreeNode]:
     return roots
 
 
-def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str | None, int]:
+def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str | None]:
     """
-    Returns (forest_as_dicts, section_count, error_message, mention_edge_count).
+    Returns (forest_as_dicts, section_count, error_message).
     The syllabus skeleton is the document's stored TOC outline (the TOC-preview structure),
     which is present for every converted PDF — including slug-keyed books with no numbered
-    hierarchy. Falls back to the has_subsection KG tree only when no outline is stored.
-    When ``doc`` is given it selects that document (by id); unmatched ids fall back to latest.
+    hierarchy. When ``doc`` is given it selects that document (by id); unmatched ids fall
+    back to latest.
     """
     try:
         from app.content.documents import fetch_latest_document
@@ -464,23 +333,16 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
         outline = (doc_obj or {}).get("outline") or []
         # Scope EVERY helper to the resolved document. Section keys (toc:1, toc:summary, …) are
         # unique within a book but COLLIDE across books, so an unscoped query bleeds another
-        # book's titles/mentions/counts onto this one (e.g. AI-Eng showing DDIA's chapters).
+        # book's titles/counts onto this one (e.g. AI-Eng showing DDIA's chapters).
         doc_key = (doc_obj or {}).get("id")
-        mentions_by_section = fetch_section_mentions_by_section(doc_key)
         titles_by_key = fetch_section_titles(doc_key)
     except Exception as e:  # noqa: BLE001 — tree is best-effort; surface the error to the API
-        return [], 0, str(e), 0
+        return [], 0, str(e)
 
-    mention_edge_count = sum(len(v) for v in mentions_by_section.values())
-    if outline:
-        forest_nodes = build_tree_from_outline(outline)
-    else:
-        edges = fetch_has_subsection_edges(doc_key)
-        forest_nodes = build_nested_tree(edges)
+    forest_nodes = build_tree_from_outline(outline)
     apply_section_titles(forest_nodes, titles_by_key)
 
-    # Tie concepts to the tree, then filter the syllabus to only sections that have concepts
-    # (keeping their ancestors). If the doc has NO concepts yet (e.g. just converted, not
+    # Tie concepts to the tree. If the doc has NO concepts yet (e.g. just converted, not
     # processed), keep the full TOC skeleton so the structure is still visible.
     counts = _concept_counts_by_section(doc_key) if doc_key else {}
     if counts:
@@ -492,6 +354,5 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     forest_nodes = _drop_orphan_parts(_drop_front_back_matter(forest_nodes))
 
     section_count = _count_nodes(forest_nodes)
-    enrich_tree_with_section_mentions(forest_nodes, mentions_by_section)
-    return [n.as_dict() for n in forest_nodes], section_count, None, mention_edge_count
+    return [n.as_dict() for n in forest_nodes], section_count, None
 

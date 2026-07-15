@@ -59,7 +59,7 @@ def health() -> JSONResponse:
 
 @app.get("/api/toc-tree")
 def api_toc_tree(doc: str | None = None) -> JSONResponse:
-    forest, edge_count, err, mention_count = get_toc_tree(doc)
+    forest, section_count, err = get_toc_tree(doc)
     if err:
         return JSONResponse(
             {
@@ -70,11 +70,12 @@ def api_toc_tree(doc: str | None = None) -> JSONResponse:
             },
             status_code=503,
         )
+    # edgeCount/mentionEdgeCount kept for response-shape stability (mentions retired).
     return JSONResponse(
         {
             "tree": forest,
-            "edgeCount": edge_count,
-            "mentionEdgeCount": mention_count,
+            "edgeCount": section_count,
+            "mentionEdgeCount": 0,
         }
     )
 

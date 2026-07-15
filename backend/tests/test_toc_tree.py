@@ -1,11 +1,10 @@
-"""Tests for pure TOC-tree assembly (no ArangoDB)."""
+"""Tests for pure TOC-tree assembly (no DB)."""
 
 from app.content.toc_tree import (
     _chapter_titles,
     _is_bare_chapter_number,
     apply_section_titles,
-    build_nested_tree,
-    enrich_tree_with_section_mentions,
+    build_tree_from_outline,
 )
 
 
@@ -37,33 +36,42 @@ def test_is_bare_chapter_number():
     assert not _is_bare_chapter_number("Introduction", 1)
 
 
-def _edges(*pairs):
-    return [{"parentName": p, "childName": c} for p, c in pairs]
+def _outline(*rows):
+    return [
+        {"sectionKey": sk, "title": title, "numberKey": num, "listDepth": depth}
+        for sk, title, num, depth in rows
+    ]
 
 
-def test_build_nested_tree_sorts_numerically():
-    # toc:1.2 must come before toc:1.10 (numeric, not lexicographic).
-    forest = build_nested_tree(
-        _edges(("toc:1", "toc:1.10"), ("toc:1", "toc:1.2"))
+def test_build_tree_from_outline_nests_by_list_depth():
+    forest = build_tree_from_outline(
+        _outline(
+            ("toc:1", "Introduction", "1", 0),
+            ("toc:1.1", "Background", "1.1", 1),
+            ("toc:1.2", "Scope", "1.2", 1),
+            ("toc:2", "Methods", "2", 0),
+        )
+    )
+    assert [n.id for n in forest] == ["toc:1", "toc:2"]
+    assert [c.id for c in forest[0].children] == ["toc:1.1", "toc:1.2"]
+    assert forest[1].children == []
+
+
+def test_build_tree_from_outline_skips_duplicates_and_non_toc():
+    forest = build_tree_from_outline(
+        _outline(
+            ("toc:1", "Intro", "1", 0),
+            ("toc:1", "Intro again", "1", 0),  # duplicate key — skipped
+            (None, "No key", "", 0),  # keyless — skipped
+        )
     )
     assert len(forest) == 1
-    child_ids = [c.id for c in forest[0].children]
-    assert child_ids == ["toc:1.2", "toc:1.10"]
-
-
-def test_enrich_attaches_section_mention_entities():
-    # Regression: enrich_tree_with_section_mentions used to define its inner
-    # visitor but never call it, so entity leaves were silently dropped.
-    forest = build_nested_tree(_edges(("toc:1", "toc:1.1")))
-    enrich_tree_with_section_mentions(forest, {"toc:1.1": ["Entropy", "Gradient"]})
-
-    leaf = forest[0].children[0]
-    assert [c.label for c in leaf.children] == ["Entropy", "Gradient"]
-    assert all(not c.id.startswith("toc:") for c in leaf.children)
 
 
 def test_apply_section_titles_sets_heading_on_sections_only():
-    forest = build_nested_tree(_edges(("toc:1", "toc:1.1")))
+    forest = build_tree_from_outline(
+        _outline(("toc:1", "", "1", 0), ("toc:1.1", "", "1.1", 1))
+    )
     apply_section_titles(forest, {"toc:1": "Introduction"})
     assert forest[0].title == "Introduction"
     assert forest[0].children[0].title is None
