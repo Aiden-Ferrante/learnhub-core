@@ -1145,38 +1145,49 @@ export function DeepChapter({
         <ReadingThemeToggle />
       </div>
 
-      {/* Path rail — the guided journey as a rail over ONE surface (the mode-switcher is retired). */}
+      {/* Path stepper — the guided journey compressed to one glance: done stages are
+          check-dots, the CURRENT stage keeps its label, the rest are quiet dots. */}
       {chapterKey && (
-        <div className="flex items-center gap-1 overflow-x-auto border-b bg-card/60 px-3 py-1.5">
-          {PATH_STAGES.map((s, i) => {
+        <div className="flex items-center gap-1 overflow-x-auto border-b bg-card/60 px-3 py-1">
+          <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Path
+          </span>
+          {PATH_STAGES.map((s) => {
             const done = !!stages[s.key]
-            const isNext = firstIncompleteStage(stages).key === s.key
-            return (
-              <React.Fragment key={s.key}>
-                {i > 0 && <span className="h-px w-3 shrink-0 bg-border" />}
+            const isNext = !done && firstIncompleteStage(stages).key === s.key
+            if (isNext) {
+              return (
                 <button
+                  key={s.key}
                   type="button"
                   title={s.lead}
                   onClick={() => runStage(s.key)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                    done
-                      ? "border-brand/40 bg-brand/10 text-brand"
-                      : isNext
-                        ? "border-foreground/30 text-foreground"
-                        : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                  )}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand transition-colors hover:bg-brand/20"
                 >
-                  {done ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <span className={cn("h-1.5 w-1.5 rounded-full", isNext ? "bg-brand" : "bg-muted-foreground/40")} />
-                  )}
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand" />
                   {s.label}
                 </button>
-              </React.Fragment>
+              )
+            }
+            return (
+              <button
+                key={s.key}
+                type="button"
+                title={`${s.label} — ${s.lead}`}
+                onClick={() => runStage(s.key)}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted/60"
+              >
+                {done ? (
+                  <Check className="h-3 w-3 text-status-mastered" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                )}
+              </button>
             )
           })}
+          <span className="ml-1 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+            {PATH_STAGES.filter((s) => stages[s.key]).length}/{PATH_STAGES.length}
+          </span>
         </div>
       )}
 
