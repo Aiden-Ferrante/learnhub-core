@@ -24,12 +24,60 @@ import time
 from typing import Any
 
 from app.content.scope import _scope_section_keys
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.study import srs
 from app.study.mastery import record_quiz_event
 
 REVIEWS = "concept_reviews"
 CONCEPTS = "concepts"
+
+# Read a review row into an srs state dict (epoch floats; camelCase keys srs/schedule expect).
+_REVIEW_STATE_SELECT = (
+    'SELECT extract(epoch from due)::float8 AS due, interval, ease, reps, lapses, state, '
+    'last_grade AS "lastGrade", extract(epoch from last_review)::float8 AS "lastReview", '
+    'extract(epoch from first_review)::float8 AS "firstReview" FROM concept_reviews'
+)
+
+
+def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None):
+    """Upsert one SM-2 review row (state dict ``st`` from srs). Preserves the original
+    first_review; ``extra`` carries skeleton/figure metadata (itemType/chapterScope/caption/…)."""
+    extra = extra or {}
+    p = {
+        "key": key, "doc_id": doc_id, "section_key": section_key,
+        "due": st["due"], "ease": st.get("ease"), "interval": st.get("interval"),
+        "reps": st.get("reps"), "lapses": st.get("lapses"), "state": st.get("state"),
+        "lg": st.get("lastGrade"), "lr": st.get("lastReview"),
+        "fr": st.get("lastReview") if is_new else None,
+        "it": extra.get("itemType"), "cs": extra.get("chapterScope"),
+        "cap": extra.get("caption"), "pg": extra.get("page"), "ord": extra.get("order"),
+        "hd": extra.get("heading"),
+        "ch": Json(extra["children"]) if extra.get("children") is not None else None,
+        "fo": extra.get("figureOrder"),
+    }
+    conn.execute(
+        'INSERT INTO concept_reviews (key, doc_id, section_key, due, ease, interval, reps, lapses, '
+        'state, last_grade, last_review, first_review, item_type, chapter_scope, caption, page, "order", '
+        "heading, children, figure_order) "
+        "VALUES (%(key)s,%(doc_id)s,%(section_key)s, to_timestamp(%(due)s), %(ease)s,%(interval)s,"
+        "%(reps)s,%(lapses)s,%(state)s,%(lg)s, to_timestamp(%(lr)s), "
+        "CASE WHEN %(fr)s IS NULL THEN NULL ELSE to_timestamp(%(fr)s) END, %(it)s,%(cs)s,%(cap)s,%(pg)s,%(ord)s,"
+        "%(hd)s,%(ch)s,%(fo)s) "
+        "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
+        "due=EXCLUDED.due, ease=EXCLUDED.ease, interval=EXCLUDED.interval, reps=EXCLUDED.reps, "
+        "lapses=EXCLUDED.lapses, state=EXCLUDED.state, last_grade=EXCLUDED.last_grade, "
+        "last_review=EXCLUDED.last_review, "
+        "first_review=COALESCE(concept_reviews.first_review, EXCLUDED.first_review), "
+        "item_type=COALESCE(concept_reviews.item_type, EXCLUDED.item_type), "
+        "chapter_scope=COALESCE(EXCLUDED.chapter_scope, concept_reviews.chapter_scope), "
+        "caption=COALESCE(EXCLUDED.caption, concept_reviews.caption), "
+        "page=COALESCE(EXCLUDED.page, concept_reviews.page), "
+        '"order"=COALESCE(EXCLUDED."order", concept_reviews."order"), '
+        "heading=COALESCE(EXCLUDED.heading, concept_reviews.heading), "
+        "children=COALESCE(EXCLUDED.children, concept_reviews.children), "
+        "figure_order=COALESCE(EXCLUDED.figure_order, concept_reviews.figure_order)",
+        p,
+    )
 
 # Course/library-wide review sessions introduce at most this many never-reviewed concepts per
 # day (Anki-style intake discipline) so a big backlog can't flood a session. Chapter-scoped
@@ -38,13 +86,6 @@ NEW_PER_DAY = int(os.getenv("LEARN_NEW_PER_DAY", "10"))
 
 SKELETON_KEY_PREFIX = "skel-"
 FIGURE_KEY_PREFIX = "fig-"
-
-
-def ensure_reviews(db) -> None:
-    if not db.has_collection(REVIEWS):
-        col = db.create_collection(REVIEWS)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["due"])
 
 
 def day_start(now: float) -> float:
@@ -171,43 +212,34 @@ def build_review_queue(
     the learner's timezone, not the server's."""
     now = time.time()
     try:
-        db = connect_arango()
-        if not db.has_collection(CONCEPTS):
-            return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}}
-        ensure_reviews(db)
         # A chapter scope spans ALL its sub-sections (same reading-order span the reader and
         # quiz use) — exact-key matching misses everything under a chapter node.
         span = _scope_section_keys(doc, scope) if scope else None
-        concepts = list(
-            db.aql.execute(
-                "FOR c IN concepts "
-                "FILTER (@doc == null OR c.docId == @doc) "
-                "SORT c.order "
-                "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-                "source: c.source, sectionKey: c.sectionKey, docId: c.docId, "
-                "pageStart: c.pageStart, pageEnd: c.pageEnd}",
-                bind_vars={"doc": doc},
-            )
-        )
+        with db() as conn:
+            concepts = conn.execute(
+                'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
+                'doc_id AS "docId", page_start AS "pageStart", page_end AS "pageEnd" '
+                'FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) ORDER BY "order"',
+                {"doc": doc},
+            ).fetchall()
+            reviews: dict[str, dict[str, Any]] = {}
+            for r in conn.execute(
+                "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
+                "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'figure'))",
+                {"doc": doc},
+            ).fetchall():
+                reviews[r["key"]] = r
+            # Skeleton (structure-recall) and figure-recall cards.
+            typed_rows = conn.execute(
+                'SELECT key, extract(epoch from due)::float8 AS due, state, item_type AS "itemType", '
+                'chapter_scope AS "chapterScope", section_key AS "sectionKey", caption, page, "order" '
+                "FROM concept_reviews WHERE item_type IN ('skeleton', 'figure') "
+                "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
+                {"doc": doc},
+            ).fetchall()
         if span is not None:
             concepts = [c for c in concepts if c.get("sectionKey") in span]
-        reviews: dict[str, dict[str, Any]] = {}
-        for r in db.aql.execute(
-            "FOR r IN concept_reviews FILTER (@doc == null OR r.docId == @doc) "
-            "AND r.itemType NOT IN ['skeleton', 'figure'] "
-            "RETURN {key: r._key, due: r.due, state: r.state}",
-            bind_vars={"doc": doc},
-        ):
-            reviews[r["key"]] = r
-        # Skeleton (structure-recall) and figure-recall cards: they enter the system through
-        # deliberate study (the walk / a chapter review), then surface on their SM-2 due date.
-        typed_rows = list(
-            db.aql.execute(
-                "FOR r IN concept_reviews FILTER r.itemType IN ['skeleton', 'figure'] "
-                "AND (@doc == null OR r.docId == @doc) RETURN r",
-                bind_vars={"doc": doc},
-            )
-        )
         if scope is not None:
             typed_rows = [
                 r
@@ -216,36 +248,35 @@ def build_review_queue(
             ]
         skeleton_rows = [r for r in typed_rows if r.get("itemType") == "skeleton"]
         figure_rows = [r for r in typed_rows if r.get("itemType") == "figure"]
-        # Chapter-scoped sessions also OFFER the chapter's unseeded captioned figures as new
-        # cards ("what does this figure show?") — first grade seeds their schedule.
+        # Chapter-scoped sessions also OFFER the chapter's unseeded captioned figures as new cards.
         new_figures: list[dict[str, Any]] = []
-        if scope is not None and doc and span and db.has_collection("elements"):
-            seeded = {r["_key"] for r in figure_rows}
-            for f in db.aql.execute(
-                "FOR e IN elements FILTER e.docId == @d AND e.type == 'figure' "
-                "AND e.caption != null AND e.caption != '' "
-                "SORT e.order RETURN {order: e.order, page: e.page, caption: e.caption, "
-                "sectionKey: e.sectionKey}",
-                bind_vars={"d": doc},
-            ):
+        if scope is not None and doc and span:
+            seeded = {r["key"] for r in figure_rows}
+            with db() as conn:
+                figs = conn.execute(
+                    'SELECT "order", page, caption, section_key AS "sectionKey" FROM elements '
+                    "WHERE doc_id = %(d)s AND type = 'figure' AND caption IS NOT NULL AND caption <> '' "
+                    'ORDER BY "order"',
+                    {"d": doc},
+                ).fetchall()
+            for f in figs:
                 if f.get("sectionKey") not in span:
                     continue
                 if figure_review_key(doc, int(f.get("order") or 0)) in seeded:
                     continue
                 new_figures.append(new_figure_card(doc, f))
-        # Daily new-card allowance (unscoped sessions only): how many concepts already got
-        # their first grade since the learner's midnight?
+        # Daily new-card allowance (unscoped sessions only).
         introduced_today = 0
         if scope is None:
             since = day_start_ts if day_start_ts is not None else day_start(now)
-            introduced_today = next(
-                db.aql.execute(
-                    "RETURN COUNT(FOR r IN concept_reviews "
-                    "FILTER (@doc == null OR r.docId == @doc) AND r.itemType != 'skeleton' "
-                    "AND r.firstReview != null AND r.firstReview >= @since RETURN 1)",
-                    bind_vars={"doc": doc, "since": since},
-                )
-            )
+            with db() as conn:
+                introduced_today = conn.execute(
+                    "SELECT count(*) AS n FROM concept_reviews "
+                    "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+                    "AND (item_type IS NULL OR item_type <> 'skeleton') "
+                    "AND first_review IS NOT NULL AND extract(epoch from first_review) >= %(since)s",
+                    {"doc": doc, "since": since},
+                ).fetchone()["n"]
     except Exception as exc:  # noqa: BLE001
         return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)}
 
@@ -300,27 +331,21 @@ def grade_review(body: dict, concept_key: str, grade: int, now: float) -> tuple[
     if not concept_key:
         return {"error": "conceptKey and grade (1-4) are required"}, 400
     try:
-        db = connect_arango()
-        ensure_reviews(db)
-        concept = db.collection(CONCEPTS).get(concept_key) if db.has_collection(CONCEPTS) else None
-        if not concept:
-            return {"error": "unknown concept"}, 404
-        doc_id = concept.get("docId")
-        section_key = concept.get("sectionKey")
-
-        reviews = db.collection(REVIEWS)
-        existing = reviews.get(concept_key)
+        with db() as conn:
+            concept = conn.execute(
+                'SELECT doc_id AS "docId", section_key AS "sectionKey", name, signal '
+                "FROM concepts WHERE key = %(k)s",
+                {"k": concept_key},
+            ).fetchone()
+            if not concept:
+                return {"error": "unknown concept"}, 404
+            doc_id = concept.get("docId")
+            section_key = concept.get("sectionKey")
+            existing = conn.execute(_REVIEW_STATE_SELECT + " WHERE key = %(k)s", {"k": concept_key}).fetchone()
         state = existing if existing else srs.new_state(now)
         next_state = srs.schedule(state, grade, now)
-        row = {
-            **next_state,
-            "_key": concept_key,
-            "docId": doc_id,
-            "sectionKey": section_key,
-        }
-        if not existing:
-            row["firstReview"] = now  # feeds the daily new-card allowance
-        reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per concept)
+        with db() as conn:
+            _upsert_review(conn, concept_key, doc_id, section_key, next_state, is_new=not existing)
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}, 500
 
@@ -351,42 +376,34 @@ def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -
     doc_id = str(body.get("doc") or "").strip()
     section_key = str(body.get("sectionKey") or "").strip()
     try:
-        db = connect_arango()
-        ensure_reviews(db)
-        reviews = db.collection(REVIEWS)
-        if doc_id and section_key:
-            key = skeleton_review_key(doc_id, section_key)
-            existing = reviews.get(key)
-        elif concept_key.startswith(SKELETON_KEY_PREFIX):
-            key = concept_key
-            existing = reviews.get(key)
-            if not existing:
-                return {"error": "unknown skeleton item"}, 404
-            doc_id = existing.get("docId")
-            section_key = existing.get("sectionKey")
-        else:
-            return {"error": "doc and sectionKey are required for a skeleton grade"}, 400
+        with db() as conn:
+            if doc_id and section_key:
+                key = skeleton_review_key(doc_id, section_key)
+                existing = conn.execute(_REVIEW_STATE_SELECT + " WHERE key = %(k)s", {"k": key}).fetchone()
+            elif concept_key.startswith(SKELETON_KEY_PREFIX):
+                key = concept_key
+                existing = conn.execute(
+                    _REVIEW_STATE_SELECT.replace(
+                        " FROM concept_reviews",
+                        ', doc_id AS "docId", section_key AS "sectionKey" FROM concept_reviews',
+                    ) + " WHERE key = %(k)s",
+                    {"k": key},
+                ).fetchone()
+                if not existing:
+                    return {"error": "unknown skeleton item"}, 404
+                doc_id = existing.get("docId")
+                section_key = existing.get("sectionKey")
+            else:
+                return {"error": "doc and sectionKey are required for a skeleton grade"}, 400
         state = existing if existing else srs.new_state(now)
         next_state = srs.schedule(state, grade, now)
-        row = {
-            **next_state,
-            "_key": key,
-            "itemType": "skeleton",
-            "docId": doc_id,
-            "sectionKey": section_key,
-        }
-        if not existing:
-            row["firstReview"] = now
-        heading = str(body.get("heading") or "").strip()
-        if heading:
-            row["heading"] = heading
-        chapter_scope = str(body.get("chapterScope") or "").strip()
-        if chapter_scope:
-            row["chapterScope"] = chapter_scope
-        children = clean_skeleton_children(body.get("children"))
-        if children:
-            row["children"] = children
-        reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per skeleton item)
+        heading = str(body.get("heading") or "").strip() or None
+        chapter_scope = str(body.get("chapterScope") or "").strip() or None
+        children = clean_skeleton_children(body.get("children")) or None
+        with db() as conn:
+            _upsert_review(conn, key, doc_id, section_key, next_state, is_new=not existing,
+                           extra={"itemType": "skeleton", "heading": heading,
+                                  "chapterScope": chapter_scope, "children": children})
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}, 500
 
@@ -396,8 +413,8 @@ def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -
         None,
         correct=(grade >= 3),
         doc=doc_id,
-        stem=row.get("heading") or section_key,
-        expected="; ".join(c["heading"] for c in (row.get("children") or [])) or None,
+        stem=heading or section_key,
+        expected="; ".join(c["heading"] for c in (children or [])) or None,
         kind="recall",
     )
     return {
@@ -417,49 +434,47 @@ def _grade_figure_item(body: dict, concept_key: str, grade: int, now: float) -> 
     doc_id = str(body.get("doc") or "").strip()
     order = body.get("figureOrder")
     try:
-        db = connect_arango()
-        ensure_reviews(db)
-        reviews = db.collection(REVIEWS)
-        if doc_id and order is not None:
-            key = figure_review_key(doc_id, int(order))
-            existing = reviews.get(key)
-        elif concept_key.startswith(FIGURE_KEY_PREFIX):
-            key = concept_key
-            existing = reviews.get(key)
-            if not existing:
-                return {"error": "unknown figure item"}, 404
-            doc_id = existing.get("docId")
-            order = existing.get("figureOrder")
-        else:
-            return {"error": "doc and figureOrder are required for a figure grade"}, 400
+        with db() as conn:
+            if doc_id and order is not None:
+                key = figure_review_key(doc_id, int(order))
+                existing = conn.execute(_REVIEW_STATE_SELECT + " WHERE key = %(k)s", {"k": key}).fetchone()
+            elif concept_key.startswith(FIGURE_KEY_PREFIX):
+                key = concept_key
+                existing = conn.execute(
+                    _REVIEW_STATE_SELECT.replace(
+                        " FROM concept_reviews",
+                        ', doc_id AS "docId", figure_order AS "figureOrder" FROM concept_reviews',
+                    ) + " WHERE key = %(k)s",
+                    {"k": key},
+                ).fetchone()
+                if not existing:
+                    return {"error": "unknown figure item"}, 404
+                doc_id = existing.get("docId")
+                order = existing.get("figureOrder")
+            else:
+                return {"error": "doc and figureOrder are required for a figure grade"}, 400
         state = existing if existing else srs.new_state(now)
         next_state = srs.schedule(state, grade, now)
-        row = {
-            **next_state,
-            "_key": key,
-            "itemType": "figure",
-            "docId": doc_id,
-            "figureOrder": int(order) if order is not None else None,
-        }
-        if not existing:
-            row["firstReview"] = now
-        for field in ("caption", "sectionKey", "chapterScope"):
+        extra: dict[str, Any] = {"itemType": "figure", "figureOrder": int(order) if order is not None else None}
+        section_key = str(body.get("sectionKey") or "").strip() or None
+        for field in ("caption", "chapterScope"):
             val = str(body.get(field) or "").strip()
             if val:
-                row[field] = val
+                extra[field] = val
         if body.get("page") is not None:
-            row["page"] = body.get("page")
-        reviews.insert(row, overwrite=True)  # idempotent upsert (1 row per figure)
+            extra["page"] = body.get("page")
+        with db() as conn:
+            _upsert_review(conn, key, doc_id, section_key, next_state, is_new=not existing, extra=extra)
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}, 500
 
     record_quiz_event(
-        row.get("sectionKey"),
+        section_key,
         None,
         correct=(grade >= 3),
         doc=doc_id,
-        stem=f"Figure p.{row.get('page')}" if row.get("page") else "Figure",
-        expected=row.get("caption"),
+        stem=f"Figure p.{extra.get('page')}" if extra.get("page") else "Figure",
+        expected=extra.get("caption"),
         kind="recall",
     )
     return {
