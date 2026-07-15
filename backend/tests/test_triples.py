@@ -1,6 +1,6 @@
 """Tests for the read-time noise filter (pure functions, no DB)."""
 
-from app.extraction.arango_learn import _is_noise_triple, _triple_rows_from_cursor
+from app.extraction.triples import _is_noise_triple, _triple_rows_from_cursor
 
 
 def test_keeps_real_knowledge_triples():

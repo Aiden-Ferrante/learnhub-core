@@ -1,6 +1,6 @@
 """Tests for pure TOC-tree assembly (no ArangoDB)."""
 
-from app.content.arango_tree import (
+from app.content.toc_tree import (
     _chapter_titles,
     _is_bare_chapter_number,
     apply_section_titles,

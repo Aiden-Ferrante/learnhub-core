@@ -17,8 +17,8 @@ import os
 import time
 from typing import Any
 
-from app.extraction.arango_learn import content_triples_for_section, triple_id
-from app.content.arango_tree import get_toc_tree
+from app.extraction.triples import content_triples_for_section, triple_id
+from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 EVENTS_COLLECTION = "study_events"

@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from app.platform.db import db
-from app.extraction.arango_learn import (
+from app.extraction.triples import (
     fetch_triples_or_error,
     triple_id,
     triple_line,

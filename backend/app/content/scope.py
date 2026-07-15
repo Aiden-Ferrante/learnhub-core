@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from app.content.arango_tree import get_toc_tree
+from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 TOC_ROOT_KEY = "toc:root"

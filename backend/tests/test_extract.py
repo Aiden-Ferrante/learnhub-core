@@ -1,6 +1,6 @@
 """Tests for the extraction infrastructure (pure functions, no LLM, no DB)."""
 
-from app.extraction.arango_learn import triple_id
+from app.extraction.triples import triple_id
 from app.extraction.extract import (
     ExtractedTriple,
     SectionExtractInput,

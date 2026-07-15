@@ -81,7 +81,7 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
     return out
   }, [concepts])
 
-  // "What can I learn next": concepts whose prerequisites are all mastered (and not yet mastered).
+  // "What can I learn next": concepts you haven't mastered yet (gate "ready").
   const ready = useMemo(
     () => concepts.filter((c) => c.conceptKey && mastery[c.conceptKey]?.gate === "ready").slice(0, 10),
     [concepts, mastery],
@@ -92,10 +92,6 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
   const openConcept = (c: ConceptLesson) => {
     setSelected(c)
     setMode("detail")
-  }
-  const openByName = (name: string) => {
-    const found = concepts.find((c) => c.name.toLowerCase() === name.toLowerCase())
-    if (found) openConcept(found)
   }
 
   // Deep-link from the syllabus tree: once concepts arrive, jump to the requested one.
@@ -140,13 +136,10 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
         docId={course.learnDocId}
         mastery={sm?.mastery}
         attempts={sm?.attempts}
-        gate={sm?.gate}
-        blockedBy={sm?.blockedBy}
         onBack={() => {
           setMode("list")
           loadMastery()
         }}
-        onOpenConcept={openByName}
         onGraded={loadMastery}
       />
     )

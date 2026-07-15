@@ -8,7 +8,7 @@ import hashlib
 import os
 from typing import Any
 
-from app.content.arango_tree import (
+from app.content.toc_tree import (
     HIERARCHY_PREDICATE,
     MENTIONS_PREDICATE,
     fetch_section_mentions_by_section,

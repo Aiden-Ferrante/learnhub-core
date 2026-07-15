@@ -214,7 +214,6 @@ export type ConceptLesson = {
   signal: string
   source?: string | null
   questions?: { q: string; a: string }[]
-  prereqNames?: string[]
   sectionKey?: string
   pageStart?: number | null
   pageEnd?: number | null
@@ -592,9 +591,8 @@ export type ConceptMastery = {
   attempts: number
   due?: number | null
   state?: string
-  /** Prerequisite gate: mastered | ready (prereqs met) | locked (prereqs unmet). */
-  gate?: 'mastered' | 'ready' | 'locked'
-  blockedBy?: string[]
+  /** Study gate: mastered (≥ threshold) | ready (not yet mastered). */
+  gate?: 'mastered' | 'ready'
 }
 
 export type ConceptMasteryResponse = {
@@ -621,7 +619,6 @@ export type ExtractStatusResponse = {
     extracted?: number
     concepts?: number
     questions?: number
-    prereqEdges?: number
     seconds?: number
     errors?: string[]
   }
@@ -1358,7 +1355,6 @@ export type ChapterBuildJob = {
   /** Per-section extraction report (why sections produced 0 concepts, etc.). */
   outcomes?: SectionOutcome[] | null
   concepts?: number | null
-  prereqEdges?: number | null
 }
 
 export async function fetchChapterBuilds(

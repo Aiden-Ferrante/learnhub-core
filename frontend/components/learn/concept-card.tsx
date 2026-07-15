@@ -29,7 +29,7 @@ export function prettyScope(key?: string): string {
   return key.replace(/^toc:/, "").replace(/-/g, " ")
 }
 
-/** One expandable concept card: name + kind + 1-line signal; expands to source/prereqs/Q&A.
+/** One expandable concept card: name + kind + 1-line signal; expands to source/Q&A.
  *  Self-contained (owns its open state) so it's reusable across the document and section views. */
 export function ConceptCard({
   concept: c,
@@ -104,12 +104,6 @@ export function ConceptCard({
             <div className="border-l-2 border-muted pl-3 text-xs italic text-muted-foreground">
               <ConceptMarkdown content={c.source} />
             </div>
-          )}
-          {(c.prereqNames || []).length > 0 && (
-            <p className="text-xs">
-              <span className="text-muted-foreground">Prerequisites: </span>
-              {c.prereqNames!.join(", ")}
-            </p>
           )}
           {(c.questions || []).length > 0 && (
             <ul className="space-y-1.5">

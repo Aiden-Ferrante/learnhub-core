@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronLeft, Lock } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConceptMarkdown } from "@/components/learn/concept-markdown"
 import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
@@ -19,29 +19,23 @@ const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
 type ConceptDetailProps = {
   concept: ConceptLesson
   onBack: () => void
-  onOpenConcept?: (name: string) => void
   onGraded?: () => void
   sectionTitle?: string
   docId?: string
   mastery?: number
   attempts?: number
-  gate?: "mastered" | "ready" | "locked"
-  blockedBy?: string[]
 }
 
-/** A focused single-concept lesson: explanation, source passage, clickable prerequisites, a
- *  reveal-on-click self-test, and self-grading (feeds the spaced-repetition schedule). */
+/** A focused single-concept lesson: explanation, source passage, a reveal-on-click
+ *  self-test, and self-grading (feeds the spaced-repetition schedule). */
 export function ConceptDetail({
   concept: c,
   onBack,
-  onOpenConcept,
   onGraded,
   sectionTitle,
   docId,
   mastery,
   attempts,
-  gate,
-  blockedBy,
 }: ConceptDetailProps) {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
   const [graded, setGraded] = useState<string | null>(null)
@@ -82,27 +76,6 @@ export function ConceptDetail({
         </p>
       </div>
 
-      {gate === "locked" && (blockedBy || []).length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
-          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden="true" />
-          <span className="text-muted-foreground">
-            Learn first:{" "}
-            {blockedBy!.map((n, i) => (
-              <span key={n}>
-                {i > 0 && ", "}
-                <button
-                  type="button"
-                  onClick={() => onOpenConcept?.(n)}
-                  className="text-foreground underline-offset-2 hover:underline"
-                >
-                  {n}
-                </button>
-              </span>
-            ))}
-          </span>
-        </div>
-      )}
-
       <ConceptMarkdown content={c.signal} className="text-[15px] leading-relaxed" />
 
       {c.source && (
@@ -123,27 +96,6 @@ export function ConceptDetail({
         className="grid gap-3 sm:grid-cols-2"
       />
 
-
-      {(c.prereqNames || []).length > 0 && (
-        <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Prerequisites
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {c.prereqNames!.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => onOpenConcept?.(n)}
-                disabled={!onOpenConcept}
-                className="rounded-full border bg-card px-2.5 py-1 text-xs hover:bg-muted disabled:cursor-default disabled:hover:bg-card"
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {(c.questions || []).length > 0 && (
         <div>

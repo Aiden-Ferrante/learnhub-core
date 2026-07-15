@@ -116,7 +116,7 @@ function ConceptReceipt({ docId, scope }: { docId: string; scope: string }) {
               <button
                 type="button"
                 className="shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                title="Delete this concept (removes its reviews and prerequisite links)"
+                title="Delete this concept (also removes its review history)"
                 disabled={busyKey === c.conceptKey}
                 onClick={() => remove(c.conceptKey!)}
               >
@@ -169,7 +169,6 @@ function OutcomeReport({ job, docId }: { job: ChapterBuildJob; docId: string }) 
         {counts.error > 0 && <span className="text-destructive">{counts.error} errors</span>}
         {counts.gated > 0 && <span className="text-amber-400">{counts.gated} gated (ungrounded)</span>}
         {counts.chunked > 0 && <span>{counts.chunked} chunked (oversize)</span>}
-        {job.prereqEdges != null && <span>{job.prereqEdges} prereq edges</span>}
       </div>
       {noteworthy.length > 0 && (
         <div className="max-h-56 space-y-1 overflow-y-auto">

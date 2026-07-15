@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from app.content.documents import fetch_latest_document
-from app.content.arango_tree import get_toc_tree
+from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 

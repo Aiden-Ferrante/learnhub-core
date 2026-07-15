@@ -1556,11 +1556,6 @@ export function DeepChapter({
                 className="text-[13px] leading-relaxed text-muted-foreground"
               />
             )}
-            {(activeConcept.prereqNames?.length ?? 0) > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Builds on: <span className="text-foreground/80">{activeConcept.prereqNames!.join(", ")}</span>
-              </div>
-            )}
             {activeConcept.questions?.[0] && (
               <CheckReveal q={activeConcept.questions[0].q} a={activeConcept.questions[0].a} />
             )}

@@ -27,7 +27,7 @@ There are **zero import cycles** (checked by AST; keep it that way).
 | Package | Owns |
 |---|---|
 | `platform/` | Postgres pool + X-User-Db schema tenancy (`db.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
-| `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`arango_tree.py`), chapter units (`chapters.py`) |
+| `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`) |
 | `ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
 | `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`), concept reads (`concept_store.py`), deep-chapter overlay, skeleton, reading guides |
 | `study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, SM-2 (`srs.py`) |
