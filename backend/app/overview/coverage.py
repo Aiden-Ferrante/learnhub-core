@@ -44,7 +44,7 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
             bind_vars={"d": doc_id},
         )
     )
-    level_of = _section_level_fn(db, doc_id)
+    level_of = _section_level_fn(doc_id)
     jobs = {j["scope"]: j for j in list_builds(doc_id).get("builds", [])}
 
     out: dict[str, Any] = {}
@@ -103,7 +103,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
             bind_vars={"d": doc_id},
         )
     )
-    level_of = _section_level_fn(db, doc_id)
+    level_of = _section_level_fn(doc_id)
     jobs_by = {
         (j["scope"], j.get("kind") or "build"): j
         for j in list_builds(doc_id, kind=None).get("builds", [])
@@ -123,7 +123,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
         # Outline nesting first — it bridges mixed keyspaces (numbered chapter toc:2 whose
         # sub-sections carry slug keys); reading-order span is the fallback. Same resolution
         # order as fetch_section_content, so the grid can't disagree with the reader.
-        okeys = _scope_keys_from_outline(db, doc_id, scope)
+        okeys = _scope_keys_from_outline(doc_id, scope)
         keys = sorted((okeys & block_keys) if okeys else set())
         if not keys:
             keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(blocks, scope, level_of) if b.get("sectionKey")})

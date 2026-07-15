@@ -214,11 +214,11 @@ def _load_section_blocks(
         )
     )
     if scope:
-        okeys = _scope_keys_from_outline(db, doc_id, scope)
+        okeys = _scope_keys_from_outline(doc_id, scope)
         if okeys is not None:
             rows = [r for r in rows if r.get("sectionKey") in okeys]
         else:
-            rows = _blocks_in_scope(rows, scope, _section_level_fn(db, doc_id))
+            rows = _blocks_in_scope(rows, scope, _section_level_fn(doc_id))
     wanted = set(section_keys) if section_keys else None
     out: list[SectionExtractInput] = []
     for r in rows:

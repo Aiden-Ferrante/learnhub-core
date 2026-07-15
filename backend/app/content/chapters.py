@@ -46,12 +46,12 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
             )
         )
         block_keys = {r.get("sectionKey") for r in rows}
-        level_of = _section_level_fn(db, doc_id)
+        level_of = _section_level_fn(doc_id)
 
         def has_content(key: str) -> bool:
             # Same outline-first rule as fetch_section_content/_load_section_blocks.
             try:
-                okeys = _scope_keys_from_outline(db, doc_id, key)
+                okeys = _scope_keys_from_outline(doc_id, key)
                 if okeys and okeys & block_keys:
                     return True
                 return bool(_blocks_in_scope(rows, key, level_of))

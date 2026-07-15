@@ -25,7 +25,7 @@ def _latest_doc_id() -> str | None:
 
 
 def _run_quizzes(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    keys = sorted(_scope_section_keys(db, job["docId"], job["scope"]) or {job["scope"]})
+    keys = sorted(_scope_section_keys(job["docId"], job["scope"]) or {job["scope"]})
     return author_scope_sync(db, job["docId"], keys, on_progress=ctx.progress)
 
 

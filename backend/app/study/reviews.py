@@ -177,7 +177,7 @@ def build_review_queue(
         ensure_reviews(db)
         # A chapter scope spans ALL its sub-sections (same reading-order span the reader and
         # quiz use) — exact-key matching misses everything under a chapter node.
-        span = _scope_section_keys(db, doc, scope) if scope else None
+        span = _scope_section_keys(doc, scope) if scope else None
         concepts = list(
             db.aql.execute(
                 "FOR c IN concepts "

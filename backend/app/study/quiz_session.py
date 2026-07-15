@@ -51,7 +51,7 @@ def _pool(db, doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]],
             bind_vars={"doc": doc},
         )
     )
-    keys = _scope_section_keys(db, doc, scope)
+    keys = _scope_section_keys(doc, scope)
     targets = [
         c for c in rows if (keys is None or c.get("sectionKey") in keys) and c.get("signal")
     ]
@@ -85,7 +85,7 @@ def start_quiz_session(doc: str | None, scope: str | None) -> tuple[dict[str, An
         nn = nearest_distractor_names(db, doc, target.get("key"), target.get("name"))
         question = build_concept_question(target, pool, rng, distractor_names=nn)
     if any(not (t.get("quizQuestions")) for t in targets):
-        ensure_questions_async(doc, _scope_section_keys(db, doc, scope))
+        ensure_questions_async(doc, _scope_section_keys(doc, scope))
     if not question:
         return {"error": "Could not build a question"}, 400
 
@@ -142,7 +142,7 @@ def quiz_prepare_status(doc: str | None, scope: str | None) -> dict[str, Any]:
     """How many of a scope's concepts have LLM quiz questions authored yet (+ running flag,
     covering both the inline backfill thread and a ledgered queue job)."""
     db = connect_arango()
-    keys = _scope_section_keys(db, doc, scope)
+    keys = _scope_section_keys(doc, scope)
     status = scope_question_status(db, doc, keys)
     status["running"] = bool(status.get("running")) or _quiz_job_running(doc, scope)
     return status
@@ -156,7 +156,7 @@ def prepare_quizzes(doc: str | None, scope: str) -> dict[str, Any]:
 
     db = connect_arango()
     enqueue_build(doc, scope, kind="quizzes")
-    keys = _scope_section_keys(db, doc, scope)
+    keys = _scope_section_keys(doc, scope)
     status = scope_question_status(db, doc, keys)
     status["running"] = True
     return status

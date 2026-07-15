@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 
 from app.content.arango_tree import get_toc_tree
+from app.platform.db import db
 
 TOC_ROOT_KEY = "toc:root"
 
@@ -43,7 +44,7 @@ def _walk_tree_depths(nodes, depth: int, out: dict[str, int]) -> None:
         _walk_tree_depths(getattr(n, "children", None), depth + 1, out)
 
 
-def _section_level_fn(db, doc_id: str):
+def _section_level_fn(doc_id: str):
     """Build ``level_of(sectionKey, heading)`` — a 1-based outline level where chapters are
     level 1. Robust across numbering schemes:
       - numeric keys ``toc:1.2`` → numeric depth;
@@ -107,21 +108,20 @@ def _blocks_in_scope(rows: list[dict], scope: str, level_of=None) -> list[dict]:
     return ordered[start_idx:end_idx]
 
 
-def _scope_keys_from_outline(db, doc_id: str, scope: str) -> set[str] | None:
+def _scope_keys_from_outline(doc_id: str, scope: str) -> set[str] | None:
     """Section keys under ``scope`` via the outline's ``listDepth`` nesting — ``scope`` plus
     everything nested beneath it until a same-or-shallower (sibling) entry. Key-scheme-agnostic:
     works when a numbered chapter (``toc:2``) contains slug sub-sections (``toc:modeling``) that
     aren't numeric descendants of the chapter. Returns None if ``scope`` isn't an outline entry
     (caller falls back to the reading-order span)."""
     try:
-        rows = list(
-            db.aql.execute(
-                "FOR d IN documents FILTER d._key == @doc RETURN d.outline", bind_vars={"doc": doc_id}
-            )
-        )
+        with db() as conn:
+            row = conn.execute(
+                "SELECT outline FROM documents WHERE key = %(doc)s", {"doc": doc_id}
+            ).fetchone()
     except Exception:  # noqa: BLE001
         return None
-    outline = rows[0] if rows else None
+    outline = row["outline"] if row else None
     if not outline:
         return None
     idx = next((i for i, e in enumerate(outline) if e.get("sectionKey") == scope), None)
@@ -137,7 +137,7 @@ def _scope_keys_from_outline(db, doc_id: str, scope: str) -> set[str] | None:
     return keys
 
 
-def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | None:
+def _scope_section_keys(doc: str | None, scope: str | None) -> set[str] | None:
     """The set of section keys a chapter scope spans (chapter → all its sub-sections).
     Outline nesting first (bridges mixed keyspaces — a numbered chapter whose sub-sections
     carry slug keys), then the reading-order span — the same resolution order as the reader,
@@ -147,17 +147,17 @@ def _scope_section_keys(db, doc: str | None, scope: str | None) -> set[str] | No
     if not doc:
         return {scope}
     try:
-        rows = list(
-            db.aql.execute(
-                "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-                bind_vars={"d": doc},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT section_key AS "sectionKey", "order", heading, level '
+                "FROM section_content WHERE doc_id = %(d)s ORDER BY \"order\"",
+                {"d": doc},
+            ).fetchall()
         block_keys = {b.get("sectionKey") for b in rows if b.get("sectionKey")}
-        okeys = _scope_keys_from_outline(db, doc, scope)
+        okeys = _scope_keys_from_outline(doc, scope)
         keys = (okeys & block_keys) if okeys else set()
         if not keys:
-            matched = _blocks_in_scope(rows, scope, _section_level_fn(db, doc))
+            matched = _blocks_in_scope(rows, scope, _section_level_fn(doc))
             keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
         return keys or {scope}
     except Exception:  # noqa: BLE001

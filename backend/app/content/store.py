@@ -251,10 +251,10 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
         # ancestor walk can't see, so chapters whose heading block isn't keyed toc:N
         # would read as EMPTY (DDIA ch.3+, AI-Eng ch.2-9). Reading-order span remains
         # the fallback. Local import avoids an arango_content <-> extract module cycle.
-        okeys = _scope_keys_from_outline(db, doc_id, section_key)
+        okeys = _scope_keys_from_outline(doc_id, section_key)
         matched = [r for r in rows if r.get("sectionKey") in okeys] if okeys else []
         if not matched:
-            matched = _blocks_in_scope(rows, section_key, _section_level_fn(db, doc_id))
+            matched = _blocks_in_scope(rows, section_key, _section_level_fn(doc_id))
         blocks = [
             {
                 "sectionKey": r.get("sectionKey"),

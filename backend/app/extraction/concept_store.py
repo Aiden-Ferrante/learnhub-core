@@ -75,7 +75,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
                 )
                 from app.content.scope import _blocks_in_scope, _section_level_fn
 
-                matched = _blocks_in_scope(blocks, section_key, _section_level_fn(db, doc_id))
+                matched = _blocks_in_scope(blocks, section_key, _section_level_fn(doc_id))
                 ranked: dict[str, int] = {}
                 for b in matched:
                     sk = b.get("sectionKey")

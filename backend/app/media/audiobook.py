@@ -142,13 +142,13 @@ def _scope_segments_text(db, doc_id: str, scope: str | None) -> list[str]:
     return segs
 
 
-def _scope_section_keys(db, doc_id: str, scope: str | None) -> list[str]:
+def _scope_section_keys(doc_id: str, scope: str | None) -> list[str]:
     return [s.section_key for s in _load_section_blocks(db, doc_id, scope=scope)]
 
 
 def _scope_segments_concepts(db, doc_id: str, scope: str | None) -> list[str]:
     """Chapter's concept lessons as a clean audio summary, in reading order."""
-    keys = _scope_section_keys(db, doc_id, scope)
+    keys = _scope_section_keys(doc_id, scope)
     if not keys:
         return []
     rows = list(
