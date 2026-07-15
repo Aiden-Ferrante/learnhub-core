@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUserData } from '@/lib/user-data-db'
+import { withUserData } from '@/lib/server/user-data-db'
 
 export const dynamic = 'force-dynamic'
 

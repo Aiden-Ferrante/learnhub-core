@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from app.content.documents import fetch_latest_document
-from app.content.arango_tree import get_toc_tree
+from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 
@@ -32,7 +32,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
         if not doc_id:
             return {"error": "no document found"}
 
-        forest, _sections, err, _mentions = get_toc_tree(doc_id)
+        forest, _sections, err = get_toc_tree(doc_id)
         if err:
             return {"docId": doc_id, "chapters": [], "error": err}
 

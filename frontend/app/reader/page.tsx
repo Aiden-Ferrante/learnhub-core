@@ -12,17 +12,11 @@ import {
   resolveChapterFromOutline,
   topLevelChapters,
   type Chapter,
-} from "@/components/learn/chapter-reader"
-import { SyllabusTree } from "@/components/learn/syllabus-tree"
-import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
-import {
-  fetchMastery,
-  fetchOutline,
-  fetchTocTree,
-  type LearnTreeNode,
-  type MasteryResponse,
-  type OutlineEntry,
-} from "@/lib/learn-service"
+} from "@/features/learn/components/reader/chapter-reader"
+import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
+import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
+import { fetchOutline, fetchTocTree, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
+import { fetchMastery, type MasteryResponse } from "@/features/learn/api/progress"
 
 function ReaderInner() {
   const params = useSearchParams()

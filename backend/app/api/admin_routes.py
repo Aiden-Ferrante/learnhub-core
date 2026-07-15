@@ -275,9 +275,7 @@ def api_delete_concept(key: str) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=503)
 
 
-# Learn-content collections that carry a per-document field. KG entities/relationships are
-# deliberately NOT touched: they live in the frontend doc-id namespace (docIds arrays) and
-# belong to the Upload/KG tabs' clear flow, not the learn store.
+# Learn-content tables that carry a per-document field.
 _DOC_CASCADE: tuple[tuple[str, str], ...] = (
     ("section_content", "doc_id"),
     ("page_content", "doc_id"),

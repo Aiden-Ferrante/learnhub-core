@@ -7,7 +7,7 @@ import or convert, we fall back to pymupdf so ingestion never hard-breaks.
 
 Page provenance: alongside the full-document markdown we collect (a) per-heading page
 numbers from Docling's structured document (``iterate_items`` → ``prov[0].page_no``) and
-(b) per-page markdown via ``pymupdf4llm(page_chunks=True)``. ``arango_content`` joins
+(b) per-page markdown via ``pymupdf4llm(page_chunks=True)``. ``content/store`` joins
 these into page-primary blocks tagged with their section coordinates. We deliberately do
 NOT re-serialize Docling per item (that would risk the decoded ``$$`` formula markdown);
 the per-page text for the "source page" view comes from pymupdf, which is fast and always
@@ -100,9 +100,13 @@ class PdfConvertError(Exception):
 
 
 class Converter(Protocol):
+    """A PDF engine returns everything it knows in one ``ConvertedDoc`` — markdown plus
+    whatever provenance it can produce (heading pages, typed elements). Engines that
+    can't produce a channel leave it empty; ``convert_document`` fills the gaps."""
+
     name: str
 
-    def to_markdown(self, data: bytes, filename: str) -> str: ...
+    def convert(self, data: bytes, filename: str) -> ConvertedDoc: ...
 
 
 class PyMuPDFConverter:
@@ -110,19 +114,19 @@ class PyMuPDFConverter:
 
     name = "pymupdf4llm"
 
-    def to_markdown(self, data: bytes, filename: str) -> str:
+    def convert(self, data: bytes, filename: str) -> ConvertedDoc:
         doc = fitz.open(stream=data, filetype="pdf")
         try:
             kwargs: dict = {"detect_bg_color": True, "force_text": True}
-            primary = pymupdf4llm.to_markdown(doc, **kwargs) or ""
-            if replacement_char_ratio(primary) > 0.002:
+            markdown = pymupdf4llm.to_markdown(doc, **kwargs) or ""
+            if replacement_char_ratio(markdown) > 0.002:
                 try:
                     alt = pymupdf4llm.to_markdown(doc, use_glyphs=True, **kwargs) or ""
-                    if replacement_char_ratio(alt) < replacement_char_ratio(primary):
-                        return alt
+                    if replacement_char_ratio(alt) < replacement_char_ratio(markdown):
+                        markdown = alt
                 except TypeError:
                     pass
-            return primary
+            return ConvertedDoc(markdown=markdown, engine=self.name)
         finally:
             doc.close()
 
@@ -140,10 +144,6 @@ class DoclingConverter:
 
     def __init__(self) -> None:
         self._converter = None
-        # Captured from the most recent ``to_markdown`` call so ``convert_document``
-        # can read per-heading page numbers + typed elements without re-running Docling.
-        self.last_heading_pages: list[HeadingPage] = []
-        self.last_elements: list[Element] = []
 
     def _get_converter(self):
         if self._converter is not None:
@@ -181,15 +181,18 @@ class DoclingConverter:
             )
         return self._converter
 
-    def to_markdown(self, data: bytes, filename: str) -> str:
+    def convert(self, data: bytes, filename: str) -> ConvertedDoc:
         from docling.datamodel.base_models import DocumentStream
 
         source = DocumentStream(name=filename or "document.pdf", stream=io.BytesIO(data))
         result = self._get_converter().convert(source)
         document = result.document
-        self.last_heading_pages = _docling_heading_pages(document)
-        self.last_elements = _docling_elements(document) if _EXTRACT_ELEMENTS else []
-        return document.export_to_markdown() or ""
+        return ConvertedDoc(
+            markdown=document.export_to_markdown() or "",
+            engine=self.name,
+            heading_pages=_docling_heading_pages(document),
+            elements=_docling_elements(document) if _EXTRACT_ELEMENTS else [],
+        )
 
 
 def _docling_heading_pages(document) -> list[HeadingPage]:
@@ -394,71 +397,35 @@ def select_converter() -> Converter:
     return conv
 
 
-def convert_to_markdown(data: bytes, filename: str) -> tuple[str, str]:
-    """Run the configured converter, falling back to pymupdf4llm on any failure.
-
-    Returns ``(markdown, engine_name)``. Page provenance is collected separately by
-    ``convert_document`` (which wraps this).
-    """
-    primary = select_converter()
-    try:
-        md = primary.to_markdown(data, filename)
-        if md and md.strip():
-            return md, primary.name
-        if primary.name != "pymupdf4llm":
-            raise PdfConvertError("Converter produced no text", 500)
-        return md, primary.name
-    except PdfConvertError:
-        raise
-    except Exception as exc:  # noqa: BLE001 - any converter failure should degrade gracefully
-        if primary.name == PyMuPDFConverter.name:
-            raise PdfConvertError(f"PDF conversion failed: {exc}", 500) from exc
-        fallback = PyMuPDFConverter()
-        try:
-            return fallback.to_markdown(data, filename), fallback.name
-        except Exception as fexc:  # noqa: BLE001
-            raise PdfConvertError(f"PDF conversion failed: {fexc}", 500) from fexc
-
-
 def convert_document(data: bytes, filename: str) -> ConvertedDoc:
     """Full-document markdown + page provenance (heading pages + per-page markdown).
 
-    Mirrors ``convert_to_markdown``'s engine selection + pymupdf fallback, but also
-    captures Docling's per-heading page numbers and always extracts per-page markdown
-    (cheap pymupdf pass) for the page-primary store.
+    Runs the configured engine (pymupdf fallback on any failure), then fills the
+    provenance channels the engine couldn't produce: per-page markdown (cheap pymupdf
+    pass, always), heading pages (derived from page markdown when the engine gave
+    none), and the PDF's embedded bookmark outline.
     """
     primary = select_converter()
-    heading_pages: list[HeadingPage] = []
-    elements: list[Element] = []
     try:
-        md = primary.to_markdown(data, filename)
-        engine = primary.name
-        heading_pages = list(getattr(primary, "last_heading_pages", []) or [])
-        elements = list(getattr(primary, "last_elements", []) or [])
-        if not (md and md.strip()) and primary.name != PyMuPDFConverter.name:
+        doc = primary.convert(data, filename)
+        if not doc.markdown.strip() and primary.name != PyMuPDFConverter.name:
             raise PdfConvertError("Converter produced no text", 500)
     except PdfConvertError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — any engine failure should degrade gracefully
         if primary.name == PyMuPDFConverter.name:
             raise PdfConvertError(f"PDF conversion failed: {exc}", 500) from exc
-        fallback = PyMuPDFConverter()
         try:
-            md = fallback.to_markdown(data, filename)
-            engine = fallback.name
-            heading_pages = []
-            elements = []  # pymupdf has no structured-item layer
+            doc = PyMuPDFConverter().convert(data, filename)
         except Exception as fexc:  # noqa: BLE001
             raise PdfConvertError(f"PDF conversion failed: {fexc}", 500) from fexc
 
-    pages = extract_pages(data)
-    if not heading_pages:
-        # Docling not used (or gave nothing) — derive heading pages from per-page markdown.
-        heading_pages = _heading_pages_from_pages(pages)
-    outline = extract_pdf_outline(data)
-    return ConvertedDoc(
-        markdown=md, engine=engine, heading_pages=heading_pages, pages=pages, outline=outline, elements=elements
-    )
+    doc.pages = extract_pages(data)
+    if not doc.heading_pages:
+        # Engine gave no heading provenance — derive it from per-page markdown.
+        doc.heading_pages = _heading_pages_from_pages(doc.pages)
+    doc.outline = extract_pdf_outline(data)
+    return doc
 
 
 def converter_health() -> dict[str, str]:

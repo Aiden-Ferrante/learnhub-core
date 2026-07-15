@@ -147,9 +147,9 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`elements.py`](backend/app/content/elements.py) | Figures/tables: save, link, read |
 | [`scope.py`](backend/app/content/scope.py) | Scope resolution — "what sections are inside chapter X" |
 | [`store.py`](backend/app/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
-| [`arango_tree.py`](backend/app/content/arango_tree.py) | TOC tree from `has_subsection` edges |
 | [`chapters.py`](backend/app/content/chapters.py) | Canonical chapter-unit list |
 | [`math_markdown.py`](backend/app/content/math_markdown.py) | LaTeX/KaTeX math rendering |
+| [`toc_tree.py`](backend/app/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
 
 ### ingestion/ — PDF in
 
@@ -169,7 +169,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`augment.py`](backend/app/extraction/augment.py) | Section learning objectives + recap |
-| [`arango_learn.py`](backend/app/extraction/arango_learn.py) | Legacy triple KG read-layer (deprecation candidate) |
 
 ### study/ — learning state
 
@@ -241,10 +240,14 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ## 3. Frontend (inside the `app` container)
 
-The frontend is a layered data flow. Everything ultimately reaches the backend through the
-**proxy layer**: a component calls `/api/learn/*`, a thin route handler forwards it via
-[`lib/learn-proxy.ts`](frontend/lib/learn-proxy.ts), which stamps the `X-User-Db` tenancy
-header. Auth and the per-user document list are the paths that talk to Postgres directly.
+The frontend is feature-partitioned the way the backend is domain-partitioned: each
+feature under `features/` owns its screens, components, hooks, client helpers, and API
+client (see [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md)). Everything ultimately
+reaches the backend through the **proxy layer**: a component calls `/api/learn/*`, a thin
+route handler forwards it via
+[`lib/server/learn-proxy.ts`](frontend/lib/server/learn-proxy.ts), which stamps the
+`X-User-Db` tenancy header. Auth and the per-user document list are the paths that talk to
+Postgres directly — every server-only module lives in [`lib/server/`](frontend/lib/server).
 
 ```mermaid
 flowchart TD
@@ -252,15 +255,15 @@ flowchart TD
 
   subgraph client["client · runs in the browser"]
     pages["app/ — pages<br/>router · login · reader"]
-    components["components/<br/>learn · tabs · process · ui"]
-    state["contexts/ + hooks/<br/>document scope · prefs"]
-    libc["lib/ — client helpers<br/>courses · learn-path · read-along"]
+    components["features/<br/>learn · documents · process"]
+    state["components/<br/>layout chrome · ui primitives"]
+    libc["features/learn/api/*<br/>typed client, one module per domain"]
   end
 
   subgraph server["server · Next.js runtime"]
     apiroutes["app/api/learn/*<br/>~40 route handlers"]
-    proxy["lib/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
-    authlib["lib/auth*.ts + auth-db.ts + pg.ts<br/>NextAuth · pg"]
+    proxy["lib/server/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
+    authlib["lib/server/ — auth · dbs · pg<br/>NextAuth · pg"]
   end
 
   backend["learn backend<br/>:8010"]
@@ -285,31 +288,32 @@ flowchart TD
   style server fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click pages "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app"
-  click components "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/components"
-  click state "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/contexts"
-  click libc "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/lib"
+  click components "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/features"
+  click state "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/components"
+  click libc "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/features/learn/api"
   click apiroutes "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app/api/learn"
-  click proxy "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/learn-proxy.ts"
-  click authlib "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/auth-db.ts"
+  click proxy "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/server/learn-proxy.ts"
+  click authlib "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/lib/server"
 ```
 
 | Layer | Location | What it is |
 |---|---|---|
 | pages | [`app/`](frontend/app) | Route entry points: the `#learn`/`#process` router, `login/`, `reader/` |
-| components | [`components/`](frontend/components) | UI: `learn/` (study surfaces), `tabs/`, `process/`, `ui/` (primitives) |
-| client state | [`contexts/`](frontend/contexts) + [`hooks/`](frontend/hooks) | Selected course scope + reading prefs/theme |
-| client helpers | [`lib/`](frontend/lib) | Typed helpers the components call (table below) |
+| features | [`features/`](frontend/features) | `learn/` (study surfaces: home · reader · concepts · study), `documents/` (upload + table), `process/` (pipeline dashboard) — each owns its components, hooks, lib, api |
+| API client | [`features/learn/api/`](frontend/features/learn/api) | Typed fetchers, one module per domain (outline, content, concepts, progress, review, quiz, reading, chapter, audiobook, search, pipeline) |
+| chrome | [`components/`](frontend/components) | `layout/` (header, theme, user menu) + `ui/` (shadcn primitives) |
+| server-only | [`lib/server/`](frontend/lib/server) | Everything that must never reach the client bundle (table below) |
 | proxy routes | [`app/api/learn/`](frontend/app/api/learn) | ~40 thin handlers → backend (one per backend endpoint) |
 
-Key `lib/` seams:
+Key `lib/server/` seams:
 
 | File | Purpose |
 |---|---|
-| [`learn-proxy.ts`](frontend/lib/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
-| [`learn-service.ts`](frontend/lib/learn-service.ts) | Shared response type definitions |
-| [`user-db.ts`](frontend/lib/user-db.ts) | Resolves the session's per-user schema name (tenancy) |
-| [`auth.ts`](frontend/lib/auth.ts) + [`auth-db.ts`](frontend/lib/auth-db.ts) + [`pg.ts`](frontend/lib/pg.ts) | NextAuth setup + Postgres user/auth reads (schema-per-tenant pool) |
-| [`courses.ts`](frontend/lib/courses.ts) · [`learn-path.ts`](frontend/lib/learn-path.ts) · [`read-along.ts`](frontend/lib/read-along.ts) | Course listing · prereq path · audiobook/text sync |
+| [`learn-proxy.ts`](frontend/lib/server/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
+| [`learn-upstream.ts`](frontend/lib/server/learn-upstream.ts) | Where the learn backend lives (`LEARN_SERVICE_URL`) |
+| [`user-db.ts`](frontend/lib/server/user-db.ts) | Resolves the session's per-user schema name (tenancy) |
+| [`auth.ts`](frontend/lib/server/auth.ts) + [`auth-db.ts`](frontend/lib/server/auth-db.ts) + [`pg.ts`](frontend/lib/server/pg.ts) | NextAuth setup + Postgres user/auth reads (schema-per-tenant pool) |
+| [`features/learn/lib/`](frontend/features/learn/lib) (client side) | `courses.ts` · `learn-path.ts` · `read-along.ts` — course listing · chapter stage rail · audiobook/text sync |
 
 ---
 
@@ -323,8 +327,7 @@ is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/
 runs these as queue jobs (`extract` / `deep` / `build`). Four other LLM *generation passes*
 (coral) live in the folder but are triggered independently — only `deep_chapter` runs as part
 of the `build` job, as the overlay after concepts are written.
-[`arango_learn.py`](backend/app/extraction/arango_learn.py) (gray) is dead legacy from the
-pruned triple pipeline. Two dependencies live outside the folder: `concepts_extract` calls
+Two dependencies live outside the folder: `concepts_extract` calls
 `platform/llm.py` for the model, and the pipeline runners are dispatched by
 `platform/jobs.py` (the one queue).
 
@@ -338,7 +341,6 @@ flowchart TD
   skeleton["skeleton.py<br/>chapter essences"]
   guide["reading_guide.py<br/>section guides"]
   augment["augment.py<br/>objectives + recap"]
-  legacy["arango_learn.py<br/>legacy triple layer"]
 
   build --> concepts
   build --> deep
@@ -348,11 +350,9 @@ flowchart TD
   classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
   classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
-  classDef old fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   class build trig;
   class extract,concepts,store core;
   class deep,skeleton,guide,augment pass;
-  class legacy old;
 
   click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
   click extract "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/extract.py"
@@ -362,10 +362,9 @@ flowchart TD
   click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/skeleton.py"
   click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/reading_guide.py"
   click augment "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/augment.py"
-  click legacy "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/arango_learn.py"
 ```
 
-Color key: purple = conductor · teal = extraction core · coral = generation passes · gray = legacy.
+Color key: purple = conductor · teal = extraction core · coral = generation passes.
 
 ---
 

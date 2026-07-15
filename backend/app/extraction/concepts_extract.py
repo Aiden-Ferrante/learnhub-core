@@ -5,9 +5,9 @@ The product is a *course*, not a triple graph. Each concept is one learnable ide
 ``signal`` (distilled explanation) and ``source`` (the verbatim passage that grounds it).
 
 Reuses the extraction engine from ``app.extract`` (section loading + chapter scope, the
-domain-aware user prompt, the per-section model, structured-output transport, the
-structural ``has_subsection`` edges) and only swaps the schema / system prompt / write
-target. The pure parse/assemble/key functions are unit-tested without LLM or DB.
+domain-aware user prompt, the per-section model, structured-output transport) and only
+swaps the schema / system prompt / write target. The pure parse/assemble/key functions
+are unit-tested without LLM or DB.
 """
 
 from __future__ import annotations
@@ -28,8 +28,6 @@ from app.extraction.extract import (
     _load_section_blocks,
     _norm_part,
     normalize_entity,
-    structural_subsection_triples,
-    upsert_structural_edges,
 )
 from app.extraction.concept_store import CONCEPTS
 from app.platform.llm import ollama_structured_completion
@@ -394,9 +392,6 @@ async def extract_concepts_document(
         write_section_concepts(sc)
         total_concepts += len(sc.concepts)
         total_questions += sum(len(c.questions) for c in sc.concepts)
-
-    # Keep the structural TOC tree (drives the syllabus view).
-    upsert_structural_edges(structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
     # Deep Chapter overlay (assembled briefing + per-section recaps + per-concept deep
     # explanations). The pipeline runs this as a separate "deep" enrichment job, so

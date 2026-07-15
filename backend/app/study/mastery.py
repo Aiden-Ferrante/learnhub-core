@@ -1,12 +1,12 @@
 """Persisted study events + view-time mastery computation.
 
 Mastery per section = coverage x accuracy x decay:
-  - coverage: distinct quizzed content-triples / total content triples in the section
+  - coverage: distinct quizzed concepts / total concepts in the section
   - accuracy: Beta-Binomial posterior mean of quiz correctness (quizzes only)
   - decay:    exp(-dt / tau), dt = days since last quiz, tau = MASTERY_TAU_DAYS
 
 Only raw events persist; mastery is recomputed on read because decay is
-time-dependent. Internal sections roll up as a triple-count-weighted average
+time-dependent. Internal sections roll up as a concept-count-weighted average
 over their descendant leaf sections.
 """
 
@@ -17,8 +17,7 @@ import os
 import time
 from typing import Any
 
-from app.extraction.arango_learn import content_triples_for_section, triple_id
-from app.content.arango_tree import get_toc_tree
+from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 EVENTS_COLLECTION = "study_events"
@@ -325,20 +324,8 @@ def _weighted_average(pairs: list[tuple[float, float]]) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# Concept coverage (replaces triple coverage for concept-extracted docs)
+# Concept coverage
 # --------------------------------------------------------------------------- #
-
-def _doc_has_concepts(doc: str | None) -> bool:
-    try:
-        with db() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s LIMIT 1",
-                {"doc": doc},
-            ).fetchone()
-        return row is not None
-    except Exception:
-        return False
-
 
 def _section_concept_ids(section_key: str, doc: str | None) -> set[str]:
     """The concept keys taught in a section — the per-concept coverage denominator."""
@@ -383,7 +370,7 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
     now = time.time() if now is None else now
     alpha, beta, tau = _alpha(), _beta(), _tau_days()
 
-    forest, _edges, err, _mentions = get_toc_tree(doc)
+    forest, _sections, err = get_toc_tree(doc)
     if err:
         return {"bySection": {}, "overall": 0.0, "weakest": [], "error": err}
 
@@ -397,20 +384,14 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
         if sk:
             events_by_section.setdefault(sk, []).append(e)
 
-    # Concept docs cover sections by concepts; legacy KG docs by content triples.
-    use_concepts = _doc_has_concepts(doc)
-    intervals = _concept_intervals(doc) if use_concepts else {}
+    # Sections are covered by their concepts (the triple-era coverage path is retired).
+    intervals = _concept_intervals(doc)
     leaf_stats: dict[str, dict[str, Any]] = {}
     weights: dict[str, int] = {}
     for k in leaf_keys:
-        if use_concepts:
-            content_ids = _section_concept_ids(k, doc)
-            id_field = "concept_key"
-            tau_eff = _section_tau(content_ids, intervals, tau)
-        else:
-            content_ids = {triple_id(t) for t in content_triples_for_section(k, doc=doc)}
-            id_field = "triple_id"
-            tau_eff = tau
+        content_ids = _section_concept_ids(k, doc)
+        id_field = "concept_key"
+        tau_eff = _section_tau(content_ids, intervals, tau)
         total = len(content_ids)
         weights[k] = total
         leaf_stats[k] = compute_leaf_mastery(
