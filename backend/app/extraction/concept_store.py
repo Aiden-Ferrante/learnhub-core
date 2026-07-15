@@ -8,28 +8,31 @@ here, keeping readers decoupled from the extraction pipeline.
 from __future__ import annotations
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 CONCEPTS = "concepts"
 
 
-def concept_count(db, doc_id: str, section_keys: list[str]) -> int:
+def concept_count(doc_id: str, section_keys: list[str]) -> int:
     if not section_keys:
         return 0
-    return db.aql.execute(
-        "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks RETURN 1)",
-        bind_vars={"d": doc_id, "ks": section_keys},
-    ).next()
+    with db() as conn:
+        return conn.execute(
+            "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+            {"d": doc_id, "ks": section_keys},
+        ).fetchone()["n"]
 
 
-def _concept_reading_ranks(db, doc_id: str, rows: list[dict]) -> dict[str, int]:
+def _concept_reading_ranks(doc_id: str, rows: list[dict]) -> dict[str, int]:
     """Global reading rank per concept: section reading order, then within-section order.
     A strict unique rank gives every concept a stable global reading order."""
     sec_order: dict[str, int] = {}
-    for r in db.aql.execute(
-        "FOR s IN section_content FILTER s.docId == @d RETURN {k: s.sectionKey, o: s.order}",
-        bind_vars={"d": doc_id},
-    ):
+    with db() as conn:
+        srows = conn.execute(
+            'SELECT section_key AS k, "order" AS o FROM section_content WHERE doc_id = %(d)s',
+            {"d": doc_id},
+        ).fetchall()
+    for r in srows:
         k, o = r.get("k"), r.get("o") or 0
         if k is not None and (k not in sec_order or o < sec_order[k]):
             sec_order[k] = o
@@ -50,9 +53,6 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
     the exact section key when there's no ``section_content`` to span over.
     """
     try:
-        db = connect_arango()
-        if not db.has_collection(CONCEPTS):
-            return {"sectionKey": section_key, "concepts": []}
         if doc_id is None:
             doc = (fetch_latest_document() or {}).get("document")
             doc_id = doc.get("id") if doc else None
@@ -66,13 +66,13 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
         section_rank: dict[str, int] = {section_key: 0}
         section_titles: dict[str, str] = {}
         try:
-            if db.has_collection("section_content"):
-                blocks = list(
-                    db.aql.execute(
-                        "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-                        bind_vars={"d": doc_id},
-                    )
-                )
+            with db() as conn:
+                blocks = conn.execute(
+                    'SELECT section_key AS "sectionKey", "order", heading, level '
+                    'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+                    {"d": doc_id},
+                ).fetchall()
+            if blocks:
                 from app.content.scope import _blocks_in_scope, _section_level_fn
 
                 matched = _blocks_in_scope(blocks, section_key, _section_level_fn(doc_id))
@@ -91,16 +91,13 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
             section_rank = {section_key: 0}
             section_titles = {}
 
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-                "RETURN { conceptKey: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-                "source: c.source, questions: c.questions, "
-                "sectionKey: c.sectionKey, order: c.order, "
-                "pageStart: c.pageStart, pageEnd: c.pageEnd }",
-                bind_vars={"d": doc_id, "ks": scope_keys},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT key AS "conceptKey", name, kind, signal, source, questions, '
+                'section_key AS "sectionKey", "order", page_start AS "pageStart", page_end AS "pageEnd" '
+                "FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+                {"d": doc_id, "ks": scope_keys},
+            ).fetchall()
         # Reading order across the span: by section position, then within-section order.
         rows.sort(
             key=lambda c: (
@@ -118,18 +115,21 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
         # Attach each sub-section's one-line essence + relative depth from the cached chapter
         # skeleton, so the guided concept walk can show "where you are" per subsection.
         try:
-            from app.extraction.skeleton import SKELETONS, _attach_depths, _key as _skel_key
+            from app.extraction.skeleton import _attach_depths, _key as _skel_key
 
-            if db.has_collection(SKELETONS):
-                skel = db.collection(SKELETONS).get(_skel_key(doc_id, section_key))
-                if skel and skel.get("sections"):
-                    skel_secs = _attach_depths(db, doc_id, skel["sections"])
-                    by_key = {s.get("sectionKey"): s for s in skel_secs}
-                    for sec in sections:
-                        s = by_key.get(sec["sectionKey"])
-                        if s:
-                            sec["essence"] = s.get("essence") or ""
-                            sec["depth"] = s.get("depth", 0)
+            with db() as conn:
+                skel = conn.execute(
+                    "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                    {"k": _skel_key(doc_id, section_key)},
+                ).fetchone()
+            if skel and skel.get("sections"):
+                skel_secs = _attach_depths(doc_id, skel["sections"])
+                by_key = {s.get("sectionKey"): s for s in skel_secs}
+                for sec in sections:
+                    s = by_key.get(sec["sectionKey"])
+                    if s:
+                        sec["essence"] = s.get("essence") or ""
+                        sec["depth"] = s.get("depth", 0)
         except Exception:  # noqa: BLE001 — essence is supplementary
             pass
         return {
@@ -147,27 +147,22 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
     canonicalKey, in reading order, each carrying the merged provenance of where it appears
     (``appearsIn`` = every section/page the concept — or a duplicate of it — was taught in)."""
     try:
-        db = connect_arango()
-        if not db.has_collection(CONCEPTS):
-            return {"docId": doc_id, "concepts": []}
         if doc_id is None:
             doc = (fetch_latest_document() or {}).get("document")
             doc_id = doc.get("id") if doc else None
         if not doc_id:
             return {"docId": None, "concepts": []}
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER c.docId == @d RETURN {key: c._key, canon: c.canonicalKey, "
-                "name: c.name, kind: c.kind, signal: c.signal, source: c.source, questions: c.questions, "
-                "sectionKey: c.sectionKey, pageStart: c.pageStart, "
-                "pageEnd: c.pageEnd, order: c.order}",
-                bind_vars={"d": doc_id},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT key, NULL AS canon, name, kind, signal, source, questions, '
+                'section_key AS "sectionKey", page_start AS "pageStart", page_end AS "pageEnd", "order" '
+                "FROM concepts WHERE doc_id = %(d)s",
+                {"d": doc_id},
+            ).fetchall()
         if not rows:
             return {"docId": doc_id, "concepts": []}
         ranks = _concept_reading_ranks(
-            db, doc_id, [{"key": r["key"], "sk": r["sectionKey"], "ord": r["order"]} for r in rows]
+            doc_id, [{"key": r["key"], "sk": r["sectionKey"], "ord": r["order"]} for r in rows]
         )
         by_key = {r["key"]: r for r in rows}
         groups: dict[str, list[dict]] = {}

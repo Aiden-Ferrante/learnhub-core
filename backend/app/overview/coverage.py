@@ -50,7 +50,7 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for scope in scopes:
         keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(rows, scope, level_of) if b.get("sectionKey")})
-        concepts = concept_count(db, doc_id, list(keys))
+        concepts = concept_count(doc_id, list(keys))
         explained = 0
         if keys:
             explained = db.aql.execute(
@@ -139,7 +139,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
                 "scope": scope,
                 "title": e.get("title") or scope,
                 "sections": len(keys),
-                "concepts": concept_count(db, doc_id, keys),
+                "concepts": concept_count(doc_id, keys),
                 "quizzes": {"authored": quiz["authored"], "total": quiz["total"]},
                 "skeleton": skeleton,
                 "orient": bool(orient_row and (orient_row.get("objectives") or orient_row.get("watchFor"))),

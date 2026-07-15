@@ -57,7 +57,7 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
         keys = _scope_keys(db, doc_id, scope)
         if not keys:
             return {"error": "no readable content in this scope"}
-        if not force and concept_count(db, doc_id, keys) > 0:
+        if not force and concept_count(doc_id, keys) > 0:
             ctx.patch({"outcomes": None})
             return None
     ctx.phase = "extract"
