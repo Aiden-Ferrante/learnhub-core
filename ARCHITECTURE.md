@@ -14,7 +14,7 @@ frontend/  Next.js 15 app (:3001) — auth, UI, and a proxy layer that forwards
 backend/   FastAPI service (:8010) — everything below
 mcp/       FastMCP server driving the backend over REST only (no DB access)
 deploy/    docker-compose + service images (app, learn, ollama, sentence-transformers)
-           Tools: ArangoDB :8529, Ollama :11434, optional Qdrant/embeddings
+           Tools: PostgreSQL+pgvector :5432, Ollama :11434, embeddings :8000
 ```
 
 ## Backend packages (`backend/app/`)
@@ -26,7 +26,7 @@ There are **zero import cycles** (checked by AST; keep it that way).
 
 | Package | Owns |
 |---|---|
-| `platform/` | ArangoDB connection + X-User-Db tenancy (`arango.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
+| `platform/` | Postgres pool + X-User-Db schema tenancy (`db.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
 | `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`arango_tree.py`), chapter units (`chapters.py`) |
 | `ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
 | `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`), concept reads (`concept_store.py`), deep-chapter overlay, skeleton, reading guides |

@@ -1,4 +1,4 @@
-"""AQL helpers over the legacy triple KG — the /api/deck flashcards (MCP) and the
+"""SQL helpers over the legacy triple KG — the /api/deck flashcards (MCP) and the
 triple branch of mastery still read it. The quiz/exam/Socratic consumers were removed
 with the triple pipeline."""
 

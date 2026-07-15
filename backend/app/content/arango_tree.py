@@ -1,4 +1,4 @@
-"""Fetch TOC hierarchy (has_subsection) from ArangoDB and build a nested tree."""
+"""Fetch TOC hierarchy (has_subsection edges in the relationships table) and build a nested tree."""
 
 from __future__ import annotations
 

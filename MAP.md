@@ -27,7 +27,7 @@ flowchart LR
   subgraph compose["docker compose network"]
     app["app · frontend<br/>:3001"]
     learn["learn · backend<br/>:8010"]
-    arango["ArangoDB<br/>:8529"]
+    pg["PostgreSQL + pgvector<br/>:5432"]
     ollama["Ollama<br/>:11434"]
     embed["embeddings<br/>:80"]
   end
@@ -38,8 +38,8 @@ flowchart LR
   claude -->|stdio| mcp
   mcp -->|:8010| learn
   app -->|learn:8000| learn
-  app -->|auth| arango
-  learn --> arango
+  app -->|auth + user data| pg
+  learn --> pg
   learn --> ollama
   learn --> embed
 
@@ -48,7 +48,7 @@ flowchart LR
   classDef tool fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class browser,claude client;
   class app,learn,mcp built;
-  class arango,ollama,embed tool;
+  class pg,ollama,embed tool;
   style compose fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click app "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend" "frontend/"
@@ -62,7 +62,7 @@ flowchart LR
 | learn | [`backend/`](backend) | FastAPI service — everything in section 2 below |
 | mcp | [`mcp/server.py`](mcp/server.py) | FastMCP server; drives the backend over REST only |
 | compose / tools | [`deploy/compose/`](deploy/compose) | docker-compose + service images |
-| ArangoDB / Ollama / embeddings | (off-the-shelf images) | database · local LLM · vector search |
+| Postgres / Ollama / embeddings | (off-the-shelf images) | database + vector search (pgvector) · local LLM · MiniLM embeddings |
 
 ---
 
@@ -130,11 +130,11 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 | File | Purpose |
 |---|---|
-| [`arango.py`](backend/app/platform/arango.py) | DB connection + per-user tenancy (the `X-User-Db` ContextVar) |
 | [`llm.py`](backend/app/platform/llm.py) | Ollama client — free-text + structured/JSON completions |
 | [`llm_schemas.py`](backend/app/platform/llm_schemas.py) | Pydantic schemas for structured LLM output |
 | [`jobs.py`](backend/app/platform/jobs.py) | Persistent job ledger + worker; runners injected (no domain imports) |
 | [`seedling_client.py`](backend/app/platform/seedling_client.py) | Optional vaultwriter seam (distilled-concept export) |
+| [`db.py`](backend/app/platform/db.py) | _(describe me)_ |
 
 ### content/ — the book itself
 
@@ -244,7 +244,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 The frontend is a layered data flow. Everything ultimately reaches the backend through the
 **proxy layer**: a component calls `/api/learn/*`, a thin route handler forwards it via
 [`lib/learn-proxy.ts`](frontend/lib/learn-proxy.ts), which stamps the `X-User-Db` tenancy
-header. Auth is the one path that talks to ArangoDB directly.
+header. Auth and the per-user document list are the paths that talk to Postgres directly.
 
 ```mermaid
 flowchart TD
@@ -260,11 +260,11 @@ flowchart TD
   subgraph server["server · Next.js runtime"]
     apiroutes["app/api/learn/*<br/>~40 route handlers"]
     proxy["lib/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
-    authlib["lib/auth*.ts + auth-db.ts<br/>NextAuth · arangojs"]
+    authlib["lib/auth*.ts + auth-db.ts + pg.ts<br/>NextAuth · pg"]
   end
 
   backend["learn backend<br/>:8010"]
-  arango["ArangoDB<br/>:8529"]
+  pgdb["PostgreSQL + pgvector<br/>:5432"]
 
   browser --> pages
   pages --> components
@@ -273,14 +273,14 @@ flowchart TD
   libc --> apiroutes
   apiroutes --> proxy
   proxy --> backend
-  authlib --> arango
+  authlib --> pgdb
 
   classDef ext fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   classDef code fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef svc fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class browser ext;
   class pages,components,state,libc,apiroutes,proxy,authlib code;
-  class backend,arango svc;
+  class backend,pgdb svc;
   style client fill:none,stroke:#888780,stroke-dasharray:4 3;
   style server fill:none,stroke:#888780,stroke-dasharray:4 3;
 
@@ -307,8 +307,8 @@ Key `lib/` seams:
 |---|---|
 | [`learn-proxy.ts`](frontend/lib/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
 | [`learn-service.ts`](frontend/lib/learn-service.ts) | Shared response type definitions |
-| [`user-db.ts`](frontend/lib/user-db.ts) | Resolves the session's per-user database name (tenancy) |
-| [`auth.ts`](frontend/lib/auth.ts) + [`auth-db.ts`](frontend/lib/auth-db.ts) | NextAuth setup + arangojs user/auth reads |
+| [`user-db.ts`](frontend/lib/user-db.ts) | Resolves the session's per-user schema name (tenancy) |
+| [`auth.ts`](frontend/lib/auth.ts) + [`auth-db.ts`](frontend/lib/auth-db.ts) + [`pg.ts`](frontend/lib/pg.ts) | NextAuth setup + Postgres user/auth reads (schema-per-tenant pool) |
 | [`courses.ts`](frontend/lib/courses.ts) · [`learn-path.ts`](frontend/lib/learn-path.ts) · [`read-along.ts`](frontend/lib/read-along.ts) | Course listing · prereq path · audiobook/text sync |
 
 ---
@@ -374,6 +374,6 @@ Color key: purple = conductor · teal = extraction core · coral = generation pa
 Floor first (small, everything builds on these), then trace one journey:
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md) — the map's legend
-2. [`platform/arango.py`](backend/app/platform/arango.py) → [`platform/llm.py`](backend/app/platform/llm.py) → [`content/scope.py`](backend/app/content/scope.py) → [`platform/jobs.py`](backend/app/platform/jobs.py)
+2. [`platform/db.py`](backend/app/platform/db.py) → [`platform/llm.py`](backend/app/platform/llm.py) → [`content/scope.py`](backend/app/content/scope.py) → [`platform/jobs.py`](backend/app/platform/jobs.py)
 3. Then a vertical slice — e.g. **build a chapter**: [`api/build_routes.py`](backend/app/api/build_routes.py) → [`platform/jobs.py`](backend/app/platform/jobs.py) → [`pipeline/registry.py`](backend/app/pipeline/registry.py) → [`pipeline/build.py`](backend/app/pipeline/build.py) → [`extraction/concepts_extract.py`](backend/app/extraction/concepts_extract.py)
 4. Or the **document lifecycle**: an upload flows [`api/ingest_routes.py`](backend/app/api/ingest_routes.py) → [`pipeline/ingest.py`](backend/app/pipeline/ingest.py) (convert job) → auto-chained [`pipeline/build.py`](backend/app/pipeline/build.py) (extract) → studyable, tracked by [`pipeline/lifecycle.py`](backend/app/pipeline/lifecycle.py)
