@@ -21,7 +21,8 @@ import { PipelineGrid } from "@/features/process/components/pipeline-grid"
 import { cleanCourseTitle } from "@/lib/course-title"
 import { fetchCourseChapters, type CourseChapter } from "@/features/learn/api/chapter"
 import { deleteConcept, fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
-import { cancelChapterBuild, enqueueChapterBuild, fetchChapterBuilds, fetchChaptersReadiness, fetchLearnDocuments, type ChapterBuildJob, type ChapterReadiness, type LearnDocumentInfo, type SectionOutcome } from "@/features/learn/api/pipeline"
+import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterBuildJob, type ChapterReadiness, type SectionOutcome } from "@/features/learn/api/pipeline"
+import { fetchChapterBuilds, fetchLearnDocuments, type LearnDocumentInfo } from "@/features/process/api/pipeline"
 import { cn } from "@/lib/utils"
 
 /** Processing dashboard — the extraction UI, rebuilt on the canonical pipeline:
