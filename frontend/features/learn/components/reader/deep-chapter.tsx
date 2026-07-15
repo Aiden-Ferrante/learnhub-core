@@ -41,11 +41,13 @@ import { LessonPanel } from "@/features/learn/components/study/lesson-panel"
 import { AudiobookPanel } from "@/features/learn/components/reader/audiobook-panel"
 import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/features/learn/lib/learn-path"
 import {
+} from "@/features/learn/components/reader/chapter-reader"
+import {
   chaptersFromOutline,
   resolveChapterForScope,
   topLevelChapters,
-  type Chapter,
-} from "@/features/learn/components/reader/chapter-reader"
+  type CourseChapter,
+} from "@/features/learn/lib/toc"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs, type Measure } from "@/features/learn/hooks/use-reading-prefs"
 import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
@@ -84,7 +86,7 @@ const KIND_COLOR: Record<string, string> = {
 /** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
  *  wherever they exist — outline depth 0 can be Parts/front-matter (e.g. DDIA), which carry
  *  no section content of their own. Fall back to depth-0 outline entries, then the TOC tree. */
-function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): Chapter[] {
+function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): CourseChapter[] {
   const numbered = (outline || []).filter((e) => /^toc:\d+$/.test(e.sectionKey || ""))
   if (numbered.length) return numbered.map((e) => ({ key: e.sectionKey, title: e.title || e.sectionKey }))
   const fromOutline = chaptersFromOutline(outline)
@@ -95,7 +97,7 @@ function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): Chapter[]
 /** Resolve any incoming position to a key that is GUARANTEED to be one of `chapters` —
  *  resolveChapterForScope's tree fallback can return a top-level Part node, which carries
  *  no section content of its own and would render an empty surface. */
-function resolveDeepChapter(chapters: Chapter[], tree: LearnTreeNode[], scope: string | null): string | null {
+function resolveDeepChapter(chapters: CourseChapter[], tree: LearnTreeNode[], scope: string | null): string | null {
   if (chapters.length === 0) return null
   if (!scope) return chapters[0].key
   if (chapters.some((c) => c.key === scope)) return scope
@@ -418,7 +420,7 @@ export function DeepChapter({
   // Canonical chapter list from /api/chapters — the SAME derivation the dashboard
   // tree and the Today plan use. The outline-rule fallback only covers the moment
   // before the fetch lands (or a backend error).
-  const [canonChapters, setCanonChapters] = useState<Chapter[] | null>(null)
+  const [canonChapters, setCanonChapters] = useState<CourseChapter[] | null>(null)
   useEffect(() => {
     let alive = true
     fetchCourseChapters(docId)

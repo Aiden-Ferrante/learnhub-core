@@ -3,15 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ExternalLink, PictureInPicture2 } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
-import {
-  ChapterReader,
-  chaptersFromOutline,
-  outlineToTree,
-  resolveChapterForScope,
-  resolveChapterFromOutline,
-  topLevelChapters,
-  type Chapter,
-} from "@/features/learn/components/reader/chapter-reader"
+import { ChapterReader } from "@/features/learn/components/reader/chapter-reader"
+import { chaptersFromOutline, outlineToTree, resolveChapterForScope, resolveChapterFromOutline, topLevelChapters, type CourseChapter } from "@/features/learn/lib/toc"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
 import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
 import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
@@ -52,7 +45,7 @@ export function BookReader({
   // Canonical chapters from /api/chapters — the same derivation as the course
   // dashboard and the deep surface, so this list can never disagree with them.
   // The outline/tree rules only bridge the moment before the fetch lands.
-  const [canonChapters, setCanonChapters] = useState<Chapter[] | null>(null)
+  const [canonChapters, setCanonChapters] = useState<CourseChapter[] | null>(null)
   useEffect(() => {
     let alive = true
     fetchCourseChapters(course.learnDocId ?? course.id)

@@ -4,15 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { PanelLeft, X } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
-import {
-  ChapterReader,
-  chaptersFromOutline,
-  outlineToTree,
-  resolveChapterForScope,
-  resolveChapterFromOutline,
-  topLevelChapters,
-  type Chapter,
-} from "@/features/learn/components/reader/chapter-reader"
+import { ChapterReader } from "@/features/learn/components/reader/chapter-reader"
+import { chaptersFromOutline, outlineToTree, resolveChapterForScope, resolveChapterFromOutline, topLevelChapters, type CourseChapter } from "@/features/learn/lib/toc"
 import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
 import { fetchOutline, fetchTocTree, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
@@ -22,7 +15,7 @@ function ReaderInner() {
   const params = useSearchParams()
   const doc = params.get("doc") || undefined
   const initialScope = params.get("scope")
-  const [chapters, setChapters] = useState<Chapter[]>([])
+  const [chapters, setChapters] = useState<CourseChapter[]>([])
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [tree, setTree] = useState<LearnTreeNode[]>([])
   const [mastery, setMastery] = useState<MasteryResponse | null>(null)
