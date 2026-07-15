@@ -76,11 +76,11 @@ type DeepChapterProps = {
 }
 
 const KIND_COLOR: Record<string, string> = {
-  definition: "text-sky-400 border-sky-400/30 bg-sky-400/10",
-  theorem: "text-purple-400 border-purple-400/30 bg-purple-400/10",
-  principle: "text-amber-400 border-amber-400/30 bg-amber-400/10",
-  result: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
-  method: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+  definition: "text-kind-definition border-kind-definition/30 bg-kind-definition/10",
+  theorem: "text-kind-theorem border-kind-theorem/30 bg-kind-theorem/10",
+  principle: "text-kind-principle border-kind-principle/30 bg-kind-principle/10",
+  result: "text-kind-result border-kind-result/30 bg-kind-result/10",
+  method: "text-kind-method border-kind-method/30 bg-kind-method/10",
 }
 
 /** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
@@ -374,8 +374,8 @@ export function DeepChapter({
 
   const paper = theme === "paper"
   // Cards sit on the reading surface, so they follow it: warm on paper, app-dark otherwise.
-  const cardCls = paper ? "border-[#e0d6c4] bg-[#efe8da] text-[#3a332c]" : "bg-card"
-  const mutedCls = paper ? "text-[#6b5d4d]" : "text-muted-foreground"
+  const cardCls = paper ? "border-paper-border bg-paper-card text-paper-ink" : "bg-card"
+  const mutedCls = paper ? "text-paper-muted" : "text-muted-foreground"
 
   // The surface lives inside the app's padded, page-scrolling container — pin its height to
   // the viewport so the READER owns the scroll (scroll persistence, margin notes, and the
@@ -1284,7 +1284,7 @@ export function DeepChapter({
                       "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
                       j === activeRail
                         ? "bg-brand/10 font-medium text-brand"
-                        : cn(mutedCls, paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/50", "hover:opacity-100"),
+                        : cn(mutedCls, paper ? "hover:bg-paper-card" : "hover:bg-muted/50", "hover:opacity-100"),
                       it.target < 0 && "cursor-default opacity-60",
                     )}
                     style={{ paddingLeft: `${8 + it.depthPad * 12}px` }}
@@ -1498,7 +1498,7 @@ export function DeepChapter({
                       onClick={() => goChapter(nextChapter.key)}
                       className={cn(
                         "flex w-full items-center justify-between gap-3 border-t px-5 py-3 text-left text-sm transition-colors",
-                        paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/40",
+                        paper ? "hover:bg-paper-card" : "hover:bg-muted/40",
                       )}
                     >
                       <span className={cn("shrink-0 text-xs", mutedCls)}>
@@ -1523,7 +1523,7 @@ export function DeepChapter({
                 type="button"
                 className={cn(
                   "absolute hidden w-52 rounded-md border border-transparent p-1.5 text-left transition-colors min-[1440px]:block",
-                  paper ? "hover:border-[#e0d6c4] hover:bg-[#efe8da]" : "hover:border-border hover:bg-card",
+                  paper ? "hover:border-paper-border hover:bg-paper-card" : "hover:border-border hover:bg-card",
                 )}
                 style={{ top: n.top, left: `calc(50% + ${HALF_MEASURE[prefs.measure]} + 28px)` }}
                 onClick={(e) => {
@@ -1532,7 +1532,7 @@ export function DeepChapter({
                   setActive({ idx: n.idx, x: Math.max(16, r.left - 440), y: r.top })
                 }}
               >
-                <div className={cn("truncate text-xs font-medium", paper ? "text-[#221d18]" : "text-foreground/90")}>
+                <div className={cn("truncate text-xs font-medium", paper ? "text-paper-ink-strong" : "text-foreground/90")}>
                   {n.name}
                 </div>
                 <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>

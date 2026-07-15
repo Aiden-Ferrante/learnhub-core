@@ -31,6 +31,22 @@ const config: Config = {
           dark: "hsl(var(--brand-accent-dark))",
           light: "hsl(var(--brand-accent-light))",
         },
+        // Concept-kind hues (see globals.css) — chips in the reader/concept surfaces.
+        kind: {
+          definition: "hsl(var(--kind-definition))",
+          theorem: "hsl(var(--kind-theorem))",
+          principle: "hsl(var(--kind-principle))",
+          result: "hsl(var(--kind-result))",
+          method: "hsl(var(--kind-method))",
+        },
+        // Paper reading-surface palette — defined on .reading-surface-paper.
+        paper: {
+          card: "hsl(var(--paper-card))",
+          border: "hsl(var(--paper-border))",
+          ink: "hsl(var(--paper-ink))",
+          "ink-strong": "hsl(var(--paper-ink-strong))",
+          muted: "hsl(var(--paper-muted))",
+        },
         // Domain status vocabulary (see globals.css) — text-status-due, bg-status-mastered/15, …
         status: {
           mastered: "hsl(var(--status-mastered))",

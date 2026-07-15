@@ -119,6 +119,13 @@ body {
     --status-fading: 16 85% 58%;
     --status-building: 265 65% 68%;
     --status-error: 0 68% 58%;
+
+    /* Concept-kind hues (definition/theorem/principle/result/method chips). */
+    --kind-definition: 199 89% 60%;
+    --kind-theorem: 271 91% 75%;
+    --kind-principle: 43 96% 56%;
+    --kind-result: 160 64% 52%;
+    --kind-method: 351 95% 71%;
   }
 
   .light {
@@ -167,6 +174,13 @@ body {
     --status-fading: 16 80% 44%;
     --status-building: 265 55% 50%;
     --status-error: 0 72% 45%;
+
+    /* Concept-kind hues, deepened for light backgrounds. */
+    --kind-definition: 201 98% 39%;
+    --kind-theorem: 271 81% 56%;
+    --kind-principle: 32 95% 44%;
+    --kind-result: 161 94% 30%;
+    --kind-method: 347 77% 50%;
   }
 }
 
@@ -185,6 +199,13 @@ body {
 .reading-surface-paper {
   background-color: #f4efe6;
   color: #3a332c;
+  /* Paper-surface tokens — cards/rails/notes inside the reader use paper-* utilities
+     instead of raw hexes, so the warm palette lives in ONE place. */
+  --paper-card: 40 40% 90%;        /* #efe8da */
+  --paper-border: 39 31% 82%;      /* #e0d6c4 */
+  --paper-ink: 30 14% 20%;         /* #3a332c */
+  --paper-ink-strong: 30 17% 11%;  /* #221d18 */
+  --paper-muted: 32 16% 36%;       /* #6b5d4d */
 }
 
 /* Override the Tailwind Typography palette + font for the paper reader. */
