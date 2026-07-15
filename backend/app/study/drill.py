@@ -12,7 +12,7 @@ import random
 import time
 import uuid
 
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.exam import _doc_pool
 from app.extraction.extract import _load_section_blocks
@@ -29,31 +29,32 @@ def _sweep(now: float) -> None:
         _DRILL.pop(k, None)
 
 
-def _missed_keys(db, doc: str | None) -> set[str]:
+def _missed_keys(doc: str | None) -> set[str]:
     """Concept keys with at least one wrong answer on record (recent misses to resurface)."""
     try:
-        rows = db.aql.execute(
-            "FOR e IN study_events FILTER (@d == null OR e.doc == @d OR e.doc == null) "
-            "AND e.correct == false AND e.concept_key != null AND e.concept_key != '' "
-            "RETURN DISTINCT e.concept_key",
-            bind_vars={"d": doc},
-        )
-        return set(rows)
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT concept_key FROM study_events "
+                "WHERE (%(d)s::text IS NULL OR doc = %(d)s OR doc IS NULL) "
+                "AND correct = false AND concept_key IS NOT NULL AND concept_key <> ''",
+                {"d": doc},
+            ).fetchall()
+        return {r["concept_key"] for r in rows}
     except Exception:  # noqa: BLE001
         return set()
 
 
-def select_targets(db, doc: str, scope: str | None, pool: list[dict], n: int) -> list[dict]:
+def select_targets(doc: str, scope: str | None, pool: list[dict], n: int) -> list[dict]:
     """Order candidate concepts by practice need: missed first, then weakest sections, with
     interleaving (shuffle within tiers). ``scope`` null = whole course (cross-chapter)."""
-    missed = _missed_keys(db, doc)
+    missed = _missed_keys(doc)
     try:
         sec_mastery = compute_mastery(doc=doc).get("bySection", {})
     except Exception:  # noqa: BLE001
         sec_mastery = {}
 
     if scope:
-        keys = {s.section_key for s in _load_section_blocks(db, doc, scope=scope)}
+        keys = {s.section_key for s in _load_section_blocks(doc, scope=scope)}
         cand = [c for c in pool if c.get("sectionKey") in keys and c.get("signal")]
     else:
         cand = [c for c in pool if c.get("signal")]
@@ -74,19 +75,16 @@ def select_targets(db, doc: str, scope: str | None, pool: list[dict], n: int) ->
 
 def start_drill(doc_id: str | None, scope: str | None, n: int = 10) -> dict:
     """Build an adaptive drill: up to ``n`` MCQs over the concepts you most need to practice."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    if not db.has_collection(CONCEPTS):
-        return {"error": "No concepts to drill — process a chapter first."}
-    pool = _doc_pool(db, doc_id)
-    targets = select_targets(db, doc_id, scope, pool, n)
+    pool = _doc_pool(doc_id)
+    targets = select_targets(doc_id, scope, pool, n)
     if len(pool) < 4 or not targets:
         return {"error": "Not enough concepts to drill yet — study a chapter first."}
 
     rng = random.Random()
-    missed = _missed_keys(db, doc_id)
+    missed = _missed_keys(doc_id)
     questions = [q for q in (build_concept_question(t, pool, rng) for t in targets) if q]
     if not questions:
         return {"error": "Could not build drill questions"}

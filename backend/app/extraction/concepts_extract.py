@@ -19,7 +19,9 @@ import time
 from dataclasses import dataclass, replace
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.extraction.extract import (
     _domain,
     _extract_model,
@@ -198,48 +200,42 @@ def concept_key(doc_id: str, section_key: str, name: str) -> str:
 # ArangoDB write path
 # --------------------------------------------------------------------------- #
 
-def ensure_concept_collections(db) -> None:
-    if not db.has_collection(CONCEPTS):
-        col = db.create_collection(CONCEPTS)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["sectionKey"])
-    # The structural TOC tree (has_subsection) is written by upsert_structural_edges into
-    # entities/relationships so get_toc_tree still renders. Ensure they exist — on a fresh
-    # DB (no prior triple run) they otherwise wouldn't, and the structural write would throw.
-    if not db.has_collection("entities"):
-        db.create_collection("entities")
-    if not db.has_collection("relationships"):
-        db.create_collection("relationships", edge=True)
-
-
-def write_section_concepts(db, sc: SectionConcepts, batch: int = 500) -> None:
+def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
     # Re-extraction must be idempotent: clear this section's existing concepts first, else
-    # concepts the new run no longer produces (renamed/dropped) linger (import_bulk only
-    # overwrites same-key rows, never deletes).
-    db.aql.execute(
-        "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey == @s REMOVE c IN concepts",
-        bind_vars={"d": sc.doc_id, "s": sc.section_key},
-    )
+    # concepts the new run no longer produces (renamed/dropped) linger.
     rows = []
     for idx, c in enumerate(sc.concepts):
         rows.append(
             {
-                "_key": concept_key(sc.doc_id, sc.section_key, c.name),
-                "docId": sc.doc_id,
-                "sectionKey": sc.section_key,
-                "pageStart": sc.page_start,
-                "pageEnd": sc.page_end,
+                "key": concept_key(sc.doc_id, sc.section_key, c.name),
+                "doc_id": sc.doc_id,
+                "section_key": sc.section_key,
+                "page_start": sc.page_start,
+                "page_end": sc.page_end,
                 "name": c.name,
                 "kind": c.kind,
                 "signal": c.signal,
                 "source": c.source,
-                "questions": [{"q": q.q, "a": q.a} for q in c.questions],
+                "questions": Json([{"q": q.q, "a": q.a} for q in c.questions]),
                 "order": idx,
-                "createdAt": int(time.time()),
             }
         )
-    if rows:
-        db.collection(CONCEPTS).import_bulk(rows, on_duplicate="replace")
+    with db() as conn, conn.transaction():
+        conn.execute(
+            "DELETE FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
+            {"d": sc.doc_id, "s": sc.section_key},
+        )
+        if rows:
+            conn.cursor().executemany(
+                'INSERT INTO concepts (key, doc_id, section_key, page_start, page_end, name, kind, '
+                'signal, source, questions, "order", created_at) VALUES (%(key)s,%(doc_id)s,%(section_key)s,'
+                '%(page_start)s,%(page_end)s,%(name)s,%(kind)s,%(signal)s,%(source)s,%(questions)s,%(order)s, now()) '
+                "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
+                "page_start=EXCLUDED.page_start, page_end=EXCLUDED.page_end, name=EXCLUDED.name, "
+                "kind=EXCLUDED.kind, signal=EXCLUDED.signal, source=EXCLUDED.source, "
+                'questions=EXCLUDED.questions, "order"=EXCLUDED."order", created_at=EXCLUDED.created_at',
+                rows,
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -343,16 +339,14 @@ async def extract_concepts_document(
     own enrichment job and passes ``False``; the legacy ``/api/extract`` path passes ``None``,
     which falls back to the ``LEARN_DEEP_PREGEN`` env (default on) to preserve its behavior."""
     t0 = time.time()
-    db = connect_arango()
     if doc_id is None:
         doc = (fetch_latest_document() or {}).get("document")
         doc_id = doc.get("id") if doc else None
     if not doc_id:
         return {"error": "no document found"}
 
-    ensure_concept_collections(db)
     skipped: list[dict] = []
-    sections = _load_section_blocks(db, doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
+    sections = _load_section_blocks(doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
     outcomes: list[dict] = [
         {"sectionKey": s["sectionKey"], "heading": s["heading"], "status": "skipped", "reason": s["reason"]}
         for s in skipped
@@ -397,12 +391,12 @@ async def extract_concepts_document(
     total_concepts = 0
     total_questions = 0
     for sc in results:
-        write_section_concepts(db, sc)
+        write_section_concepts(sc)
         total_concepts += len(sc.concepts)
         total_questions += sum(len(c.questions) for c in sc.concepts)
 
     # Keep the structural TOC tree (drives the syllabus view).
-    upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
+    upsert_structural_edges(structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
     # Deep Chapter overlay (assembled briefing + per-section recaps + per-concept deep
     # explanations). The pipeline runs this as a separate "deep" enrichment job, so

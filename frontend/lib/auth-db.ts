@@ -1,8 +1,9 @@
-import { Database } from 'arangojs'
+import { pgPool, withSchema } from '@/lib/pg'
 
-// Shared auth database (separate from per-user data databases).
-export const AUTH_DB_NAME = 'learnhub_auth'
-export const USERS_COLLECTION = 'users'
+// Shared auth lives in the Postgres `auth` schema (was the learnhub_auth Arango db);
+// per-user data lives in a tenant schema named by the user's `dbName` (was a per-user db).
+export const AUTH_SCHEMA = 'auth'
+export const USERS_TABLE = 'auth.users'
 
 export type UserRecord = {
   _key: string
@@ -14,66 +15,49 @@ export type UserRecord = {
   createdAt: number
 }
 
-function arangoUrl(): string {
-  return process.env.ARANGODB_URL || 'http://localhost:8529'
-}
-
-function arangoAuth() {
-  return {
-    username: process.env.ARANGODB_USER || 'root',
-    password: process.env.ARANGODB_PASSWORD || '',
-  }
-}
-
-let authDbPromise: Promise<Database> | null = null
-
-/** Connect to the shared auth db, creating the db + users collection on first use. */
-export function getAuthDb(): Promise<Database> {
-  if (!authDbPromise) {
-    authDbPromise = (async () => {
-      const system = new Database({ url: arangoUrl(), auth: arangoAuth() })
-      const names = await system.listDatabases()
-      if (!names.includes(AUTH_DB_NAME)) {
-        await system.createDatabase(AUTH_DB_NAME)
-      }
-      const db = system.database(AUTH_DB_NAME)
-      const users = db.collection(USERS_COLLECTION)
-      if (!(await users.exists())) {
-        await users.create()
-        await users.ensureIndex({
-          type: 'persistent',
-          fields: ['username'],
-          unique: true,
-          name: 'unique_username',
-        })
-      }
-      return db
-    })().catch((err) => {
-      authDbPromise = null
-      throw err
-    })
-  }
-  return authDbPromise
-}
-
+/** Look up a user by username (case-insensitive). Returns the same shape the auth
+ * flow already consumes; `_key`/`dbName` map to username/schema_name in Postgres. */
 export async function findUserByUsername(username: string): Promise<UserRecord | null> {
-  const db = await getAuthDb()
-  const cursor = await db.query(
-    'FOR u IN @@col FILTER u.username == @username LIMIT 1 RETURN u',
-    { '@col': USERS_COLLECTION, username: username.toLowerCase().trim() },
+  const { rows } = await pgPool().query(
+    `SELECT username, password_hash, display_name, role, schema_name,
+            (extract(epoch from created_at) * 1000)::bigint AS created_at
+       FROM auth.users WHERE username = $1 LIMIT 1`,
+    [username.toLowerCase().trim()],
   )
-  const user = await cursor.next()
-  return (user as UserRecord) ?? null
+  const u = rows[0]
+  if (!u) return null
+  return {
+    _key: u.username, // username is the PK / stable id
+    username: u.username,
+    displayName: u.display_name ?? '',
+    passwordHash: u.password_hash ?? '',
+    dbName: u.schema_name,
+    role: u.role ?? 'user',
+    createdAt: Number(u.created_at ?? 0),
+  }
 }
 
-/** Create a per-user database if it does not exist yet. Collections are created lazily by the services. */
+// Frontend-owned tables in a tenant schema. The backend's own study tables are
+// created for the primary tenant by deploy/postgres/init; a brand-new tenant gets
+// at least its document-list table here so login + the library work immediately.
+const APP_DOCUMENTS_DDL = `
+CREATE TABLE IF NOT EXISTS app_documents (
+  key text PRIMARY KEY, id text, learn_doc_id text, name text, file jsonb,
+  status text, upload_status text, processing_method text, original_pdf_name text,
+  converted_from_pdf boolean, "order" int, size text, selected_section_keys jsonb,
+  metadata jsonb, extracted_date timestamptz, last_updated timestamptz)`
+
+/** Ensure the tenant schema exists (was: create a per-user Arango database).
+ * Idempotent; the primary tenant's schema is already provisioned by the init SQL. */
 export async function ensureUserDb(dbName: string): Promise<void> {
   if (!/^[a-zA-Z0-9_-]+$/.test(dbName)) {
     throw new Error(`Invalid database name: ${dbName}`)
   }
-  const system = new Database({ url: arangoUrl(), auth: arangoAuth() })
-  const names = await system.listDatabases()
-  if (!names.includes(dbName)) {
-    await system.createDatabase(dbName)
+  const client = await pgPool().connect()
+  try {
+    await client.query(`CREATE SCHEMA IF NOT EXISTS "${dbName}"`)
+  } finally {
+    client.release()
   }
+  await withSchema(dbName, (c) => c.query(APP_DOCUMENTS_DDL))
 }

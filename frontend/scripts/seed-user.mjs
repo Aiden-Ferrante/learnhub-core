@@ -1,4 +1,4 @@
-// Seed (or update) a user account in the shared learnhub_auth database.
+// Seed (or update) a user account in the shared Postgres `auth.users` table.
 //
 // Usage (credentials come from env so they never land in code or shell history files):
 //   SEED_USERNAME=Mooteo SEED_PASSWORD='...' SEED_DB_NAME=learnhub node scripts/seed-user.mjs
@@ -6,16 +6,13 @@
 // Env:
 //   SEED_USERNAME   required — login name (stored lowercase, display name keeps casing)
 //   SEED_PASSWORD   required — plaintext password, stored only as a bcrypt hash
-//   SEED_DB_NAME    optional — ArangoDB database for this user's data
+//   SEED_DB_NAME    optional — Postgres schema for this user's data
 //                   (defaults to learnhub_u_<username>; use "learnhub" to adopt existing data)
 //   SEED_ROLE       optional — defaults to "user"
-//   ARANGODB_URL / ARANGODB_USER / ARANGODB_PASSWORD — Arango connection (same as the app)
+//   POSTGRES_DSN    — Postgres connection (same keyword DSN as the app)
 
-import { Database } from 'arangojs'
 import bcrypt from 'bcryptjs'
-
-const AUTH_DB_NAME = 'learnhub_auth'
-const USERS_COLLECTION = 'users'
+import pg from 'pg'
 
 const displayName = (process.env.SEED_USERNAME || '').trim()
 const username = displayName.toLowerCase()
@@ -41,66 +38,45 @@ if (!/^[a-zA-Z0-9_-]+$/.test(dbName)) {
   process.exit(1)
 }
 
-const system = new Database({
-  url: process.env.ARANGODB_URL || 'http://localhost:8529',
-  auth: {
-    username: process.env.ARANGODB_USER || 'root',
-    password: process.env.ARANGODB_PASSWORD || '',
-  },
-})
-
-const databases = await system.listDatabases()
-if (!databases.includes(AUTH_DB_NAME)) {
-  await system.createDatabase(AUTH_DB_NAME)
-  console.log(`Created auth database ${AUTH_DB_NAME}`)
-}
-const authDb = system.database(AUTH_DB_NAME)
-
-const users = authDb.collection(USERS_COLLECTION)
-if (!(await users.exists())) {
-  await users.create()
-  await users.ensureIndex({
-    type: 'persistent',
-    fields: ['username'],
-    unique: true,
-    name: 'unique_username',
-  })
-  console.log(`Created ${USERS_COLLECTION} collection`)
+function connString(dsn) {
+  if (!dsn) return 'postgresql://learnhub:learnhub_local@localhost:5432/learnhub'
+  if (dsn.startsWith('postgres://') || dsn.startsWith('postgresql://')) return dsn
+  const kv = Object.fromEntries(dsn.split(/\s+/).filter(Boolean).map((p) => p.split('=')))
+  return `postgresql://${encodeURIComponent(kv.user || 'learnhub')}:${encodeURIComponent(
+    kv.password || '',
+  )}@${kv.host || 'localhost'}:${kv.port || '5432'}/${kv.dbname || 'learnhub'}`
 }
 
-if (!databases.includes(dbName)) {
-  await system.createDatabase(dbName)
-  console.log(`Created user database ${dbName}`)
-}
+const client = new pg.Client({ connectionString: connString(process.env.POSTGRES_DSN) })
+await client.connect()
 
 const passwordHash = await bcrypt.hash(password, 12)
 
-const cursor = await authDb.query(
-  'FOR u IN @@col FILTER u.username == @username LIMIT 1 RETURN u',
-  { '@col': USERS_COLLECTION, username },
-)
-const existing = await cursor.next()
+// The tenant schema holds this user's data (was a per-user Arango database).
+await client.query(`CREATE SCHEMA IF NOT EXISTS "${dbName}"`)
 
-if (existing) {
-  await users.update(existing._key, {
-    passwordHash,
-    displayName,
-    role,
-    ...(process.env.SEED_DB_NAME ? { dbName } : {}),
-  })
-  console.log(
-    `Updated user "${username}" (db: ${process.env.SEED_DB_NAME ? dbName : existing.dbName})`,
+const { rows } = await client.query('SELECT username, schema_name FROM auth.users WHERE username = $1', [
+  username,
+])
+if (rows[0]) {
+  // Only move an existing user's schema when SEED_DB_NAME was explicitly given.
+  await client.query(
+    `UPDATE auth.users SET password_hash = $2, display_name = $3, role = $4
+       ${process.env.SEED_DB_NAME ? ', schema_name = $5' : ''}
+     WHERE username = $1`,
+    process.env.SEED_DB_NAME
+      ? [username, passwordHash, displayName, role, dbName]
+      : [username, passwordHash, displayName, role],
   )
+  console.log(`Updated user "${username}" (schema: ${process.env.SEED_DB_NAME ? dbName : rows[0].schema_name})`)
 } else {
-  await users.save({
-    username,
-    displayName,
-    passwordHash,
-    dbName,
-    role,
-    createdAt: Date.now(),
-  })
-  console.log(`Created user "${username}" → database "${dbName}"`)
+  await client.query(
+    `INSERT INTO auth.users (username, password_hash, display_name, schema_name, role, created_at)
+     VALUES ($1, $2, $3, $4, $5, now())`,
+    [username, passwordHash, displayName, dbName, role],
+  )
+  console.log(`Created user "${username}" → schema "${dbName}"`)
 }
 
+await client.end()
 console.log('Done. The plaintext password was not stored anywhere.')

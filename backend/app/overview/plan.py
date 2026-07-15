@@ -18,7 +18,7 @@ from typing import Any
 from app.content.documents import fetch_latest_document
 from app.content.chapters import chapter_units
 from app.overview.coverage import chapters_readiness
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 # Mirrors lib/learn-path.ts PATH_STAGES — keep in sync (stage keys are the contract).
 STAGE_ORDER: list[tuple[str, str]] = [
@@ -42,7 +42,6 @@ def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, A
     """Assemble the Today plan. ``hint_scope`` is the client's reading position
     (stored client-side), which wins over inferred recency when it maps to a chapter."""
     try:
-        db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
@@ -55,11 +54,11 @@ def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, A
         readiness = chapters_readiness(doc_id, chapter_keys).get("chapters", {})
 
         progress: dict[str, dict[str, Any]] = {}
-        if db.has_collection("chapter_progress"):
-            for r in db.aql.execute(
-                "FOR p IN chapter_progress FILTER p.docId == @d RETURN {scope: p.scope, stages: p.stages}",
-                bind_vars={"d": doc_id},
-            ):
+        with db() as conn:
+            for r in conn.execute(
+                "SELECT scope, stages FROM chapter_progress WHERE doc_id = %(d)s",
+                {"d": doc_id},
+            ).fetchall():
                 if r.get("scope"):
                     progress[r["scope"]] = r.get("stages") or {}
 
@@ -95,12 +94,12 @@ def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, A
         done_count = sum(1 for k, _ in STAGE_ORDER if done.get(k))
 
         due = 0
-        if db.has_collection("concept_reviews"):
-            due = db.aql.execute(
-                "RETURN LENGTH(FOR r IN concept_reviews FILTER r.docId == @d "
-                "AND r.due != null AND r.due <= @now RETURN 1)",
-                bind_vars={"d": doc_id, "now": time.time()},
-            ).next()
+        with db() as conn:
+            due = conn.execute(
+                "SELECT count(*) AS n FROM concept_reviews WHERE doc_id = %(d)s "
+                "AND due IS NOT NULL AND due <= to_timestamp(%(now)s)",
+                {"d": doc_id, "now": time.time()},
+            ).fetchone()["n"]
 
         # The next dark room: first chapter (reading order) with no concepts yet.
         next_unbuilt: dict[str, Any] | None = None

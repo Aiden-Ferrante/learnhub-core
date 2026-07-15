@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.platform.arango import connect_arango
 from app.search.semantic_search import ask, ensure_index, index_status, semantic_search
 
 router = APIRouter()
@@ -15,7 +14,7 @@ router = APIRouter()
 def api_index_status(doc: str | None = Query(None)) -> JSONResponse:
     """How many of a doc's content blocks are embedded for semantic search."""
     try:
-        return JSONResponse(index_status(connect_arango(), doc))
+        return JSONResponse(index_status(doc))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
 
@@ -25,7 +24,7 @@ def api_build_index(doc: str | None = Query(None), body: dict = Body(default=Non
     """Embed a doc's (or all) not-yet-embedded content blocks. Idempotent; safe to re-run."""
     limit = int((body or {}).get("limit") or 100000)
     try:
-        return JSONResponse(ensure_index(connect_arango(), doc, limit=limit))
+        return JSONResponse(ensure_index(doc, limit=limit))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
 
@@ -38,7 +37,7 @@ def api_semantic_search(
 ) -> JSONResponse:
     """Natural-language search over the content layer (cosine over MiniLM embeddings)."""
     try:
-        return JSONResponse(semantic_search(connect_arango(), q, doc, k))
+        return JSONResponse(semantic_search(q, doc, k))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
 
@@ -53,6 +52,6 @@ def api_ask(doc: str | None = Query(None), body: dict = Body(...)) -> JSONRespon
     k = int(b.get("k") or 6)
     model = b.get("model")
     try:
-        return JSONResponse(ask(connect_arango(), q, doc, k=k, model=model))
+        return JSONResponse(ask(q, doc, k=k, model=model))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

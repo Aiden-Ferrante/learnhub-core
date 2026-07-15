@@ -16,7 +16,9 @@ import time
 from typing import Any
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ReadingGuide
@@ -48,16 +50,10 @@ def _key(doc: str | None, sk: str) -> str:
     return hashlib.sha256(f"{doc}|{sk}".encode()).hexdigest()[:16]
 
 
-def _ensure_col(db) -> None:
-    if not db.has_collection(GUIDE_COL):
-        col = db.create_collection(GUIDE_COL)
-        col.add_persistent_index(fields=["docId"])
-
-
-def _blocks(db, doc: str, scope: str | None) -> list[dict[str, Any]]:
+def _blocks(doc: str, scope: str | None) -> list[dict[str, Any]]:
     """The chapter's section blocks (heading + its own text), in reading order."""
     try:
-        secs = _load_section_blocks(db, doc, scope=scope)
+        secs = _load_section_blocks(doc, scope=scope)
         return [
             {
                 "sectionKey": s.section_key,
@@ -98,22 +94,30 @@ def author_reading_guide(section: dict[str, Any], model: str | None = None) -> d
     return {"focus": focus, "checks": checks[:3]}
 
 
-def author_guides_sync(db, doc: str | None, scope: str | None, on_progress=None) -> dict:
+def author_guides_sync(doc: str | None, scope: str | None, on_progress=None) -> dict:
     """Author guides for every un-guided section in scope, sequentially. Synchronous so the
     build queue can run it as a ledgered job; returns an {authored, total} receipt."""
-    _ensure_col(db)
-    col = db.collection(GUIDE_COL)
-    blocks = _blocks(db, doc, scope)
+    blocks = _blocks(doc, scope)
+    with db() as conn:
+        existing = {
+            r["key"] for r in conn.execute(
+                "SELECT key FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+            ).fetchall()
+        }
     authored = 0
     for i, b in enumerate(blocks):
         k = _key(doc, b["sectionKey"])
-        if not col.has(k):
+        if k not in existing:
             g = author_reading_guide(b, model=_AUTHOR_MODEL)
             if g:
-                col.insert(
-                    {"_key": k, "docId": doc, "sectionKey": b["sectionKey"], **g, "createdAt": int(time.time())},
-                    overwrite=True,
-                )
+                with db() as conn:
+                    conn.execute(
+                        "INSERT INTO reading_guides (key, doc_id, section_key, focus, checks, created_at) "
+                        "VALUES (%(k)s,%(d)s,%(sk)s,%(focus)s,%(checks)s, now()) "
+                        "ON CONFLICT (key) DO UPDATE SET focus=EXCLUDED.focus, checks=EXCLUDED.checks",
+                        {"k": k, "d": doc, "sk": b["sectionKey"],
+                         "focus": g.get("focus"), "checks": Json(g.get("checks"))},
+                    )
                 authored += 1
         if on_progress:
             on_progress(i + 1, len(blocks), b.get("heading"))
@@ -122,8 +126,7 @@ def author_guides_sync(db, doc: str | None, scope: str | None, on_progress=None)
 
 def _ensure_worker(doc: str | None, scope: str | None, sig: str) -> None:
     try:
-        db = connect_arango()
-        author_guides_sync(db, doc, scope)
+        author_guides_sync(doc, scope)
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:
@@ -144,58 +147,70 @@ def ensure_guides_async(doc: str | None, scope: str | None) -> bool:
     return True
 
 
-def guide_status(db, doc: str | None, scope: str | None) -> dict[str, Any]:
-    blocks = _blocks(db, doc, scope)
+def guide_status(doc: str | None, scope: str | None) -> dict[str, Any]:
+    blocks = _blocks(doc, scope)
     total = len(blocks)
-    col = db.collection(GUIDE_COL) if db.has_collection(GUIDE_COL) else None
-    authored = sum(1 for b in blocks if col and col.has(_key(doc, b["sectionKey"]))) if col else 0
+    with db() as conn:
+        existing = {
+            r["key"] for r in conn.execute(
+                "SELECT key FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+            ).fetchall()
+        }
+    authored = sum(1 for b in blocks if _key(doc, b["sectionKey"]) in existing)
     with _inflight_lock:
         running = f"{doc}|{scope}" in _inflight
     return {"total": total, "authored": authored, "running": running}
 
 
-def prepare_guides(db, doc: str | None, scope: str | None) -> dict[str, Any]:
+def prepare_guides(doc: str | None, scope: str | None) -> dict[str, Any]:
     ensure_guides_async(doc, scope)
-    return guide_status(db, doc, scope)
+    return guide_status(doc, scope)
 
 
 def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
     """The guided read for a chapter: each section's text + skeleton position (depth/essence) +
     cached focus note + checks. Triggers background authoring for any section not guided yet."""
     try:
-        db = connect_arango()
         if doc is None:
             d = (fetch_latest_document() or {}).get("document")
             doc = d.get("id") if d else None
         if not doc:
             return {"error": "no document found", "sections": []}
-        blocks = _blocks(db, doc, scope)
+        blocks = _blocks(doc, scope)
         if not blocks:
             return {"docId": doc, "scope": scope, "sections": []}
 
         depth_by: dict[str, int] = {}
         ess_by: dict[str, str] = {}
         try:
-            from app.extraction.skeleton import SKELETONS, _attach_depths, _key as _skel_key
+            from app.extraction.skeleton import _attach_depths, _key as _skel_key
 
             secs = [{"sectionKey": b["sectionKey"], "heading": b["heading"]} for b in blocks]
-            _attach_depths(db, doc, secs)
+            _attach_depths(doc, secs)
             depth_by = {s["sectionKey"]: s.get("depth", 0) for s in secs}
-            if db.has_collection(SKELETONS):
-                skel = db.collection(SKELETONS).get(_skel_key(doc, scope))
-                if skel:
-                    ess_by = {
-                        s.get("sectionKey"): s.get("essence") or ""
-                        for s in (skel.get("sections") or [])
-                    }
+            with db() as conn:
+                skel = conn.execute(
+                    "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                    {"k": _skel_key(doc, scope)},
+                ).fetchone()
+            if skel:
+                ess_by = {
+                    s.get("sectionKey"): s.get("essence") or ""
+                    for s in (skel.get("sections") or [])
+                }
         except Exception:  # noqa: BLE001 — position is supplementary
             pass
 
-        gcol = db.collection(GUIDE_COL) if db.has_collection(GUIDE_COL) else None
+        with db() as conn:
+            guides = {
+                r["key"]: r for r in conn.execute(
+                    "SELECT key, focus, checks FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+                ).fetchall()
+            }
         sections = []
         for b in blocks:
             sk = b["sectionKey"]
-            g = gcol.get(_key(doc, sk)) if gcol else None
+            g = guides.get(_key(doc, sk))
             sections.append(
                 {
                     "sectionKey": sk,

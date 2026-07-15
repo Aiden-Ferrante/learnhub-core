@@ -15,7 +15,7 @@ from pathlib import Path
 from app.content.documents import fetch_latest_document
 from app.content.scope import is_ancestor_section_key
 from app.content.sections import SectionBlock
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 ELEMENTS = "elements"
 
@@ -128,18 +128,20 @@ def figure_markdown(doc_id: str, fig: dict) -> str:
     return "\n".join(lines)
 
 
-def _figures_by_section(db, doc_id: str, section_keys: set[str]) -> dict[str, list[dict]]:
+def _figures_by_section(doc_id: str, section_keys: set[str]) -> dict[str, list[dict]]:
     """CAPTIONED figures per section, in reading order. Uncaptioned pictures (covers, logos,
     decorations) are deliberately left out — precision over recall in the reading flow."""
     out: dict[str, list[dict]] = {}
-    if not section_keys or not db.has_collection(ELEMENTS):
+    if not section_keys:
         return out
-    for r in db.aql.execute(
-        "FOR e IN elements FILTER e.docId == @d AND e.type == 'figure' "
-        "AND e.sectionKey IN @ks AND e.caption != null AND e.caption != '' "
-        "SORT e.order RETURN {sectionKey: e.sectionKey, order: e.order, page: e.page, caption: e.caption}",
-        bind_vars={"d": doc_id, "ks": list(section_keys)},
-    ):
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS "sectionKey", "order", page, caption FROM elements '
+            "WHERE doc_id = %(d)s AND type = 'figure' AND section_key = ANY(%(ks)s) "
+            "AND caption IS NOT NULL AND caption <> '' ORDER BY \"order\"",
+            {"d": doc_id, "ks": list(section_keys)},
+        ).fetchall()
+    for r in rows:
         out.setdefault(r["sectionKey"], []).append(r)
     return out
 
@@ -157,9 +159,6 @@ def fetch_elements(
     (figure/table/equation/code) and ``scope`` (a ``toc:`` key — returns that section + descendants).
     Image bytes are never returned — figures carry an ``imageRef`` the ``/api/figure`` route serves."""
     try:
-        db = connect_arango()
-        if not db.has_collection(ELEMENTS):
-            return {"docId": doc_id, "elements": []}
         if doc_id is None:
             latest = fetch_latest_document()
             doc = latest.get("document")
@@ -167,13 +166,19 @@ def fetch_elements(
         if not doc_id:
             return {"docId": doc_id, "elements": []}
 
-        aql = "FOR e IN elements FILTER e.docId == @d"
+        sql = (
+            'SELECT "order", type, page, bbox, bbox_origin AS "bboxOrigin", '
+            'section_key AS "sectionKey", caption, image_ref AS "imageRef", latex, '
+            'table_markdown AS "tableMarkdown", table_data AS "tableData", code, language '
+            "FROM elements WHERE doc_id = %(d)s"
+        )
         binds: dict = {"d": doc_id}
         if el_type:
-            aql += " AND e.type == @t"
+            sql += " AND type = %(t)s"
             binds["t"] = el_type
-        aql += " SORT e.order RETURN e"
-        rows = list(db.aql.execute(aql, bind_vars=binds))
+        sql += ' ORDER BY "order"'
+        with db() as conn:
+            rows = conn.execute(sql, binds).fetchall()
 
         if scope:
             rows = [r for r in rows if r.get("sectionKey") and is_ancestor_section_key(scope, r["sectionKey"])]

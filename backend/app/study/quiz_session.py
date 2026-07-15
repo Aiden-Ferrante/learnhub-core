@@ -17,7 +17,7 @@ from threading import Lock
 from typing import Any
 
 from app.content.scope import _scope_section_keys
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import (
@@ -40,18 +40,16 @@ def _sweep(sessions: dict[str, dict[str, Any]], now: float) -> None:
         del sessions[sid]
 
 
-def _pool(db, doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _pool(doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Returns (doc_pool, scope_targets). Distractors draw from the whole doc; the quizzed
     concept is picked from the scope — which for a chapter spans ALL its sub-sections."""
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER @doc == null OR c.docId == @doc "
-            "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-            "source: c.source, sectionKey: c.sectionKey, quizQuestions: c.quizQuestions}",
-            bind_vars={"doc": doc},
-        )
-    )
-    keys = _scope_section_keys(db, doc, scope)
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
+            'quiz_questions AS "quizQuestions" FROM concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s',
+            {"doc": doc},
+        ).fetchall()
+    keys = _scope_section_keys(doc, scope)
     targets = [
         c for c in rows if (keys is None or c.get("sectionKey") in keys) and c.get("signal")
     ]
@@ -62,10 +60,7 @@ def start_quiz_session(doc: str | None, scope: str | None) -> tuple[dict[str, An
     """Build one MCQ (stem = a concept's signal, choices = concept names) and stash the
     answer server-side. ``scope`` = a sectionKey or None (whole course)."""
     try:
-        db = connect_arango()
-        if not db.has_collection(CONCEPTS):
-            return {"error": "No concepts to quiz"}, 400
-        pool, targets = _pool(db, doc, scope)
+        pool, targets = _pool(doc, scope)
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}, 500
 
@@ -82,10 +77,10 @@ def start_quiz_session(doc: str | None, scope: str | None) -> tuple[dict[str, An
     if cached and rng.random() < 0.75:
         question = servable_from_cached(target, rng.choice(cached), rng)
     if question is None:
-        nn = nearest_distractor_names(db, doc, target.get("key"), target.get("name"))
+        nn = nearest_distractor_names(doc, target.get("key"), target.get("name"))
         question = build_concept_question(target, pool, rng, distractor_names=nn)
     if any(not (t.get("quizQuestions")) for t in targets):
-        ensure_questions_async(doc, _scope_section_keys(db, doc, scope))
+        ensure_questions_async(doc, _scope_section_keys(doc, scope))
     if not question:
         return {"error": "Could not build a question"}, 400
 
@@ -141,9 +136,8 @@ def _quiz_job_running(doc: str | None, scope: str | None) -> bool:
 def quiz_prepare_status(doc: str | None, scope: str | None) -> dict[str, Any]:
     """How many of a scope's concepts have LLM quiz questions authored yet (+ running flag,
     covering both the inline backfill thread and a ledgered queue job)."""
-    db = connect_arango()
-    keys = _scope_section_keys(db, doc, scope)
-    status = scope_question_status(db, doc, keys)
+    keys = _scope_section_keys(doc, scope)
+    status = scope_question_status(doc, keys)
     status["running"] = bool(status.get("running")) or _quiz_job_running(doc, scope)
     return status
 
@@ -154,9 +148,8 @@ def prepare_quizzes(doc: str | None, scope: str) -> dict[str, Any]:
     thread. Returns current status."""
     from app.platform.jobs import enqueue_build
 
-    db = connect_arango()
     enqueue_build(doc, scope, kind="quizzes")
-    keys = _scope_section_keys(db, doc, scope)
-    status = scope_question_status(db, doc, keys)
+    keys = _scope_section_keys(doc, scope)
+    status = scope_question_status(doc, keys)
     status["running"] = True
     return status

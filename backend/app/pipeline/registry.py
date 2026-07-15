@@ -25,20 +25,20 @@ def _latest_doc_id() -> str | None:
 
 
 def _run_quizzes(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    keys = sorted(_scope_section_keys(db, job["docId"], job["scope"]) or {job["scope"]})
-    return author_scope_sync(db, job["docId"], keys, on_progress=ctx.progress)
+    keys = sorted(_scope_section_keys(job["docId"], job["scope"]) or {job["scope"]})
+    return author_scope_sync(job["docId"], keys, on_progress=ctx.progress)
 
 
 def _run_guides(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return author_guides_sync(db, job["docId"], job["scope"], on_progress=ctx.progress)
+    return author_guides_sync(job["docId"], job["scope"], on_progress=ctx.progress)
 
 
 def _run_skeleton(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return refresh_skeleton(db, job["docId"], job["scope"])
+    return refresh_skeleton(job["docId"], job["scope"])
 
 
 def _run_orient(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return refresh_orient(db, job["docId"], job["scope"])
+    return refresh_orient(job["docId"], job["scope"])
 
 
 def install() -> None:

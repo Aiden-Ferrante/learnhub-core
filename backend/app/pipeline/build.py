@@ -23,26 +23,25 @@ from app.content.store import fetch_section_content
 from app.extraction.concept_store import concept_count
 from app.extraction.concepts_extract import extract_concepts_document
 from app.extraction.deep_chapter import generate_deep_chapter_artifacts
+from app.platform.db import db
 
 
-def _scope_keys(db, doc_id: str, scope: str) -> list[str] | None:
+def _scope_keys(doc_id: str, scope: str) -> list[str] | None:
     """The section keys this scope spans, or None if the scope has no readable content."""
     content = fetch_section_content(scope, doc_id)
     keys = sorted({b.get("sectionKey") for b in content.get("blocks", []) if b.get("sectionKey")})
     return keys or None
 
 
-def _all_section_keys(db, doc_id: str) -> list[str]:
+def _all_section_keys(doc_id: str) -> list[str]:
     """Every section key stored for a document (whole-doc scope)."""
-    if not db.has_collection("section_content"):
-        return []
-    return sorted(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d AND b.sectionKey != null "
-            "RETURN DISTINCT b.sectionKey",
-            bind_vars={"d": doc_id},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT section_key FROM section_content "
+            "WHERE doc_id = %(d)s AND section_key IS NOT NULL",
+            {"d": doc_id},
+        ).fetchall()
+    return sorted(r["section_key"] for r in rows)
 
 
 def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
@@ -54,10 +53,10 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     model = job.get("model")
     force = bool(job.get("force"))
     if scope and not section_keys:
-        keys = _scope_keys(db, doc_id, scope)
+        keys = _scope_keys(doc_id, scope)
         if not keys:
             return {"error": "no readable content in this scope"}
-        if not force and concept_count(db, doc_id, keys) > 0:
+        if not force and concept_count(doc_id, keys) > 0:
             ctx.patch({"outcomes": None})
             return None
     ctx.phase = "extract"
@@ -79,7 +78,7 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     try:
         from app.search.semantic_search import ensure_index
 
-        ensure_index(db, doc_id)
+        ensure_index(doc_id)
     except Exception:  # noqa: BLE001 — indexing must never fail the extraction
         pass
     return None
@@ -92,12 +91,12 @@ def run_deep(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     doc_id, scope = job["docId"], (job.get("scope") or None)
     section_keys = job.get("sectionKeys")
     if not section_keys:
-        section_keys = _scope_keys(db, doc_id, scope) if scope else _all_section_keys(db, doc_id)
+        section_keys = _scope_keys(doc_id, scope) if scope else _all_section_keys(doc_id)
     if not section_keys:
         return {"error": "no readable content in this scope"}
     ctx.check_cancel()
     ctx.patch({"phase": "deep", "done": 0, "total": 0})
-    generate_deep_chapter_artifacts(db, doc_id, scope, section_keys)
+    generate_deep_chapter_artifacts(doc_id, scope, section_keys)
     return None
 
 

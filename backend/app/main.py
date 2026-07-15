@@ -12,7 +12,7 @@ from app.content.elements import fetch_elements, figure_path
 from app.api.admin_routes import router as admin_router
 from app.pipeline.registry import install as install_job_runners
 from app.content.arango_tree import get_toc_tree
-from app.platform.arango import set_request_db_name
+from app.platform.db import set_request_db_name
 from app.api.audiobook_routes import router as audiobook_router
 from app.api.learning_path_routes import router as learning_path_router
 from app.api.build_routes import router as build_router
@@ -177,8 +177,11 @@ def api_figure(doc: str, n: int):
 @app.get("/", response_class=HTMLResponse)
 def landing() -> str:
     shared = os.environ.get("SHARED_DIR", "/shared")
-    arango_url = os.environ.get("ARANGODB_URL", "")
-    arango_db = os.environ.get("ARANGODB_DB", "")
+    pg_dsn = os.environ.get("POSTGRES_DSN", "")
+    # Show host/dbname only — never echo the password into an HTML page.
+    pg_summary = " ".join(
+        p for p in pg_dsn.split() if p.split("=", 1)[0] in ("host", "port", "dbname")
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -194,6 +197,6 @@ def landing() -> str:
   <h1>Learn Hub backend</h1>
   <p>This is the API service; the app lives in the Next.js frontend. See <code>/health</code>.</p>
   <p>Shared volume: <code>{shared}</code></p>
-  <p>ArangoDB: <code>{arango_url}</code> / DB <code>{arango_db}</code></p>
+  <p>Postgres: <code>{pg_summary}</code></p>
 </body>
 </html>"""

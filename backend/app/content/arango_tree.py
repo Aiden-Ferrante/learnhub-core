@@ -7,10 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from arango.database import StandardDatabase
-from arango.exceptions import ArangoError
-
-from app.platform.arango import _get_db
+from app.platform.db import db
 
 # The structural-edge predicates in the relationships collection.
 HIERARCHY_PREDICATE = "has_subsection"
@@ -57,41 +54,32 @@ def _toc_sort_key(name: str) -> tuple:
     return (10_000, name or "")
 
 
-def fetch_has_subsection_edges(
-    db: StandardDatabase, doc: str | None = None
-) -> list[dict[str, str]]:
-    aql = """
-    FOR edge IN relationships
-      FILTER edge.type == @pred
-      FILTER @doc == null OR @doc IN NOT_NULL(edge.docIds, [])
-      LET parent = DOCUMENT(edge._from)
-      LET child = DOCUMENT(edge._to)
-      FILTER parent != null AND child != null
-      RETURN {
-        parentKey: parent._key,
-        parentName: parent.name,
-        childKey: child._key,
-        childName: child.name
-      }
-    """
-    cursor = db.aql.execute(aql, bind_vars={"pred": HIERARCHY_PREDICATE, "doc": doc})
-    return list(cursor)
+# relationships._from / _to are stored verbatim as "entities/<key>"; join to entities
+# on the key after the slash (equivalent to Arango's DOCUMENT(edge._from)).
+_EDGE_JOIN = (
+    "relationships r "
+    "JOIN entities p ON p.key = split_part(r.from_key, '/', 2) "
+    "JOIN entities c ON c.key = split_part(r.to_key, '/', 2) "
+    "WHERE r.type = %(pred)s AND ((%(doc)s)::text IS NULL OR r.doc_ids ? (%(doc)s)::text)"
+)
 
 
-def fetch_section_mentions_by_section(
-    db: StandardDatabase, doc: str | None = None
-) -> dict[str, list[str]]:
+def fetch_has_subsection_edges(doc: str | None = None) -> list[dict[str, str]]:
+    with db() as conn:
+        return conn.execute(
+            'SELECT p.key AS "parentKey", p.name AS "parentName", '
+            'c.key AS "childKey", c.name AS "childName" FROM ' + _EDGE_JOIN,
+            {"pred": HIERARCHY_PREDICATE, "doc": doc},
+        ).fetchall()
+
+
+def fetch_section_mentions_by_section(doc: str | None = None) -> dict[str, list[str]]:
     """section entity name -> sorted unique mentioned entity names."""
-    aql = """
-    FOR edge IN relationships
-      FILTER edge.type == @pred
-      FILTER @doc == null OR @doc IN NOT_NULL(edge.docIds, [])
-      LET sec = DOCUMENT(edge._from)
-      LET ent = DOCUMENT(edge._to)
-      FILTER sec != null AND ent != null
-      RETURN { sectionName: sec.name, entityName: ent.name }
-    """
-    cursor = db.aql.execute(aql, bind_vars={"pred": MENTIONS_PREDICATE, "doc": doc})
+    with db() as conn:
+        cursor = conn.execute(
+            'SELECT p.name AS "sectionName", c.name AS "entityName" FROM ' + _EDGE_JOIN,
+            {"pred": MENTIONS_PREDICATE, "doc": doc},
+        ).fetchall()
     by_section: dict[str, set[str]] = {}
     for row in cursor:
         sec = (row.get("sectionName") or "").strip()
@@ -102,19 +90,18 @@ def fetch_section_mentions_by_section(
     return {k: sorted(v, key=str.casefold) for k, v in by_section.items()}
 
 
-def _resolve_section_doc_id(db: StandardDatabase) -> str | None:
-    """``_key`` of the most recently ingested document (section_content scope).
+def _resolve_section_doc_id() -> str | None:
+    """``key`` of the most recently ingested document (section_content scope).
 
-    section_content.docId is the learn-service convert-pdf UUID, a different id
+    section_content.doc_id is the learn-service convert-pdf UUID, a different id
     namespace from the frontend doc id used on KG edges — so titles are scoped to
     the latest ingested document rather than joined by the edge doc id.
     """
-    if not db.has_collection("documents"):
-        return None
-    rows = list(
-        db.aql.execute("FOR d IN documents SORT d.createdAt DESC LIMIT 1 RETURN d._key")
-    )
-    return rows[0] if rows else None
+    with db() as conn:
+        row = conn.execute(
+            "SELECT key FROM documents ORDER BY created_at DESC NULLS LAST LIMIT 1"
+        ).fetchone()
+    return row["key"] if row else None
 
 
 # Headings that are chapter labels / front-matter, not the chapter's real title.
@@ -169,9 +156,7 @@ def _chapter_titles(blocks: list[dict[str, Any]]) -> dict[str, str]:
     return titles
 
 
-def fetch_section_titles(
-    db: StandardDatabase, doc_id: str | None = None
-) -> dict[str, str]:
+def fetch_section_titles(doc_id: str | None = None) -> dict[str, str]:
     """sectionKey -> human heading, scoped to one document's section_content.
 
     Scoping to a single document stops titles from bleeding across books that share
@@ -180,26 +165,24 @@ def fetch_section_titles(
     document is used. Numbered nodes get their own heading; chapter nodes (``toc:N``),
     which the markdown keys by slug, are backfilled via ``_chapter_titles``.
     """
-    if not db.has_collection("section_content"):
-        return {}
     if doc_id is None:
-        doc_id = _resolve_section_doc_id(db)
+        doc_id = _resolve_section_doc_id()
     if not doc_id:
         return {}
 
-    aql = """
-    FOR b IN section_content
-      FILTER b.docId == @doc AND b.heading != null AND b.heading != ""
-      SORT b.order
-      RETURN { key: b.sectionKey, heading: b.heading, order: b.order }
-    """
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS key, heading, "order" FROM section_content '
+            "WHERE doc_id = %(doc)s AND heading IS NOT NULL AND heading <> '' ORDER BY \"order\"",
+            {"doc": doc_id},
+        ).fetchall()
     blocks = [
         {
             "key": row.get("key"),
             "heading": (row.get("heading") or "").strip(),
             "order": row.get("order") or 0,
         }
-        for row in db.aql.execute(aql, bind_vars={"doc": doc_id})
+        for row in rows
     ]
     blocks = [b for b in blocks if b["key"] and b["heading"]]
 
@@ -218,22 +201,18 @@ def fetch_section_titles(
     # PDF bookmark titles win over extracted headings: the text layer drops ligature
     # glyphs ("Complexity dened") and carries "Chapter N" prefixes, while the bookmark
     # outline stores the clean human title per canonical sectionKey.
-    for entry in fetch_outline_titles(db, doc_id).items():
+    for entry in fetch_outline_titles(doc_id).items():
         out[entry[0]] = entry[1]
     return out
 
 
-def fetch_outline_titles(db: StandardDatabase, doc_id: str) -> dict[str, str]:
+def fetch_outline_titles(doc_id: str) -> dict[str, str]:
     """sectionKey -> clean bookmark title from ``documents.outline`` (empty when absent)."""
-    if not db.has_collection("documents"):
-        return {}
-    rows = list(
-        db.aql.execute(
-            "FOR d IN documents FILTER d._key == @doc RETURN d.outline",
-            bind_vars={"doc": doc_id},
-        )
-    )
-    outline = rows[0] if rows and isinstance(rows[0], list) else []
+    with db() as conn:
+        row = conn.execute(
+            "SELECT outline FROM documents WHERE key = %(doc)s", {"doc": doc_id}
+        ).fetchone()
+    outline = row["outline"] if row and isinstance(row["outline"], list) else []
     out: dict[str, str] = {}
     for e in outline:
         key = (e.get("sectionKey") or "").strip()
@@ -342,16 +321,15 @@ def _count_nodes(nodes: list[TreeNode]) -> int:
     return sum(1 + _count_nodes(n.children) for n in nodes)
 
 
-def _concept_counts_by_section(db: StandardDatabase, doc_id: str) -> dict[str, int]:
+def _concept_counts_by_section(doc_id: str) -> dict[str, int]:
     """Number of extracted concepts per sectionKey for a document."""
     try:
-        if not db.has_collection("concepts"):
-            return {}
-        rows = db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d COLLECT sk = c.sectionKey "
-            "WITH COUNT INTO n RETURN {sk: sk, n: n}",
-            bind_vars={"d": doc_id},
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT section_key AS sk, count(*) AS n FROM concepts "
+                "WHERE doc_id = %(d)s GROUP BY section_key",
+                {"d": doc_id},
+            ).fetchall()
         return {r["sk"]: r["n"] for r in rows if r.get("sk")}
     except Exception:
         return {}
@@ -367,16 +345,15 @@ def _annotate_concept_counts(nodes: list[TreeNode], counts: dict[str, int]) -> i
     return total
 
 
-def _concepts_by_section(db: StandardDatabase, doc_id: str) -> dict[str, list[dict[str, Any]]]:
+def _concepts_by_section(doc_id: str) -> dict[str, list[dict[str, Any]]]:
     """sectionKey -> [{key, name, kind}] in extraction order — the syllabus's concept leaves."""
     try:
-        if not db.has_collection("concepts"):
-            return {}
-        rows = db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d SORT c.sectionKey, c.order "
-            "RETURN {sk: c.sectionKey, key: c._key, name: c.name, kind: c.kind}",
-            bind_vars={"d": doc_id},
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT section_key AS sk, key, name, kind FROM concepts "
+                'WHERE doc_id = %(d)s ORDER BY section_key, "order"',
+                {"d": doc_id},
+            ).fetchall()
         out: dict[str, list[dict[str, Any]]] = {}
         for r in rows:
             sk = r.get("sk")
@@ -479,7 +456,6 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     When ``doc`` is given it selects that document (by id); unmatched ids fall back to latest.
     """
     try:
-        db = _get_db()
         from app.content.documents import fetch_latest_document
 
         doc_obj = fetch_latest_document(doc).get("document")
@@ -490,30 +466,26 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
         # unique within a book but COLLIDE across books, so an unscoped query bleeds another
         # book's titles/mentions/counts onto this one (e.g. AI-Eng showing DDIA's chapters).
         doc_key = (doc_obj or {}).get("id")
-        mentions_by_section = fetch_section_mentions_by_section(db, doc_key)
-        titles_by_key = fetch_section_titles(db, doc_key)
-    except ArangoError as e:
-        return [], 0, str(e), 0
-    except OSError as e:
-        return [], 0, str(e), 0
-    except Exception as e:
+        mentions_by_section = fetch_section_mentions_by_section(doc_key)
+        titles_by_key = fetch_section_titles(doc_key)
+    except Exception as e:  # noqa: BLE001 — tree is best-effort; surface the error to the API
         return [], 0, str(e), 0
 
     mention_edge_count = sum(len(v) for v in mentions_by_section.values())
     if outline:
         forest_nodes = build_tree_from_outline(outline)
     else:
-        edges = fetch_has_subsection_edges(db, doc_key)
+        edges = fetch_has_subsection_edges(doc_key)
         forest_nodes = build_nested_tree(edges)
     apply_section_titles(forest_nodes, titles_by_key)
 
     # Tie concepts to the tree, then filter the syllabus to only sections that have concepts
     # (keeping their ancestors). If the doc has NO concepts yet (e.g. just converted, not
     # processed), keep the full TOC skeleton so the structure is still visible.
-    counts = _concept_counts_by_section(db, doc_key) if doc_key else {}
+    counts = _concept_counts_by_section(doc_key) if doc_key else {}
     if counts:
         _annotate_concept_counts(forest_nodes, counts)
-        _attach_concepts(forest_nodes, _concepts_by_section(db, doc_key))
+        _attach_concepts(forest_nodes, _concepts_by_section(doc_key))
     # The course outline IS the textbook's TOC: show the whole book (chapters & sections, whether
     # or not concepts are extracted yet), pruning only top-level front/back matter, and dropping
     # mis-bookmarked orphan "Part" containers so chapters read as a clean numbered list.

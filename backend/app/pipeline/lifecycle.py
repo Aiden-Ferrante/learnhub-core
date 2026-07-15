@@ -15,7 +15,7 @@ import os
 from typing import Any
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.platform.jobs import enqueue_build
 
 
@@ -46,19 +46,18 @@ def document_state(doc_id: str | None = None) -> dict[str, Any]:
     Returns ``{docId, state, studyable, concepts}`` where ``state`` is one of
     ``missing`` (no document row), ``converted`` (content persisted, no concepts yet),
     or ``extracted`` (concepts exist — studyable)."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"docId": None, "state": "missing", "studyable": False, "concepts": 0}
-    converted = db.has_collection("documents") and db.collection("documents").get(doc_id) is not None
-    if not converted:
-        return {"docId": doc_id, "state": "missing", "studyable": False, "concepts": 0}
-    concepts = 0
-    if db.has_collection("concepts"):
-        concepts = db.aql.execute(
-            "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d RETURN 1)",
-            bind_vars={"d": doc_id},
-        ).next()
+    with db() as conn:
+        converted = conn.execute(
+            "SELECT 1 FROM documents WHERE key = %(d)s", {"d": doc_id}
+        ).fetchone() is not None
+        if not converted:
+            return {"docId": doc_id, "state": "missing", "studyable": False, "concepts": 0}
+        concepts = conn.execute(
+            "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s", {"d": doc_id}
+        ).fetchone()["n"]
     state = "extracted" if concepts > 0 else "converted"
     return {
         "docId": doc_id,

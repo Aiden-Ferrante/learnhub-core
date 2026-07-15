@@ -1,25 +1,11 @@
-import { Database } from 'arangojs'
+import { PoolClient } from 'pg'
+import { withSchema } from '@/lib/pg'
 import { getUserDbName } from '@/lib/user-db'
 
-/** Connect to the session user's data database (creating collections lazily). */
-export async function getUserDataDb(): Promise<Database> {
-  const dbName = await getUserDbName()
-  return new Database({
-    url: process.env.ARANGODB_URL || 'http://localhost:8529',
-    databaseName: dbName,
-    auth: {
-      username: process.env.ARANGODB_USER || 'root',
-      password: process.env.ARANGODB_PASSWORD || '',
-    },
-  })
-}
-
-export async function ensureCollection(db: Database, name: string): Promise<void> {
-  const col = db.collection(name)
-  if (!(await col.exists())) {
-    await col.create().catch(async (err) => {
-      // Tolerate races where a parallel request created it first.
-      if (!(await col.exists())) throw err
-    })
-  }
+/** Run a query callback against the session user's tenant schema (was: connect to
+ * the user's Arango data database). The client's search_path is pinned to the
+ * user's schema for the duration of `fn`. */
+export async function withUserData<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const schema = await getUserDbName()
+  return withSchema(schema, fn)
 }

@@ -23,7 +23,9 @@ from dataclasses import dataclass
 from app.content.sections import _clean_heading_markup
 from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 from app.content.arango_tree import get_toc_tree
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 
 ENTITIES = "entities"
 RELATIONSHIPS = "relationships"
@@ -135,14 +137,13 @@ def edge_key(from_key: str, predicate: str, to_key: str) -> str:
 # ArangoDB structural-edge writes (python-arango UPSERT)
 # --------------------------------------------------------------------------- #
 
-def ensure_kg_collections(db) -> None:
-    if not db.has_collection(ENTITIES):
-        db.create_collection(ENTITIES)
-    if not db.has_collection(RELATIONSHIPS):
-        db.create_collection(RELATIONSHIPS, edge=True)
+_UNION_DOCIDS = (
+    " DO UPDATE SET doc_ids = (SELECT jsonb_agg(DISTINCT e) FROM jsonb_array_elements("
+    "COALESCE({tbl}.doc_ids, '[]'::jsonb) || EXCLUDED.doc_ids) e)"
+)
 
 
-def upsert_entities(db, names: list[str], doc_id: str, batch: int = 1000) -> None:
+def upsert_entities(names: list[str], doc_id: str, batch: int = 1000) -> None:
     seen: set[str] = set()
     items: list[dict] = []
     for n in names:
@@ -150,29 +151,27 @@ def upsert_entities(db, names: list[str], doc_id: str, batch: int = 1000) -> Non
         if k in seen:
             continue
         seen.add(k)
-        items.append({"_key": k, "name": n})
-    doc_ids = [doc_id] if doc_id else []
-    for i in range(0, len(items), batch):
-        db.aql.execute(
-            """
-            FOR item IN @batch
-              UPSERT { _key: item._key }
-              INSERT MERGE(item, { docIds: @docIds })
-              UPDATE { docIds: UNION_DISTINCT(NOT_NULL(OLD.docIds, []), @docIds) }
-              IN entities
-            """,
-            bind_vars={"batch": items[i : i + batch], "docIds": doc_ids},
+        items.append({"key": k, "name": n})
+    if not items:
+        return
+    doc_ids = Json([doc_id] if doc_id else [])
+    with db() as conn:
+        conn.cursor().executemany(
+            "INSERT INTO entities (key, name, doc_ids) VALUES (%(key)s, %(name)s, %(doc_ids)s) "
+            "ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name,"
+            + _UNION_DOCIDS.format(tbl="entities").replace(" DO UPDATE SET doc_ids", " doc_ids"),
+            [{"key": it["key"], "name": it["name"], "doc_ids": doc_ids} for it in items],
         )
 
 
-def upsert_structural_edges(db, triples: list[ExtractedTriple], doc_id: str, batch: int = 1000) -> None:
+def upsert_structural_edges(triples: list[ExtractedTriple], doc_id: str, batch: int = 1000) -> None:
     """has_subsection / section_mentions edges (docIds provenance only). Ensures endpoints exist."""
     names: set[str] = set()
     for t in triples:
         names.add(t.subject)
         names.add(t.object)
     if names:
-        upsert_entities(db, list(names), doc_id, batch)
+        upsert_entities(list(names), doc_id, batch)
     seen: set[str] = set()
     edges: list[dict] = []
     for t in triples:
@@ -181,18 +180,16 @@ def upsert_structural_edges(db, triples: list[ExtractedTriple], doc_id: str, bat
         if ek in seen:
             continue
         seen.add(ek)
-        edges.append({"_key": ek, "_from": f"entities/{fk}", "_to": f"entities/{tk}", "type": t.predicate})
-    doc_ids = [doc_id] if doc_id else []
-    for i in range(0, len(edges), batch):
-        db.aql.execute(
-            """
-            FOR item IN @batch
-              UPSERT { _key: item._key }
-              INSERT MERGE(item, { docIds: @docIds })
-              UPDATE { docIds: UNION_DISTINCT(NOT_NULL(OLD.docIds, []), @docIds) }
-              IN relationships
-            """,
-            bind_vars={"batch": edges[i : i + batch], "docIds": doc_ids},
+        edges.append({"key": ek, "from_key": f"entities/{fk}", "to_key": f"entities/{tk}", "type": t.predicate})
+    if not edges:
+        return
+    doc_ids = Json([doc_id] if doc_id else [])
+    with db() as conn:
+        conn.cursor().executemany(
+            "INSERT INTO relationships (key, from_key, to_key, type, doc_ids) "
+            "VALUES (%(key)s, %(from_key)s, %(to_key)s, %(type)s, %(doc_ids)s) "
+            "ON CONFLICT (key)" + _UNION_DOCIDS.format(tbl="relationships"),
+            [{**e, "doc_ids": doc_ids} for e in edges],
         )
 
 
@@ -201,24 +198,24 @@ def upsert_structural_edges(db, triples: list[ExtractedTriple], doc_id: str, bat
 # --------------------------------------------------------------------------- #
 
 def _load_section_blocks(
-    db,
     doc_id: str,
     section_keys: list[str] | None = None,
     scope: str | None = None,
     skipped_out: list[dict] | None = None,
 ) -> list[SectionExtractInput]:
-    rows = list(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-            bind_vars={"d": doc_id},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS "sectionKey", "order", heading, level, markdown, '
+            'page_start AS "pageStart", page_end AS "pageEnd" '
+            'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+            {"d": doc_id},
+        ).fetchall()
     if scope:
-        okeys = _scope_keys_from_outline(db, doc_id, scope)
+        okeys = _scope_keys_from_outline(doc_id, scope)
         if okeys is not None:
             rows = [r for r in rows if r.get("sectionKey") in okeys]
         else:
-            rows = _blocks_in_scope(rows, scope, _section_level_fn(db, doc_id))
+            rows = _blocks_in_scope(rows, scope, _section_level_fn(doc_id))
     wanted = set(section_keys) if section_keys else None
     out: list[SectionExtractInput] = []
     for r in rows:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.extraction.reading_guide import fetch_reading_guide, guide_status
 
 router = APIRouter()
@@ -26,8 +26,7 @@ def api_reading_guide_prepare_status(
 ) -> JSONResponse:
     """How many of a chapter's sections have authored guidance yet (+ running flag)."""
     try:
-        db = connect_arango()
-        return JSONResponse(guide_status(db, doc, scope))
+        return JSONResponse(guide_status(doc, scope))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -43,9 +42,8 @@ def api_reading_guide_prepare(body: dict = Body(default=None)) -> JSONResponse:
     try:
         from app.platform.jobs import enqueue_build
 
-        db = connect_arango()
         enqueue_build(doc, scope, kind="guides")
-        status = guide_status(db, doc, scope)
+        status = guide_status(doc, scope)
         status["running"] = True
         return JSONResponse(status)
     except Exception as exc:  # noqa: BLE001

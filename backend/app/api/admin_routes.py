@@ -16,9 +16,10 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
+from psycopg.types.json import Json
 
 from app.content.store import fetch_outline
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 router = APIRouter()
 
@@ -34,23 +35,20 @@ def api_list_documents() -> JSONResponse:
     """List the processed courses (one per converted document). Returns the learnDocId each
     study/concept endpoint expects as ``doc``."""
     try:
-        db = connect_arango()
-        if not db.has_collection(DOCUMENTS):
-            return JSONResponse({"documents": []})
-        rows = list(
-            db.aql.execute(
-                "FOR d IN documents SORT d.createdAt DESC RETURN {"
-                "docId: d._key, title: d.title, sourceFilename: d.sourceFilename, "
-                "pageCount: d.pageCount, sectionCount: d.sectionCount, createdAt: d.createdAt}"
-            )
-        )
-        # Concept counts per doc, so the MCP can show which courses are extracted.
-        counts = {
-            r["docId"]: r["n"]
-            for r in db.aql.execute(
-                "FOR c IN concepts COLLECT d = c.docId WITH COUNT INTO n RETURN {docId: d, n: n}"
-            )
-        } if db.has_collection(CONCEPTS) else {}
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT key AS "docId", title, source_filename AS "sourceFilename", '
+                'page_count AS "pageCount", section_count AS "sectionCount", '
+                '(extract(epoch from created_at) * 1000)::bigint AS "createdAt" '
+                "FROM documents ORDER BY created_at DESC NULLS LAST"
+            ).fetchall()
+            # Concept counts per doc, so the MCP can show which courses are extracted.
+            counts = {
+                r["docId"]: r["n"]
+                for r in conn.execute(
+                    'SELECT doc_id AS "docId", count(*) AS n FROM concepts GROUP BY doc_id'
+                ).fetchall()
+            }
         for r in rows:
             r["conceptCount"] = counts.get(r["docId"], 0)
         return JSONResponse({"documents": rows})
@@ -121,16 +119,14 @@ def api_chapter(
         later = [e["page"] for e in tops if e["page"] > start]
         end = min(later) if later else 10**9
 
-        db = connect_arango()
-        blocks = list(
-            db.aql.execute(
-                f"FOR b IN {SECTION_CONTENT} FILTER b.docId == @d AND b.pageStart != null "
-                "AND b.pageStart >= @s AND b.pageStart < @e SORT b.pageStart ASC, b.order ASC "
-                "RETURN {markdown: b.markdown, sectionKey: b.sectionKey, heading: b.heading, "
-                "pageStart: b.pageStart, pageEnd: b.pageEnd}",
-                bind_vars={"d": resolved_doc, "s": start, "e": end},
-            )
-        )
+        with db() as conn:
+            blocks = conn.execute(
+                'SELECT markdown, section_key AS "sectionKey", heading, '
+                'page_start AS "pageStart", page_end AS "pageEnd" '
+                f"FROM {SECTION_CONTENT} WHERE doc_id = %(d)s AND page_start IS NOT NULL "
+                'AND page_start >= %(s)s AND page_start < %(e)s ORDER BY page_start ASC, "order" ASC',
+                {"d": resolved_doc, "s": start, "e": end},
+            ).fetchall()
         markdown = "\n\n".join(b.get("markdown") or "" for b in blocks if b.get("markdown")).strip()
         truncated = False
         if max_chars and len(markdown) > max_chars:
@@ -189,21 +185,14 @@ def api_search(
     if not terms:
         return JSONResponse({"query": q, "matches": []})
     try:
-        db = connect_arango()
-        blocks = list(
-            db.aql.execute(
-                f"FOR b IN {SECTION_CONTENT} FILTER b.docId == @d AND b.markdown != null "
-                "RETURN {sectionKey: b.sectionKey, heading: b.heading, markdown: b.markdown, "
-                "pageStart: b.pageStart, pageEnd: b.pageEnd}",
-                bind_vars={"d": doc} if doc else {"d": None},
-            )
-            if doc
-            else db.aql.execute(
-                f"FOR b IN {SECTION_CONTENT} FILTER b.markdown != null "
-                "RETURN {sectionKey: b.sectionKey, heading: b.heading, markdown: b.markdown, "
-                "pageStart: b.pageStart, pageEnd: b.pageEnd}"
-            )
-        )
+        with db() as conn:
+            blocks = conn.execute(
+                'SELECT section_key AS "sectionKey", heading, markdown, '
+                'page_start AS "pageStart", page_end AS "pageEnd" '
+                f"FROM {SECTION_CONTENT} WHERE markdown IS NOT NULL "
+                "AND (%(d)s::text IS NULL OR doc_id = %(d)s)",
+                {"d": doc},
+            ).fetchall()
         scored = []
         for b in blocks:
             md = b.get("markdown") or ""
@@ -246,12 +235,18 @@ def api_update_concept(key: str, body: dict = Body(...)) -> JSONResponse:
         return JSONResponse(
             {"error": f"no editable fields; allowed: {sorted(_EDITABLE)}"}, status_code=400
         )
+    # "questions" is a jsonb column; the rest are plain text.
+    sets, params = [], {"key": key}
+    for f, v in patch.items():
+        sets.append(f'"{f}" = %({f})s')
+        params[f] = Json(v) if f == "questions" else v
     try:
-        db = connect_arango()
-        col = db.collection(CONCEPTS)
-        if not col.has(key):
+        with db() as conn:
+            row = conn.execute(
+                f"UPDATE {CONCEPTS} SET {', '.join(sets)} WHERE key = %(key)s RETURNING key", params
+            ).fetchone()
+        if row is None:
             return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
-        col.update({"_key": key, **patch})
         return JSONResponse({"updated": key, "fields": sorted(patch)})
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
@@ -263,21 +258,18 @@ def api_delete_concept(key: str) -> JSONResponse:
     section/document content is untouched — re-extracting the section will re-create
     the concept if the model still finds it."""
     try:
-        db = connect_arango()
-        col = db.collection(CONCEPTS)
-        row = col.get(key)
-        if row is None:
-            return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
-        removed: dict[str, Any] = {"concept": row.get("name")}
-        if db.has_collection("concept_reviews"):
-            removed["reviews"] = list(
-                db.aql.execute(
-                    "FOR r IN concept_reviews FILTER r.conceptKey == @k "
-                    "REMOVE r IN concept_reviews COLLECT WITH COUNT INTO n RETURN n",
-                    bind_vars={"k": key},
-                )
-            )[0]
-        col.delete(key)
+        with db() as conn:
+            row = conn.execute(
+                f"SELECT name FROM {CONCEPTS} WHERE key = %(k)s", {"k": key}
+            ).fetchone()
+            if row is None:
+                return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
+            removed: dict[str, Any] = {"concept": row.get("name")}
+            # Review schedule is one row per concept, keyed by the concept key.
+            removed["reviews"] = conn.execute(
+                "DELETE FROM concept_reviews WHERE key = %(k)s", {"k": key}
+            ).rowcount
+            conn.execute(f"DELETE FROM {CONCEPTS} WHERE key = %(k)s", {"k": key})
         return JSONResponse({"deleted": key, **removed})
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)
@@ -287,21 +279,20 @@ def api_delete_concept(key: str) -> JSONResponse:
 # deliberately NOT touched: they live in the frontend doc-id namespace (docIds arrays) and
 # belong to the Upload/KG tabs' clear flow, not the learn store.
 _DOC_CASCADE: tuple[tuple[str, str], ...] = (
-    ("section_content", "docId"),
-    ("page_content", "docId"),
-    ("elements", "docId"),
-    ("content_vectors", "docId"),
-    ("concepts", "docId"),
-    ("propositions", "docId"),
-    ("concept_reviews", "docId"),
+    ("section_content", "doc_id"),
+    ("page_content", "doc_id"),
+    ("elements", "doc_id"),
+    ("content_vectors", "doc_id"),
+    ("concepts", "doc_id"),
+    ("concept_reviews", "doc_id"),
     ("study_events", "doc"),
-    ("chapter_builds", "docId"),
-    ("chapter_skeletons", "docId"),
-    ("chapter_orient", "docId"),
-    ("chapter_progress", "docId"),
-    ("deep_chapter_briefing", "docId"),
-    ("reading_guides", "docId"),
-    ("section_augment", "docId"),
+    ("chapter_builds", "doc_id"),
+    ("chapter_skeletons", "doc_id"),
+    ("chapter_orient", "doc_id"),
+    ("chapter_progress", "doc_id"),
+    ("deep_chapter_briefing", "doc_id"),
+    ("reading_guides", "doc_id"),
+    ("section_augment", "doc_id"),
 )
 
 
@@ -312,24 +303,22 @@ def api_delete_document(doc: str = Query(...)) -> JSONResponse:
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", doc or ""):
         return JSONResponse({"error": "invalid doc id"}, status_code=400)
     try:
-        db = connect_arango()
-        docs = db.collection(DOCUMENTS)
-        existed = docs.has(doc)
-        removed: dict[str, int] = {}
-        for coll, field in _DOC_CASCADE:
-            if not db.has_collection(coll):
-                continue
-            n = list(
-                db.aql.execute(
-                    f"FOR x IN {coll} FILTER x.{field} == @d REMOVE x IN {coll} "
-                    "COLLECT WITH COUNT INTO n RETURN n",
-                    bind_vars={"d": doc},
-                )
-            )[0]
-            if n:
-                removed[coll] = n
-        if existed:
-            docs.delete(doc)
+        with db() as conn:
+            existed = conn.execute(
+                f"SELECT 1 FROM {DOCUMENTS} WHERE key = %(d)s", {"d": doc}
+            ).fetchone() is not None
+            removed: dict[str, int] = {}
+            for coll, field in _DOC_CASCADE:
+                try:
+                    n = conn.execute(
+                        f"DELETE FROM {coll} WHERE {field} = %(d)s", {"d": doc}
+                    ).rowcount
+                except Exception:  # noqa: BLE001 — table may not exist in this schema
+                    continue
+                if n:
+                    removed[coll] = n
+            if existed:
+                conn.execute(f"DELETE FROM {DOCUMENTS} WHERE key = %(d)s", {"d": doc})
         shared = Path(os.environ.get("SHARED_DIR", "/shared"))
         for sub in ("ingest", "figures"):
             target = shared / sub / doc
@@ -358,12 +347,21 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
     how far concept/quiz coverage has progressed per chapter. Drives the UI status strip
     and reason-aware empty states (exists=false -> broken content link)."""
     try:
-        db = connect_arango()
-        row = db.collection(DOCUMENTS).get(doc) if db.has_collection(DOCUMENTS) else None
-        if row is None:
-            return JSONResponse(
-                {"doc": doc, "exists": False, "reason": "doc-not-found"}, status_code=404
-            )
+        with db() as conn:
+            row = conn.execute(
+                "SELECT title, outline, page_count AS \"pageCount\", "
+                'section_count AS "sectionCount" FROM documents WHERE key = %(d)s',
+                {"d": doc},
+            ).fetchone()
+            if row is None:
+                return JSONResponse(
+                    {"doc": doc, "exists": False, "reason": "doc-not-found"}, status_code=404
+                )
+            concept_rows = conn.execute(
+                'SELECT section_key AS s, COALESCE(jsonb_array_length(quiz_questions), 0) AS q '
+                "FROM concepts WHERE doc_id = %(d)s",
+                {"d": doc},
+            ).fetchall()
         outline = row.get("outline") or []
         top = [e for e in outline if (e.get("listDepth") or 0) == 0]
         # Numbered chapters are the study surface; front/back matter (Title Page, Index…)
@@ -373,17 +371,6 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
         chapters = numbered or top
         chapter_keys = {e.get("sectionKey") for e in chapters if e.get("sectionKey")}
 
-        concept_rows = (
-            list(
-                db.aql.execute(
-                    "FOR c IN concepts FILTER c.docId == @d "
-                    "RETURN {s: c.sectionKey, q: LENGTH(c.quizQuestions || [])}",
-                    bind_vars={"d": doc},
-                )
-            )
-            if db.has_collection(CONCEPTS)
-            else []
-        )
         with_concepts: set[str] = set()
         with_quizzes: set[str] = set()
         for c in concept_rows:
@@ -419,34 +406,22 @@ def api_study_debt(days: int = Query(7)) -> JSONResponse:
     import time as _time
 
     try:
-        db = connect_arango()
-        titles = (
-            {
-                r["k"]: r["t"]
-                for r in db.aql.execute(
-                    "FOR d IN documents RETURN {k: d._key, t: d.title}"
-                )
-            }
-            if db.has_collection(DOCUMENTS)
-            else {}
-        )
         now = int(_time.time())
         horizon = now + max(1, days) * 86400
-        rows = (
-            list(
-                db.aql.execute(
-                    "FOR r IN concept_reviews FILTER r.due != null "
-                    "COLLECT d = r.docId AGGREGATE "
-                    "due = SUM(r.due <= @now ? 1 : 0), "
-                    "soon = SUM(r.due > @now && r.due <= @hz ? 1 : 0), "
-                    "tracked = SUM(1) "
-                    "RETURN {d, due, soon, tracked}",
-                    bind_vars={"now": now, "hz": horizon},
-                )
-            )
-            if db.has_collection("concept_reviews")
-            else []
-        )
+        with db() as conn:
+            titles = {
+                r["k"]: r["t"]
+                for r in conn.execute('SELECT key AS k, title AS t FROM documents').fetchall()
+            }
+            rows = conn.execute(
+                "SELECT doc_id AS d, "
+                "SUM(CASE WHEN due <= to_timestamp(%(now)s) THEN 1 ELSE 0 END) AS due, "
+                "SUM(CASE WHEN due > to_timestamp(%(now)s) AND due <= to_timestamp(%(hz)s) "
+                "THEN 1 ELSE 0 END) AS soon, "
+                "COUNT(*) AS tracked "
+                "FROM concept_reviews WHERE due IS NOT NULL GROUP BY doc_id",
+                {"now": now, "hz": horizon},
+            ).fetchall()
         courses = [
             {
                 "doc": r["d"],
@@ -480,11 +455,13 @@ def api_set_concept_questions(key: str, body: dict = Body(...)) -> JSONResponse:
     if qs is not None and not isinstance(qs, list):
         return JSONResponse({"error": "questions must be a list or null"}, status_code=400)
     try:
-        db = connect_arango()
-        col = db.collection(CONCEPTS)
-        if not col.has(key):
+        with db() as conn:
+            row = conn.execute(
+                f"UPDATE {CONCEPTS} SET quiz_questions = %(q)s WHERE key = %(k)s RETURNING key",
+                {"q": Json(qs) if qs else None, "k": key},
+            ).fetchone()
+        if row is None:
             return JSONResponse({"error": f"concept {key} not found"}, status_code=404)
-        col.update({"_key": key, "quizQuestions": qs or None})
         return JSONResponse({"updated": key, "quizQuestions": len(qs) if qs else 0})
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

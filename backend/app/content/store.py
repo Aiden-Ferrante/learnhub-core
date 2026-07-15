@@ -14,9 +14,7 @@ this change (no heading/page side channels) keep working with page data absent.
 
 from __future__ import annotations
 
-import time
-
-from arango.database import StandardDatabase
+from psycopg.types.json import Json
 
 from app.content.documents import fetch_latest_document
 from app.content.elements import (
@@ -35,30 +33,11 @@ from app.content.outline import (
 from app.content.pages import build_page_blocks, section_page_ranges
 from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 from app.content.sections import split_markdown_sections
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 DOCUMENTS = "documents"
 SECTION_CONTENT = "section_content"
 PAGE_CONTENT = "page_content"
-
-
-def _ensure_collections(db: StandardDatabase) -> None:
-    if not db.has_collection(DOCUMENTS):
-        db.create_collection(DOCUMENTS)
-    if not db.has_collection(SECTION_CONTENT):
-        col = db.create_collection(SECTION_CONTENT)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["sectionKey"])
-    if not db.has_collection(PAGE_CONTENT):
-        col = db.create_collection(PAGE_CONTENT)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["docId", "pageNo"])
-    if not db.has_collection(ELEMENTS):
-        col = db.create_collection(ELEMENTS)
-        col.add_persistent_index(fields=["docId"])
-        col.add_persistent_index(fields=["docId", "type"])
-        col.add_persistent_index(fields=["docId", "sectionKey"])
-        col.add_persistent_index(fields=["docId", "page"])
 
 
 def persist_document(
@@ -81,9 +60,6 @@ def persist_document(
     document is stored without page provenance (backward compatible).
     """
     try:
-        db = connect_arango()
-        _ensure_collections(db)
-
         # Typed elements (retrieval layer): save figure images + swap <!-- image --> placeholders
         # BEFORE splitting, so documents.markdown AND every section block inherit the real links.
         # sectionKey is assigned after the page-ranges/keys are final (below).
@@ -126,73 +102,67 @@ def persist_document(
         page_blocks = build_page_blocks(page_list, blocks, hp, page_count) if page_list else []
         has_page_provenance = bool(page_blocks) and any(b.page_start is not None for b in blocks)
 
-        docs = db.collection(DOCUMENTS)
-        docs.insert(
-            {
-                "_key": doc_id,
-                "title": title,
-                "sourceFilename": source_filename,
-                "markdown": markdown,
-                "pageCount": page_count,
-                "charCount": len(markdown),
-                "sectionCount": len(blocks),
-                "pageBlockCount": len(page_blocks),
-                "elementCount": len(elements),
-                "hasPageProvenance": has_page_provenance,
-                "outline": outline_entries,
-                "sourceHash": source_hash,
-                "createdAt": int(time.time()),
-            },
-            overwrite=True,
-        )
-
-        sc = db.collection(SECTION_CONTENT)
-        sc.delete_match({"docId": doc_id})
-        if blocks:
-            sc.import_bulk(
-                [
-                    {
-                        "_key": f"{doc_id}__{b.order}",
-                        "docId": doc_id,
-                        "sectionKey": b.section_key,
-                        "heading": b.heading,
-                        "level": b.level,
-                        "numberKey": b.number_key,
-                        "order": b.order,
-                        "markdown": b.markdown,
-                        "pageStart": b.page_start,
-                        "pageEnd": b.page_end,
-                    }
-                    for b in blocks
-                ],
-                on_duplicate="replace",
-            )
-
-        pc = db.collection(PAGE_CONTENT)
-        pc.delete_match({"docId": doc_id})
-        if page_blocks:
-            pc.import_bulk(
-                [
-                    {
-                        "_key": f"{doc_id}__p{pb.page_no}",
-                        "docId": doc_id,
-                        "pageNo": pb.page_no,
-                        "markdown": pb.markdown,
-                        "charCount": len(pb.markdown),
-                        "sectionPath": pb.section_path,
-                        "sectionKeys": pb.section_keys,
-                        "headings": pb.headings,
-                    }
-                    for pb in page_blocks
-                ],
-                on_duplicate="replace",
-            )
-
-        el = db.collection(ELEMENTS)
-        el.delete_match({"docId": doc_id})
         element_rows = _element_rows(doc_id, elements, blocks)
-        if element_rows:
-            el.import_bulk(element_rows, on_duplicate="replace")
+        with db() as conn, conn.transaction():
+            conn.execute(
+                """
+                INSERT INTO documents (key, title, source_filename, markdown, page_count, char_count,
+                    section_count, page_block_count, element_count, has_page_provenance, outline,
+                    source_hash, created_at)
+                VALUES (%(key)s,%(title)s,%(sf)s,%(md)s,%(pc)s,%(cc)s,%(sec)s,%(pbc)s,%(ec)s,%(hpp)s,
+                    %(outline)s,%(sh)s, now())
+                ON CONFLICT (key) DO UPDATE SET
+                    title=EXCLUDED.title, source_filename=EXCLUDED.source_filename, markdown=EXCLUDED.markdown,
+                    page_count=EXCLUDED.page_count, char_count=EXCLUDED.char_count, section_count=EXCLUDED.section_count,
+                    page_block_count=EXCLUDED.page_block_count, element_count=EXCLUDED.element_count,
+                    has_page_provenance=EXCLUDED.has_page_provenance, outline=EXCLUDED.outline,
+                    source_hash=EXCLUDED.source_hash, created_at=EXCLUDED.created_at
+                """,
+                {"key": doc_id, "title": title, "sf": source_filename, "md": markdown, "pc": page_count,
+                 "cc": len(markdown), "sec": len(blocks), "pbc": len(page_blocks), "ec": len(elements),
+                 "hpp": has_page_provenance, "outline": Json(outline_entries), "sh": source_hash},
+            )
+
+            conn.execute("DELETE FROM section_content WHERE doc_id = %(d)s", {"d": doc_id})
+            if blocks:
+                conn.cursor().executemany(
+                    'INSERT INTO section_content (key, doc_id, section_key, heading, level, number_key, '
+                    '"order", markdown, page_start, page_end) VALUES (%(key)s,%(doc_id)s,%(section_key)s,'
+                    '%(heading)s,%(level)s,%(number_key)s,%(order)s,%(markdown)s,%(page_start)s,%(page_end)s)',
+                    [{"key": f"{doc_id}__{b.order}", "doc_id": doc_id, "section_key": b.section_key,
+                      "heading": b.heading, "level": b.level, "number_key": b.number_key, "order": b.order,
+                      "markdown": b.markdown, "page_start": b.page_start, "page_end": b.page_end} for b in blocks],
+                )
+
+            conn.execute("DELETE FROM page_content WHERE doc_id = %(d)s", {"d": doc_id})
+            if page_blocks:
+                conn.cursor().executemany(
+                    "INSERT INTO page_content (key, doc_id, page_no, markdown, char_count, section_path, "
+                    "section_keys, headings) VALUES (%(key)s,%(doc_id)s,%(page_no)s,%(markdown)s,"
+                    "%(char_count)s,%(section_path)s,%(section_keys)s,%(headings)s)",
+                    [{"key": f"{doc_id}__p{pb.page_no}", "doc_id": doc_id, "page_no": pb.page_no,
+                      "markdown": pb.markdown, "char_count": len(pb.markdown),
+                      "section_path": Json(pb.section_path), "section_keys": Json(pb.section_keys),
+                      "headings": Json(pb.headings)} for pb in page_blocks],
+                )
+
+            conn.execute("DELETE FROM elements WHERE doc_id = %(d)s", {"d": doc_id})
+            if element_rows:
+                conn.cursor().executemany(
+                    'INSERT INTO elements (key, doc_id, "order", type, page, bbox, bbox_origin, section_key, '
+                    'caption, image_ref, latex, table_markdown, table_data, code, language, embedding) '
+                    "VALUES (%(key)s,%(doc_id)s,%(order)s,%(type)s,%(page)s,%(bbox)s,%(bbox_origin)s,"
+                    "%(section_key)s,%(caption)s,%(image_ref)s,%(latex)s,%(table_markdown)s,%(table_data)s,"
+                    "%(code)s,%(language)s,%(embedding)s)",
+                    [{"key": e["_key"], "doc_id": doc_id, "order": e.get("order"), "type": e.get("type"),
+                      "page": e.get("page"),
+                      "bbox": Json(e["bbox"]) if e.get("bbox") is not None else None,
+                      "bbox_origin": e.get("bboxOrigin"), "section_key": e.get("sectionKey"),
+                      "caption": e.get("caption"), "image_ref": e.get("imageRef"), "latex": e.get("latex"),
+                      "table_markdown": e.get("tableMarkdown"),
+                      "table_data": Json(e["tableData"]) if e.get("tableData") is not None else None,
+                      "code": e.get("code"), "language": e.get("language"), "embedding": None} for e in element_rows],
+                )
         return doc_id
     except Exception:
         return None
@@ -202,16 +172,16 @@ def fetch_outline(doc_id: str | None = None) -> dict:
     """Just the document's stored outline (embedded PDF bookmarks → TOC entries) — WITHOUT the
     full markdown. Lets the chapter reader list chapters cheaply (it then loads one chapter)."""
     try:
-        db = connect_arango()
-        if not db.has_collection(DOCUMENTS):
-            return {"docId": doc_id, "outline": []}
-        if doc_id:
-            rows = list(
-                db.aql.execute("FOR d IN documents FILTER d._key == @k RETURN d.outline", bind_vars={"k": doc_id})
-            )
-        else:
-            rows = list(db.aql.execute("FOR d IN documents SORT d.createdAt DESC LIMIT 1 RETURN d.outline"))
-        return {"docId": doc_id, "outline": (rows[0] if rows and rows[0] else [])}
+        with db() as conn:
+            if doc_id:
+                row = conn.execute(
+                    "SELECT outline FROM documents WHERE key = %(k)s", {"k": doc_id}
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT outline FROM documents ORDER BY created_at DESC NULLS LAST LIMIT 1"
+                ).fetchone()
+        return {"docId": doc_id, "outline": (row["outline"] if row and row["outline"] else [])}
     except Exception as exc:  # noqa: BLE001
         return {"docId": doc_id, "outline": [], "error": str(exc)}
 
@@ -228,10 +198,6 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
     the reading flow.
     """
     try:
-        db = connect_arango()
-        if not db.has_collection(SECTION_CONTENT):
-            return {"sectionKey": section_key, "blocks": [], "markdown": ""}
-
         if doc_id is None:
             latest = fetch_latest_document()
             doc = latest.get("document")
@@ -239,22 +205,22 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
         if not doc_id:
             return {"sectionKey": section_key, "blocks": [], "markdown": ""}
 
-        aql = """
-        FOR b IN section_content
-          FILTER b.docId == @docId
-          SORT b.order
-          RETURN b
-        """
-        rows = list(db.aql.execute(aql, bind_vars={"docId": doc_id}))
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT key AS "_key", section_key AS "sectionKey", heading, level, "order", '
+                'markdown, page_start AS "pageStart", page_end AS "pageEnd" '
+                'FROM section_content WHERE doc_id = %(docId)s ORDER BY "order"',
+                {"docId": doc_id},
+            ).fetchall()
         # Outline-first spanning — the SAME rule extraction uses (_load_section_blocks):
         # a numbered chapter's sub-sections are usually slug-keyed, which the numeric
         # ancestor walk can't see, so chapters whose heading block isn't keyed toc:N
         # would read as EMPTY (DDIA ch.3+, AI-Eng ch.2-9). Reading-order span remains
         # the fallback. Local import avoids an arango_content <-> extract module cycle.
-        okeys = _scope_keys_from_outline(db, doc_id, section_key)
+        okeys = _scope_keys_from_outline(doc_id, section_key)
         matched = [r for r in rows if r.get("sectionKey") in okeys] if okeys else []
         if not matched:
-            matched = _blocks_in_scope(rows, section_key, _section_level_fn(db, doc_id))
+            matched = _blocks_in_scope(rows, section_key, _section_level_fn(doc_id))
         blocks = [
             {
                 "sectionKey": r.get("sectionKey"),
@@ -267,7 +233,7 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
             for r in matched
         ]
         figures_by_sk: dict[str, list[dict]] = (
-            _figures_by_section(db, doc_id, {r.get("sectionKey") for r in matched if r.get("sectionKey")})
+            _figures_by_section(doc_id, {r.get("sectionKey") for r in matched if r.get("sectionKey")})
             if include_figures
             else {}
         )
@@ -299,24 +265,21 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
 def fetch_page(page_no: int, doc_id: str | None = None) -> dict:
     """A single page's content + its section coordinate trail (page-primary read)."""
     try:
-        db = connect_arango()
-        if not db.has_collection(PAGE_CONTENT):
-            return {"page": None}
         if doc_id is None:
             latest = fetch_latest_document()
             doc = latest.get("document")
             doc_id = doc.get("id") if doc else None
         if not doc_id:
             return {"page": None}
-        rows = list(
-            db.aql.execute(
-                "FOR p IN page_content FILTER p.docId == @d AND p.pageNo == @n LIMIT 1 RETURN p",
-                bind_vars={"d": doc_id, "n": int(page_no)},
-            )
-        )
-        if not rows:
+        with db() as conn:
+            p = conn.execute(
+                'SELECT page_no AS "pageNo", markdown, section_path AS "sectionPath", '
+                'section_keys AS "sectionKeys", headings FROM page_content '
+                "WHERE doc_id = %(d)s AND page_no = %(n)s LIMIT 1",
+                {"d": doc_id, "n": int(page_no)},
+            ).fetchone()
+        if not p:
             return {"page": None}
-        p = rows[0]
         return {
             "page": {
                 "docId": doc_id,

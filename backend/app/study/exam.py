@@ -12,7 +12,7 @@ import random
 import time
 import uuid
 
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import ensure_questions_async, servable_from_cached
@@ -32,18 +32,16 @@ def _sweep(now: float) -> None:
         _EXAM.pop(k, None)
 
 
-def _doc_pool(db, doc_id: str) -> list[dict]:
-    return list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d RETURN {key: c._key, name: c.name, "
-            "kind: c.kind, signal: c.signal, source: c.source, sectionKey: c.sectionKey, "
-            "quizQuestions: c.quizQuestions}",
-            bind_vars={"d": doc_id},
-        )
-    )
+def _doc_pool(doc_id: str) -> list[dict]:
+    with db() as conn:
+        return conn.execute(
+            'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
+            'quiz_questions AS "quizQuestions" FROM concepts WHERE doc_id = %(d)s',
+            {"d": doc_id},
+        ).fetchall()
 
 
-def _exam_question(db, doc_id: str, target: dict, pool: list[dict], rng) -> dict | None:
+def _exam_question(doc_id: str, target: dict, pool: list[dict], rng) -> dict | None:
     """Best available question for an exam target without blocking: a cached LLM understanding
     question if the section was authored, else a deterministic recall MCQ with confusable
     (embedding-nearest) distractors."""
@@ -52,25 +50,22 @@ def _exam_question(db, doc_id: str, target: dict, pool: list[dict], rng) -> dict
         q = servable_from_cached(target, rng.choice(cached), rng)
         if q:
             return q
-    nn = nearest_distractor_names(db, doc_id, target.get("key"), target.get("name"))
+    nn = nearest_distractor_names(doc_id, target.get("key"), target.get("name"))
     return build_concept_question(target, pool, rng, distractor_names=nn)
 
 
-def _chapter_targets(db, doc_id: str, scope: str | None, pool: list[dict]) -> list[dict]:
-    keys = {s.section_key for s in _load_section_blocks(db, doc_id, scope=scope)}
+def _chapter_targets(doc_id: str, scope: str | None, pool: list[dict]) -> list[dict]:
+    keys = {s.section_key for s in _load_section_blocks(doc_id, scope=scope)}
     return [c for c in pool if c.get("sectionKey") in keys and is_quizzable(c)]
 
 
 def start_exam(doc_id: str | None, scope: str | None, n: int = 12) -> dict:
     """Build the exam: up to ``n`` interleaved MCQs across the chapter's concepts."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    if not db.has_collection(CONCEPTS):
-        return {"error": "No concepts to examine — process this chapter first."}
-    pool = _doc_pool(db, doc_id)
-    targets = _chapter_targets(db, doc_id, scope, pool) if scope else [c for c in pool if is_quizzable(c)]
+    pool = _doc_pool(doc_id)
+    targets = _chapter_targets(doc_id, scope, pool) if scope else [c for c in pool if is_quizzable(c)]
     if len(pool) < 4 or not targets:
         return {"error": "Not enough concepts in this chapter to build an exam — study/extract more first."}
 
@@ -79,7 +74,7 @@ def start_exam(doc_id: str | None, scope: str | None, n: int = 12) -> dict:
     chosen = targets[: max(1, min(n, len(targets)))]
     # Stays fast: a cached LLM understanding question where one exists, else a mechanical MCQ
     # with confusable distractors (no blocking generation). Backfill so future exams improve.
-    questions = [q for q in (_exam_question(db, doc_id, t, pool, rng) for t in chosen) if q]
+    questions = [q for q in (_exam_question(doc_id, t, pool, rng) for t in chosen) if q]
     ensure_questions_async(doc_id, {c.get("sectionKey") for c in chosen if c.get("sectionKey")})
     if not questions:
         return {"error": "Could not build exam questions"}

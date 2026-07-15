@@ -13,7 +13,9 @@ import re
 import time
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import Orient, Skeleton
@@ -34,7 +36,7 @@ def _norm_heading(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", "", (s or "").lower())).strip()
 
 
-def _attach_depths(db, doc_id: str, sections: list[dict]) -> list[dict]:
+def _attach_depths(doc_id: str, sections: list[dict]) -> list[dict]:
     """Tag each skeleton section with a relative ``depth`` (0 = shallowest in this scope) so the
     UI can render the TOC hierarchy with indentation instead of a flat numbered list.
 
@@ -48,8 +50,9 @@ def _attach_depths(db, doc_id: str, sections: list[dict]) -> list[dict]:
         return sections
     depth_by_title: dict[str, int] = {}
     try:
-        doc = db.collection("documents").get(doc_id)
-        for e in (doc or {}).get("outline") or []:
+        with db() as conn:
+            row = conn.execute("SELECT outline FROM documents WHERE key = %(d)s", {"d": doc_id}).fetchone()
+        for e in ((row["outline"] if row else None) or []):
             t, d = _norm_heading(e.get("title")), e.get("listDepth")
             if t and d is not None and t not in depth_by_title:
                 depth_by_title[t] = d
@@ -71,11 +74,13 @@ def _attach_depths(db, doc_id: str, sections: list[dict]) -> list[dict]:
         keys = [s.get("sectionKey") for s in sections if s.get("sectionKey")]
         levels: dict[str, int] = {}
         try:
-            for r in db.aql.execute(
-                "FOR b IN section_content FILTER b.docId == @d AND b.sectionKey IN @ks "
-                "RETURN {sk: b.sectionKey, lvl: b.level}",
-                bind_vars={"d": doc_id, "ks": keys},
-            ):
+            with db() as conn:
+                lrows = conn.execute(
+                    'SELECT section_key AS sk, level AS lvl FROM section_content '
+                    "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+                    {"d": doc_id, "ks": keys},
+                ).fetchall()
+            for r in lrows:
                 sk, lvl = r.get("sk"), r.get("lvl")
                 if sk and lvl is not None:
                     levels[sk] = min(lvl, levels.get(sk, lvl))
@@ -89,11 +94,6 @@ def _attach_depths(db, doc_id: str, sections: list[dict]) -> list[dict]:
     return sections
 
 
-def ensure_path_collections(db) -> None:
-    for name in (SKELETONS, ORIENT, PROGRESS):
-        if not db.has_collection(name):
-            col = db.create_collection(name)
-            col.add_persistent_index(fields=["docId"])
 
 
 # Bump to invalidate cached skeletons when the essence prompt changes (lazy regenerate on fetch).
@@ -118,26 +118,28 @@ def _clean(s: object) -> str:
     return re.sub(r"[*_`#]", "", str(s or "")).strip()
 
 
-def _concepts_by_section(db, doc_id: str, section_keys: list[str]) -> dict[str, list[str]]:
+def _concepts_by_section(doc_id: str, section_keys: list[str]) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     if not section_keys:
         return out
-    for r in db.aql.execute(
-        "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks SORT c.order "
-        "RETURN {sk: c.sectionKey, name: c.name}",
-        bind_vars={"d": doc_id, "ks": section_keys},
-    ):
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS sk, name FROM concepts '
+            'WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) ORDER BY "order"',
+            {"d": doc_id, "ks": section_keys},
+        ).fetchall()
+    for r in rows:
         out.setdefault(r["sk"], []).append(r["name"])
     return out
 
 
-def generate_skeleton(db, doc_id: str, scope: str | None, model: str | None = None) -> list[dict] | None:
+def generate_skeleton(doc_id: str, scope: str | None, model: str | None = None) -> list[dict] | None:
     """Build the ordered [{sectionKey, heading, essence}] for a chapter scope."""
-    sections = _load_section_blocks(db, doc_id, scope=scope)
+    sections = _load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]
-    by_sec = _concepts_by_section(db, doc_id, keys)
+    by_sec = _concepts_by_section(doc_id, keys)
 
     lines = []
     for s in sections:
@@ -164,24 +166,20 @@ def generate_skeleton(db, doc_id: str, scope: str | None, model: str | None = No
     return out
 
 
-def refresh_skeleton(db, doc_id: str, scope: str | None) -> dict:
+def refresh_skeleton(doc_id: str, scope: str | None) -> dict:
     """Generate the skeleton NOW and write the cache (the build queue's runner; also used
     by explicit ``regenerate`` requests). Returns a small receipt."""
-    ensure_path_collections(db)
-    sections = generate_skeleton(db, doc_id, scope)
+    sections = generate_skeleton(doc_id, scope)
     if not sections:
         return {"sections": 0, "error": "no sections in this scope"}
-    db.collection(SKELETONS).insert(
-        {
-            "_key": _key(doc_id, scope),
-            "docId": doc_id,
-            "scope": scope,
-            "sections": sections,
-            "promptVersion": SKELETON_PROMPT_VERSION,
-            "createdAt": int(time.time()),
-        },
-        overwrite=True,
-    )
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO chapter_skeletons (key, doc_id, scope, sections, created_at) "
+            "VALUES (%(k)s,%(d)s,%(sc)s,%(sections)s, now()) "
+            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
+            "sections=EXCLUDED.sections, created_at=EXCLUDED.created_at",
+            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections)},
+        )
     return {"sections": len(sections)}
 
 
@@ -202,27 +200,28 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
     returns ``pending: true`` with the refresh queued. ``regenerate=True`` (an explicit,
     caller-owned ask) is the one synchronous path."""
     try:
-        db = connect_arango()
         if doc_id is None:
             doc = (fetch_latest_document() or {}).get("document")
             doc_id = doc.get("id") if doc else None
         if not doc_id:
             return {"error": "no document found"}
-        ensure_path_collections(db)
         if regenerate:
-            receipt = refresh_skeleton(db, doc_id, scope)
+            receipt = refresh_skeleton(doc_id, scope)
             if receipt.get("error"):
                 return {"docId": doc_id, "scope": scope, "sections": [], "error": receipt["error"]}
-        existing = db.collection(SKELETONS).get(_key(doc_id, scope))
+        with db() as conn:
+            existing = conn.execute(
+                "SELECT sections FROM chapter_skeletons WHERE key = %(k)s", {"k": _key(doc_id, scope)}
+            ).fetchone()
         if existing and existing.get("sections"):
-            stale = existing.get("promptVersion") != SKELETON_PROMPT_VERSION
-            if stale:
-                _enqueue_refresh("skeleton", doc_id, scope)
+            # Stored rows carry no promptVersion → always treat as stale (queue a refresh).
+            stale = True
+            _enqueue_refresh("skeleton", doc_id, scope)
             return {
                 "docId": doc_id,
                 "scope": scope,
                 "stale": stale,
-                "sections": _attach_depths(db, doc_id, existing["sections"]),
+                "sections": _attach_depths(doc_id, existing["sections"]),
             }
         _enqueue_refresh("skeleton", doc_id, scope)
         return {"docId": doc_id, "scope": scope, "pending": True, "sections": []}
@@ -245,18 +244,17 @@ ORIENT_SYSTEM = (
 )
 
 
-def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None) -> dict | None:
-    sections = _load_section_blocks(db, doc_id, scope=scope)
+def generate_orient(doc_id: str, scope: str | None, model: str | None = None) -> dict | None:
+    sections = _load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks SORT c.sectionKey, c.order "
-            "RETURN {name: c.name, signal: c.signal}",
-            bind_vars={"d": doc_id, "ks": keys},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT name, signal FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+            'ORDER BY section_key, "order"',
+            {"d": doc_id, "ks": keys},
+        ).fetchall()
     if not rows:
         return {"objectives": [], "watchFor": []}
     concept_lines = "\n".join(f"- {r['name']}: {_clean(r.get('signal'))}" for r in rows[:40])
@@ -273,16 +271,20 @@ def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None
     }
 
 
-def refresh_orient(db, doc_id: str, scope: str | None) -> dict:
+def refresh_orient(doc_id: str, scope: str | None) -> dict:
     """Generate the orientation NOW and write the cache (build-queue runner)."""
-    ensure_path_collections(db)
-    data = generate_orient(db, doc_id, scope)
+    data = generate_orient(doc_id, scope)
     if data is None:
         return {"objectives": 0, "error": "no sections in this scope"}
-    db.collection(ORIENT).insert(
-        {"_key": _key(doc_id, scope), "docId": doc_id, "scope": scope, **data, "createdAt": int(time.time())},
-        overwrite=True,
-    )
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO chapter_orient (key, doc_id, scope, objectives, watch_for, created_at) "
+            "VALUES (%(k)s,%(d)s,%(sc)s,%(obj)s,%(wf)s, now()) "
+            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
+            "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, created_at=EXCLUDED.created_at",
+            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope,
+             "obj": Json(data.get("objectives")), "wf": Json(data.get("watchFor"))},
+        )
     return {"objectives": len(data.get("objectives") or []), "watchFor": len(data.get("watchFor") or [])}
 
 
@@ -290,18 +292,20 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
     """Cached chapter orientation — same serve-stale contract as fetch_skeleton: reads never
     generate; a cache miss queues the work and reports ``pending``."""
     try:
-        db = connect_arango()
         if doc_id is None:
             doc = (fetch_latest_document() or {}).get("document")
             doc_id = doc.get("id") if doc else None
         if not doc_id:
             return {"error": "no document found"}
-        ensure_path_collections(db)
         if regenerate:
-            receipt = refresh_orient(db, doc_id, scope)
+            receipt = refresh_orient(doc_id, scope)
             if receipt.get("error"):
                 return {"docId": doc_id, "scope": scope, "objectives": [], "watchFor": [], "error": receipt["error"]}
-        existing = db.collection(ORIENT).get(_key(doc_id, scope))
+        with db() as conn:
+            existing = conn.execute(
+                'SELECT objectives, watch_for AS "watchFor" FROM chapter_orient WHERE key = %(k)s',
+                {"k": _key(doc_id, scope)},
+            ).fetchone()
         if existing and (existing.get("objectives") or existing.get("watchFor")):
             return {"docId": doc_id, "scope": scope, "objectives": existing["objectives"], "watchFor": existing["watchFor"]}
         _enqueue_refresh("orient", doc_id, scope)
@@ -323,13 +327,14 @@ def _resolve_doc_id(doc_id: str | None) -> str | None:
 
 def get_chapter_progress(doc_id: str | None, scope: str | None) -> dict:
     try:
-        db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"stages": {}}
-        ensure_path_collections(db)
-        rec = db.collection(PROGRESS).get(_key(doc_id, scope))
-        return {"docId": doc_id, "scope": scope, "stages": (rec or {}).get("stages", {})}
+        with db() as conn:
+            rec = conn.execute(
+                "SELECT stages FROM chapter_progress WHERE key = %(k)s", {"k": _key(doc_id, scope)}
+            ).fetchone()
+        return {"docId": doc_id, "scope": scope, "stages": (rec or {}).get("stages") or {}}
     except Exception as exc:  # noqa: BLE001
         return {"stages": {}, "error": str(exc)}
 
@@ -337,18 +342,22 @@ def get_chapter_progress(doc_id: str | None, scope: str | None) -> dict:
 def update_stage(doc_id: str | None, scope: str | None, stage: str, data: dict) -> dict:
     """Merge one stage's progress (e.g. {done, grade, score}) into chapter_progress."""
     try:
-        db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
-        ensure_path_collections(db)
-        col = db.collection(PROGRESS)
         k = _key(doc_id, scope)
-        rec = col.get(k) or {"_key": k, "docId": doc_id, "scope": scope, "stages": {}}
-        stages = rec.get("stages", {})
-        stages[stage] = {**stages.get(stage, {}), **data, "at": int(time.time())}
-        rec["stages"] = stages
-        col.insert(rec, overwrite=True)
+        with db() as conn:
+            rec = conn.execute(
+                "SELECT stages FROM chapter_progress WHERE key = %(k)s", {"k": k}
+            ).fetchone()
+            stages = (rec or {}).get("stages") or {}
+            stages[stage] = {**stages.get(stage, {}), **data, "at": int(time.time())}
+            conn.execute(
+                "INSERT INTO chapter_progress (key, doc_id, scope, stages) "
+                "VALUES (%(k)s,%(d)s,%(sc)s,%(stages)s) "
+                "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, stages=EXCLUDED.stages",
+                {"k": k, "d": doc_id, "sc": scope, "stages": Json(stages)},
+            )
         return {"docId": doc_id, "scope": scope, "stages": stages}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}

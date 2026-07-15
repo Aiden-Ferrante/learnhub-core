@@ -17,11 +17,9 @@ import os
 import time
 from typing import Any
 
-from arango.database import StandardDatabase
-
 from app.extraction.arango_learn import content_triples_for_section, triple_id
 from app.content.arango_tree import get_toc_tree
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 EVENTS_COLLECTION = "study_events"
 
@@ -59,12 +57,6 @@ def _stability_tau(interval_days: float | None, default_tau: float) -> float:
 # The floor: append-only study events
 # --------------------------------------------------------------------------- #
 
-def _ensure_collection(db: StandardDatabase):
-    if not db.has_collection(EVENTS_COLLECTION):
-        db.create_collection(EVENTS_COLLECTION)
-    return db.collection(EVENTS_COLLECTION)
-
-
 def record_quiz_event(
     section_key: str | None,
     tid: str | None,
@@ -84,22 +76,15 @@ def record_quiz_event(
     if not section_key or not section_key.strip():
         return
     try:
-        db = connect_arango()
-        coll = _ensure_collection(db)
-        coll.insert(
-            {
-                "section_key": section_key.strip(),
-                "triple_id": tid or "",
-                "concept_key": concept_key or "",
-                "correct": bool(correct),
-                "ts": time.time(),
-                "doc": doc or None,
-                "stem": stem or None,
-                "expected": expected or None,
-                "kind": kind,
-                "confidence": confidence or None,
-            }
-        )
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO study_events (section_key, triple_id, concept_key, correct, ts, doc, "
+                "stem, expected, kind, confidence) VALUES (%(sk)s,%(tid)s,%(ck)s,%(correct)s, now(), "
+                "%(doc)s,%(stem)s,%(expected)s,%(kind)s,%(conf)s)",
+                {"sk": section_key.strip(), "tid": tid or "", "ck": concept_key or "",
+                 "correct": bool(correct), "doc": doc or None, "stem": stem or None,
+                 "expected": expected or None, "kind": kind, "conf": confidence or None},
+            )
     except Exception:
         pass
 
@@ -109,17 +94,13 @@ def compute_calibration(doc: str | None = None) -> dict[str, Any]:
     Well-calibrated = 'confident' high, 'guess' low. Surfaces overconfidence (the illusion of
     competence)."""
     try:
-        db = connect_arango()
-        if not db.has_collection(EVENTS_COLLECTION):
-            return {"buckets": [], "total": 0}
-        rows = list(
-            db.aql.execute(
-                "FOR e IN study_events FILTER (@d == null OR e.doc == @d OR e.doc == null) "
-                "AND e.confidence != null AND e.correct != null "
-                "RETURN { confidence: e.confidence, correct: e.correct }",
-                bind_vars={"d": doc},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT confidence, correct FROM study_events "
+                "WHERE (%(d)s::text IS NULL OR doc = %(d)s OR doc IS NULL) "
+                "AND confidence IS NOT NULL AND correct IS NOT NULL",
+                {"d": doc},
+            ).fetchall()
     except Exception as exc:  # noqa: BLE001
         return {"buckets": [], "total": 0, "error": str(exc)}
 
@@ -152,46 +133,28 @@ def record_engagement(
     if not section_key or not section_key.strip():
         return
     try:
-        db = connect_arango()
-        coll = _ensure_collection(db)
-        coll.insert(
-            {
-                "section_key": section_key.strip(),
-                "concept_key": concept_key or "",
-                "correct": None,
-                "ts": time.time(),
-                "doc": doc or None,
-                "kind": kind,
-            }
-        )
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO study_events (section_key, concept_key, correct, ts, doc, kind) "
+                "VALUES (%(sk)s,%(ck)s, NULL, now(), %(doc)s,%(kind)s)",
+                {"sk": section_key.strip(), "ck": concept_key or "", "doc": doc or None, "kind": kind},
+            )
     except Exception:
         pass
 
 
-def _fetch_events(
-    db: StandardDatabase, doc: str | None = None, graded_only: bool = False
-) -> list[dict[str, Any]]:
-    if not db.has_collection(EVENTS_COLLECTION):
-        return []
+def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dict[str, Any]]:
     # Untagged (legacy) events count in every doc scope. ``graded_only`` excludes passive
     # engagement (read/listen, correct == null) so they never dilute mastery accuracy.
-    aql = """
-    FOR e IN study_events
-      FILTER @doc == null OR e.doc == @doc OR e.doc == null
-      FILTER @gradedOnly == false OR e.correct != null
-      RETURN {
-        section_key: e.section_key,
-        triple_id: e.triple_id,
-        concept_key: e.concept_key,
-        correct: e.correct,
-        ts: e.ts,
-        doc: e.doc,
-        stem: e.stem,
-        expected: e.expected,
-        kind: e.kind
-      }
-    """
-    return list(db.aql.execute(aql, bind_vars={"doc": doc, "gradedOnly": graded_only}))
+    # ts is returned as epoch seconds (callers use time.gmtime / arithmetic on it).
+    with db() as conn:
+        return conn.execute(
+            "SELECT section_key, triple_id, concept_key, correct, "
+            "extract(epoch from ts)::float8 AS ts, doc, stem, expected, kind FROM study_events "
+            "WHERE (%(doc)s::text IS NULL OR doc = %(doc)s OR doc IS NULL) "
+            "AND (%(gradedOnly)s = false OR correct IS NOT NULL)",
+            {"doc": doc, "gradedOnly": graded_only},
+        ).fetchall()
 
 
 def compute_activity(doc: str | None = None) -> dict[str, Any]:
@@ -201,8 +164,7 @@ def compute_activity(doc: str | None = None) -> dict[str, Any]:
     are omitted; the frontend lays out the full calendar grid).
     """
     try:
-        db = connect_arango()
-        events = _fetch_events(db, doc)  # ALL engagement (read/listen too), not just graded
+        events = _fetch_events(doc)  # ALL engagement (read/listen too), not just graded
     except Exception as exc:  # noqa: BLE001 — surface as a soft error, never 500
         return {"days": [], "total": 0, "max": 0, "error": str(exc), "byKind": {}}
 
@@ -229,16 +191,12 @@ def compute_forecast(doc: str | None = None, days: int = 7) -> dict[str, Any]:
     """Forgetting forecast from the spaced-review schedule: how many concepts are due now and
     how many fall due over the next ``days`` — so the dashboard can say 'N fade by Friday'."""
     try:
-        db = connect_arango()
-        if not db.has_collection("concept_reviews"):
-            return {"dueNow": 0, "horizon": [], "tracked": 0}
-        rows = list(
-            db.aql.execute(
-                "FOR r IN concept_reviews FILTER @doc == null OR r.docId == @doc "
-                "RETURN { due: r.due }",
-                bind_vars={"doc": doc},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT extract(epoch from due)::float8 AS due FROM concept_reviews "
+                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
+                {"doc": doc},
+            ).fetchall()
     except Exception as exc:  # noqa: BLE001
         return {"dueNow": 0, "horizon": [], "tracked": 0, "error": str(exc)}
 
@@ -370,44 +328,40 @@ def _weighted_average(pairs: list[tuple[float, float]]) -> float:
 # Concept coverage (replaces triple coverage for concept-extracted docs)
 # --------------------------------------------------------------------------- #
 
-def _doc_has_concepts(db: StandardDatabase, doc: str | None) -> bool:
+def _doc_has_concepts(doc: str | None) -> bool:
     try:
-        if not db.has_collection("concepts"):
-            return False
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER @doc == null OR c.docId == @doc LIMIT 1 RETURN 1",
-                bind_vars={"doc": doc},
-            )
-        )
-        return bool(rows)
+        with db() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s LIMIT 1",
+                {"doc": doc},
+            ).fetchone()
+        return row is not None
     except Exception:
         return False
 
 
-def _section_concept_ids(db: StandardDatabase, section_key: str, doc: str | None) -> set[str]:
-    """The concept _keys taught in a section — the per-concept coverage denominator."""
+def _section_concept_ids(section_key: str, doc: str | None) -> set[str]:
+    """The concept keys taught in a section — the per-concept coverage denominator."""
     try:
-        rows = db.aql.execute(
-            "FOR c IN concepts FILTER c.sectionKey == @s AND (@doc == null OR c.docId == @doc) "
-            "RETURN c._key",
-            bind_vars={"s": section_key, "doc": doc},
-        )
-        return set(rows)
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT key FROM concepts WHERE section_key = %(s)s "
+                "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
+                {"s": section_key, "doc": doc},
+            ).fetchall()
+        return {r["key"] for r in rows}
     except Exception:
         return set()
 
 
-def _concept_intervals(db: StandardDatabase, doc: str | None) -> dict[str, float]:
-    """concept _key → current SM-2 interval in days, for retrievability-based decay."""
+def _concept_intervals(doc: str | None) -> dict[str, float]:
+    """concept key → current SM-2 interval in days, for retrievability-based decay."""
     try:
-        if not db.has_collection("concept_reviews"):
-            return {}
-        rows = db.aql.execute(
-            "FOR r IN concept_reviews FILTER @doc == null OR r.docId == @doc "
-            "RETURN {key: r._key, interval: r.interval}",
-            bind_vars={"doc": doc},
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT key, interval FROM concept_reviews WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
+                {"doc": doc},
+            ).fetchall()
         return {r["key"]: float(r.get("interval") or 0.0) for r in rows}
     except Exception:
         return {}
@@ -436,8 +390,7 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
     labels, titles, children = collect_sections(forest)
     leaf_keys = [k for k in labels if not children.get(k)]
 
-    db = connect_arango()
-    events = _fetch_events(db, doc, graded_only=True)
+    events = _fetch_events(doc, graded_only=True)
     events_by_section: dict[str, list[dict[str, Any]]] = {}
     for e in events:
         sk = (e.get("section_key") or "").strip()
@@ -445,13 +398,13 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
             events_by_section.setdefault(sk, []).append(e)
 
     # Concept docs cover sections by concepts; legacy KG docs by content triples.
-    use_concepts = _doc_has_concepts(db, doc)
-    intervals = _concept_intervals(db, doc) if use_concepts else {}
+    use_concepts = _doc_has_concepts(doc)
+    intervals = _concept_intervals(doc) if use_concepts else {}
     leaf_stats: dict[str, dict[str, Any]] = {}
     weights: dict[str, int] = {}
     for k in leaf_keys:
         if use_concepts:
-            content_ids = _section_concept_ids(db, k, doc)
+            content_ids = _section_concept_ids(k, doc)
             id_field = "concept_key"
             tau_eff = _section_tau(content_ids, intervals, tau)
         else:
@@ -518,25 +471,20 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
     now = time.time() if now is None else now
     alpha, beta, tau = _alpha(), _beta(), _tau_days()
     try:
-        db = connect_arango()
-        if not db.has_collection("concepts"):
-            return {"byConcept": {}, "overall": 0.0}
-        concepts = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER @doc == null OR c.docId == @doc "
-                "RETURN {key: c._key, name: c.name, sectionKey: c.sectionKey}",
-                bind_vars={"doc": doc},
-            )
-        )
-        events = _fetch_events(db, doc, graded_only=True)
-        reviews: dict[str, dict[str, Any]] = {}
-        if db.has_collection("concept_reviews"):
-            for r in db.aql.execute(
-                "FOR r IN concept_reviews FILTER @doc == null OR r.docId == @doc "
-                "RETURN {key: r._key, due: r.due, state: r.state, interval: r.interval}",
-                bind_vars={"doc": doc},
-            ):
+        with db() as conn:
+            concepts = conn.execute(
+                'SELECT key, name, section_key AS "sectionKey" FROM concepts '
+                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
+                {"doc": doc},
+            ).fetchall()
+            reviews: dict[str, dict[str, Any]] = {}
+            for r in conn.execute(
+                'SELECT key, extract(epoch from due)::float8 AS due, state, interval FROM concept_reviews '
+                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
+                {"doc": doc},
+            ).fetchall():
                 reviews[r["key"]] = r
+        events = _fetch_events(doc, graded_only=True)
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
         return {"byConcept": {}, "overall": 0.0, "error": str(exc)}
 

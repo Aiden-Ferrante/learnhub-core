@@ -9,7 +9,9 @@ import hashlib
 import os
 from typing import Any
 
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.extraction.concept_store import fetch_section_concepts
 from app.platform.llm import _ollama_model, ollama_structured_completion
 from app.platform.llm_schemas import Augment
@@ -29,12 +31,6 @@ def _augment_model() -> str:
     return os.environ.get("LEARN_AUGMENT_MODEL") or _ollama_model()
 
 
-def _ensure(db) -> None:
-    if not db.has_collection(AUGMENT):
-        col = db.create_collection(AUGMENT)
-        col.add_persistent_index(fields=["docId"])
-
-
 def _akey(doc_id: str, section_key: str) -> str:
     return hashlib.sha256(f"{doc_id}|{section_key}".encode()).hexdigest()[:16]
 
@@ -49,9 +45,6 @@ def _keyless(concepts: list[dict[str, Any]]) -> dict[str, Any]:
 def section_augment(
     doc_id: str | None, section_key: str, model: str | None = None, force: bool = False
 ) -> dict[str, Any]:
-    db = connect_arango()
-    _ensure(db)
-
     sec = fetch_section_concepts(section_key, doc_id)
     concepts = sec.get("concepts", [])
     resolved_doc = sec.get("docId") or doc_id
@@ -60,11 +53,14 @@ def section_augment(
 
     key = _akey(resolved_doc, section_key)
     if not force:
-        existing = db.collection(AUGMENT).get(key)
+        with db() as conn:
+            existing = conn.execute(
+                "SELECT objectives, recap FROM section_augment WHERE key = %(k)s", {"k": key}
+            ).fetchone()
         if existing:
             return {
-                "objectives": existing.get("objectives", []),
-                "recap": existing.get("recap", ""),
+                "objectives": existing.get("objectives") or [],
+                "recap": existing.get("recap") or "",
                 "cached": True,
             }
 
@@ -94,10 +90,15 @@ def section_augment(
         }
 
     try:
-        db.collection(AUGMENT).insert(
-            {"_key": key, "docId": resolved_doc, "sectionKey": section_key, **result},
-            overwrite=True,
-        )
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO section_augment (key, doc_id, section_key, objectives, recap) "
+                "VALUES (%(key)s,%(doc_id)s,%(section_key)s,%(objectives)s,%(recap)s) "
+                "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, "
+                "section_key=EXCLUDED.section_key, objectives=EXCLUDED.objectives, recap=EXCLUDED.recap",
+                {"key": key, "doc_id": resolved_doc, "section_key": section_key,
+                 "objectives": Json(result.get("objectives")), "recap": Json(result.get("recap"))},
+            )
     except Exception:
         pass
     return {**result, "cached": False}

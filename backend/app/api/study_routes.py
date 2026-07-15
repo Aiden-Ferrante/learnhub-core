@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.extraction.arango_learn import (
     fetch_triples_or_error,
     triple_id,
@@ -55,18 +55,14 @@ def api_mistakes(
 ) -> dict[str, Any]:
     """Most recent incorrectly answered quiz questions, newest first."""
     try:
-        db = connect_arango()
-        if not db.has_collection(EVENTS_COLLECTION):
-            return {"mistakes": []}
-        aql = """
-        FOR e IN study_events
-          FILTER e.correct == false
-          FILTER @doc == null OR e.doc == @doc OR e.doc == null
-          SORT e.ts DESC
-          LIMIT @limit
-          RETURN { sectionKey: e.section_key, ts: e.ts, stem: e.stem, expected: e.expected }
-        """
-        rows = list(db.aql.execute(aql, bind_vars={"doc": doc, "limit": limit}))
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT section_key AS "sectionKey", extract(epoch from ts)::float8 AS ts, '
+                "stem, expected FROM study_events WHERE correct = false "
+                "AND (%(doc)s::text IS NULL OR doc = %(doc)s OR doc IS NULL) "
+                "ORDER BY ts DESC LIMIT %(limit)s",
+                {"doc": doc, "limit": limit},
+            ).fetchall()
         return {"mistakes": rows}
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
         return {"mistakes": [], "error": str(exc)}
