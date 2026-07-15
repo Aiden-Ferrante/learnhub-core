@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { useDocuments } from "@/features/documents/document-context"
-import { cleanCourseTitle } from "@/features/learn/lib/courses"
+import { cleanCourseTitle } from "@/lib/course-title"
 
 const SUBPAGE_LABELS: Record<string, string> = {
   chapter: "Chapter",

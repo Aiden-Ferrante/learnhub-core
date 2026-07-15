@@ -27,7 +27,7 @@ import { countSections, displaySectionTitle, findChapterForSection, findNodeBySe
 import { ProgressRing } from "@/components/patterns/progress-ring"
 import { SectionCard } from "@/components/patterns/section-card"
 import { StatTile } from "@/components/patterns/stat-tile"
-import { enqueueChapterBuild, fetchCourseStatus, type CourseStatus } from "@/features/learn/api/pipeline"
+import { enqueueChapterBuild, fetchCourseStatus, type CoursePipelineStatus } from "@/features/learn/api/pipeline"
 import { fetchForecast, fetchMistakes, type ForecastResponse, type MasteryResponse, type Mistake, type WeakestSection } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 
@@ -156,7 +156,7 @@ export function CourseHome({
 
   // Pipeline status: drives the hero progress strip AND tells the empty shell WHY it's
   // empty (dead content link vs no TOC vs simply not processed yet).
-  const [pipeline, setPipeline] = useState<CourseStatus | null>(null)
+  const [pipeline, setPipeline] = useState<CoursePipelineStatus | null>(null)
   useEffect(() => {
     if (!course.learnDocId) {
       setPipeline(null)

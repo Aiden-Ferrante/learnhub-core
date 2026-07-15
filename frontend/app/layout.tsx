@@ -5,13 +5,13 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/layout/theme-provider"
 import { DocumentProvider } from "@/features/documents/document-context"
 import { HeaderBrand } from "@/components/layout/header-brand"
-import { AppNav } from "@/components/layout/app-nav"
-import { Breadcrumbs } from "@/components/layout/breadcrumbs"
+import { AppNav } from "@/app/_chrome/app-nav"
+import { Breadcrumbs } from "@/app/_chrome/breadcrumbs"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { InfoModal } from "@/components/layout/info-modal"
 import { Toaster } from "@/components/ui/toaster"
-import { UserMenu } from "@/components/layout/user-menu"
-import { ShortcutsHelp } from "@/features/learn/components/reader/shortcuts-help"
+import { UserMenu } from "@/app/_chrome/user-menu"
+import { ShortcutsHelp } from "@/app/_chrome/shortcuts-help"
 
 const inter = Inter({
   subsets: ["latin"],

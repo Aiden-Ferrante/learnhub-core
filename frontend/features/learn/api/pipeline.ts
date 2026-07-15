@@ -3,7 +3,7 @@ import { parseJsonResponse } from './http'
 
 // One pipeline status per course: whether the learn content exists (a dead learnDocId is the
 // "content link broken" empty state), and chapter-level concept/quiz coverage for the strip.
-export type CourseStatus = {
+export type CoursePipelineStatus = {
   doc: string
   exists: boolean
   reason?: string
@@ -19,13 +19,13 @@ export type CourseStatus = {
   error?: string
 }
 
-export async function fetchCourseStatus(doc: string): Promise<CourseStatus> {
+export async function fetchCourseStatus(doc: string): Promise<CoursePipelineStatus> {
   const res = await fetch(`/api/learn/course-status?doc=${encodeURIComponent(doc)}`, {
     cache: 'no-store',
   })
   // 404 = the course points at content that no longer exists — a state the caller renders,
   // not an exception (parseJsonResponse would throw on it).
-  const body = (await res.json().catch(() => ({}))) as Partial<CourseStatus>
+  const body = (await res.json().catch(() => ({}))) as Partial<CoursePipelineStatus>
   if (!res.ok && res.status !== 404) {
     return { doc, exists: false, error: body.error || res.statusText }
   }
