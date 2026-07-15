@@ -68,13 +68,13 @@ KINDS = ("convert", "build", "extract", "quizzes", "guides", "skeleton", "orient
 _worker_lock = threading.Lock()
 _worker_started = False
 
-# Registered by pipeline/registry.py at startup: kind -> runner(db, job, ctx) -> receipt | None,
+# Registered by pipeline/registry.py at startup: kind -> runner(job, ctx) -> receipt | None,
 # plus the "no doc id given" resolver. The queue never imports domain modules.
-_RUNNERS: dict[str, Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
+_RUNNERS: dict[str, Callable[[dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
 _doc_resolver: Callable[[], str | None] | None = None
 
 
-def register_runner(kind: str, fn: Callable[[Any, dict[str, Any], "JobCtx"], dict[str, Any] | None]) -> None:
+def register_runner(kind: str, fn: Callable[[dict[str, Any], "JobCtx"], dict[str, Any] | None]) -> None:
     _RUNNERS[kind] = fn
 
 
@@ -380,8 +380,7 @@ def _dispatch(job: dict[str, Any]) -> None:
         return
     _update_job(key, {"status": "running", "startedAt": int(time.time()), "error": None})
     try:
-        # ``db`` arg kept for the runner signature; ported runners use app.platform.db directly.
-        receipt = runner(None, job, JobCtx(key, kind))
+        receipt = runner(job, JobCtx(key, kind))
         if isinstance(receipt, dict) and receipt.get("error"):
             _update_job(key, {"status": "error", "finishedAt": int(time.time()),
                               "error": str(receipt["error"])})

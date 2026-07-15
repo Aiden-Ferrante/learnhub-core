@@ -20,8 +20,6 @@ from typing import Any
 from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
-EVENTS_COLLECTION = "study_events"
-
 
 def _alpha() -> float:
     return float(os.environ.get("MASTERY_ALPHA", "1"))
@@ -58,7 +56,6 @@ def _stability_tau(interval_days: float | None, default_tau: float) -> float:
 
 def record_quiz_event(
     section_key: str | None,
-    tid: str | None,
     correct: bool,
     doc: str | None = None,
     stem: str | None = None,
@@ -69,7 +66,6 @@ def record_quiz_event(
 ) -> None:
     """Append one graded study event (quiz answer, MCQ, or recall grade). No-op for whole-graph
     quizzes (no section to attribute). Never raises: event recording must not break study flow.
-    ``concept_key`` is set for concept-based study; legacy triple events leave it null.
     ``kind`` tags the engagement type (quiz | review | exam | recall …); ``confidence`` is the
     learner's pre-reveal self-rating (guess | shaky | confident) for calibration."""
     if not section_key or not section_key.strip():
@@ -77,10 +73,10 @@ def record_quiz_event(
     try:
         with db() as conn:
             conn.execute(
-                "INSERT INTO study_events (section_key, triple_id, concept_key, correct, ts, doc, "
-                "stem, expected, kind, confidence) VALUES (%(sk)s,%(tid)s,%(ck)s,%(correct)s, now(), "
+                "INSERT INTO study_events (section_key, concept_key, correct, ts, doc, "
+                "stem, expected, kind, confidence) VALUES (%(sk)s,%(ck)s,%(correct)s, now(), "
                 "%(doc)s,%(stem)s,%(expected)s,%(kind)s,%(conf)s)",
-                {"sk": section_key.strip(), "tid": tid or "", "ck": concept_key or "",
+                {"sk": section_key.strip(), "ck": concept_key or "",
                  "correct": bool(correct), "doc": doc or None, "stem": stem or None,
                  "expected": expected or None, "kind": kind, "conf": confidence or None},
             )
@@ -121,8 +117,6 @@ def compute_calibration(doc: str | None = None) -> dict[str, Any]:
 
 
 # Engagement kinds that are graded (feed accuracy/mastery) vs passive (read/listen — activity only).
-GRADED_KINDS = frozenset({"quiz", "review", "exam", "recall"})
-
 
 def record_engagement(
     kind: str, section_key: str | None, doc: str | None = None, concept_key: str | None = None
@@ -148,7 +142,7 @@ def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dic
     # ts is returned as epoch seconds (callers use time.gmtime / arithmetic on it).
     with db() as conn:
         return conn.execute(
-            "SELECT section_key, triple_id, concept_key, correct, "
+            "SELECT section_key, concept_key, correct, "
             "extract(epoch from ts)::float8 AS ts, doc, stem, expected, kind FROM study_events "
             "WHERE (%(doc)s::text IS NULL OR doc = %(doc)s OR doc IS NULL) "
             "AND (%(gradedOnly)s = false OR correct IS NOT NULL)",
@@ -233,13 +227,13 @@ def compute_leaf_mastery(
     alpha: float,
     beta: float,
     tau_days: float,
-    id_field: str = "triple_id",
+    id_field: str = "concept_key",
 ) -> dict[str, Any]:
     """Mastery for one leaf section from its own events.
 
     ``events`` are this section's quiz/recall events; ``content_ids`` the ids of its content
     units; ``total`` their count (coverage denominator). ``id_field`` selects which event field
-    identifies the studied unit — ``triple_id`` for the legacy KG path, ``concept_key`` for the
+    identifies the studied unit — ``concept_key`` (``triple_id`` was the retired KG path; the
     concept path — so the same coverage×accuracy×decay math serves both.
     """
     if not events:

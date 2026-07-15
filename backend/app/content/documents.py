@@ -7,6 +7,8 @@ the big section/element machinery just to resolve a doc id.
 
 from __future__ import annotations
 
+import logging
+
 from app.platform.db import db
 
 DOCUMENTS = "documents"
@@ -51,3 +53,19 @@ def fetch_latest_document(doc_id: str | None = None) -> dict:
         }
     except Exception as exc:
         return {"document": None, "error": str(exc)}
+
+
+def find_by_source_hash(source_hash: str) -> dict | None:
+    """The already-ingested document with this exact content hash, or None. Best-effort:
+    DB trouble reads as "no duplicate" (logged) so ingestion never breaks on the check."""
+    try:
+        with db() as conn:
+            row = conn.execute(
+                'SELECT key AS "docId", title, source_filename AS "sourceFilename" '
+                "FROM documents WHERE source_hash = %(h)s LIMIT 1",
+                {"h": source_hash},
+            ).fetchone()
+        return row or None
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("duplicate-check failed; treating as no duplicate", exc_info=True)
+        return None

@@ -41,8 +41,8 @@ def test_no_events_is_zero():
 
 def test_coverage_accuracy_decay_product():
     events = [
-        {"triple_id": "a", "correct": True, "ts": NOW},
-        {"triple_id": "b", "correct": True, "ts": NOW},
+        {"concept_key": "a", "correct": True, "ts": NOW},
+        {"concept_key": "b", "correct": True, "ts": NOW},
     ]
     st = compute_leaf_mastery(events, {"a", "b", "c", "d"}, 4, NOW, 1, 1, 14)
     assert st["coverage"] == 0.5  # 2 of 4 content triples tested
@@ -53,20 +53,20 @@ def test_coverage_accuracy_decay_product():
 
 def test_accuracy_is_smoothed_not_raw():
     # one lucky correct answer must NOT read as 100% accuracy
-    events = [{"triple_id": "a", "correct": True, "ts": NOW}]
+    events = [{"concept_key": "a", "correct": True, "ts": NOW}]
     st = compute_leaf_mastery(events, {"a"}, 1, NOW, 1, 1, 14)
     assert st["accuracy"] == (1 + 1) / (1 + 2)  # 0.666...
     assert st["accuracy"] < 1.0
 
 
 def test_decay_halves_around_tau():
-    events = [{"triple_id": "a", "correct": True, "ts": NOW - 14 * DAY}]
+    events = [{"concept_key": "a", "correct": True, "ts": NOW - 14 * DAY}]
     st = compute_leaf_mastery(events, {"a"}, 1, NOW, 1, 1, 14)
     assert math.isclose(st["decay"], math.exp(-1))  # dt == tau → exp(-1)
 
 
 def test_tested_triples_outside_content_dont_count_coverage():
-    events = [{"triple_id": "ghost", "correct": True, "ts": NOW}]
+    events = [{"concept_key": "ghost", "correct": True, "ts": NOW}]
     st = compute_leaf_mastery(events, {"a", "b"}, 2, NOW, 1, 1, 14)
     assert st["coverage"] == 0.0  # 'ghost' is not a content triple
     assert st["mastery"] == 0.0

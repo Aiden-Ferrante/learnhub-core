@@ -3,12 +3,12 @@ Hub: inspect courses & study state, run processing, study interactively, and cur
 
 Design: this server talks ONLY to the Learn service's REST API (default http://localhost:8010).
 It holds NO database credentials — every gap (listing courses, editing concepts) is a REST
-endpoint the learn service serves with its own Arango access. Keyless & local, matching the rest
+endpoint the learn service serves with its own database access. Keyless & local, matching the rest
 of the stack.
 
 Env:
   LEARN_URL      base URL of the learn service   (default http://localhost:8010)
-  LEARN_USER_DB  the ArangoDB user db to scope to (default learnhub) — sent as the X-User-Db header
+  LEARN_USER_DB  the the database user db to scope to (default learnhub) — sent as the X-User-Db header
 """
 
 from __future__ import annotations

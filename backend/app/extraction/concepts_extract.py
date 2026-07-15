@@ -30,7 +30,6 @@ from app.extraction.extract import (
     _norm_part,
     normalize_entity,
 )
-from app.extraction.concept_store import CONCEPTS
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ConceptResult
 
@@ -444,8 +443,6 @@ async def extract_concepts_document(
         "sections": len(sections),
         "extracted": len(results),
         "concepts": total_concepts,
-        "canonicalConcepts": total_concepts,
-        "mergedConcepts": 0,
         "outcomes": outcomes,
         "seconds": round(time.time() - t0, 1),
         "errors": errors,

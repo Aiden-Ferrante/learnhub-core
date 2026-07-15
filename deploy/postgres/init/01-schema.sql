@@ -47,7 +47,7 @@ CREATE INDEX ON page_content (doc_id, page_no);
 CREATE TABLE elements (
   key text PRIMARY KEY, doc_id text NOT NULL, section_key text, type text, "order" int,
   page int, caption text, code text, language text, latex text, image_ref text,
-  table_markdown text, bbox jsonb, bbox_origin text, table_data jsonb, embedding vector(384));
+  table_markdown text, bbox jsonb, bbox_origin text, table_data jsonb);
 CREATE INDEX ON elements (doc_id, section_key);
 
 CREATE TABLE concepts (

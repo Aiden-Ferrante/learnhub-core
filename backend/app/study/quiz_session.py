@@ -27,7 +27,6 @@ from app.study.concept_quiz_llm import (
 )
 from app.study.mastery import record_quiz_event
 
-CONCEPTS = "concepts"
 
 # In-memory MCQ sessions (the answer is stashed server-side, withheld from the client).
 _cq_sessions: dict[str, dict[str, Any]] = {}
@@ -105,7 +104,6 @@ def answer_quiz(session_id: str, choice_index: int) -> tuple[dict[str, Any], int
     correct = choice_index == q["answer_index"]
     record_quiz_event(
         q.get("sectionKey"),
-        None,
         correct,
         doc=session.get("doc"),
         stem=q.get("expected"),

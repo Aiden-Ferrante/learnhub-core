@@ -166,7 +166,6 @@ export async function fetchLearnDocuments(): Promise<{ documents: LearnDocumentI
 
 export type ChapterReadiness = {
   concepts: number
-  explained: number
   briefing: boolean
   build: Pick<ChapterBuildJob, 'status' | 'notBefore' | 'phase' | 'done' | 'total' | 'error'> | null
 }

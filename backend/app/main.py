@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from app.content.store import fetch_outline, fetch_page, fetch_section_content
+from app.content.store import fetch_outline, fetch_section_content
 from app.content.documents import fetch_latest_document
 from app.content.elements import fetch_elements, figure_path
 from app.api.admin_routes import router as admin_router
@@ -46,8 +46,8 @@ app.include_router(system_router)
 
 @app.middleware("http")
 async def user_db_middleware(request: Request, call_next):
-    # Multi-tenancy: the Next.js proxy forwards the session user's ArangoDB
-    # database in X-User-Db. Invalid/absent values fall back to the env default.
+    # Multi-tenancy: the Next.js proxy forwards the session user's Postgres
+    # schema in X-User-Db. Invalid/absent values fall back to the env default.
     set_request_db_name(request.headers.get("x-user-db"))
     return await call_next(request)
 
@@ -61,23 +61,8 @@ def health() -> JSONResponse:
 def api_toc_tree(doc: str | None = None) -> JSONResponse:
     forest, section_count, err = get_toc_tree(doc)
     if err:
-        return JSONResponse(
-            {
-                "error": err,
-                "tree": [],
-                "edgeCount": 0,
-                "mentionEdgeCount": 0,
-            },
-            status_code=503,
-        )
-    # edgeCount/mentionEdgeCount kept for response-shape stability (mentions retired).
-    return JSONResponse(
-        {
-            "tree": forest,
-            "edgeCount": section_count,
-            "mentionEdgeCount": 0,
-        }
-    )
+        return JSONResponse({"error": err, "tree": [], "sectionCount": 0}, status_code=503)
+    return JSONResponse({"tree": forest, "sectionCount": section_count})
 
 
 @app.get("/api/mastery")
@@ -148,12 +133,6 @@ def api_document_pdf(doc: str | None = None):
 @app.get("/api/section/{key:path}/content")
 def api_section_content(key: str, doc: str | None = None) -> JSONResponse:
     data = fetch_section_content(key, doc)
-    return JSONResponse(data, status_code=503 if data.get("error") else 200)
-
-
-@app.get("/api/page/{page_no}")
-def api_page(page_no: int, doc: str | None = None) -> JSONResponse:
-    data = fetch_page(page_no, doc)
     return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 

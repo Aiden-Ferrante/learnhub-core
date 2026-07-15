@@ -15,12 +15,7 @@ from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _secti
 from app.extraction.concept_store import concept_count
 from app.extraction.deep_chapter import _bkey as briefing_key
 from app.extraction.reading_guide import guide_status
-from app.extraction.skeleton import (
-    ORIENT,
-    SKELETON_PROMPT_VERSION,
-    SKELETONS,
-    _key as chapter_cache_key,
-)
+from app.extraction.skeleton import SKELETON_PROMPT_VERSION, _key as chapter_cache_key
 from app.media.audiobook import audiobook_path, timeline_path
 from app.platform.db import db
 from app.platform.jobs import KINDS, _resolve_doc_id, list_builds
@@ -55,9 +50,6 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
         job = jobs.get(scope)
         out[scope] = {
             "concepts": concepts,
-            # deepExplanation retired — mirrors `concepts` so readiness UIs read "complete"
-            # until the frontend trims the Deep read metric.
-            "explained": concepts,
             "briefing": briefing,
             "build": {
                 "status": job.get("status"),

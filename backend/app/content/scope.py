@@ -12,8 +12,6 @@ import re
 
 from app.platform.db import db
 
-TOC_ROOT_KEY = "toc:root"
-
 _NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
 _CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")
 
@@ -22,13 +20,9 @@ def is_ancestor_section_key(ancestor: str, child: str) -> bool:
     """True when ``ancestor`` is the same section or a numeric parent of ``child``."""
     if ancestor == child:
         return True
-    if ancestor == TOC_ROOT_KEY:
-        return True
     a = ancestor[4:] if ancestor.startswith("toc:") else ancestor
     c = child[4:] if child.startswith("toc:") else child
-    if _NUMERIC.match(a) and _NUMERIC.match(c):
-        return c == a or c.startswith(f"{a}.")
-    return child.startswith(f"{ancestor}/")
+    return bool(_NUMERIC.match(a) and _NUMERIC.match(c)) and (c == a or c.startswith(f"{a}."))
 
 
 def _is_chapter_marker(sk: str, heading: str) -> bool:

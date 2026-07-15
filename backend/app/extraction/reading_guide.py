@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import threading
-import time
 from typing import Any
 
 from app.content.documents import fetch_latest_document
@@ -23,7 +21,6 @@ from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ReadingGuide
 
-GUIDE_COL = "reading_guides"
 # Reuse the quiz authoring model override unless a reading-specific one is set.
 _AUTHOR_MODEL = (
     os.environ.get("LEARN_READING_AUTHOR_MODEL") or os.environ.get("LEARN_QUIZ_AUTHOR_MODEL") or None
@@ -41,10 +38,6 @@ AUTHOR_SYSTEM = (
     "section, each with a concise model answer (1-2 sentences). Test understanding, not trivia.\n"
     "No markdown, no preamble."
 )
-
-_inflight: set[str] = set()
-_inflight_lock = threading.Lock()
-
 
 def _key(doc: str | None, sk: str) -> str:
     return hashlib.sha256(f"{doc}|{sk}".encode()).hexdigest()[:16]
@@ -124,27 +117,15 @@ def author_guides_sync(doc: str | None, scope: str | None, on_progress=None) -> 
     return {"authored": authored, "total": len(blocks)}
 
 
-def _ensure_worker(doc: str | None, scope: str | None, sig: str) -> None:
+def _enqueue_backfill(doc: str | None, scope: str | None) -> None:
+    """Queue guide authoring on the processing ledger (visible, restart-safe) —
+    replaces the old fire-and-forget daemon thread. Best-effort."""
     try:
-        author_guides_sync(doc, scope)
-    except Exception:  # noqa: BLE001 — best-effort backfill
+        from app.platform.jobs import enqueue_build
+
+        enqueue_build(doc, scope or "", kind="guides")
+    except Exception:  # noqa: BLE001 — the read path must not break on a queue hiccup
         pass
-    finally:
-        with _inflight_lock:
-            _inflight.discard(sig)
-
-
-def ensure_guides_async(doc: str | None, scope: str | None) -> bool:
-    """Fire-and-forget: author guidance for un-guided sections of a chapter. Guarded per scope."""
-    if not scope:
-        return False
-    sig = f"{doc}|{scope}"
-    with _inflight_lock:
-        if sig in _inflight:
-            return False
-        _inflight.add(sig)
-    threading.Thread(target=_ensure_worker, args=(doc, scope, sig), daemon=True).start()
-    return True
 
 
 def guide_status(doc: str | None, scope: str | None) -> dict[str, Any]:
@@ -157,14 +138,18 @@ def guide_status(doc: str | None, scope: str | None) -> dict[str, Any]:
             ).fetchall()
         }
     authored = sum(1 for b in blocks if _key(doc, b["sectionKey"]) in existing)
-    with _inflight_lock:
-        running = f"{doc}|{scope}" in _inflight
+    # Running = a guides job for this scope is live on the ledger (was an in-process flag).
+    running = False
+    try:
+        from app.platform.jobs import list_builds
+
+        running = any(
+            j.get("scope") == (scope or "") and j.get("status") in ("queued", "running")
+            for j in list_builds(doc, kind="guides").get("builds", [])
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return {"total": total, "authored": authored, "running": running}
-
-
-def prepare_guides(doc: str | None, scope: str | None) -> dict[str, Any]:
-    ensure_guides_async(doc, scope)
-    return guide_status(doc, scope)
 
 
 def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
@@ -224,7 +209,8 @@ def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
                     "pageEnd": b.get("pageEnd"),
                 }
             )
-        ensure_guides_async(doc, scope)  # lazy backfill
+        if scope and any(not sec["focus"] and not sec["checks"] for sec in sections):
+            _enqueue_backfill(doc, scope)  # lazy backfill, on the ledger
         return {"docId": doc, "scope": scope, "sections": sections}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc), "sections": []}

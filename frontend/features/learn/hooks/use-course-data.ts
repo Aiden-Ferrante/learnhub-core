@@ -30,7 +30,7 @@ export function useCourseData(courseId: string) {
   const docKey = course ? (course.learnDocId ?? course.id) : undefined
 
   const [tree, setTree] = useState<LearnTreeNode[]>([])
-  const [edgeCount, setEdgeCount] = useState(0)
+  const [sectionCount, setSectionCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mastery, setMastery] = useState<MasteryResponse | null>(null)
@@ -45,10 +45,10 @@ export function useCourseData(courseId: string) {
       if (data.error) {
         setError(data.error)
         setTree([])
-        setEdgeCount(0)
+        setSectionCount(0)
       } else {
         setTree(data.tree)
-        setEdgeCount(data.edgeCount)
+        setSectionCount(data.sectionCount)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load syllabus")
@@ -121,7 +121,7 @@ export function useCourseData(courseId: string) {
     isLive,
     docKey,
     tree: isLive ? tree : [],
-    edgeCount: isLive ? edgeCount : 0,
+    sectionCount: isLive ? sectionCount : 0,
     loading: isLive ? loading : false,
     error: isLive ? error : null,
     mastery: isLive ? mastery : null,

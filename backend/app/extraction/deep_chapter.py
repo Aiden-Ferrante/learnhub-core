@@ -25,9 +25,6 @@ from psycopg.types.json import Json
 
 from app.platform.db import db
 
-BRIEFING = "deep_chapter_briefing"
-CONCEPTS = "concepts"
-
 # One backfill per (doc, scope) at a time — same guard pattern as concept_quiz_llm.
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
@@ -156,28 +153,15 @@ def generate_deep_chapter_artifacts(
 
 
 def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict[str, Any]:
-    """Readiness of the overlay for a scope: briefing presence (+ recap warm state via prepare).
-
-    ``explained`` mirrors ``totalConcepts`` — per-concept deep explanations were retired, so
-    the surface reads as complete; the keys stay until the frontend trims the Deep read UI."""
-    total = 0
+    """Readiness of the reading surface for a scope: briefing presence + backfill state."""
+    del section_keys  # kept for signature stability at the two call sites
     with db() as conn:
-        if section_keys:
-            total = conn.execute(
-                "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
-                {"d": doc_id, "ks": section_keys},
-            ).fetchone()["n"]
         has_briefing = conn.execute(
             "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s", {"k": _bkey(doc_id, scope)}
         ).fetchone() is not None
     with _inflight_lock:
         running = f"{doc_id}|{scope or 'ALL'}" in _inflight
-    return {
-        "totalConcepts": total,
-        "explained": total,
-        "running": running,
-        "briefing": has_briefing,
-    }
+    return {"running": running, "briefing": has_briefing}
 
 
 def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
@@ -200,9 +184,6 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
 
         sec = fetch_section_concepts(scope, doc_id)
         concepts = sec.get("concepts", [])
-        # deepExplanation retired — key kept (None) until the frontend trims the Deep read UI.
-        for c in concepts:
-            c["deepExplanation"] = None
 
         with db() as conn:
             briefing = conn.execute(

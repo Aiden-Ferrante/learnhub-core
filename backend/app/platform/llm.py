@@ -2,11 +2,11 @@
 
 Free-text (Socratic) + JSON-schema/Pydantic-constrained (extraction) generation, all
 keyless and fully local. ``ChatOllama`` talks to Ollama's **native** ``/api`` endpoint
-(NOT the OpenAI-compat ``/v1`` shim), so the base URL is taken from
-``_ollama_native_base()`` — ``OLLAMA_BASE_URL`` keeps its historical ``/v1`` suffix for
+(NOT the OpenAI-compat ``/v1`` shim). ``OLLAMA_BASE_URL`` is the native root
+(``http://host:11434``); a stale ``/v1`` suffix from old .env files is stripped
 the rest of the stack, and we strip it here.
 
-The two public helpers (``ollama_chat_completion`` / ``ollama_structured_completion``)
+The public helper (``ollama_structured_completion``)
 keep their original ``(result, error)`` tuple contract so every call site is unchanged;
 LangChain lives entirely behind this boundary. Per-request model selection (the UI model
 picker) is preserved by building a fresh ``ChatOllama`` per call via ``get_chat_model`` —
@@ -25,17 +25,10 @@ from pydantic import BaseModel
 DEFAULT_TIMEOUT = 120.0
 
 
-def _ollama_base() -> str:
-    return (os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1").rstrip("/")
-
-
-def _ollama_native_base() -> str:
-    """Base URL for Ollama's native API (strip the OpenAI-compat ``/v1`` suffix).
-
-    ``langchain-ollama`` speaks the native protocol, so ``ChatOllama(base_url=...)`` must
-    receive the root (``http://host:11434``), never the ``/v1`` shim.
-    """
-    base = _ollama_base()
+def ollama_base_url() -> str:
+    """Ollama's native API root (``http://host:11434``). One defensive strip: stale
+    ``.env.local`` files may still carry the retired OpenAI-compat ``/v1`` suffix."""
+    base = (os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
     return base[:-3].rstrip("/") if base.endswith("/v1") else base
 
 
@@ -68,7 +61,7 @@ def get_chat_model(
     """
     kwargs: dict[str, Any] = {
         "model": model or _ollama_model(),
-        "base_url": _ollama_native_base(),
+        "base_url": ollama_base_url(),
         "temperature": temperature,
         "num_ctx": _num_ctx(),
         "client_kwargs": {"timeout": timeout},
@@ -91,27 +84,6 @@ def _to_lc_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
         else:
             out.append(HumanMessage(content=content))
     return out
-
-
-def ollama_chat_completion(
-    messages: list[dict[str, str]],
-    temperature: float = 0.6,
-    model: str | None = None,
-) -> tuple[str | None, str | None]:
-    """Free-text chat completion. Returns ``(assistant_content, error_message)``.
-
-    ``model`` is the UI-selected Ollama model (threaded from the request); when omitted it
-    falls back to the ``OLLAMA_MODEL`` env default.
-    """
-    try:
-        llm = get_chat_model(model=model, temperature=temperature)
-        resp = llm.invoke(_to_lc_messages(messages))
-        content = resp.content if isinstance(resp.content, str) else str(resp.content)
-        if not content or not content.strip():
-            return None, "No assistant content in response"
-        return content.strip(), None
-    except Exception as e:  # noqa: BLE001 — preserve the (None, error) contract for callers
-        return None, str(e)
 
 
 def ollama_structured_completion(

@@ -21,7 +21,7 @@ services:
       - AUTH_SECRET=${AUTH_SECRET:?set in compose/.env}
       - AUTH_TRUST_HOST=true
       # Ollama configuration
-      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=nemotron-3-nano:30b
       # Embeddings configuration
       - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
@@ -57,7 +57,7 @@ services:
       # Postgres + pgvector is the one datastore (ArangoDB + Qdrant retired).
       - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
       - SHARED_DIR=/shared
-      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=nemotron-3-nano:30b
       # Quizzes use the deterministic triple-based builder (no LLM) so studying never loads a
       # model — concept extraction is the only LLM workload. Set to 1 to re-enable LLM quizzes.
@@ -71,14 +71,6 @@ services:
       # Docling's torch/table/layout models run on the GB10 GPU (cu130 wheel in the image).
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      # Vault seam (synergy #1): where to POST distilled seedlings. Empty by
-      # default = the learn-hub seedling_client no-ops. Set VAULTWRITER_URL in
-      # compose/.env (e.g. http://host.docker.internal:8799) once the vaultwriter
-      # service is running on the host, then `docker compose build learn && up -d learn`.
-      - VAULTWRITER_URL=${VAULTWRITER_URL:-}
-    extra_hosts:
-      # lets the container reach the host's localhost vaultwriter seam on Linux
-      - "host.docker.internal:host-gateway"
     volumes:
       - learnhub_shared:/shared
     networks:

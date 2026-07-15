@@ -26,8 +26,6 @@ __all__ = [
     "ConvertResult",
     "PdfConvertError",
     "convert_pdf_bytes",
-    "find_existing_ingest",
-    "pdf_convert_health",
     "source_hash_of",
 ]
 
@@ -37,33 +35,15 @@ def source_hash_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def find_existing_ingest(data: bytes) -> dict | None:
-    """The already-ingested document with this exact content, or None. Best-effort:
-    any DB trouble reads as "no duplicate" so ingestion never breaks on the check."""
-    try:
-        from app.platform.db import db
-
-        with db() as conn:
-            row = conn.execute(
-                'SELECT key AS "docId", title, source_filename AS "sourceFilename" '
-                "FROM documents WHERE source_hash = %(h)s LIMIT 1",
-                {"h": source_hash_of(data)},
-            ).fetchone()
-        return row or None
-    except Exception:  # noqa: BLE001
-        return None
-
-
 @dataclass
 class ConvertResult:
-    markdown: str
+    """What the convert job patches onto its ledger row. The converted markdown itself
+    is NOT here — it lives in ``documents`` (the status route re-reads it from there)."""
+
     source_filename: str
     output_filename: str
     page_count: int
     doc_id: str
-    engine: str
-    has_page_provenance: bool = False
-    element_count: int = 0
 
 
 def _normalize_markdown(text: str, engine: str) -> str:
@@ -124,7 +104,6 @@ def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) 
     # the Docling section markdown above.
     heading_pages = [(hp.text, hp.page_no) for hp in converted.heading_pages]
     pages = [(pt.page_no, pt.markdown) for pt in converted.pages]
-    has_page_provenance = bool(pages) and bool(heading_pages)
 
     # Flatten the typed elements to plain dicts so persist_document stays decoupled from the
     # reader types (mirrors how heading_pages/pages are passed). Image bytes ride along as
@@ -162,19 +141,8 @@ def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) 
     )
 
     return ConvertResult(
-        markdown=markdown,
         source_filename=filename or "document.pdf",
         output_filename=output_filename,
         page_count=page_count,
         doc_id=doc_id,
-        engine=engine,
-        has_page_provenance=has_page_provenance,
-        element_count=len(elements),
     )
-
-
-def pdf_convert_health() -> dict[str, str]:
-    """Report converter availability (selected engine + fallback)."""
-    from app.ingestion.reader import converter_health
-
-    return converter_health()

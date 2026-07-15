@@ -111,7 +111,6 @@ def _element_rows(doc_id: str, elements: list[dict], blocks: list[SectionBlock])
             "tableData": e.get("tableData"),
             "code": e.get("code"),
             "language": e.get("language"),
-            "embedding": None,  # reserved for Phase-2 semantic search
         })
     return rows
 

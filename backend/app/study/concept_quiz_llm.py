@@ -31,7 +31,6 @@ from app.study.concept_quiz_gen import _name_variants
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import AuthoredSet
 
-CONCEPTS = "concepts"
 # Authoring is GPU-bound on a single model, so it runs sequentially. The critic pass roughly
 # doubles per-concept time (~1 concept/min for a 30B). Override with a smaller/faster model to
 # trade quality for speed, e.g. LEARN_QUIZ_AUTHOR_MODEL=qwen3:8b.

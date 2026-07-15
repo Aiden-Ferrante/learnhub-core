@@ -13,14 +13,14 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from app.platform.jobs import queue_summary, set_queue_paused
-from app.platform.llm import _ollama_native_base
+from app.platform.llm import ollama_base_url
 
 router = APIRouter()
 
 
 def _ollama_ps() -> dict:
     try:
-        r = httpx.get(f"{_ollama_native_base()}/api/ps", timeout=3.0)
+        r = httpx.get(f"{ollama_base_url()}/api/ps", timeout=3.0)
         models = [
             {
                 "name": m.get("name"),

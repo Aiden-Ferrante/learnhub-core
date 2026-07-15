@@ -70,7 +70,6 @@ class Element:
     bbox: list[float] | None = None      # [l, t, r, b] in the page's coordinate space
     bbox_origin: str | None = None       # TOPLEFT | BOTTOMLEFT (how to read bbox)
     caption: str | None = None
-    text: str | None = None              # generic text payload (reserved; unused in v1)
     latex: str | None = None             # equation body
     table_markdown: str | None = None
     table_data: dict | None = None       # {columns: [...], rows: [[...]]}

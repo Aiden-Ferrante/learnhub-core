@@ -16,8 +16,6 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.platform.db import db
 from app.search.concept_resolve import embed_texts
-from app.search.lc_embeddings import SentenceTransformerEmbeddings
-from app.search.lc_vectorstore import PgContentVectorStore
 from app.platform.llm import get_chat_model
 
 VECTORS = "content_vectors"
@@ -105,13 +103,12 @@ def ensure_index(doc: str | None = None, limit: int = 100000) -> dict[str, Any]:
     return {**index_status(doc), "indexed_now": indexed}
 
 
-def semantic_search(query: str, doc: str | None = None, k: int = 8) -> dict[str, Any]:
-    """Embed the query and return the top-k most similar content blocks by pgvector cosine."""
-    if not (query or "").strip():
-        return {"matches": [], "error": "empty query"}
+def _top_matches(query: str, doc: str | None, k: int) -> tuple[list[dict[str, Any]], int]:
+    """The one retrieval path (search + ask): embed the query, pgvector-cosine top-k.
+    Returns ``(rows, indexed_count)``; raises RuntimeError when the embedder is down."""
     qv = embed_texts([query])
     if not qv:
-        return {"matches": [], "error": "embedder unavailable"}
+        raise RuntimeError("embedder unavailable")
     q = _vec_literal(qv[0])
     with db() as conn:
         indexed = conn.execute(
@@ -120,7 +117,7 @@ def semantic_search(query: str, doc: str | None = None, k: int = 8) -> dict[str,
             {"doc": doc},
         ).fetchone()["n"]
         if not indexed:
-            return {"matches": [], "indexed": 0, "hint": "no embeddings yet — call ensure_index for this doc"}
+            return [], 0
         rows = conn.execute(
             'SELECT section_key AS "sectionKey", heading, page_start AS "pageStart", '
             'page_end AS "pageEnd", text, 1 - (embedding <=> %(q)s::vector) AS score '
@@ -128,6 +125,19 @@ def semantic_search(query: str, doc: str | None = None, k: int = 8) -> dict[str,
             "ORDER BY embedding <=> %(q)s::vector LIMIT %(k)s",
             {"q": q, "doc": doc, "k": k},
         ).fetchall()
+    return rows, indexed
+
+
+def semantic_search(query: str, doc: str | None = None, k: int = 8) -> dict[str, Any]:
+    """Embed the query and return the top-k most similar content blocks by pgvector cosine."""
+    if not (query or "").strip():
+        return {"matches": [], "error": "empty query"}
+    try:
+        rows, indexed = _top_matches(query, doc, k)
+    except RuntimeError as e:
+        return {"matches": [], "error": str(e)}
+    if not indexed:
+        return {"matches": [], "indexed": 0, "hint": "no embeddings yet — call ensure_index for this doc"}
     matches = [
         {
             "sectionKey": r["sectionKey"],
@@ -151,29 +161,26 @@ _ASK_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def _format_context(docs) -> str:
+def _format_context(rows: list[dict[str, Any]]) -> str:
     """Numbered source block the answer cites against — `[n] (p.X, heading)` then the passage."""
     return "\n\n".join(
-        f"[{d.metadata['n']}] (p.{d.metadata.get('pageStart')}, "
-        f"{d.metadata.get('heading') or d.metadata.get('sectionKey')})\n"
-        f"{(d.page_content or '')[:1200]}"
-        for d in docs
+        f"[{n}] (p.{r.get('pageStart')}, {r.get('heading') or r.get('sectionKey')})\n"
+        f"{(r.get('text') or '')[:1200]}"
+        for n, r in enumerate(rows, start=1)
     )
 
 
 def ask(query: str, doc: str | None = None, k: int = 6, model: str | None = None) -> dict[str, Any]:
-    """Retrieve the top passages and have Ollama answer grounded in them, with inline [n]
-    citations. Built as an LCEL chain (prompt | ChatOllama | StrOutputParser) over the
-    LangChain retriever; citations are assembled from retrieved-doc metadata outside the LLM
-    step so the [1][2] numbering matches the sources. Returns {query, answer, citations}."""
+    """Retrieve the top passages (same pgvector path as ``semantic_search``) and have Ollama
+    answer grounded in them, via the LCEL prompt chain. Citations are assembled from the
+    retrieved rows outside the LLM step so the [1][2] numbering matches the sources."""
     if not (query or "").strip():
         return {"answer": None, "citations": [], "error": "empty query"}
     try:
-        retriever = PgContentVectorStore(SentenceTransformerEmbeddings(), doc)
-        docs = retriever.similarity_search(query, k=k)
+        rows, indexed = _top_matches(query, doc, k)
     except Exception as e:  # noqa: BLE001 — embedder/db down → graceful error
         return {"answer": None, "citations": [], "error": str(e)}
-    if not docs:
+    if not rows:
         return {
             "answer": None,
             "citations": [],
@@ -182,17 +189,17 @@ def ask(query: str, doc: str | None = None, k: int = 6, model: str | None = None
 
     chain = _ASK_PROMPT | get_chat_model(model=model, temperature=0.3) | StrOutputParser()
     try:
-        answer = chain.invoke({"query": query, "context": _format_context(docs)})
+        answer = chain.invoke({"query": query, "context": _format_context(rows)})
     except Exception as e:  # noqa: BLE001
         return {"answer": None, "citations": [], "error": str(e)}
 
     citations = [
         {
-            "n": d.metadata["n"],
-            "sectionKey": d.metadata.get("sectionKey"),
-            "heading": d.metadata.get("heading"),
-            "page": d.metadata.get("pageStart"),
+            "n": n,
+            "sectionKey": r.get("sectionKey"),
+            "heading": r.get("heading"),
+            "page": r.get("pageStart"),
         }
-        for d in docs
+        for n, r in enumerate(rows, start=1)
     ]
     return {"query": query, "answer": answer, "citations": citations}

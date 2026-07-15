@@ -15,18 +15,15 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.content.documents import fetch_latest_document
-from app.pipeline.ingest import find_existing_ingest, pdf_convert_health, prepare_upload
+from app.content.documents import find_by_source_hash
+from app.ingestion.pdf_convert import source_hash_of
+from app.pipeline.ingest import prepare_upload
 from app.platform.jobs import enqueue_build, list_builds
 
 router = APIRouter()
 
 _STATUS = {"queued": "running", "running": "running", "done": "done",
            "error": "error", "canceled": "error"}
-
-
-@router.get("/api/convert-pdf/health")
-def convert_pdf_health() -> JSONResponse:
-    return JSONResponse(pdf_convert_health())
 
 
 @router.post("/api/convert-pdf")
@@ -43,7 +40,7 @@ async def convert_pdf(file: UploadFile = File(...), force: int = Query(0)) -> JS
         raise HTTPException(status_code=400, detail="Empty file")
 
     if not force:
-        existing = find_existing_ingest(data)
+        existing = find_by_source_hash(source_hash_of(data))
         if existing:
             return JSONResponse(
                 {

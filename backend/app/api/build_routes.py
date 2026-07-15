@@ -8,7 +8,6 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from app.overview.coverage import chapters_coverage, chapters_readiness
-from app.pipeline.lifecycle import document_state
 from app.platform.jobs import (
     KINDS,
     cancel_build,
@@ -21,12 +20,6 @@ router = APIRouter()
 
 # Start the worker with the app so scheduled jobs run without a triggering request.
 ensure_worker()
-
-
-@router.get("/api/lifecycle")
-def api_lifecycle(doc: str | None = None) -> JSONResponse:
-    """The document's pipeline lifecycle state: missing → converted → extracted (studyable)."""
-    return JSONResponse(document_state(doc))
 
 
 @router.post("/api/build")

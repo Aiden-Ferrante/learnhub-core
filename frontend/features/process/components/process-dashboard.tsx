@@ -263,7 +263,7 @@ export function ProcessDashboard() {
   const unbuilt = chapters.filter((c) => (readiness[c.key]?.concepts ?? 0) === 0 && !jobFor(c.key))
   const deepCount = chapters.filter((c) => {
     const r = readiness[c.key]
-    return r && r.concepts > 0 && r.explained >= r.concepts && r.briefing
+    return r && r.concepts > 0 && r.briefing
   }).length
 
   const buildAllTonight = async () => {
@@ -356,7 +356,7 @@ export function ProcessDashboard() {
             {chapters.map((c) => {
               const r = readiness[c.key]
               const job = jobFor(c.key)
-              const deep = r && r.concepts > 0 && r.explained >= r.concepts && r.briefing
+              const deep = r && r.concepts > 0 && r.briefing
               const partial = r && r.concepts > 0 && !deep
               const isOpen = expanded === c.key
               return (
@@ -384,7 +384,7 @@ export function ProcessDashboard() {
                       {c.title}
                     </span>
                     <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:inline">
-                      {r ? `${r.concepts} concepts · ${r.explained}/${r.concepts || 0} deep` : "—"}
+                      {r ? `${r.concepts} concepts · ${r.briefing ? "briefing ready" : "no briefing"}` : "—"}
                     </span>
 
                     {job?.status === "running" ? (

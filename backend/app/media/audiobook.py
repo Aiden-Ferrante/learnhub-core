@@ -282,7 +282,7 @@ def timeline_path(doc_id: str, scope: str | None, source: str) -> str:
     return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.timeline.json")
 
 
-def estimate_weights(segments: list[str], gap_sec: float = 0.35, chars_per_sec: float = 14.0) -> list[float]:
+def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RATE, chars_per_sec: float = 14.0) -> list[float]:
     """Relative duration weights for chunks whose real audio timing is unknown (MP3s
     generated before timelines existed). Speech time ≈ chars/rate, plus the fixed
     inter-chunk gap — the client scales these to the actual MP3 duration."""
@@ -462,7 +462,7 @@ def _find_audiobook_job(doc_id: str, scope: str | None, source: str) -> dict | N
     return None
 
 
-def run_audiobook(db, job: dict, ctx) -> dict:
+def run_audiobook(job: dict, ctx) -> dict:
     """``audiobook`` queue runner. make_audiobook keeps its own checkpoint/resume — the
     queue just dispatches and records status."""
     doc_id = job["docId"]

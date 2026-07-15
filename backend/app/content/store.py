@@ -152,10 +152,10 @@ def persist_document(
         if element_rows:
             conn.cursor().executemany(
                 'INSERT INTO elements (key, doc_id, "order", type, page, bbox, bbox_origin, section_key, '
-                'caption, image_ref, latex, table_markdown, table_data, code, language, embedding) '
+                'caption, image_ref, latex, table_markdown, table_data, code, language) '
                 "VALUES (%(key)s,%(doc_id)s,%(order)s,%(type)s,%(page)s,%(bbox)s,%(bbox_origin)s,"
                 "%(section_key)s,%(caption)s,%(image_ref)s,%(latex)s,%(table_markdown)s,%(table_data)s,"
-                "%(code)s,%(language)s,%(embedding)s)",
+                "%(code)s,%(language)s)",
                 [{"key": e["_key"], "doc_id": doc_id, "order": e.get("order"), "type": e.get("type"),
                   "page": e.get("page"),
                   "bbox": Json(e["bbox"]) if e.get("bbox") is not None else None,
@@ -163,7 +163,7 @@ def persist_document(
                   "caption": e.get("caption"), "image_ref": e.get("imageRef"), "latex": e.get("latex"),
                   "table_markdown": e.get("tableMarkdown"),
                   "table_data": Json(e["tableData"]) if e.get("tableData") is not None else None,
-                  "code": e.get("code"), "language": e.get("language"), "embedding": None} for e in element_rows],
+                  "code": e.get("code"), "language": e.get("language")} for e in element_rows],
             )
     return doc_id
 
@@ -260,35 +260,3 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
         }
     except Exception as exc:
         return {"sectionKey": section_key, "blocks": [], "markdown": "", "error": str(exc)}
-
-
-def fetch_page(page_no: int, doc_id: str | None = None) -> dict:
-    """A single page's content + its section coordinate trail (page-primary read)."""
-    try:
-        if doc_id is None:
-            latest = fetch_latest_document()
-            doc = latest.get("document")
-            doc_id = doc.get("id") if doc else None
-        if not doc_id:
-            return {"page": None}
-        with db() as conn:
-            p = conn.execute(
-                'SELECT page_no AS "pageNo", markdown, section_path AS "sectionPath", '
-                'section_keys AS "sectionKeys", headings FROM page_content '
-                "WHERE doc_id = %(d)s AND page_no = %(n)s LIMIT 1",
-                {"d": doc_id, "n": int(page_no)},
-            ).fetchone()
-        if not p:
-            return {"page": None}
-        return {
-            "page": {
-                "docId": doc_id,
-                "pageNo": p.get("pageNo"),
-                "markdown": p.get("markdown", ""),
-                "sectionPath": p.get("sectionPath", []),
-                "sectionKeys": p.get("sectionKeys", []),
-                "headings": p.get("headings", []),
-            }
-        }
-    except Exception as exc:
-        return {"page": None, "error": str(exc)}

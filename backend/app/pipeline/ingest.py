@@ -17,18 +17,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from app.ingestion.pdf_convert import (
-    PdfConvertError,
-    convert_pdf_bytes,
-    find_existing_ingest,
-    pdf_convert_health,
-)
+from app.ingestion.pdf_convert import PdfConvertError, convert_pdf_bytes
+from app.pipeline.lifecycle import on_converted
 
 __all__ = [
     "prepare_upload",
     "run_convert",
-    "find_existing_ingest",
-    "pdf_convert_health",
     "PdfConvertError",
 ]
 
@@ -48,7 +42,7 @@ def prepare_upload(data: bytes, filename: str) -> dict[str, Any]:
     return {"docId": doc_id, "pdfPath": str(path), "filename": filename}
 
 
-def run_convert(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
+def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     """``convert`` job runner: read the stashed PDF, convert + persist, and patch a light
     result (no markdown — that lives in the documents collection) onto the ledger row."""
     doc_id = job["docId"]
@@ -69,14 +63,9 @@ def run_convert(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
             "outputFilename": result.output_filename,
             "pageCount": result.page_count,
             "docId": result.doc_id,
-            "engine": result.engine,
-            "hasPageProvenance": result.has_page_provenance,
-            "elementCount": result.element_count,
         }
     })
     # Lifecycle auto-chain: converted → extract, so an upload yields a studyable document
     # without a manual build. Enrichment stays on-demand. (No-op when LEARN_AUTOCHAIN=0.)
-    from app.pipeline.lifecycle import on_converted
-
     on_converted(result.doc_id or doc_id)
     return None

@@ -19,7 +19,6 @@ from app.extraction.extract import _load_section_blocks
 from app.study.mastery import compute_mastery, record_quiz_event
 from app.extraction.skeleton import _resolve_doc_id
 
-CONCEPTS = "concepts"
 _TTL = 60 * 60
 _DRILL: dict[str, dict] = {}
 
@@ -124,7 +123,7 @@ def grade_drill(session_id: str, answers: list, confidences: list | None = None)
             correct += 1
         conf = confidences[i] if i < len(confidences) else None
         record_quiz_event(
-            q.get("sectionKey"), None, ok, doc=sess.get("doc"),
+            q.get("sectionKey"), ok, doc=sess.get("doc"),
             stem=q.get("expected"), expected=q.get("signal"), concept_key=q.get("conceptKey"),
             kind="drill", confidence=conf if conf in ("guess", "shaky", "confident") else None,
         )

@@ -125,7 +125,6 @@ def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, A
                 {
                     **c,
                     "concepts": (readiness.get(c["key"]) or {}).get("concepts", 0),
-                    "explained": (readiness.get(c["key"]) or {}).get("explained", 0),
                 }
                 for c in chapters
             ],

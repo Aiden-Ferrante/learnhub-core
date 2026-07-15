@@ -31,10 +31,9 @@ _TOKEN_RE = re.compile(r"<custom_token_(\d+)>")
 
 
 def _generate_url() -> str:
-    base = (os.environ.get("OLLAMA_BASE_URL") or "http://ollama:11434/v1").rstrip("/")
-    if base.endswith("/v1"):
-        base = base[:-3].rstrip("/")  # native API, not the OpenAI shim
-    return base + "/api/generate"
+    from app.platform.llm import ollama_base_url
+
+    return ollama_base_url() + "/api/generate"
 
 
 def orpheus_token_text(text: str, voice: str = DEFAULT_VOICE, max_tokens: int = 3072,

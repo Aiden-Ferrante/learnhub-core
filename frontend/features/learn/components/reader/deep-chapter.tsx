@@ -1032,10 +1032,8 @@ export function DeepChapter({
   // response status until it loads. "Needs" = anything short of fully deep.
   const cr = chapterKey ? readiness[chapterKey] : undefined
   const needsPrepare = cr
-    ? cr.concepts === 0 || cr.explained < cr.concepts || !cr.briefing
-    : Boolean(
-        status && (!status.briefing || (status.totalConcepts > 0 && status.explained < status.totalConcepts)),
-      )
+    ? cr.concepts === 0 || !cr.briefing
+    : Boolean(status && !status.briefing)
   const activeConcept = active ? concepts[active.idx] : null
   const activeMastery =
     activeConcept?.conceptKey != null ? masteryByKey[activeConcept.conceptKey] : undefined
@@ -1110,7 +1108,7 @@ export function DeepChapter({
                   <Loader2 className="h-3 w-3 animate-spin text-brand" />
                 ) : b?.status === "queued" ? (
                   <Clock className="h-3 w-3 text-muted-foreground" />
-                ) : r && r.concepts > 0 && r.explained >= r.concepts && r.briefing ? (
+                ) : r && r.concepts > 0 && r.briefing ? (
                   <span className="h-2 w-2 rounded-full bg-brand" title="Deep — ready" />
                 ) : r && r.concepts > 0 ? (
                   <span className="h-2 w-2 rounded-full border border-brand bg-brand/30" title="Partially built" />
@@ -1560,12 +1558,6 @@ export function DeepChapter({
           </div>
           <div className="max-h-72 space-y-2 overflow-y-auto pr-1 text-sm">
             <MathText text={activeConcept.signal} className="text-foreground/90" />
-            {activeConcept.deepExplanation && (
-              <MathText
-                text={activeConcept.deepExplanation}
-                className="text-[13px] leading-relaxed text-muted-foreground"
-              />
-            )}
             {activeConcept.questions?.[0] && (
               <CheckReveal q={activeConcept.questions[0].q} a={activeConcept.questions[0].a} />
             )}

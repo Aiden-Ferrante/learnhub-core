@@ -15,8 +15,7 @@ export type LearnTreeNode = {
 
 export type TocTreeResponse = {
   tree: LearnTreeNode[]
-  edgeCount: number
-  mentionEdgeCount: number
+  sectionCount: number
   error?: string
 }
 

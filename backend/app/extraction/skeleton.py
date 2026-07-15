@@ -20,8 +20,6 @@ from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import Orient, Skeleton
 
-SKELETONS = "chapter_skeletons"
-ORIENT = "chapter_orient"
 PROGRESS = "chapter_progress"
 
 # Self-grade scale for the skeleton recall. Soft gate: "most" or better completes the stage.

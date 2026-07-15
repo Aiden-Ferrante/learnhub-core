@@ -10,7 +10,6 @@ from __future__ import annotations
 from app.content.documents import fetch_latest_document
 from app.platform.db import db
 
-CONCEPTS = "concepts"
 
 
 def concept_count(doc_id: str, section_keys: list[str]) -> int:
@@ -143,9 +142,9 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
 
 
 def fetch_document_concepts(doc_id: str | None = None) -> dict:
-    """Document-level CANONICAL concept list (within-doc dedup applied): one entry per
-    canonicalKey, in reading order, each carrying the merged provenance of where it appears
-    (``appearsIn`` = every section/page the concept — or a duplicate of it — was taught in)."""
+    """Document-level concept list, in reading order. (The canonical-dedup grouping was
+    retired with the resolve pass — every concept is its own entry; ``appearsIn`` keeps the
+    one-element provenance shape clients already consume.)"""
     try:
         if doc_id is None:
             doc = (fetch_latest_document() or {}).get("document")
@@ -154,7 +153,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
             return {"docId": None, "concepts": []}
         with db() as conn:
             rows = conn.execute(
-                'SELECT key, NULL AS canon, name, kind, signal, source, '
+                'SELECT key, name, kind, signal, source, '
                 'section_key AS "sectionKey", page_start AS "pageStart", page_end AS "pageEnd", "order" '
                 "FROM concepts WHERE doc_id = %(d)s",
                 {"d": doc_id},
@@ -164,36 +163,25 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
         ranks = _concept_reading_ranks(
             doc_id, [{"key": r["key"], "sk": r["sectionKey"], "ord": r["order"]} for r in rows]
         )
-        by_key = {r["key"]: r for r in rows}
-        groups: dict[str, list[dict]] = {}
-        for r in rows:
-            groups.setdefault(r.get("canon") or r["key"], []).append(r)
-        out: list[dict] = []
-        for canon_key, members in groups.items():
-            rep = by_key.get(canon_key) or min(members, key=lambda m: ranks.get(m["key"], 10**9))
-            members_sorted = sorted(members, key=lambda m: ranks.get(m["key"], 10**9))
-            out.append(
-                {
-                    "_rank": ranks.get(rep["key"], 10**9),
-                    "conceptKey": rep["key"],
-                    "name": rep["name"],
-                    "kind": rep["kind"],
-                    "signal": rep["signal"],
-                    "source": rep.get("source"),
-                    "questions": [],  # extraction-era questions retired; quiz_questions is the live store
-                    "sectionKey": rep["sectionKey"],
-                    "pageStart": rep.get("pageStart"),
-                    "pageEnd": rep.get("pageEnd"),
-                    "appearsIn": [
-                        {"sectionKey": m["sectionKey"], "pageStart": m.get("pageStart"), "pageEnd": m.get("pageEnd")}
-                        for m in members_sorted
-                    ],
-                    "aliasCount": len(members) - 1,
-                }
-            )
-        out.sort(key=lambda c: c["_rank"])
-        for c in out:
-            c.pop("_rank", None)
+        rows.sort(key=lambda r: ranks.get(r["key"], 10**9))
+        out = [
+            {
+                "conceptKey": r["key"],
+                "name": r["name"],
+                "kind": r["kind"],
+                "signal": r["signal"],
+                "source": r.get("source"),
+                "questions": [],  # extraction-era questions retired; quiz_questions is the live store
+                "sectionKey": r["sectionKey"],
+                "pageStart": r.get("pageStart"),
+                "pageEnd": r.get("pageEnd"),
+                "appearsIn": [
+                    {"sectionKey": r["sectionKey"], "pageStart": r.get("pageStart"), "pageEnd": r.get("pageEnd")}
+                ],
+                "aliasCount": 0,
+            }
+            for r in rows
+        ]
         return {"docId": doc_id, "concepts": out}
     except Exception as exc:  # noqa: BLE001
         return {"docId": doc_id, "concepts": [], "error": str(exc)}

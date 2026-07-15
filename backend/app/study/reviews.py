@@ -30,9 +30,6 @@ from app.platform.db import db
 from app.study import srs
 from app.study.mastery import record_quiz_event
 
-REVIEWS = "concept_reviews"
-CONCEPTS = "concepts"
-
 # Read a review row into an srs state dict (epoch floats; camelCase keys srs/schedule expect).
 _REVIEW_STATE_SELECT = (
     'SELECT extract(epoch from due)::float8 AS due, interval, ease, reps, lapses, state, '
@@ -355,7 +352,6 @@ def grade_review(body: dict, concept_key: str, grade: int, now: float) -> tuple[
     # Append to the mastery floor (best-effort; never breaks the grade flow).
     record_quiz_event(
         section_key,
-        None,
         correct=(grade >= 3),
         doc=doc_id,
         stem=concept.get("name"),
@@ -413,7 +409,6 @@ def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -
     # Append to the mastery floor (best-effort; never breaks the grade flow).
     record_quiz_event(
         section_key,
-        None,
         correct=(grade >= 3),
         doc=doc_id,
         stem=heading or section_key,
@@ -473,7 +468,6 @@ def _grade_figure_item(body: dict, concept_key: str, grade: int, now: float) -> 
 
     record_quiz_event(
         section_key,
-        None,
         correct=(grade >= 3),
         doc=doc_id,
         stem=f"Figure p.{extra.get('page')}" if extra.get("page") else "Figure",

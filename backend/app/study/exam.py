@@ -20,7 +20,6 @@ from app.extraction.extract import _load_section_blocks
 from app.study.mastery import record_quiz_event
 from app.extraction.skeleton import _resolve_doc_id, update_stage
 
-CONCEPTS = "concepts"
 PASS_PCT = 80
 _TTL = 60 * 60  # an exam session is valid for an hour
 
@@ -105,7 +104,7 @@ def grade_exam(session_id: str, answers: list) -> dict:
         if ok:
             correct += 1
         record_quiz_event(
-            q.get("sectionKey"), None, ok, doc=sess.get("doc"),
+            q.get("sectionKey"), ok, doc=sess.get("doc"),
             stem=q.get("expected"), expected=q.get("signal"), concept_key=q.get("conceptKey"),
         )
         results.append({

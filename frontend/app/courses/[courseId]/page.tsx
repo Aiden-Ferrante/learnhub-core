@@ -24,7 +24,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
       <CourseHome
         course={data.course}
         tree={data.tree}
-        edgeCount={data.edgeCount}
+        sectionCount={data.sectionCount}
         loading={data.loading}
         error={data.error}
         mastery={data.mastery}

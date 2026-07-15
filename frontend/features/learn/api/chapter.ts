@@ -110,7 +110,6 @@ export type DeepChapterBriefing = {
 
 export type DeepChapterStatus = {
   totalConcepts: number
-  explained: number
   running: boolean
   briefing: boolean
 }
@@ -167,7 +166,7 @@ export type TodayPlan = {
     title: string
     build: { status: string; notBefore?: number | null } | null
   } | null
-  chapters: { key: string; title: string; concepts: number; explained: number }[]
+  chapters: { key: string; title: string; concepts: number }[]
   error?: string
 }
 

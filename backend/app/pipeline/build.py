@@ -30,7 +30,7 @@ def _scope_keys(doc_id: str, scope: str) -> list[str] | None:
 
 
 
-def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
+def run_extract(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     """Core concept extraction — no overlay. ``sectionKeys``/``model`` come from the job
     payload. Idempotent: skips a whole scope that already has concepts unless ``force`` is
     set (or an exact ``sectionKeys`` set is requested). Refreshes the semantic index after."""

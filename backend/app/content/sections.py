@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-TOC_ROOT_KEY = "toc:root"
 _HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
 _LEADING_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\s*[.:)\-–]?\s+")
 _NUMERIC_KEY = re.compile(r"^\d+(?:\.\d+)*$")

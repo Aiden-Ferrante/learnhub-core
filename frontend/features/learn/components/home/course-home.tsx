@@ -34,7 +34,7 @@ import type { Course } from "@/features/learn/lib/courses"
 type CourseHomeProps = {
   course: Course
   tree: LearnTreeNode[]
-  edgeCount: number
+  sectionCount: number
   loading: boolean
   error: string | null
   mastery: MasteryResponse | null
@@ -103,7 +103,7 @@ function PracticeTile({
 export function CourseHome({
   course,
   tree,
-  edgeCount,
+  sectionCount,
   loading,
   error,
   mastery,
@@ -610,8 +610,8 @@ export function CourseHome({
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <BookMarked className="h-3.5 w-3.5" />
               <span>Course outline</span>
-              {!loading && edgeCount > 0 ? (
-                <span className="tabular-nums text-muted-foreground/70">· {edgeCount} sections</span>
+              {!loading && sectionCount > 0 ? (
+                <span className="tabular-nums text-muted-foreground/70">· {sectionCount} sections</span>
               ) : loading ? (
                 <Skeleton className="h-3 w-12" />
               ) : null}

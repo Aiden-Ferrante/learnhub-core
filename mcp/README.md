@@ -5,7 +5,7 @@ courses & study state, run processing, study interactively, and curate content.
 
 **Design:** the server talks **only** to the Learn service's REST API (`:8010`). It holds **no
 database credentials** — the few gaps (listing courses, editing concepts) are REST endpoints the
-learn service serves with its own Arango access (`app/admin_routes.py`). Keyless & local.
+learn service serves with its own database access (`app/api/admin_routes.py`). Keyless & local.
 
 ## Tools (27)
 
