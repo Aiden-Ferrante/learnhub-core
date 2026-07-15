@@ -26,7 +26,9 @@ from typing import Any
 
 from app.content.documents import fetch_latest_document
 from app.content.store import fetch_section_content
-from app.platform.arango import connect_arango
+from psycopg.types.json import Json
+
+from app.platform.db import db
 from app.platform.llm import _ollama_model, ollama_chat_completion
 
 BRIEFING = "deep_chapter_briefing"
@@ -47,12 +49,6 @@ def _deep_model() -> str:
 
 def _bkey(doc_id: str, scope: str | None) -> str:
     return hashlib.sha256(f"{doc_id}|{scope or 'ALL'}".encode()).hexdigest()[:16]
-
-
-def ensure_deep_collections(db) -> None:
-    if not db.has_collection(BRIEFING):
-        col = db.create_collection(BRIEFING)
-        col.add_persistent_index(fields=["docId"])
 
 
 def _resolve_doc_id(doc_id: str | None) -> str | None:
@@ -101,7 +97,7 @@ def _explain_one(concept: dict[str, Any], model: str | None = None) -> str | Non
 
 
 def generate_deep_explanations(
-    db, doc_id: str, section_keys: list[str], model: str | None = None
+    doc_id: str, section_keys: list[str], model: str | None = None
 ) -> dict[str, Any]:
     """Fill ``deepExplanation`` for every in-scope concept still missing one.
 
@@ -110,22 +106,23 @@ def generate_deep_explanations(
     authoring pass)."""
     if not section_keys:
         return {"explainedNow": 0, "explainFailed": 0}
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-            "AND (c.deepExplanation == null OR c.deepExplanation == '') "
-            "SORT c.sectionKey, c.order "
-            "RETURN {key: c._key, name: c.name, kind: c.kind, signal: c.signal, "
-            "source: c.source}",
-            bind_vars={"d": doc_id, "ks": section_keys},
-        )
-    )
-    col = db.collection(CONCEPTS)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT key, name, kind, signal, source FROM concepts "
+            "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+            "AND (deep_explanation IS NULL OR deep_explanation = '') "
+            'ORDER BY section_key, "order"',
+            {"d": doc_id, "ks": section_keys},
+        ).fetchall()
     done = failed = 0
     for r in rows:
         text = _explain_one(r, model)
         if text:
-            col.update({"_key": r["key"], "deepExplanation": text, "deepExplainedAt": int(time.time())})
+            with db() as conn:
+                conn.execute(
+                    "UPDATE concepts SET deep_explanation = %(t)s, deep_explained_at = now() WHERE key = %(k)s",
+                    {"t": text, "k": r["key"]},
+                )
             done += 1
         else:
             failed += 1
@@ -136,7 +133,7 @@ def generate_deep_explanations(
 # Briefing — assembled, never LLM-fused
 # --------------------------------------------------------------------------- #
 
-def build_briefing(db, doc_id: str, scope: str | None, allow_generate: bool = False) -> dict | None:
+def build_briefing(doc_id: str, scope: str | None, allow_generate: bool = False) -> dict | None:
     """Assemble the chapter briefing from the cached orient/skeleton/concepts.
 
     ``allow_generate=True`` (the prepare/processing path) lets orient/skeleton
@@ -144,24 +141,27 @@ def build_briefing(db, doc_id: str, scope: str | None, allow_generate: bool = Fa
     chapter never waits on a model. Returns None when nothing is cached yet.
     """
     from app.extraction.skeleton import (
-        ORIENT,
-        SKELETONS,
         _attach_depths,
         _key as skel_key,
-        ensure_path_collections,
         fetch_orient,
         fetch_skeleton,
     )
 
-    ensure_path_collections(db)
     if allow_generate:
         orient = fetch_orient(doc_id, scope)
         skeleton = fetch_skeleton(doc_id, scope)
         sections = skeleton.get("sections") or []
     else:
-        orient = db.collection(ORIENT).get(skel_key(doc_id, scope)) or {}
-        cached = db.collection(SKELETONS).get(skel_key(doc_id, scope)) or {}
-        sections = _attach_depths(db, doc_id, cached.get("sections") or [])
+        with db() as conn:
+            orient = conn.execute(
+                'SELECT objectives, watch_for AS "watchFor" FROM chapter_orient WHERE key = %(k)s',
+                {"k": skel_key(doc_id, scope)},
+            ).fetchone() or {}
+            cached = conn.execute(
+                "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                {"k": skel_key(doc_id, scope)},
+            ).fetchone() or {}
+        sections = _attach_depths(doc_id, cached.get("sections") or [])
 
     objectives = orient.get("objectives") or []
     watch_for = orient.get("watchFor") or []
@@ -190,8 +190,17 @@ def build_briefing(db, doc_id: str, scope: str | None, allow_generate: bool = Fa
         "conceptCount": concept_count,
         "createdAt": int(time.time()),
     }
-    ensure_deep_collections(db)
-    db.collection(BRIEFING).insert({"_key": _bkey(doc_id, scope), **briefing}, overwrite=True)
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO deep_chapter_briefing (key, doc_id, scope, objectives, watch_for, sections, "
+            "key_concepts, concept_count, created_at) VALUES "
+            "(%(k)s,%(d)s,%(sc)s,%(obj)s,%(wf)s,%(sec)s,%(kc)s,%(cc)s, now()) "
+            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
+            "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, sections=EXCLUDED.sections, "
+            "key_concepts=EXCLUDED.key_concepts, concept_count=EXCLUDED.concept_count, created_at=EXCLUDED.created_at",
+            {"k": _bkey(doc_id, scope), "d": doc_id, "sc": scope, "obj": Json(objectives),
+             "wf": Json(watch_for), "sec": Json(sections), "kc": Json(key_concepts), "cc": concept_count},
+        )
     return briefing
 
 
@@ -200,14 +209,14 @@ def build_briefing(db, doc_id: str, scope: str | None, allow_generate: bool = Fa
 # --------------------------------------------------------------------------- #
 
 def generate_deep_chapter_artifacts(
-    db, doc_id: str, scope: str | None, section_keys: list[str], model: str | None = None
+    doc_id: str, scope: str | None, section_keys: list[str], model: str | None = None
 ) -> dict[str, Any]:
     """The eager pass: briefing + per-section recap cache warm + deep explanations.
 
     Every stage is error-isolated; a failure in one never blocks the others."""
     out: dict[str, Any] = {"docId": doc_id, "scope": scope}
     try:
-        out["briefing"] = bool(build_briefing(db, doc_id, scope, allow_generate=True))
+        out["briefing"] = bool(build_briefing(doc_id, scope, allow_generate=True))
     except Exception as exc:  # noqa: BLE001
         out["briefingError"] = str(exc)
 
@@ -225,29 +234,31 @@ def generate_deep_chapter_artifacts(
     out["augmentsWarmed"] = warmed
 
     try:
-        out.update(generate_deep_explanations(db, doc_id, section_keys or [], model=model))
+        out.update(generate_deep_explanations(doc_id, section_keys or [], model=model))
     except Exception as exc:  # noqa: BLE001
         out["explainError"] = str(exc)
     return out
 
 
-def deep_status(db, doc_id: str, scope: str | None, section_keys: list[str]) -> dict[str, Any]:
+def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict[str, Any]:
     """Readiness of the overlay for a scope: explanation coverage + briefing presence."""
     total = explained = 0
-    if section_keys:
-        total = db.aql.execute(
-            "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks RETURN 1)",
-            bind_vars={"d": doc_id, "ks": section_keys},
-        ).next()
-        explained = db.aql.execute(
-            "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-            "AND c.deepExplanation != null AND c.deepExplanation != '' RETURN 1)",
-            bind_vars={"d": doc_id, "ks": section_keys},
-        ).next()
+    with db() as conn:
+        if section_keys:
+            total = conn.execute(
+                "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+                {"d": doc_id, "ks": section_keys},
+            ).fetchone()["n"]
+            explained = conn.execute(
+                "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+                "AND deep_explanation IS NOT NULL AND deep_explanation <> ''",
+                {"d": doc_id, "ks": section_keys},
+            ).fetchone()["n"]
+        has_briefing = conn.execute(
+            "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s", {"k": _bkey(doc_id, scope)}
+        ).fetchone() is not None
     with _inflight_lock:
         running = f"{doc_id}|{scope or 'ALL'}" in _inflight
-    ensure_deep_collections(db)
-    has_briefing = db.collection(BRIEFING).get(_bkey(doc_id, scope)) is not None
     return {
         "totalConcepts": total,
         "explained": explained,
@@ -263,7 +274,6 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
     Reads caches only — never calls the LLM — so it is always fast; ``status``
     tells the client whether a prepare pass would enrich it."""
     try:
-        db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
@@ -281,33 +291,38 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
         keys = [c.get("conceptKey") for c in concepts if c.get("conceptKey")]
         deep_by_key: dict[str, str] = {}
         if keys:
-            for r in db.aql.execute(
-                "FOR c IN concepts FILTER c._key IN @ks AND c.deepExplanation != null "
-                "RETURN {key: c._key, deep: c.deepExplanation}",
-                bind_vars={"ks": keys},
-            ):
-                deep_by_key[r["key"]] = r["deep"]
+            with db() as conn:
+                for r in conn.execute(
+                    "SELECT key, deep_explanation AS deep FROM concepts "
+                    "WHERE key = ANY(%(ks)s::text[]) AND deep_explanation IS NOT NULL",
+                    {"ks": keys},
+                ).fetchall():
+                    deep_by_key[r["key"]] = r["deep"]
         for c in concepts:
             c["deepExplanation"] = deep_by_key.get(c.get("conceptKey") or "")
 
-        ensure_deep_collections(db)
-        briefing = db.collection(BRIEFING).get(_bkey(doc_id, scope))
-        if briefing:
-            briefing = {k: v for k, v in briefing.items() if not k.startswith("_")}
-        else:
-            briefing = build_briefing(db, doc_id, scope, allow_generate=False)
+        with db() as conn:
+            briefing = conn.execute(
+                'SELECT doc_id AS "docId", scope, objectives, watch_for AS "watchFor", sections, '
+                'key_concepts AS "keyConcepts", concept_count AS "conceptCount" '
+                "FROM deep_chapter_briefing WHERE key = %(k)s",
+                {"k": _bkey(doc_id, scope)},
+            ).fetchone()
+        if not briefing:
+            briefing = build_briefing(doc_id, scope, allow_generate=False)
 
         augments: dict[str, dict[str, Any]] = {}
-        if section_keys and db.has_collection("section_augment"):
-            for r in db.aql.execute(
-                "FOR a IN section_augment FILTER a.docId == @d AND a.sectionKey IN @ks "
-                "RETURN {sk: a.sectionKey, objectives: a.objectives, recap: a.recap}",
-                bind_vars={"d": doc_id, "ks": section_keys},
-            ):
-                augments[r["sk"]] = {
-                    "objectives": r.get("objectives") or [],
-                    "recap": r.get("recap") or "",
-                }
+        if section_keys:
+            with db() as conn:
+                for r in conn.execute(
+                    "SELECT section_key AS sk, objectives, recap FROM section_augment "
+                    "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+                    {"d": doc_id, "ks": section_keys},
+                ).fetchall():
+                    augments[r["sk"]] = {
+                        "objectives": r.get("objectives") or [],
+                        "recap": r.get("recap") or "",
+                    }
 
         return {
             "docId": doc_id,
@@ -320,7 +335,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
             "augments": augments,
             "pageStart": content.get("pageStart"),
             "pageEnd": content.get("pageEnd"),
-            "status": deep_status(db, doc_id, scope, list(section_keys)),
+            "status": deep_status(doc_id, scope, list(section_keys)),
         }
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
@@ -328,8 +343,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
 
 def _prepare_worker(doc_id: str, scope: str, sig: str) -> None:
     try:
-        db = connect_arango()
-        generate_deep_chapter_artifacts(db, doc_id, scope, _scope_section_keys(doc_id, scope))
+        generate_deep_chapter_artifacts(doc_id, scope, _scope_section_keys(doc_id, scope))
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:
@@ -339,7 +353,6 @@ def _prepare_worker(doc_id: str, scope: str, sig: str) -> None:
 
 def prepare_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
     """Fire-and-forget backfill of the overlay for an already-processed scope."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
@@ -350,5 +363,5 @@ def prepare_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
             _inflight.add(sig)
     if started:
         threading.Thread(target=_prepare_worker, args=(doc_id, scope, sig), daemon=True).start()
-    status = deep_status(db, doc_id, scope, _scope_section_keys(doc_id, scope))
+    status = deep_status(doc_id, scope, _scope_section_keys(doc_id, scope))
     return {"docId": doc_id, "scope": scope, "started": started, **status, "running": True}
