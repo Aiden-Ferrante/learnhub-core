@@ -1039,7 +1039,7 @@ export function DeepChapter({
   const title = chapters[chapterIdx]?.title || data?.blocks?.[0]?.heading || "Chapter"
 
   return (
-    <div ref={rootRef} className="flex h-full flex-col">
+    <div ref={rootRef} className="relative flex h-full flex-col">
       {/* Header — the only chrome; everything else happens on the one surface. */}
       <div className="flex items-center gap-2 border-b bg-card/80 px-3 py-2 backdrop-blur">
         <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onBack}>
@@ -1615,7 +1615,7 @@ export function DeepChapter({
 
       {/* Explain drawer — grounded answer over the same surface, reader stays put. */}
       {explain && (
-        <div className="fixed bottom-0 right-0 top-12 z-40 w-[min(28rem,95vw)] overflow-y-auto border-l bg-card p-4 shadow-2xl">
+        <div className="absolute inset-y-0 right-0 z-40 w-[min(28rem,95vw)] overflow-y-auto border-l bg-card p-4 shadow-2xl">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="text-xs font-medium text-muted-foreground">Explain</div>
             <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setExplain(null)}>
@@ -1650,7 +1650,7 @@ export function DeepChapter({
 
       {/* Study drawer — quiz / review / exam over the same surface (spec §8 step 5). */}
       {drawer && (
-        <div className="fixed bottom-0 right-0 top-12 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
+        <div className="absolute inset-y-0 right-0 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
           <div className="flex items-center justify-between border-b px-4 py-2">
             <div className="text-xs font-medium text-muted-foreground">
               {DRAWER_TITLES[drawer]} · {title}
