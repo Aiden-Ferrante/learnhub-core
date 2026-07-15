@@ -44,7 +44,7 @@ def test_clean_skeleton_children_non_list_is_empty():
 
 def test_skeleton_card_shape_and_fallbacks():
     row = {
-        "_key": "skel-abc",
+        "key": "skel-abc",
         "heading": "1.2 Scalability",
         "sectionKey": "toc:1.2",
         "chapterScope": "toc:1",
@@ -64,7 +64,7 @@ def test_skeleton_card_shape_and_fallbacks():
     # Scheduler internals stay off the card.
     assert "ease" not in card
 
-    bare = skeleton_card({"_key": "skel-x", "sectionKey": "toc:2"})
+    bare = skeleton_card({"key": "skel-x", "sectionKey": "toc:2"})
     assert bare["name"] == "toc:2"  # heading falls back to the section key
     assert bare["children"] == []
     assert bare["state"] == "review"
@@ -90,7 +90,7 @@ def test_figure_review_key_deterministic_prefixed_and_distinct():
 
 def test_figure_card_carries_caption_as_signal_and_no_scheduler_internals():
     row = {
-        "_key": "fig-abc",
+        "key": "fig-abc",
         "caption": "Figure 1-1. Tokenization.",
         "figureOrder": 13,
         "page": 27,

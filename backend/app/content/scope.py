@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 
-from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 TOC_ROOT_KEY = "toc:root"
@@ -36,28 +35,13 @@ def _is_chapter_marker(sk: str, heading: str) -> bool:
     return sk.startswith("toc:chapter-") or bool(_CHAPTER_HEADING.match(heading or ""))
 
 
-def _walk_tree_depths(nodes, depth: int, out: dict[str, int]) -> None:
-    for n in nodes or []:
-        nid = getattr(n, "id", None)
-        if nid:
-            out.setdefault(nid, depth)
-        _walk_tree_depths(getattr(n, "children", None), depth + 1, out)
-
-
 def _section_level_fn(doc_id: str):
     """Build ``level_of(sectionKey, heading)`` — a 1-based outline level where chapters are
-    level 1. Robust across numbering schemes:
-      - numeric keys ``toc:1.2`` → numeric depth;
-      - ``toc:chapter-*`` keys or "CHAPTER N" headings → level 1;
-      - otherwise the node's TOC-tree depth (root=level 1) if known, else a deep leaf level.
-    The TOC tree only partially nests slug books, so the chapter-marker signal is what makes a
-    chapter scope expand to the whole chapter."""
-    tree_depth: dict[str, int] = {}
-    try:
-        forest = get_toc_tree(doc_id)[0]
-        _walk_tree_depths(forest, 0, tree_depth)
-    except Exception:  # noqa: BLE001 — tree is a best-effort signal; markers carry the rest
-        tree_depth = {}
+    level 1: numeric keys ``toc:1.2`` → numeric depth; ``toc:chapter-*`` keys or "CHAPTER N"
+    headings → level 1; any other slug → a deep leaf level. (A TOC-tree-depth fallback used
+    to sit between the last two, but its lookup had never worked — the system's observed
+    behavior IS this rule, now stated honestly. ``doc_id`` is kept for signature stability.)"""
+    del doc_id  # no longer consulted; see docstring
 
     def level_of(sk: str, heading: str = "") -> int:
         body = sk[4:] if sk.startswith("toc:") else sk
@@ -65,9 +49,6 @@ def _section_level_fn(doc_id: str):
             return body.count(".") + 1
         if _is_chapter_marker(sk, heading):
             return 1
-        d = tree_depth.get(sk)
-        if d is not None:
-            return d + 1
         return 99
 
     return level_of

@@ -82,7 +82,7 @@ CREATE TABLE chapter_builds (
 
 CREATE TABLE chapter_progress    (key text PRIMARY KEY, doc_id text, scope text, stages jsonb);
 CREATE TABLE chapter_orient      (key text PRIMARY KEY, doc_id text, scope text, objectives jsonb, watch_for jsonb, created_at timestamptz);
-CREATE TABLE chapter_skeletons   (key text PRIMARY KEY, doc_id text, scope text, sections jsonb, created_at timestamptz);
+CREATE TABLE chapter_skeletons   (key text PRIMARY KEY, doc_id text, scope text, sections jsonb, prompt_version int, created_at timestamptz);
 CREATE TABLE deep_chapter_briefing (key text PRIMARY KEY, doc_id text, scope text, concept_count int,
   key_concepts jsonb, objectives jsonb, sections jsonb, watch_for jsonb, created_at timestamptz);
 CREATE TABLE reading_guides   (key text PRIMARY KEY, doc_id text, section_key text, focus text, checks jsonb, created_at timestamptz);

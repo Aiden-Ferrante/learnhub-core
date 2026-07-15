@@ -121,7 +121,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
             keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(blocks, scope, level_of) if b.get("sectionKey")})
         with db() as conn:
             skel_row = conn.execute(
-                "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                "SELECT sections, prompt_version FROM chapter_skeletons WHERE key = %(k)s",
                 {"k": chapter_cache_key(doc_id, scope)},
             ).fetchone()
             orient_row = conn.execute(
@@ -132,8 +132,10 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
                 "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s",
                 {"k": briefing_key(doc_id, scope)},
             ).fetchone() is not None
-        # Stored skeletons carry no promptVersion → 'stale' when present (matches fetch_skeleton).
-        skeleton = "missing" if not (skel_row and skel_row.get("sections")) else "stale"
+        if not (skel_row and skel_row.get("sections")):
+            skeleton = "missing"
+        else:
+            skeleton = "fresh" if (skel_row.get("prompt_version") or 0) == SKELETON_PROMPT_VERSION else "stale"
         quiz = scope_question_status(doc_id, set(keys)) if keys else {"total": 0, "authored": 0, "running": False}
         chapters.append(
             {

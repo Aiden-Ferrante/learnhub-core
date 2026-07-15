@@ -73,3 +73,16 @@ def test_blocks_in_scope_chapter_includes_slugs_stops_at_next_chapter():
 def test_blocks_in_scope_subsection():
     keys = [r["sectionKey"] for r in _blocks_in_scope(_SCOPE_ROWS, "toc:1.1")]
     assert keys == ["toc:1.1", "toc:definition-1-2-3"]
+
+
+def test_section_level_rule():
+    # The honest level rule after the dead tree-depth branch was removed: numeric depth,
+    # chapter markers = 1, other slugs = deep leaf.
+    from app.content.scope import _section_level_fn
+
+    level_of = _section_level_fn("any-doc")
+    assert level_of("toc:1") == 1
+    assert level_of("toc:1.2.3") == 3
+    assert level_of("toc:chapter-two") == 1
+    assert level_of("toc:some-slug", "CHAPTER 4") == 1
+    assert level_of("toc:some-slug", "A Theory of Things") == 99

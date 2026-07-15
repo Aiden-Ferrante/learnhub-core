@@ -23,6 +23,8 @@ import os
 import time
 from typing import Any
 
+from psycopg.types.json import Json
+
 from app.content.scope import _scope_section_keys
 from app.platform.db import db
 from app.study import srs
@@ -124,7 +126,7 @@ def skeleton_card(row: dict[str, Any]) -> dict[str, Any]:
     keys and grades by ``conceptKey``, which for skeleton items is the review-row key)."""
     return {
         "itemType": "skeleton",
-        "conceptKey": row.get("_key"),
+        "conceptKey": row.get("key"),
         "name": row.get("heading") or row.get("sectionKey"),
         "kind": "skeleton",
         "signal": "",
@@ -149,7 +151,7 @@ def figure_card(row: dict[str, Any]) -> dict[str, Any]:
     page = row.get("page")
     return {
         "itemType": "figure",
-        "conceptKey": row.get("_key"),
+        "conceptKey": row.get("key"),
         "name": f"Figure · p.{page}" if page else "Figure",
         "kind": "figure",
         "signal": row.get("caption") or "",
@@ -232,8 +234,9 @@ def build_review_queue(
                 reviews[r["key"]] = r
             # Skeleton (structure-recall) and figure-recall cards.
             typed_rows = conn.execute(
-                'SELECT key, extract(epoch from due)::float8 AS due, state, item_type AS "itemType", '
-                'chapter_scope AS "chapterScope", section_key AS "sectionKey", caption, page, "order" '
+                'SELECT key, doc_id AS "docId", extract(epoch from due)::float8 AS due, state, '
+                'item_type AS "itemType", chapter_scope AS "chapterScope", section_key AS "sectionKey", '
+                'caption, page, "order", heading, children, figure_order AS "figureOrder" '
                 "FROM concept_reviews WHERE item_type IN ('skeleton', 'figure') "
                 "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
                 {"doc": doc},

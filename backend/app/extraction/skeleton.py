@@ -174,11 +174,12 @@ def refresh_skeleton(doc_id: str, scope: str | None) -> dict:
         return {"sections": 0, "error": "no sections in this scope"}
     with db() as conn:
         conn.execute(
-            "INSERT INTO chapter_skeletons (key, doc_id, scope, sections, created_at) "
-            "VALUES (%(k)s,%(d)s,%(sc)s,%(sections)s, now()) "
+            "INSERT INTO chapter_skeletons (key, doc_id, scope, sections, prompt_version, created_at) "
+            "VALUES (%(k)s,%(d)s,%(sc)s,%(sections)s,%(pv)s, now()) "
             "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
-            "sections=EXCLUDED.sections, created_at=EXCLUDED.created_at",
-            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections)},
+            "sections=EXCLUDED.sections, prompt_version=EXCLUDED.prompt_version, created_at=EXCLUDED.created_at",
+            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections),
+             "pv": SKELETON_PROMPT_VERSION},
         )
     return {"sections": len(sections)}
 
@@ -211,12 +212,14 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
                 return {"docId": doc_id, "scope": scope, "sections": [], "error": receipt["error"]}
         with db() as conn:
             existing = conn.execute(
-                "SELECT sections FROM chapter_skeletons WHERE key = %(k)s", {"k": _key(doc_id, scope)}
+                "SELECT sections, prompt_version FROM chapter_skeletons WHERE key = %(k)s",
+                {"k": _key(doc_id, scope)},
             ).fetchone()
         if existing and existing.get("sections"):
-            # Stored rows carry no promptVersion → always treat as stale (queue a refresh).
-            stale = True
-            _enqueue_refresh("skeleton", doc_id, scope)
+            # Stale = generated under an older prompt; only then queue a background refresh.
+            stale = (existing.get("prompt_version") or 0) != SKELETON_PROMPT_VERSION
+            if stale:
+                _enqueue_refresh("skeleton", doc_id, scope)
             return {
                 "docId": doc_id,
                 "scope": scope,

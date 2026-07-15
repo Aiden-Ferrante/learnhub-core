@@ -406,19 +406,23 @@ def convert_document(data: bytes, filename: str) -> ConvertedDoc:
     none), and the PDF's embedded bookmark outline.
     """
     primary = select_converter()
+    doc: ConvertedDoc | None = None
+    primary_err: Exception | None = None
     try:
         doc = primary.convert(data, filename)
-        if not doc.markdown.strip() and primary.name != PyMuPDFConverter.name:
-            raise PdfConvertError("Converter produced no text", 500)
-    except PdfConvertError:
-        raise
+        if not doc.markdown.strip():
+            doc = None  # engine ran but produced nothing usable — same as a failure
     except Exception as exc:  # noqa: BLE001 — any engine failure should degrade gracefully
-        if primary.name == PyMuPDFConverter.name:
-            raise PdfConvertError(f"PDF conversion failed: {exc}", 500) from exc
+        primary_err = exc
+    if doc is None and primary.name != PyMuPDFConverter.name:
+        # Fall back to pymupdf. Empty fallback output is NOT an error here — the caller
+        # turns "no extractable text" into a friendly 400 (likely a scanned PDF).
         try:
             doc = PyMuPDFConverter().convert(data, filename)
         except Exception as fexc:  # noqa: BLE001
             raise PdfConvertError(f"PDF conversion failed: {fexc}", 500) from fexc
+    if doc is None:
+        raise PdfConvertError(f"PDF conversion failed: {primary_err}", 500) from primary_err
 
     doc.pages = extract_pages(data)
     if not doc.heading_pages:
