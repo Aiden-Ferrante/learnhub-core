@@ -66,7 +66,7 @@ services:
       learn:
         condition: service_started
 
-  # Python learning app (placeholder UI; same ArangoDB + shared volume as the learn service)
+  # Python learning app (placeholder UI; same Postgres + shared volume as the learn service)
   learn:
     build:
       context: ../../backend
@@ -74,10 +74,8 @@ services:
     ports:
       - '127.0.0.1:8010:8000'
     environment:
-      - ARANGODB_URL=http://arangodb:8529
-      - ARANGODB_DB=learnhub
-      - ARANGODB_USER=root
-      - ARANGODB_PASSWORD=${ARANGO_ROOT_PASSWORD:?set in compose/.env}
+      # Postgres + pgvector is the one datastore (ArangoDB + Qdrant retired).
+      - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
       - SHARED_DIR=/shared
       - OLLAMA_BASE_URL=http://ollama:11434/v1
       - OLLAMA_MODEL=nemotron-3-nano:30b
@@ -106,8 +104,8 @@ services:
     networks:
       - default
     depends_on:
-      arangodb:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       ollama:
         condition: service_started
     restart: unless-stopped
