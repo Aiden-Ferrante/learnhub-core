@@ -30,7 +30,7 @@ def _run_quizzes(db, job: dict[str, Any], ctx) -> dict[str, Any]:
 
 
 def _run_guides(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return author_guides_sync(db, job["docId"], job["scope"], on_progress=ctx.progress)
+    return author_guides_sync(job["docId"], job["scope"], on_progress=ctx.progress)
 
 
 def _run_skeleton(db, job: dict[str, Any], ctx) -> dict[str, Any]:

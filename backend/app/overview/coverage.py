@@ -144,7 +144,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
                 "skeleton": skeleton,
                 "orient": bool(orient_row and (orient_row.get("objectives") or orient_row.get("watchFor"))),
                 "briefing": db.collection(BRIEFING).get(briefing_key(doc_id, scope)) is not None,
-                "guides": {k: v for k, v in guide_status(db, doc_id, scope).items() if k != "running"},
+                "guides": {k: v for k, v in guide_status(doc_id, scope).items() if k != "running"},
                 "audiobooks": [
                     src for src in ("text", "guided", "concepts")
                     if os.path.exists(audiobook_path(doc_id, scope, src))
