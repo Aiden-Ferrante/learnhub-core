@@ -4,7 +4,9 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/layout/theme-provider"
 import { DocumentProvider } from "@/features/documents/document-context"
-import { HeaderBrand, HeaderProcessLink } from "@/components/layout/header-brand"
+import { HeaderBrand } from "@/components/layout/header-brand"
+import { AppNav } from "@/components/layout/app-nav"
+import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { InfoModal } from "@/components/layout/info-modal"
 import { Toaster } from "@/components/ui/toaster"
@@ -34,10 +36,13 @@ export default function RootLayout({
           <DocumentProvider>
             {/* Modern Gradient Header */}
             <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
-              <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-                <HeaderBrand />
-                <div className="flex items-center gap-4">
-                  <HeaderProcessLink />
+              <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-2">
+                  <HeaderBrand />
+                  <Breadcrumbs />
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <AppNav />
                   <InfoModal />
                   <ThemeToggle />
                   <UserMenu />

@@ -25,6 +25,9 @@ export type Document = {
 
 type DocumentContextType = {
   documents: Document[]
+  /** True once the initial server load has settled — lets deep links distinguish
+   *  "documents still loading" from "no such document". */
+  isInitialized: boolean
   addDocuments: (items: DocumentAddInput[]) => void
   deleteDocuments: (documentIds: string[]) => void
   clearDocuments: () => void
@@ -208,6 +211,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     <DocumentContext.Provider
       value={{
         documents,
+        isInitialized,
         addDocuments,
         deleteDocuments,
         clearDocuments,
