@@ -13,37 +13,33 @@ from typing import Any
 
 from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 from app.extraction.concept_store import concept_count
-from app.extraction.deep_chapter import BRIEFING, _bkey as briefing_key, ensure_deep_collections
+from app.extraction.deep_chapter import _bkey as briefing_key
 from app.extraction.reading_guide import guide_status
 from app.extraction.skeleton import (
     ORIENT,
     SKELETON_PROMPT_VERSION,
     SKELETONS,
     _key as chapter_cache_key,
-    ensure_path_collections,
 )
 from app.media.audiobook import audiobook_path, timeline_path
-from app.platform.arango import connect_arango
-from app.platform.jobs import KINDS, _resolve_doc_id, ensure_builds_collection, list_builds
+from app.platform.db import db
+from app.platform.jobs import KINDS, _resolve_doc_id, list_builds
 from app.study.concept_quiz_llm import scope_question_status
 
 
 def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
     """Readiness ladder per chapter: concept coverage + deep coverage + any build job.
     Loads the doc's section blocks ONCE and spans each scope over them."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    ensure_builds_collection(db)
-    ensure_deep_collections(db)
 
-    rows = list(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-            bind_vars={"d": doc_id},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS "sectionKey", "order", heading, level '
+            'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+            {"d": doc_id},
+        ).fetchall()
     level_of = _section_level_fn(doc_id)
     jobs = {j["scope"]: j for j in list_builds(doc_id).get("builds", [])}
 
@@ -52,13 +48,18 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
         keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(rows, scope, level_of) if b.get("sectionKey")})
         concepts = concept_count(doc_id, list(keys))
         explained = 0
-        if keys:
-            explained = db.aql.execute(
-                "RETURN LENGTH(FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-                "AND c.deepExplanation != null AND c.deepExplanation != '' RETURN 1)",
-                bind_vars={"d": doc_id, "ks": list(keys)},
-            ).next()
-        briefing = db.collection(BRIEFING).get(briefing_key(doc_id, scope)) is not None
+        with db() as conn:
+            if keys:
+                explained = conn.execute(
+                    "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s "
+                    "AND section_key = ANY(%(ks)s::text[]) AND deep_explanation IS NOT NULL "
+                    "AND deep_explanation <> ''",
+                    {"d": doc_id, "ks": list(keys)},
+                ).fetchone()["n"]
+            briefing = conn.execute(
+                "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s",
+                {"k": briefing_key(doc_id, scope)},
+            ).fetchone() is not None
         job = jobs.get(scope)
         out[scope] = {
             "concepts": concepts,
@@ -84,25 +85,22 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
     Per chapter: concept count, quiz-authoring x/y, skeleton fresh/stale/missing,
     orient/briefing presence, guide x/y, generated audiobook sources, and any
     queued/running/failed job per kind. One call answers "what state is my library in"."""
-    db = connect_arango()
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    ensure_builds_collection(db)
-    ensure_deep_collections(db)
-    ensure_path_collections(db)
 
-    doc_row = db.collection("documents").get(doc_id) or {}
+    with db() as conn:
+        doc_row = conn.execute(
+            "SELECT outline FROM documents WHERE key = %(d)s", {"d": doc_id}
+        ).fetchone() or {}
+        blocks = conn.execute(
+            'SELECT section_key AS "sectionKey", "order", heading, level '
+            'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+            {"d": doc_id},
+        ).fetchall()
     top = [e for e in (doc_row.get("outline") or []) if (e.get("listDepth") or 0) == 0]
     numbered = [e for e in top if e.get("numberKey")]
     chapter_entries = [e for e in (numbered or top) if e.get("sectionKey")]
-
-    blocks = list(
-        db.aql.execute(
-            "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-            bind_vars={"d": doc_id},
-        )
-    )
     level_of = _section_level_fn(doc_id)
     jobs_by = {
         (j["scope"], j.get("kind") or "build"): j
@@ -127,13 +125,22 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
         keys = sorted((okeys & block_keys) if okeys else set())
         if not keys:
             keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(blocks, scope, level_of) if b.get("sectionKey")})
-        skel_row = db.collection(SKELETONS).get(chapter_cache_key(doc_id, scope))
-        skeleton = (
-            "missing" if not (skel_row and skel_row.get("sections"))
-            else ("fresh" if skel_row.get("promptVersion") == SKELETON_PROMPT_VERSION else "stale")
-        )
-        orient_row = db.collection(ORIENT).get(chapter_cache_key(doc_id, scope))
-        quiz = scope_question_status(db, doc_id, set(keys)) if keys else {"total": 0, "authored": 0, "running": False}
+        with db() as conn:
+            skel_row = conn.execute(
+                "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                {"k": chapter_cache_key(doc_id, scope)},
+            ).fetchone()
+            orient_row = conn.execute(
+                "SELECT objectives, watch_for AS \"watchFor\" FROM chapter_orient WHERE key = %(k)s",
+                {"k": chapter_cache_key(doc_id, scope)},
+            ).fetchone()
+            briefing_present = conn.execute(
+                "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s",
+                {"k": briefing_key(doc_id, scope)},
+            ).fetchone() is not None
+        # Stored skeletons carry no promptVersion → 'stale' when present (matches fetch_skeleton).
+        skeleton = "missing" if not (skel_row and skel_row.get("sections")) else "stale"
+        quiz = scope_question_status(doc_id, set(keys)) if keys else {"total": 0, "authored": 0, "running": False}
         chapters.append(
             {
                 "scope": scope,
@@ -143,7 +150,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
                 "quizzes": {"authored": quiz["authored"], "total": quiz["total"]},
                 "skeleton": skeleton,
                 "orient": bool(orient_row and (orient_row.get("objectives") or orient_row.get("watchFor"))),
-                "briefing": db.collection(BRIEFING).get(briefing_key(doc_id, scope)) is not None,
+                "briefing": briefing_present,
                 "guides": {k: v for k, v in guide_status(doc_id, scope).items() if k != "running"},
                 "audiobooks": [
                     src for src in ("text", "guided", "concepts")
