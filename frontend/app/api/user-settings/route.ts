@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserDataDb, ensureCollection } from '@/lib/user-data-db'
+import { withUserData } from '@/lib/user-data-db'
 
 export const dynamic = 'force-dynamic'
 
-const COLLECTION = 'user_settings'
 const DOC_KEY = 'default'
 
 /** GET /api/user-settings — the session user's settings document (course groups, prompts, ...). */
 export async function GET() {
   try {
-    const db = await getUserDataDb()
-    await ensureCollection(db, COLLECTION)
-    const col = db.collection(COLLECTION)
-    const doc = await col.document(DOC_KEY, { graceful: true })
-    if (!doc) return NextResponse.json({ settings: {} })
-    const { _key, _id, _rev, ...settings } = doc
+    const settings = await withUserData(async (c) => {
+      const { rows } = await c.query('SELECT settings FROM user_settings WHERE key = $1', [DOC_KEY])
+      return rows[0]?.settings ?? {}
+    })
     return NextResponse.json({ settings })
   } catch (error) {
     console.error('GET /api/user-settings failed:', error)
@@ -29,18 +26,19 @@ export async function PUT(req: NextRequest) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 })
     }
-    const { _key, _id, _rev, ...updates } = body
+    // Strip any Arango-era envelope keys a client might still echo back.
+    const { _key, _id, _rev, ...updates } = body as Record<string, unknown>
 
-    const db = await getUserDataDb()
-    await ensureCollection(db, COLLECTION)
-    const col = db.collection(COLLECTION)
-
-    const existing = await col.document(DOC_KEY, { graceful: true })
-    if (existing) {
-      await col.update(DOC_KEY, updates)
-    } else {
-      await col.save({ _key: DOC_KEY, ...updates })
-    }
+    await withUserData(async (c) => {
+      // jsonb `||` merges at the top level — same shallow-merge semantics as the old
+      // collection.update(DOC_KEY, updates).
+      await c.query(
+        `INSERT INTO user_settings (key, settings) VALUES ($1, $2::jsonb)
+         ON CONFLICT (key) DO UPDATE
+           SET settings = COALESCE(user_settings.settings, '{}'::jsonb) || EXCLUDED.settings`,
+        [DOC_KEY, JSON.stringify(updates)],
+      )
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

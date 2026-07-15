@@ -93,5 +93,8 @@ CREATE TABLE relationships    (key text PRIMARY KEY, from_key text, to_key text,
 CREATE INDEX ON relationships (from_key);
 CREATE INDEX ON relationships (to_key);
 CREATE INDEX ON relationships (type);
-CREATE TABLE user_settings    (key text PRIMARY KEY, course_groups jsonb, reading_progress jsonb);
+-- Schemaless per-user settings (course groups, reading progress, prompts, …) as one blob,
+-- matching the frontend's merge-arbitrary-keys contract. The legacy typed columns are kept
+-- for provenance of the migrated row; the app reads/writes only `settings`.
+CREATE TABLE user_settings    (key text PRIMARY KEY, course_groups jsonb, reading_progress jsonb, settings jsonb);
 CREATE TABLE learn_meta       (key text PRIMARY KEY, paused boolean);

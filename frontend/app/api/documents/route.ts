@@ -1,23 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { aql } from 'arangojs'
-import { getUserDataDb, ensureCollection } from '@/lib/user-data-db'
+import { withUserData } from '@/lib/user-data-db'
 
 export const dynamic = 'force-dynamic'
 
-const COLLECTION = 'app_documents'
+// Columns of the tenant `app_documents` table ↔ the client's camelCase document shape.
+// Dates round-trip as epoch-ms (what the client stored, verbatim through the migration).
+const SELECT = `
+  SELECT id, learn_doc_id AS "learnDocId", name, file, status,
+         upload_status AS "uploadStatus", processing_method AS "processingMethod",
+         original_pdf_name AS "originalPdfName", converted_from_pdf AS "convertedFromPdf",
+         size, selected_section_keys AS "selectedSectionKeys", metadata,
+         (extract(epoch from extracted_date) * 1000)::float8 AS "extractedDate",
+         (extract(epoch from last_updated) * 1000)::float8 AS "lastUpdated"
+    FROM app_documents ORDER BY "order" ASC`
+
+const UPSERT = `
+  INSERT INTO app_documents
+    (key, id, learn_doc_id, name, file, status, upload_status, processing_method,
+     original_pdf_name, converted_from_pdf, "order", size, selected_section_keys,
+     metadata, extracted_date, last_updated)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+  ON CONFLICT (key) DO UPDATE SET
+    id = EXCLUDED.id, learn_doc_id = EXCLUDED.learn_doc_id, name = EXCLUDED.name,
+    file = EXCLUDED.file, status = EXCLUDED.status, upload_status = EXCLUDED.upload_status,
+    processing_method = EXCLUDED.processing_method, original_pdf_name = EXCLUDED.original_pdf_name,
+    converted_from_pdf = EXCLUDED.converted_from_pdf, "order" = EXCLUDED."order",
+    size = EXCLUDED.size, selected_section_keys = EXCLUDED.selected_section_keys,
+    metadata = EXCLUDED.metadata, extracted_date = EXCLUDED.extracted_date,
+    last_updated = EXCLUDED.last_updated`
+
+const jsonb = (v: unknown) => (v === undefined || v === null ? null : JSON.stringify(v))
+const ts = (v: unknown) =>
+  v === undefined || v === null || v === '' ? null : new Date(typeof v === 'number' ? v : String(v))
 
 /** GET /api/documents — list the session user's documents in saved order. */
 export async function GET() {
   try {
-    const db = await getUserDataDb()
-    await ensureCollection(db, COLLECTION)
-    const col = db.collection(COLLECTION)
-    const cursor = await db.query(aql`
-      FOR doc IN ${col}
-        SORT doc.order ASC
-        RETURN UNSET(doc, "_id", "_rev", "order")
-    `)
-    const documents = await cursor.all()
+    const documents = await withUserData(async (c) => (await c.query(SELECT)).rows)
     return NextResponse.json({ documents })
   } catch (error) {
     console.error('GET /api/documents failed:', error)
@@ -37,13 +56,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'documents must be an array' }, { status: 400 })
     }
 
-    const db = await getUserDataDb()
-    await ensureCollection(db, COLLECTION)
-    const col = db.collection(COLLECTION)
-
     const records = documents
       .filter((d) => d && typeof d.id === 'string' && d.id.length > 0)
-      .map((d, i) => ({ ...d, _key: d.id, order: i }))
+      .map((d, i) => ({ d, i }))
 
     // Wipe guard: an empty list almost always means a client-side race (a failed
     // load followed by an autosave), not an intentional clear. Refuse to delete
@@ -52,17 +67,27 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ saved: 0, skipped: 'empty-ignored' })
     }
 
-    // Save FIRST, then prune — if saveAll fails we throw before deleting anything,
-    // so a failed save can never leave the collection wiped.
-    if (records.length > 0) {
-      await col.saveAll(records, { overwriteMode: 'replace' })
-    }
-    const keys = records.map((r) => r._key)
-    await db.query(aql`
-      FOR doc IN ${col}
-        FILTER doc._key NOT IN ${keys}
-        REMOVE doc IN ${col}
-    `)
+    await withUserData(async (c) => {
+      // Save FIRST, then prune — if an upsert fails we throw before deleting anything,
+      // so a failed save can never leave the table wiped.
+      await c.query('BEGIN')
+      try {
+        for (const { d, i } of records) {
+          await c.query(UPSERT, [
+            d.id, d.id, d.learnDocId ?? null, d.name ?? null, jsonb(d.file), d.status ?? null,
+            d.uploadStatus ?? null, d.processingMethod ?? null, d.originalPdfName ?? null,
+            d.convertedFromPdf ?? null, i, d.size ?? null, jsonb(d.selectedSectionKeys),
+            jsonb(d.metadata), ts(d.extractedDate), ts(d.lastUpdated),
+          ])
+        }
+        const keys = records.map((r) => r.d.id)
+        await c.query('DELETE FROM app_documents WHERE NOT (key = ANY($1::text[]))', [keys])
+        await c.query('COMMIT')
+      } catch (e) {
+        await c.query('ROLLBACK')
+        throw e
+      }
+    })
 
     return NextResponse.json({ saved: records.length })
   } catch (error) {
