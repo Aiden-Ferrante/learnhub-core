@@ -17,7 +17,7 @@ from app.study.concept_quiz_gen import build_concept_question, public_concept_qu
 from app.study.exam import _doc_pool
 from app.extraction.extract import _load_section_blocks
 from app.study.mastery import compute_mastery, record_quiz_event
-from app.extraction.skeleton import _resolve_doc_id
+from app.content.documents import resolve_doc_id
 
 _TTL = 60 * 60
 _DRILL: dict[str, dict] = {}
@@ -74,7 +74,7 @@ def select_targets(doc: str, scope: str | None, pool: list[dict], n: int) -> lis
 
 def start_drill(doc_id: str | None, scope: str | None, n: int = 10) -> dict:
     """Build an adaptive drill: up to ``n`` MCQs over the concepts you most need to practice."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
     pool = _doc_pool(doc_id)

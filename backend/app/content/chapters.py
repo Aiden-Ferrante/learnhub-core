@@ -14,21 +14,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.content.toc_tree import get_toc_tree
 from app.platform.db import db
 
 
-def _resolve_doc_id(doc_id: str | None) -> str | None:
-    if doc_id:
-        return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
-
-
 def chapter_units(doc_id: str | None) -> dict[str, Any]:
     try:
-        doc_id = _resolve_doc_id(doc_id)
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
 

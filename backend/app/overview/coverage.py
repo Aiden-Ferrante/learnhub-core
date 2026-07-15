@@ -18,14 +18,15 @@ from app.extraction.reading_guide import guide_status
 from app.extraction.skeleton import SKELETON_PROMPT_VERSION, _key as chapter_cache_key
 from app.media.audiobook import audiobook_path, timeline_path
 from app.platform.db import db
-from app.platform.jobs import KINDS, _resolve_doc_id, list_builds
+from app.content.documents import resolve_doc_id
+from app.platform.jobs import KINDS, list_builds
 from app.study.concept_quiz_llm import scope_question_status
 
 
 def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
     """Readiness ladder per chapter: concept coverage + deep coverage + any build job.
     Loads the doc's section blocks ONCE and spans each scope over them."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
 
@@ -71,7 +72,7 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
     Per chapter: concept count, quiz-authoring x/y, skeleton fresh/stale/missing,
     orient/briefing presence, guide x/y, generated audiobook sources, and any
     queued/running/failed job per kind. One call answers "what state is my library in"."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
 

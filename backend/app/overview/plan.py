@@ -15,7 +15,7 @@ import re
 import time
 from typing import Any
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.content.chapters import chapter_units
 from app.overview.coverage import chapters_readiness
 from app.platform.db import db
@@ -31,18 +31,11 @@ STAGE_ORDER: list[tuple[str, str]] = [
 ]
 
 
-def _resolve_doc_id(doc_id: str | None) -> str | None:
-    if doc_id:
-        return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
-
-
 def build_plan(doc_id: str | None, hint_scope: str | None = None) -> dict[str, Any]:
     """Assemble the Today plan. ``hint_scope`` is the client's reading position
     (stored client-side), which wins over inferred recency when it maps to a chapter."""
     try:
-        doc_id = _resolve_doc_id(doc_id)
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
 

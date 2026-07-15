@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.extraction.concept_store import fetch_document_concepts, fetch_section_concepts
 from app.platform.jobs import enqueue_build, list_builds
 
@@ -50,7 +50,7 @@ async def api_extract(
 @router.get("/api/extract/status")
 def api_extract_status(doc: str | None = None, scope: str | None = None) -> JSONResponse:
     """Poll a background extraction's status (idle | running | done | error)."""
-    doc_id = doc or ((fetch_latest_document() or {}).get("document") or {}).get("id")
+    doc_id = resolve_doc_id(doc)
     if not doc_id:
         return JSONResponse({"status": "idle", "scope": scope})
     builds = list_builds(doc_id, kind="build").get("builds", [])

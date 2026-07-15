@@ -14,8 +14,8 @@ from app.media.audiobook import (
     audiobook_timeline,
     list_audiobooks,
     start_audiobook,
-    _resolve_doc_id,
 )
+from app.content.documents import resolve_doc_id
 from app.media.tts_orpheus import VOICES
 
 router = APIRouter()
@@ -67,7 +67,7 @@ def api_file(
     download: int = 0,
 ) -> FileResponse | JSONResponse:
     """Stream the generated MP3 (inline for the player; ``?download=1`` to save it)."""
-    doc_id = _resolve_doc_id(doc)
+    doc_id = resolve_doc_id(doc)
     if not doc_id:
         return JSONResponse({"error": "no document"}, status_code=404)
     path = audiobook_path(doc_id, scope, source)

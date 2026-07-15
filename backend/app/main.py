@@ -7,7 +7,7 @@ from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.content.store import fetch_outline, fetch_section_content
-from app.content.documents import fetch_latest_document
+from app.content.documents import fetch_latest_document, resolve_doc_id
 from app.content.elements import fetch_elements, figure_path
 from app.api.admin_routes import router as admin_router
 from app.pipeline.registry import install as install_job_runners
@@ -117,10 +117,7 @@ def api_outline(doc: str | None = None) -> JSONResponse:
 def api_document_pdf(doc: str | None = None):
     """The ORIGINAL uploaded PDF, untouched — the source of truth a reader can verify
     the extracted content against. 404 for documents ingested from non-PDF sources."""
-    doc_id = doc
-    if not doc_id:
-        d = (fetch_latest_document() or {}).get("document")
-        doc_id = d.get("id") if d else None
+    doc_id = resolve_doc_id(doc)
     # Ingest ids are uuid-ish; reject anything that could traverse the shared dir.
     if not doc_id or set(doc_id) - set("0123456789abcdef-"):
         return JSONResponse({"error": "doc required"}, status_code=400)

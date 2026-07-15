@@ -22,6 +22,25 @@ _DOC_COLS = (
 )
 
 
+def resolve_doc_id(doc_id: str | None) -> str | None:
+    """The app-wide "default to the latest document" rule, as ONE cheap lookup.
+
+    Every surface accepts an optional doc id; absent means "the most recently ingested
+    book". This resolver reads just the key — the old per-module copies went through
+    ``fetch_latest_document()``, which drags the full book markdown along for one id."""
+    if doc_id:
+        return doc_id
+    try:
+        with db() as conn:
+            row = conn.execute(
+                "SELECT key FROM documents ORDER BY created_at DESC NULLS LAST LIMIT 1"
+            ).fetchone()
+        return row["key"] if row else None
+    except Exception:  # noqa: BLE001 — resolution failure reads as "no document"
+        logging.getLogger(__name__).warning("resolve_doc_id failed", exc_info=True)
+        return None
+
+
 def fetch_latest_document(doc_id: str | None = None) -> dict:
     """Latest stored document metadata + full markdown (or a specific id)."""
     try:

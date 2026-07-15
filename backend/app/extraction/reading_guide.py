@@ -13,7 +13,7 @@ import hashlib
 import os
 from typing import Any
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.platform.db import db
@@ -156,9 +156,7 @@ def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
     """The guided read for a chapter: each section's text + skeleton position (depth/essence) +
     cached focus note + checks. Triggers background authoring for any section not guided yet."""
     try:
-        if doc is None:
-            d = (fetch_latest_document() or {}).get("document")
-            doc = d.get("id") if d else None
+        doc = resolve_doc_id(doc)
         if not doc:
             return {"error": "no document found", "sections": []}
         blocks = _blocks(doc, scope)

@@ -12,7 +12,7 @@ import hashlib
 import re
 import time
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.platform.db import db
@@ -199,9 +199,7 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
     returns ``pending: true`` with the refresh queued. ``regenerate=True`` (an explicit,
     caller-owned ask) is the one synchronous path."""
     try:
-        if doc_id is None:
-            doc = (fetch_latest_document() or {}).get("document")
-            doc_id = doc.get("id") if doc else None
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
         if regenerate:
@@ -293,9 +291,7 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
     """Cached chapter orientation — same serve-stale contract as fetch_skeleton: reads never
     generate; a cache miss queues the work and reports ``pending``."""
     try:
-        if doc_id is None:
-            doc = (fetch_latest_document() or {}).get("document")
-            doc_id = doc.get("id") if doc else None
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
         if regenerate:
@@ -319,16 +315,9 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
 # Path progress (shared across stages)
 # --------------------------------------------------------------------------- #
 
-def _resolve_doc_id(doc_id: str | None) -> str | None:
-    if doc_id:
-        return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
-
-
 def get_chapter_progress(doc_id: str | None, scope: str | None) -> dict:
     try:
-        doc_id = _resolve_doc_id(doc_id)
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"stages": {}}
         with db() as conn:
@@ -343,7 +332,7 @@ def get_chapter_progress(doc_id: str | None, scope: str | None) -> dict:
 def update_stage(doc_id: str | None, scope: str | None, stage: str, data: dict) -> dict:
     """Merge one stage's progress (e.g. {done, grade, score}) into chapter_progress."""
     try:
-        doc_id = _resolve_doc_id(doc_id)
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
         k = _key(doc_id, scope)

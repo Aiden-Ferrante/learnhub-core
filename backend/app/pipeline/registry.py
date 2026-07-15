@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.content.scope import _scope_section_keys
 from app.pipeline.build import run_extract
 from app.pipeline.ingest import run_convert
@@ -20,8 +20,9 @@ from app.study.concept_quiz_llm import author_scope_sync
 
 
 def _latest_doc_id() -> str | None:
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
+    # Injected into platform/jobs (set_doc_resolver) — the dependency-inversion seam that
+    # keeps platform below content while sharing the one resolve rule.
+    return resolve_doc_id(None)
 
 
 def _run_quizzes(job: dict[str, Any], ctx) -> dict[str, Any]:

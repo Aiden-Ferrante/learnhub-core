@@ -23,7 +23,7 @@ import time
 
 import numpy as np
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.platform.db import db
 from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
@@ -339,9 +339,7 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
     (service restart, crash) resumes from the last finished chunk on the next request
     instead of losing hours of GPU time."""
     t0 = time.time()
-    if doc_id is None:
-        doc = (fetch_latest_document() or {}).get("document")
-        doc_id = doc.get("id") if doc else None
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
     if voice not in VOICES:
@@ -440,13 +438,6 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
 # Background job (on the persistent queue — the "audiobook" kind)
 # --------------------------------------------------------------------------- #
 
-def _resolve_doc_id(doc_id: str | None) -> str | None:
-    if doc_id:
-        return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
-
-
 def _audio_scope(scope: str | None, source: str) -> str:
     """Queue key scope for an audiobook — carries the ``source`` dimension the queue's
     (doc, scope, kind) keying doesn't model, so each source is its own job row."""
@@ -479,7 +470,7 @@ def start_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
                     voice: str = DEFAULT_VOICE) -> dict:
     from app.platform.jobs import enqueue_build
 
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "error", "error": "no document found"}
     res = enqueue_build(doc_id, _audio_scope(scope, source), kind="audiobook",
@@ -493,7 +484,7 @@ def start_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
 
 
 def audiobook_status(doc_id: str | None, scope: str | None, source: str = "text") -> dict:
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "idle", "scope": scope, "source": source}
     # Live queue state (queued / running / error) takes precedence.
@@ -531,7 +522,7 @@ def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "tex
     segmentation is recomputed and per-chunk weights (∝ text length + gap) are returned for
     the client to scale to the real MP3 duration. Guided scripts were LLM-written and can't
     be reconstructed — no sidecar means no read-along there."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
     tl_path = timeline_path(doc_id, scope, source)
@@ -564,7 +555,7 @@ def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "tex
 
 
 def list_audiobooks(doc_id: str | None) -> dict:
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"docId": None, "audiobooks": []}
     folder = os.path.join(AUDIO_DIR, doc_id)

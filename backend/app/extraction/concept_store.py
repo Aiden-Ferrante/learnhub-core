@@ -7,7 +7,7 @@ here, keeping readers decoupled from the extraction pipeline.
 
 from __future__ import annotations
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.platform.db import db
 
 
@@ -52,9 +52,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
     the exact section key when there's no ``section_content`` to span over.
     """
     try:
-        if doc_id is None:
-            doc = (fetch_latest_document() or {}).get("document")
-            doc_id = doc.get("id") if doc else None
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"sectionKey": section_key, "concepts": []}
 
@@ -146,9 +144,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
     retired with the resolve pass — every concept is its own entry; ``appearsIn`` keeps the
     one-element provenance shape clients already consume.)"""
     try:
-        if doc_id is None:
-            doc = (fetch_latest_document() or {}).get("document")
-            doc_id = doc.get("id") if doc else None
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"docId": None, "concepts": []}
         with db() as conn:

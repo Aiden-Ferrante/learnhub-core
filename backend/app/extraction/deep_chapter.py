@@ -19,7 +19,7 @@ import threading
 import time
 from typing import Any
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from app.content.store import fetch_section_content
 from psycopg.types.json import Json
 
@@ -32,13 +32,6 @@ _inflight_lock = threading.Lock()
 
 def _bkey(doc_id: str, scope: str | None) -> str:
     return hashlib.sha256(f"{doc_id}|{scope or 'ALL'}".encode()).hexdigest()[:16]
-
-
-def _resolve_doc_id(doc_id: str | None) -> str | None:
-    if doc_id:
-        return doc_id
-    doc = (fetch_latest_document() or {}).get("document")
-    return doc.get("id") if doc else None
 
 
 def _scope_section_keys(doc_id: str, scope: str) -> list[str]:
@@ -171,7 +164,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
     Reads caches only — never calls the LLM — so it is always fast; ``status``
     tells the client whether a prepare pass would enrich it."""
     try:
-        doc_id = _resolve_doc_id(doc_id)
+        doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
 
@@ -237,7 +230,7 @@ def _prepare_worker(doc_id: str, scope: str, sig: str) -> None:
 
 def prepare_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
     """Fire-and-forget backfill of the overlay for an already-processed scope."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
     sig = f"{doc_id}|{scope or 'ALL'}"

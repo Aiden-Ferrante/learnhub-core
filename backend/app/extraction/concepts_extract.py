@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 
-from app.content.documents import fetch_latest_document
+from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.platform.db import db
@@ -376,9 +376,7 @@ async def extract_concepts_document(
     ``on_progress(done, total, current_section_key)`` is invoked (if given) as each section
     finishes, so a polling client can render a live progress bar."""
     t0 = time.time()
-    if doc_id is None:
-        doc = (fetch_latest_document() or {}).get("document")
-        doc_id = doc.get("id") if doc else None
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
 

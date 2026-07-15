@@ -18,7 +18,8 @@ from app.study.concept_quiz_gen import build_concept_question, public_concept_qu
 from app.study.concept_quiz_llm import ensure_questions_async, servable_from_cached
 from app.extraction.extract import _load_section_blocks
 from app.study.mastery import record_quiz_event
-from app.extraction.skeleton import _resolve_doc_id, update_stage
+from app.content.documents import resolve_doc_id
+from app.extraction.skeleton import update_stage
 
 PASS_PCT = 80
 _TTL = 60 * 60  # an exam session is valid for an hour
@@ -60,7 +61,7 @@ def _chapter_targets(doc_id: str, scope: str | None, pool: list[dict]) -> list[d
 
 def start_exam(doc_id: str | None, scope: str | None, n: int = 12) -> dict:
     """Build the exam: up to ``n`` interleaved MCQs across the chapter's concepts."""
-    doc_id = _resolve_doc_id(doc_id)
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
     pool = _doc_pool(doc_id)

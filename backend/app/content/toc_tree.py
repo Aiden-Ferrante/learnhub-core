@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.content.documents import resolve_doc_id
 from app.platform.db import db
 
 
@@ -38,20 +39,6 @@ class TreeNode:
 
 
 TOC_NUMERIC = re.compile(r"^toc:(\d+(?:\.\d+)*)$")
-
-
-def _resolve_section_doc_id() -> str | None:
-    """``key`` of the most recently ingested document (section_content scope).
-
-    section_content.doc_id is the learn-service convert-pdf UUID, a different id
-    namespace from the frontend doc id used on KG edges — so titles are scoped to
-    the latest ingested document rather than joined by the edge doc id.
-    """
-    with db() as conn:
-        row = conn.execute(
-            "SELECT key FROM documents ORDER BY created_at DESC NULLS LAST LIMIT 1"
-        ).fetchone()
-    return row["key"] if row else None
 
 
 # Headings that are chapter labels / front-matter, not the chapter's real title.
@@ -115,8 +102,7 @@ def fetch_section_titles(doc_id: str | None = None) -> dict[str, str]:
     document is used. Numbered nodes get their own heading; chapter nodes (``toc:N``),
     which the markdown keys by slug, are backfilled via ``_chapter_titles``.
     """
-    if doc_id is None:
-        doc_id = _resolve_section_doc_id()
+    doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {}
 
