@@ -8,14 +8,12 @@ import hashlib
 import os
 from typing import Any
 
-from arango.exceptions import ArangoError
-
 from app.content.arango_tree import (
     HIERARCHY_PREDICATE,
     MENTIONS_PREDICATE,
     fetch_section_mentions_by_section,
 )
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 DEFAULT_SKIP_PREDICATES = (HIERARCHY_PREDICATE, MENTIONS_PREDICATE)
 MAX_EDGES_SECTION = 200
@@ -83,23 +81,19 @@ def sample_triples(
     doc: str | None = None,
 ) -> list[dict[str, str]]:
     """Random triples from relationships (structural predicates skipped by default)."""
-    db = connect_arango()
     skip = list(skip_predicates or ())
-    aql = """
-    FOR edge IN relationships
-      FILTER @doc == null OR @doc IN NOT_NULL(edge.docIds, [])
-      FILTER LENGTH(@skip) == 0 OR edge.type NOT IN @skip
-      LET s = DOCUMENT(edge._from)
-      LET t = DOCUMENT(edge._to)
-      FILTER s != null AND t != null
-      SORT RAND()
-      LIMIT @limit
-      RETURN { subject: s.name, predicate: edge.type, object: t.name }
-    """
-    cur = db.aql.execute(
-        aql, bind_vars={"limit": min(limit, MAX_EDGES_SAMPLE), "skip": skip, "doc": doc}
-    )
-    return _triple_rows_from_cursor(list(cur))
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT s.name AS subject, r.type AS predicate, t.name AS object "
+            "FROM relationships r "
+            "JOIN entities s ON s.key = split_part(r.from_key, '/', 2) "
+            "JOIN entities t ON t.key = split_part(r.to_key, '/', 2) "
+            "WHERE ((%(doc)s)::text IS NULL OR r.doc_ids ? (%(doc)s)::text) "
+            "AND r.type <> ALL(%(skip)s::text[]) "
+            "ORDER BY random() LIMIT %(limit)s",
+            {"limit": min(limit, MAX_EDGES_SAMPLE), "skip": skip, "doc": doc},
+        ).fetchall()
+    return _triple_rows_from_cursor(rows)
 
 
 def triples_for_section(
@@ -108,25 +102,18 @@ def triples_for_section(
     doc: str | None = None,
 ) -> list[dict[str, str]]:
     """Edges touching the section entity, capped (includes structural + content)."""
-    db = connect_arango()
-    aql = """
-    FOR v IN entities
-      FILTER v.name == @section
-      LIMIT 1
-      FOR edge IN relationships
-        FILTER edge._from == v._id OR edge._to == v._id
-        FILTER @doc == null OR @doc IN NOT_NULL(edge.docIds, [])
-        LIMIT @limit
-        LET s = DOCUMENT(edge._from)
-        LET t = DOCUMENT(edge._to)
-        FILTER s != null AND t != null
-        RETURN { subject: s.name, predicate: edge.type, object: t.name }
-    """
-    cur = db.aql.execute(
-        aql,
-        bind_vars={"section": section_name, "limit": min(limit, MAX_EDGES_SECTION), "doc": doc},
-    )
-    return _triple_rows_from_cursor(list(cur))
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT s.name AS subject, r.type AS predicate, t.name AS object "
+            "FROM entities v "
+            "JOIN relationships r ON (r.from_key = 'entities/' || v.key OR r.to_key = 'entities/' || v.key) "
+            "JOIN entities s ON s.key = split_part(r.from_key, '/', 2) "
+            "JOIN entities t ON t.key = split_part(r.to_key, '/', 2) "
+            "WHERE v.name = %(section)s AND ((%(doc)s)::text IS NULL OR r.doc_ids ? (%(doc)s)::text) "
+            "LIMIT %(limit)s",
+            {"section": section_name, "limit": min(limit, MAX_EDGES_SECTION), "doc": doc},
+        ).fetchall()
+    return _triple_rows_from_cursor(rows)
 
 
 def content_triples_for_section(
@@ -140,32 +127,24 @@ def content_triples_for_section(
     mostly structural), this resolves the section's ``section_mentions`` entities and
     fetches real content triples among them — the actual knowledge to test.
     """
-    db = connect_arango()
-    mentions = fetch_section_mentions_by_section(db, doc)
+    mentions = fetch_section_mentions_by_section(doc)
     names = mentions.get(section_name.strip(), [])
     if not names:
         return []
-    aql = """
-    FOR edge IN relationships
-      FILTER @doc == null OR @doc IN NOT_NULL(edge.docIds, [])
-      FILTER edge.type NOT IN @skip
-      LET s = DOCUMENT(edge._from)
-      LET t = DOCUMENT(edge._to)
-      FILTER s != null AND t != null
-      FILTER s.name IN @names OR t.name IN @names
-      LIMIT @limit
-      RETURN { subject: s.name, predicate: edge.type, object: t.name }
-    """
-    cur = db.aql.execute(
-        aql,
-        bind_vars={
-            "names": names,
-            "skip": list(DEFAULT_SKIP_PREDICATES),
-            "limit": min(limit, MAX_EDGES_SECTION),
-            "doc": doc,
-        },
-    )
-    return _triple_rows_from_cursor(list(cur))
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT s.name AS subject, r.type AS predicate, t.name AS object "
+            "FROM relationships r "
+            "JOIN entities s ON s.key = split_part(r.from_key, '/', 2) "
+            "JOIN entities t ON t.key = split_part(r.to_key, '/', 2) "
+            "WHERE ((%(doc)s)::text IS NULL OR r.doc_ids ? (%(doc)s)::text) "
+            "AND r.type <> ALL(%(skip)s::text[]) "
+            "AND (s.name = ANY(%(names)s::text[]) OR t.name = ANY(%(names)s::text[])) "
+            "LIMIT %(limit)s",
+            {"names": names, "skip": list(DEFAULT_SKIP_PREDICATES),
+             "limit": min(limit, MAX_EDGES_SECTION), "doc": doc},
+        ).fetchall()
+    return _triple_rows_from_cursor(rows)
 
 
 def triples_for_study_scope(
@@ -219,7 +198,5 @@ def fetch_triples_or_error(
             ),
             None,
         )
-    except ArangoError as e:
-        return [], str(e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return [], str(e)
