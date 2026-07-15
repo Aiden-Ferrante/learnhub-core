@@ -19,16 +19,26 @@ from typing import Iterator
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from pgvector.psycopg import register_vector
 
 _DSN = os.environ.get("POSTGRES_DSN") or (
     "host=localhost port=5432 user=learnhub password=learnhub_local dbname=learnhub"
 )
 
+
+def _configure(conn: Connection) -> None:
+    # Adapt pgvector `vector` columns ↔ Python lists/arrays (once per pooled connection).
+    register_vector(conn)
+
+
 # autocommit=True matches Arango's per-operation semantics (the ported code has no
 # explicit transactions); a request that needs one can use `with conn.transaction()`.
 # dict_row so ported queries read rows by column name (aliased back to the camelCase
 # keys the callers expect, e.g. SELECT doc_id AS "docId").
-_pool = ConnectionPool(_DSN, min_size=1, max_size=8, kwargs={"autocommit": True, "row_factory": dict_row})
+_pool = ConnectionPool(
+    _DSN, min_size=1, max_size=8,
+    kwargs={"autocommit": True, "row_factory": dict_row}, configure=_configure,
+)
 
 _REQUEST_SCHEMA: ContextVar[str | None] = ContextVar("request_schema", default=None)
 _NAME = re.compile(r"^[a-zA-Z0-9_-]+$")

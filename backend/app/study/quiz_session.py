@@ -82,7 +82,7 @@ def start_quiz_session(doc: str | None, scope: str | None) -> tuple[dict[str, An
     if cached and rng.random() < 0.75:
         question = servable_from_cached(target, rng.choice(cached), rng)
     if question is None:
-        nn = nearest_distractor_names(db, doc, target.get("key"), target.get("name"))
+        nn = nearest_distractor_names(doc, target.get("key"), target.get("name"))
         question = build_concept_question(target, pool, rng, distractor_names=nn)
     if any(not (t.get("quizQuestions")) for t in targets):
         ensure_questions_async(doc, _scope_section_keys(doc, scope))

@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.search.concept_resolve import _cosine, _sig_tokens, embed_texts
+from app.platform.db import db
 
 CONCEPTS = "concepts"
 
@@ -36,29 +37,29 @@ def is_quizzable(c: dict[str, Any]) -> bool:
     return True
 
 
-def ensure_embeddings(db, doc_id: str) -> None:
+def ensure_embeddings(doc_id: str) -> None:
     """Lazily embed + cache ``name. signal`` on each concept (one batched call per doc)."""
     try:
-        if not db.has_collection(CONCEPTS):
-            return
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER c.docId == @d AND c.embedding == null "
-                "RETURN {key: c._key, text: CONCAT(c.name, '. ', c.signal)}",
-                bind_vars={"d": doc_id},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT key, concat(name, '. ', signal) AS text FROM concepts "
+                "WHERE doc_id = %(d)s AND embedding IS NULL",
+                {"d": doc_id},
+            ).fetchall()
         if not rows:
             return
         embs = embed_texts([r["text"][:400] for r in rows])
         if not embs or len(embs) != len(rows):
             return
-        col = db.collection(CONCEPTS)
-        for r, e in zip(rows, embs):
-            try:
-                col.update({"_key": r["key"], "embedding": e})
-            except Exception:
-                pass
+        with db() as conn:
+            for r, e in zip(rows, embs):
+                try:
+                    conn.execute(
+                        "UPDATE concepts SET embedding = %(e)s WHERE key = %(k)s",
+                        {"e": e, "k": r["key"]},
+                    )
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -77,38 +78,34 @@ def _is_variant(target_name: str, other_name: str, target_tokens: set[str]) -> b
     return target_tokens <= ot or ot <= target_tokens
 
 
-def nearest_distractor_names(db, doc_id: str, target_key: str, target_name: str, n: int = 6) -> list[str]:
+def nearest_distractor_names(doc_id: str, target_key: str, target_name: str, n: int = 6) -> list[str]:
     """The most semantically-similar-yet-DISTINCT other concept names — confusable distractors
     for the deterministic fallback. Excludes near-duplicates/variants of the answer (which would
     make the MCQ ambiguous). Returns [] if embeddings are unavailable."""
     if not doc_id:
         return []
     try:
-        ensure_embeddings(db, doc_id)
-        rows = list(
-            db.aql.execute(
-                "FOR c IN concepts FILTER c.docId == @d AND c.embedding != null "
-                "RETURN {key: c._key, name: c.name, emb: c.embedding}",
-                bind_vars={"d": doc_id},
-            )
-        )
+        ensure_embeddings(doc_id)
+        # Nearest by cosine distance (pgvector <=>), closest first; sim = 1 - distance.
+        with db() as conn:
+            rows = conn.execute(
+                "WITH tgt AS (SELECT embedding FROM concepts WHERE key = %(k)s AND embedding IS NOT NULL) "
+                "SELECT c.name AS name, 1 - (c.embedding <=> tgt.embedding) AS sim "
+                "FROM concepts c, tgt "
+                "WHERE c.doc_id = %(d)s AND c.embedding IS NOT NULL AND c.key <> %(k)s "
+                "ORDER BY c.embedding <=> tgt.embedding LIMIT 100",
+                {"d": doc_id, "k": target_key},
+            ).fetchall()
     except Exception:
         return []
-    tgt = next((r for r in rows if r["key"] == target_key), None)
-    if not tgt:
-        return []
     tgt_tokens = _sig_tokens(target_name)
-    scored: list[tuple[float, str]] = []
-    for r in rows:
-        if r["key"] == target_key or not r["name"] or r["name"] == target_name:
-            continue
-        sim = _cosine(tgt["emb"], r["emb"])
-        if sim >= _SIM_MAX or _is_variant(target_name, r["name"], tgt_tokens):
-            continue  # near-duplicate of the answer → would be a second correct option
-        scored.append((sim, r["name"]))
-    scored.sort(key=lambda x: x[0], reverse=True)
     out: list[str] = []
-    for _s, nm in scored:
+    for r in rows:
+        nm, sim = r["name"], r["sim"]
+        if not nm or nm == target_name:
+            continue
+        if sim >= _SIM_MAX or _is_variant(target_name, nm, tgt_tokens):
+            continue  # near-duplicate of the answer → would be a second correct option
         if nm not in out:
             out.append(nm)
         if len(out) >= n:

@@ -52,7 +52,7 @@ def _exam_question(db, doc_id: str, target: dict, pool: list[dict], rng) -> dict
         q = servable_from_cached(target, rng.choice(cached), rng)
         if q:
             return q
-    nn = nearest_distractor_names(db, doc_id, target.get("key"), target.get("name"))
+    nn = nearest_distractor_names(doc_id, target.get("key"), target.get("name"))
     return build_concept_question(target, pool, rng, distractor_names=nn)
 
 
