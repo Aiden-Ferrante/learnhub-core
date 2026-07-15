@@ -15,7 +15,7 @@ import uuid
 from app.platform.db import db
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.exam import _doc_pool
-from app.extraction.extract import _load_section_blocks
+from app.content.scope import scope_section_keys
 from app.study.mastery import compute_mastery, record_quiz_event
 from app.content.documents import resolve_doc_id
 
@@ -53,7 +53,7 @@ def select_targets(doc: str, scope: str | None, pool: list[dict], n: int) -> lis
         sec_mastery = {}
 
     if scope:
-        keys = {s.section_key for s in _load_section_blocks(doc, scope=scope)}
+        keys = scope_section_keys(doc, scope) or set()
         cand = [c for c in pool if c.get("sectionKey") in keys and c.get("signal")]
     else:
         cand = [c for c in pool if c.get("signal")]

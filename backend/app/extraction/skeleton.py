@@ -16,7 +16,7 @@ from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.platform.db import db
-from app.extraction.extract import _load_section_blocks
+from app.content.scope import load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import Orient, Skeleton
 
@@ -133,7 +133,7 @@ def _concepts_by_section(doc_id: str, section_keys: list[str]) -> dict[str, list
 
 def generate_skeleton(doc_id: str, scope: str | None, model: str | None = None) -> list[dict] | None:
     """Build the ordered [{sectionKey, heading, essence}] for a chapter scope."""
-    sections = _load_section_blocks(doc_id, scope=scope)
+    sections = load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]
@@ -244,7 +244,7 @@ ORIENT_SYSTEM = (
 
 
 def generate_orient(doc_id: str, scope: str | None, model: str | None = None) -> dict | None:
-    sections = _load_section_blocks(doc_id, scope=scope)
+    sections = load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]

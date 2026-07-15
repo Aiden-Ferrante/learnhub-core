@@ -1,12 +1,11 @@
-"""Tests for the extraction infrastructure (pure functions, no LLM, no DB)."""
+"""Tests for scope resolution + extraction prompt helpers (pure functions, no LLM/DB)."""
 
-from app.extraction.extract import (
+from app.content.scope import (
     SectionExtractInput,
     _blocks_in_scope,
-    build_user_prompt,
-    normalize_entity,
     section_body_len,
 )
+from app.extraction.concepts_extract import build_user_prompt, normalize_entity
 
 INP = SectionExtractInput(
     doc_id="doc1",

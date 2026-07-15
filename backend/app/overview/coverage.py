@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
+from app.content.scope import scope_blocks
 from app.extraction.concept_store import concept_count
 from app.extraction.deep_chapter import _bkey as briefing_key
 from app.extraction.reading_guide import guide_status
@@ -36,12 +36,13 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
             'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
             {"d": doc_id},
         ).fetchall()
-    level_of = _section_level_fn(doc_id)
     jobs = {j["scope"]: j for j in list_builds(doc_id).get("builds", [])}
 
     out: dict[str, Any] = {}
     for scope in scopes:
-        keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(rows, scope, level_of) if b.get("sectionKey")})
+        # One shared resolver (outline-first) — this used to skip the outline step and
+        # could disagree with the reader about a chapter's extent on mixed keyspaces.
+        keys = sorted({b.get("sectionKey") for b in scope_blocks(doc_id, scope, rows=rows) if b.get("sectionKey")})
         concepts = concept_count(doc_id, list(keys))
         with db() as conn:
             briefing = conn.execute(
@@ -88,7 +89,6 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
     top = [e for e in (doc_row.get("outline") or []) if (e.get("listDepth") or 0) == 0]
     numbered = [e for e in top if e.get("numberKey")]
     chapter_entries = [e for e in (numbered or top) if e.get("sectionKey")]
-    level_of = _section_level_fn(doc_id)
     jobs_by = {
         (j["scope"], j.get("kind") or "build"): j
         for j in list_builds(doc_id, kind=None).get("builds", [])
@@ -100,18 +100,10 @@ def chapters_coverage(doc_id: str | None) -> dict[str, Any]:
             return None
         return {k: j.get(k) for k in ("status", "notBefore", "phase", "done", "total", "error")}
 
-    block_keys = {b.get("sectionKey") for b in blocks if b.get("sectionKey")}
-
     chapters: list[dict[str, Any]] = []
     for e in chapter_entries:
         scope = e["sectionKey"]
-        # Outline nesting first — it bridges mixed keyspaces (numbered chapter toc:2 whose
-        # sub-sections carry slug keys); reading-order span is the fallback. Same resolution
-        # order as fetch_section_content, so the grid can't disagree with the reader.
-        okeys = _scope_keys_from_outline(doc_id, scope)
-        keys = sorted((okeys & block_keys) if okeys else set())
-        if not keys:
-            keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(blocks, scope, level_of) if b.get("sectionKey")})
+        keys = sorted({b.get("sectionKey") for b in scope_blocks(doc_id, scope, rows=blocks) if b.get("sectionKey")})
         with db() as conn:
             skel_row = conn.execute(
                 "SELECT sections, prompt_version FROM chapter_skeletons WHERE key = %(k)s",

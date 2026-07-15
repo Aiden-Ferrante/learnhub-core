@@ -16,7 +16,7 @@ import uuid
 from threading import Lock
 from typing import Any
 
-from app.content.scope import _scope_section_keys
+from app.content.scope import scope_section_keys
 from app.platform.db import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
@@ -48,7 +48,7 @@ def _pool(doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]], lis
             'quiz_questions AS "quizQuestions" FROM concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s',
             {"doc": doc},
         ).fetchall()
-    keys = _scope_section_keys(doc, scope)
+    keys = scope_section_keys(doc, scope)
     targets = [
         c for c in rows if (keys is None or c.get("sectionKey") in keys) and c.get("signal")
     ]
@@ -79,7 +79,7 @@ def start_quiz_session(doc: str | None, scope: str | None) -> tuple[dict[str, An
         nn = nearest_distractor_names(doc, target.get("key"), target.get("name"))
         question = build_concept_question(target, pool, rng, distractor_names=nn)
     if any(not (t.get("quizQuestions")) for t in targets):
-        ensure_questions_async(doc, _scope_section_keys(doc, scope))
+        ensure_questions_async(doc, scope_section_keys(doc, scope))
     if not question:
         return {"error": "Could not build a question"}, 400
 
@@ -134,7 +134,7 @@ def _quiz_job_running(doc: str | None, scope: str | None) -> bool:
 def quiz_prepare_status(doc: str | None, scope: str | None) -> dict[str, Any]:
     """How many of a scope's concepts have LLM quiz questions authored yet (+ running flag,
     covering both the inline backfill thread and a ledgered queue job)."""
-    keys = _scope_section_keys(doc, scope)
+    keys = scope_section_keys(doc, scope)
     status = scope_question_status(doc, keys)
     status["running"] = bool(status.get("running")) or _quiz_job_running(doc, scope)
     return status
@@ -147,7 +147,7 @@ def prepare_quizzes(doc: str | None, scope: str) -> dict[str, Any]:
     from app.platform.jobs import enqueue_build
 
     enqueue_build(doc, scope, kind="quizzes")
-    keys = _scope_section_keys(doc, scope)
+    keys = scope_section_keys(doc, scope)
     status = scope_question_status(doc, keys)
     status["running"] = True
     return status

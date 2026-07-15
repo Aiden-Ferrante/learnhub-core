@@ -70,9 +70,11 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
                     {"d": doc_id},
                 ).fetchall()
             if blocks:
-                from app.content.scope import _blocks_in_scope, _section_level_fn
+                from app.content.scope import scope_blocks
 
-                matched = _blocks_in_scope(blocks, section_key, _section_level_fn(doc_id))
+                # One shared resolver (outline-first) — this used to skip the outline
+                # step and could under-count a mixed-keyspace chapter's concepts.
+                matched = scope_blocks(doc_id, section_key, rows=blocks)
                 ranked: dict[str, int] = {}
                 for b in matched:
                     sk = b.get("sectionKey")

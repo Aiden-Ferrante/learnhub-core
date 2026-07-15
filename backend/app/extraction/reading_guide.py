@@ -17,7 +17,7 @@ from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.platform.db import db
-from app.extraction.extract import _load_section_blocks
+from app.content.scope import load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ReadingGuide
 
@@ -46,7 +46,7 @@ def _key(doc: str | None, sk: str) -> str:
 def _blocks(doc: str, scope: str | None) -> list[dict[str, Any]]:
     """The chapter's section blocks (heading + its own text), in reading order."""
     try:
-        secs = _load_section_blocks(doc, scope=scope)
+        secs = load_section_blocks(doc, scope=scope)
         return [
             {
                 "sectionKey": s.section_key,

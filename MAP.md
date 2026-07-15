@@ -133,7 +133,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`llm.py`](backend/app/platform/llm.py) | Ollama client — free-text + structured/JSON completions |
 | [`llm_schemas.py`](backend/app/platform/llm_schemas.py) | Pydantic schemas for structured LLM output |
 | [`jobs.py`](backend/app/platform/jobs.py) | Persistent job ledger + worker; runners injected (no domain imports) |
-| [`seedling_client.py`](backend/app/platform/seedling_client.py) | Optional vaultwriter seam (distilled-concept export) |
 | [`db.py`](backend/app/platform/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
 
 ### content/ — the book itself
@@ -145,7 +144,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`pages.py`](backend/app/content/pages.py) | Page provenance math (pure) |
 | [`outline.py`](backend/app/content/outline.py) | Canonical TOC from bookmarks + block assignment (pure) |
 | [`elements.py`](backend/app/content/elements.py) | Figures/tables: save, link, read |
-| [`scope.py`](backend/app/content/scope.py) | Scope resolution — "what sections are inside chapter X" |
+| [`scope.py`](backend/app/content/scope.py) | THE scope owner: `scope_blocks` / `scope_section_keys` / `load_section_blocks` |
 | [`store.py`](backend/app/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
 | [`chapters.py`](backend/app/content/chapters.py) | Canonical chapter-unit list |
 | [`math_markdown.py`](backend/app/content/math_markdown.py) | LaTeX/KaTeX math rendering |
@@ -162,7 +161,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 | File | Purpose |
 |---|---|
-| [`extract.py`](backend/app/extraction/extract.py) | Section loading + scope resolution for extraction |
 | [`concepts_extract.py`](backend/app/extraction/concepts_extract.py) | Concept extraction (the write side) |
 | [`concept_store.py`](backend/app/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
 | [`deep_chapter.py`](backend/app/extraction/deep_chapter.py) | Assembled chapter briefing (+ recap warm) for the reading surface |
@@ -191,8 +189,6 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | File | Purpose |
 |---|---|
 | [`semantic_search.py`](backend/app/search/semantic_search.py) | Embed query → top-k content blocks + `ask` |
-| [`lc_vectorstore.py`](backend/app/search/lc_vectorstore.py) | LangChain vector store over `content_vectors` (+ `_load_matrix`) |
-| [`lc_embeddings.py`](backend/app/search/lc_embeddings.py) | Sentence-Transformer embeddings adapter |
 | [`concept_resolve.py`](backend/app/search/concept_resolve.py) | Embedding helper for concept resolution |
 
 ### media/ — audiobooks
@@ -321,9 +317,9 @@ Key `lib/server/` seams:
 ## 4. Inside the extraction package
 
 Extraction is the app's core feature, so here is the folder one level deeper. The pipeline
-itself is only three files (teal): [`extract.py`](backend/app/extraction/extract.py) loads a
-chapter's sections and builds the prompt, [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
-calls the LLM and writes concepts, and [`concept_store.py`](backend/app/extraction/concept_store.py)
+itself is only two files (teal): [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
+builds the prompt, calls the LLM and writes concepts (section loading + scope resolution
+come from `content/scope.py`, the shared owner), and [`concept_store.py`](backend/app/extraction/concept_store.py)
 is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/pipeline/build.py))
 runs these as queue jobs (`extract`; `build` is a compat alias). Four other LLM *generation passes*
 (coral) live in the folder and are triggered independently — `deep_chapter` assembles
@@ -335,7 +331,6 @@ Two dependencies live outside the folder: `concepts_extract` calls
 ```mermaid
 flowchart TD
   build["pipeline/build.py<br/>extract runner + eval gate"]
-  extract["extract.py<br/>sections + prompt"]
   concepts["concepts_extract.py<br/>LLM → concepts"]
   store["concept_store.py<br/>read concepts"]
   deep["deep_chapter.py<br/>assembled briefing"]
@@ -345,18 +340,16 @@ flowchart TD
 
   build --> concepts
   build --> deep
-  extract --> concepts
   concepts -->|concepts| store
 
   classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
   classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class build trig;
-  class extract,concepts,store core;
+  class concepts,store core;
   class deep,skeleton,guide,augment pass;
 
   click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
-  click extract "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/extract.py"
   click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concepts_extract.py"
   click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concept_store.py"
   click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/deep_chapter.py"

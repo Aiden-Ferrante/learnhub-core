@@ -25,7 +25,7 @@ import numpy as np
 
 from app.content.documents import resolve_doc_id
 from app.platform.db import db
-from app.extraction.extract import _load_section_blocks
+from app.content.scope import load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import GuidedScript
 from app.media.tts_orpheus import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
@@ -132,7 +132,7 @@ def segment_text(text: str, max_chars: int = 280) -> list[str]:
 
 def _scope_segments_text(doc_id: str, scope: str | None) -> list[str]:
     """Chapter's source markdown (per section, heading first), cleaned + segmented."""
-    sections = _load_section_blocks(doc_id, scope=scope)
+    sections = load_section_blocks(doc_id, scope=scope)
     segs: list[str] = []
     for s in sections:
         heading = (s.heading or "").strip()
@@ -143,7 +143,7 @@ def _scope_segments_text(doc_id: str, scope: str | None) -> list[str]:
 
 
 def _scope_section_keys(doc_id: str, scope: str | None) -> list[str]:
-    return [s.section_key for s in _load_section_blocks(doc_id, scope=scope)]
+    return [s.section_key for s in load_section_blocks(doc_id, scope=scope)]
 
 
 def _scope_segments_concepts(doc_id: str, scope: str | None) -> list[str]:
@@ -223,7 +223,7 @@ def _scope_segments_guided(doc_id: str, scope: str | None, model=None, on_progre
     """Verbatim passages spliced with concept-grounded tutor scaffolding (single voice).
     All LLM script-writing happens here, BEFORE any TTS, so the single-GPU model cache
     swaps once (script model → Orpheus) instead of per section."""
-    sections = _load_section_blocks(doc_id, scope=scope)
+    sections = load_section_blocks(doc_id, scope=scope)
     out: list[str] = []
     for si, s in enumerate(sections):
         if on_progress:

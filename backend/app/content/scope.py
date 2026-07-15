@@ -1,14 +1,19 @@
-"""Scope resolution — which sections a TOC scope spans.
+"""Scope resolution — which sections a TOC scope spans, and their contentful blocks.
 
 The ONE answer to "what's inside chapter X": outline nesting first (bridges mixed
 keyspaces — a numbered chapter whose sub-sections carry slug keys), then the
-reading-order span. Extraction, study scoping, coverage reports and the reader all
-resolve scopes through here, so no two surfaces can disagree about a chapter's extent.
+reading-order span. The public surface is three functions — ``scope_blocks`` (the
+rows), ``scope_section_keys`` (just the keys), ``load_section_blocks`` (extraction-
+ready blocks with the junk/short filters) — and every consumer (reader, extraction,
+study scoping, coverage) goes through them, so no two surfaces can disagree about a
+chapter's extent. The underscore helpers are implementation detail; do not import
+them outside this package.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from app.platform.db import db
 
@@ -112,28 +117,111 @@ def _scope_keys_from_outline(doc_id: str, scope: str) -> set[str] | None:
     return keys
 
 
-def _scope_section_keys(doc: str | None, scope: str | None) -> set[str] | None:
-    """The set of section keys a chapter scope spans (chapter → all its sub-sections).
-    Outline nesting first (bridges mixed keyspaces — a numbered chapter whose sub-sections
-    carry slug keys), then the reading-order span — the same resolution order as the reader,
-    so study scoping can't disagree with it. None = whole course (no filter)."""
+def _fetch_scope_rows(doc_id: str) -> list[dict]:
+    with db() as conn:
+        return conn.execute(
+            'SELECT section_key AS "sectionKey", "order", heading, level '
+            "FROM section_content WHERE doc_id = %(d)s ORDER BY \"order\"",
+            {"d": doc_id},
+        ).fetchall()
+
+
+def scope_blocks(doc_id: str, scope: str, rows: list[dict] | None = None) -> list[dict]:
+    """A scope's ``section_content`` rows: outline-first, reading-order-span fallback.
+
+    ``rows`` lets batch callers (coverage, chapters) load the doc's rows ONCE and span
+    many scopes over them; rows may carry extra columns (markdown, pages) — they pass
+    through untouched. ``rows=None`` fetches the minimal columns."""
+    if rows is None:
+        rows = _fetch_scope_rows(doc_id)
+    okeys = _scope_keys_from_outline(doc_id, scope)
+    if okeys:
+        matched = [r for r in rows if r.get("sectionKey") in okeys]
+        if matched:
+            return matched
+    return _blocks_in_scope(rows, scope, _section_level_fn(doc_id))
+
+
+def scope_section_keys(doc: str | None, scope: str | None) -> set[str] | None:
+    """The set of section keys a chapter scope spans (chapter → all its sub-sections),
+    resolved the same way as the reader. None = whole course (no filter)."""
     if not scope:
         return None
     if not doc:
         return {scope}
     try:
-        with db() as conn:
-            rows = conn.execute(
-                'SELECT section_key AS "sectionKey", "order", heading, level '
-                "FROM section_content WHERE doc_id = %(d)s ORDER BY \"order\"",
-                {"d": doc},
-            ).fetchall()
-        block_keys = {b.get("sectionKey") for b in rows if b.get("sectionKey")}
-        okeys = _scope_keys_from_outline(doc, scope)
-        keys = (okeys & block_keys) if okeys else set()
-        if not keys:
-            matched = _blocks_in_scope(rows, scope, _section_level_fn(doc))
-            keys = {b.get("sectionKey") for b in matched if b.get("sectionKey")}
+        keys = {b.get("sectionKey") for b in scope_blocks(doc, scope) if b.get("sectionKey")}
         return keys or {scope}
     except Exception:  # noqa: BLE001
         return {scope}
+
+
+# ---------------------------------------------------------------------------- #
+# Extraction-ready loading (moved from extraction/extract.py — content is the
+# lowest layer that may own it; media, study, and extraction all consume it)
+# ---------------------------------------------------------------------------- #
+
+_MIN_SECTION_BODY_CHARS = 80  # skip heading-only / structural blocks with no real content
+# Front-matter noise that the splitter mis-detects as a heading (copyright URLs, ISBNs).
+_JUNK_HEADING = re.compile(r"(https?://|www\.|isbn|cambridge\.org|\b\d{9,}\b)", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class SectionExtractInput:
+    doc_id: str
+    section_key: str
+    heading: str
+    page_start: int | None
+    page_end: int | None
+    markdown: str
+
+
+def section_body_len(markdown: str) -> int:
+    """Length of a section block's body (markdown minus its leading heading line)."""
+    parts = (markdown or "").split("\n", 1)
+    return len(parts[1].strip()) if len(parts) > 1 else 0
+
+
+def load_section_blocks(
+    doc_id: str,
+    section_keys: list[str] | None = None,
+    scope: str | None = None,
+    skipped_out: list[dict] | None = None,
+) -> list[SectionExtractInput]:
+    """A scope's blocks WITH their markdown, filtered to what's worth processing
+    (drops heading-only stubs and front-matter junk, recording why into ``skipped_out``)."""
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS "sectionKey", "order", heading, level, markdown, '
+            'page_start AS "pageStart", page_end AS "pageEnd" '
+            'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+            {"d": doc_id},
+        ).fetchall()
+    if scope:
+        rows = scope_blocks(doc_id, scope, rows=rows)
+    wanted = set(section_keys) if section_keys else None
+    out: list[SectionExtractInput] = []
+    for r in rows:
+        sk = r.get("sectionKey")
+        if wanted is not None and sk not in wanted:
+            continue
+        md = r.get("markdown") or ""
+        if section_body_len(md) < _MIN_SECTION_BODY_CHARS:
+            if skipped_out is not None:
+                skipped_out.append({"sectionKey": sk, "heading": r.get("heading") or sk, "reason": "too-short"})
+            continue
+        if _JUNK_HEADING.search(r.get("heading") or ""):
+            if skipped_out is not None:
+                skipped_out.append({"sectionKey": sk, "heading": r.get("heading") or sk, "reason": "junk-heading"})
+            continue
+        out.append(
+            SectionExtractInput(
+                doc_id=doc_id,
+                section_key=sk,
+                heading=r.get("heading") or sk,
+                page_start=r.get("pageStart"),
+                page_end=r.get("pageEnd"),
+                markdown=md,
+            )
+        )
+    return out

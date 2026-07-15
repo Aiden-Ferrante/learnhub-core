@@ -29,7 +29,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
         if err:
             return {"docId": doc_id, "chapters": [], "error": err}
 
-        from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
+        from app.content.scope import scope_blocks
 
         with db() as conn:
             rows = conn.execute(
@@ -37,16 +37,10 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
                 'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
                 {"d": doc_id},
             ).fetchall()
-        block_keys = {r.get("sectionKey") for r in rows}
-        level_of = _section_level_fn(doc_id)
-
         def has_content(key: str) -> bool:
-            # Same outline-first rule as fetch_section_content/_load_section_blocks.
+            # Same outline-first rule as fetch_section_content (one shared resolver).
             try:
-                okeys = _scope_keys_from_outline(doc_id, key)
-                if okeys and okeys & block_keys:
-                    return True
-                return bool(_blocks_in_scope(rows, key, level_of))
+                return bool(scope_blocks(doc_id, key, rows=rows))
             except Exception:  # noqa: BLE001
                 return False
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.content.documents import resolve_doc_id
-from app.content.scope import _scope_section_keys
+from app.content.scope import scope_section_keys
 from app.pipeline.build import run_extract
 from app.pipeline.ingest import run_convert
 from app.extraction.reading_guide import author_guides_sync
@@ -26,7 +26,7 @@ def _latest_doc_id() -> str | None:
 
 
 def _run_quizzes(job: dict[str, Any], ctx) -> dict[str, Any]:
-    keys = sorted(_scope_section_keys(job["docId"], job["scope"]) or {job["scope"]})
+    keys = sorted(scope_section_keys(job["docId"], job["scope"]) or {job["scope"]})
     return author_scope_sync(job["docId"], keys, on_progress=ctx.progress)
 
 

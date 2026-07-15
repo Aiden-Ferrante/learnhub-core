@@ -31,7 +31,7 @@ from app.content.outline import (
     normalize_outline,
 )
 from app.content.pages import build_page_blocks, section_page_ranges
-from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
+from app.content.scope import scope_blocks
 from app.content.sections import split_markdown_sections
 from app.platform.db import db
 
@@ -212,15 +212,8 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
                 'FROM section_content WHERE doc_id = %(docId)s ORDER BY "order"',
                 {"docId": doc_id},
             ).fetchall()
-        # Outline-first spanning — the SAME rule extraction uses (_load_section_blocks):
-        # a numbered chapter's sub-sections are usually slug-keyed, which the numeric
-        # ancestor walk can't see, so chapters whose heading block isn't keyed toc:N
-        # would read as EMPTY (DDIA ch.3+, AI-Eng ch.2-9). Reading-order span remains
-        # the fallback. Local import avoids an arango_content <-> extract module cycle.
-        okeys = _scope_keys_from_outline(doc_id, section_key)
-        matched = [r for r in rows if r.get("sectionKey") in okeys] if okeys else []
-        if not matched:
-            matched = _blocks_in_scope(rows, section_key, _section_level_fn(doc_id))
+        # Outline-first spanning with reading-order fallback — the one shared rule.
+        matched = scope_blocks(doc_id, section_key, rows=rows)
         blocks = [
             {
                 "sectionKey": r.get("sectionKey"),

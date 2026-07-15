@@ -4,10 +4,10 @@ The product is a *course*, not a triple graph. Each concept is one learnable ide
 (definition / theorem / principle / result / method) carrying a self-contained lesson:
 ``signal`` (distilled explanation) and ``source`` (the verbatim passage that grounds it).
 
-Reuses the extraction engine from ``app.extract`` (section loading + chapter scope, the
-domain-aware user prompt, the per-section model, structured-output transport) and only
-swaps the schema / system prompt / write target. The pure parse/assemble/key functions
-are unit-tested without LLM or DB.
+Section loading + scope resolution come from ``content.scope`` (the shared owner);
+this module owns the prompts, the structured-output transport, the grounding gate,
+and the write path. The pure parse/assemble/key functions are unit-tested without
+LLM or DB.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import re
 import time
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
@@ -22,18 +23,46 @@ from difflib import SequenceMatcher
 from app.content.documents import resolve_doc_id
 from psycopg.types.json import Json
 
+from app.content.scope import SectionExtractInput, load_section_blocks
+from app.content.sections import _clean_heading_markup
 from app.platform.db import db
-from app.extraction.extract import (
-    _domain,
-    _extract_model,
-    _load_section_blocks,
-    _norm_part,
-    normalize_entity,
-)
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import ConceptResult
 
 _KINDS = ("definition", "theorem", "principle", "result", "method")
+
+_DEFAULT_DOMAIN = "a mathematics / causal-inference textbook"
+
+
+def _domain() -> str:
+    return os.environ.get("LEARN_EXTRACT_DOMAIN") or _DEFAULT_DOMAIN
+
+
+def _extract_model() -> str | None:
+    """Optional extraction-specific model (``LEARN_EXTRACT_MODEL``); else the default
+    ``OLLAMA_MODEL`` is used. Lets the batch pick a faster/better model than the chat one."""
+    return os.environ.get("LEARN_EXTRACT_MODEL") or None
+
+
+def _norm_part(s: object) -> str:
+    return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def normalize_entity(name: object) -> str:
+    return _clean_heading_markup(str(name or "")).strip()
+
+
+def build_user_prompt(inp: SectionExtractInput) -> str:
+    if inp.page_start is None:
+        pages = ""
+    elif inp.page_end and inp.page_end != inp.page_start:
+        pages = f", pages {inp.page_start}-{inp.page_end}"
+    else:
+        pages = f", page {inp.page_start}"
+    return (
+        f"Section: {inp.heading}  ({inp.section_key}{pages})\n\n"
+        f"<section_markdown>\n{inp.markdown}\n</section_markdown>"
+    )
 
 # Grounding gate: a concept with no verbatim source_sentence is almost always manufactured
 # from motivational/narrative prose (the observed failure mode). Requiring grounding doubles
@@ -317,8 +346,6 @@ def _extract_one_section_concepts(
 ) -> tuple[SectionConcepts | None, str | None, dict]:
     """Extract one section's concepts. Returns ``(section_concepts, error, meta)`` where
     ``meta`` carries drop accounting (raw/gated/malformed) and the chunk count."""
-    from app.extraction.extract import build_user_prompt  # reuse the templated user message
-
     # Precedence: the request's model (UI picker) > LEARN_EXTRACT_MODEL > OLLAMA_MODEL.
     use_model = model or _extract_model()
     meta: dict = {}
@@ -381,7 +408,7 @@ async def extract_concepts_document(
         return {"error": "no document found"}
 
     skipped: list[dict] = []
-    sections = _load_section_blocks(doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
+    sections = load_section_blocks(doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
     outcomes: list[dict] = [
         {"sectionKey": s["sectionKey"], "heading": s["heading"], "status": "skipped", "reason": s["reason"]}
         for s in skipped

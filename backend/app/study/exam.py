@@ -16,7 +16,7 @@ from app.platform.db import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import ensure_questions_async, servable_from_cached
-from app.extraction.extract import _load_section_blocks
+from app.content.scope import scope_section_keys
 from app.study.mastery import record_quiz_event
 from app.content.documents import resolve_doc_id
 from app.extraction.skeleton import update_stage
@@ -55,8 +55,9 @@ def _exam_question(doc_id: str, target: dict, pool: list[dict], rng) -> dict | N
 
 
 def _chapter_targets(doc_id: str, scope: str | None, pool: list[dict]) -> list[dict]:
-    keys = {s.section_key for s in _load_section_blocks(doc_id, scope=scope)}
-    return [c for c in pool if c.get("sectionKey") in keys and is_quizzable(c)]
+    # Keys only — no need to load every section's markdown to filter the concept pool.
+    keys = scope_section_keys(doc_id, scope)
+    return [c for c in pool if (keys is None or c.get("sectionKey") in keys) and is_quizzable(c)]
 
 
 def start_exam(doc_id: str | None, scope: str | None, n: int = 12) -> dict:

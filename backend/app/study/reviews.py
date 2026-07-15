@@ -25,7 +25,7 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-from app.content.scope import _scope_section_keys
+from app.content.scope import scope_section_keys
 from app.platform.db import db
 from app.study import srs
 from app.study.mastery import record_quiz_event
@@ -213,7 +213,7 @@ def build_review_queue(
     try:
         # A chapter scope spans ALL its sub-sections (same reading-order span the reader and
         # quiz use) — exact-key matching misses everything under a chapter node.
-        span = _scope_section_keys(doc, scope) if scope else None
+        span = scope_section_keys(doc, scope) if scope else None
         with db() as conn:
             concepts = conn.execute(
                 'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
