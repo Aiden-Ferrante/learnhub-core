@@ -352,7 +352,7 @@ async def extract_concepts_document(
 
     ensure_concept_collections(db)
     skipped: list[dict] = []
-    sections = _load_section_blocks(db, doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
+    sections = _load_section_blocks(doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
     outcomes: list[dict] = [
         {"sectionKey": s["sectionKey"], "heading": s["heading"], "status": "skipped", "reason": s["reason"]}
         for s in skipped
@@ -402,7 +402,7 @@ async def extract_concepts_document(
         total_questions += sum(len(c.questions) for c in sc.concepts)
 
     # Keep the structural TOC tree (drives the syllabus view).
-    upsert_structural_edges(db, structural_subsection_triples([s.section_key for s in sections]), doc_id)
+    upsert_structural_edges(structural_subsection_triples([s.section_key for s in sections]), doc_id)
 
     # Deep Chapter overlay (assembled briefing + per-section recaps + per-concept deep
     # explanations). The pipeline runs this as a separate "deep" enrichment job, so

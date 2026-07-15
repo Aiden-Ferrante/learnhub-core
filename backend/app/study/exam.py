@@ -57,7 +57,7 @@ def _exam_question(db, doc_id: str, target: dict, pool: list[dict], rng) -> dict
 
 
 def _chapter_targets(db, doc_id: str, scope: str | None, pool: list[dict]) -> list[dict]:
-    keys = {s.section_key for s in _load_section_blocks(db, doc_id, scope=scope)}
+    keys = {s.section_key for s in _load_section_blocks(doc_id, scope=scope)}
     return [c for c in pool if c.get("sectionKey") in keys and is_quizzable(c)]
 
 

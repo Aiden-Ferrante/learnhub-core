@@ -133,7 +133,7 @@ def _concepts_by_section(db, doc_id: str, section_keys: list[str]) -> dict[str, 
 
 def generate_skeleton(db, doc_id: str, scope: str | None, model: str | None = None) -> list[dict] | None:
     """Build the ordered [{sectionKey, heading, essence}] for a chapter scope."""
-    sections = _load_section_blocks(db, doc_id, scope=scope)
+    sections = _load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]
@@ -246,7 +246,7 @@ ORIENT_SYSTEM = (
 
 
 def generate_orient(db, doc_id: str, scope: str | None, model: str | None = None) -> dict | None:
-    sections = _load_section_blocks(db, doc_id, scope=scope)
+    sections = _load_section_blocks(doc_id, scope=scope)
     if not sections:
         return None
     keys = [s.section_key for s in sections]

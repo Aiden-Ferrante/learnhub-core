@@ -57,7 +57,7 @@ def _ensure_col(db) -> None:
 def _blocks(db, doc: str, scope: str | None) -> list[dict[str, Any]]:
     """The chapter's section blocks (heading + its own text), in reading order."""
     try:
-        secs = _load_section_blocks(db, doc, scope=scope)
+        secs = _load_section_blocks(doc, scope=scope)
         return [
             {
                 "sectionKey": s.section_key,

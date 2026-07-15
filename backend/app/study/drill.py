@@ -53,7 +53,7 @@ def select_targets(db, doc: str, scope: str | None, pool: list[dict], n: int) ->
         sec_mastery = {}
 
     if scope:
-        keys = {s.section_key for s in _load_section_blocks(db, doc, scope=scope)}
+        keys = {s.section_key for s in _load_section_blocks(doc, scope=scope)}
         cand = [c for c in pool if c.get("sectionKey") in keys and c.get("signal")]
     else:
         cand = [c for c in pool if c.get("signal")]
