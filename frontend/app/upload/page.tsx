@@ -1,8 +1,8 @@
 "use client"
 
 import { Table, Upload } from "lucide-react"
-import { DocumentsTable } from "@/features/documents/components/documents-table"
-import { UploadDocuments } from "@/features/documents/components/upload-documents"
+import { DocumentsTable } from "@/features/documents"
+import { UploadDocuments } from "@/features/documents"
 
 export default function UploadPage() {
   return (

@@ -1,3 +1,4 @@
+import 'server-only'
 /** Where the learn backend lives, for the server-side proxy routes ONLY.
  *  Client code never needs this — it fetches the relative /api/learn/* proxies. */
 export function getLearnServiceBaseUrl(): string {

@@ -2,10 +2,10 @@
 
 import { Suspense, use, useCallback, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { DeepChapter } from "@/features/learn/components/reader/deep-chapter"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
-import { scopeFromSegments, scopeToPath } from "@/features/learn/lib/scope-url"
+import { DeepChapter } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
+import { scopeFromSegments, scopeToPath } from "@/features/learn"
 
 type Params = Promise<{ courseId: string; scope?: string[] }>
 

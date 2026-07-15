@@ -1,3 +1,4 @@
+import 'server-only'
 import { PoolClient } from 'pg'
 import { withSchema } from '@/lib/server/pg'
 import { getUserDbName } from '@/lib/server/user-db'

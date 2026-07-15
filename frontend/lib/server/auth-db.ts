@@ -1,3 +1,4 @@
+import 'server-only'
 import { pgPool, withSchema } from '@/lib/server/pg'
 
 // Shared auth lives in the Postgres `auth` schema (was the learnhub_auth Arango db);

@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { CourseShelf } from "@/features/learn/components/home/course-shelf"
-import { chapterHref } from "@/features/learn/lib/scope-url"
+import { CourseShelf } from "@/features/learn"
+import { chapterHref } from "@/features/learn"
 
 export default function CoursesPage() {
   const router = useRouter()

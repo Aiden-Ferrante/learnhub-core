@@ -2,10 +2,10 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { AskPanel } from "@/features/learn/components/reader/ask-panel"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
-import { chapterHref } from "@/features/learn/lib/scope-url"
+import { AskPanel } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
+import { chapterHref } from "@/features/learn"
 
 export default function AskPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)

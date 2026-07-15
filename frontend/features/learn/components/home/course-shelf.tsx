@@ -53,7 +53,7 @@ import {
   type GroupsState,
 } from "@/features/learn/lib/course-groups"
 import { courseFromDocument, type Course, type CourseStatus } from "@/features/learn/lib/courses"
-import { useDocuments } from "@/features/documents/document-context"
+import { useDocuments } from "@/features/documents"
 
 type CourseShelfProps = {
   liveTree: LearnTreeNode[]

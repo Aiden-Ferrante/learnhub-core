@@ -2,10 +2,10 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { CourseHome } from "@/features/learn/components/home/course-home"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
-import { chapterHref } from "@/features/learn/lib/scope-url"
+import { CourseHome } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
+import { chapterHref } from "@/features/learn"
 
 export default function CourseHomePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)

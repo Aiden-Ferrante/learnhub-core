@@ -2,9 +2,9 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { DumpView } from "@/features/learn/components/study/dump-view"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
+import { DumpView } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
 
 export default function DumpPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)

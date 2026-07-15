@@ -2,9 +2,9 @@
 
 import { Suspense, use } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ConceptsView } from "@/features/learn/components/concepts/concepts-view"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
+import { ConceptsView } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
 
 type Params = Promise<{ courseId: string }>
 

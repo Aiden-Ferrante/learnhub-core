@@ -2,9 +2,9 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { DrillView } from "@/features/learn/components/study/drill-view"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
+import { DrillView } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
 
 export default function DrillPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)

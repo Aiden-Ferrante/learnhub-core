@@ -15,7 +15,7 @@ import {
   type ReadingProgress,
 } from "@/features/learn/lib/reading-progress"
 import { courseFromDocument, isCourseReady, type Course } from "@/features/learn/lib/courses"
-import { useDocuments } from "@/features/documents/document-context"
+import { useDocuments } from "@/features/documents"
 
 export function useCourseData(courseId: string) {
   const { documents, isInitialized } = useDocuments()

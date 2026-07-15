@@ -1,3 +1,4 @@
+import 'server-only'
 import { Pool, PoolClient } from 'pg'
 
 // The ONE Postgres pool for the Next.js app (auth + per-user document list).

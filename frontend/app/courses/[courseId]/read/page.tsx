@@ -2,9 +2,9 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { PdfBookView } from "@/features/learn/components/reader/pdf-book-view"
-import { CourseFallback } from "@/features/learn/components/course-guard"
-import { useCourseData } from "@/features/learn/hooks/use-course-data"
+import { PdfBookView } from "@/features/learn"
+import { CourseFallback } from "@/features/learn"
+import { useCourseData } from "@/features/learn"
 
 export default function ReadPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)

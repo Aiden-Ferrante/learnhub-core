@@ -1,3 +1,4 @@
+import 'server-only'
 import { auth } from '@/lib/server/auth'
 
 export type SessionUser = {

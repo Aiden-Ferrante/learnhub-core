@@ -1,6 +1,6 @@
 "use client"
 
-import { ProcessDashboard } from "@/features/process/components/process-dashboard"
+import { ProcessDashboard } from "@/features/process"
 
 export default function ProcessPage() {
   return (

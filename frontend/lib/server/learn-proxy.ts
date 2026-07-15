@@ -1,3 +1,4 @@
+import 'server-only'
 import { NextResponse } from 'next/server'
 import { getLearnServiceBaseUrl } from '@/lib/server/learn-upstream'
 import { getUserDbName } from '@/lib/server/user-db'
