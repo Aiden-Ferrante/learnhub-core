@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation"
 import { Zap } from "lucide-react"
-import { BrandMark } from "@/components/brand-mark"
+import { BrandMark } from "@/components/layout/brand-mark"
 
 /** Clickable site brand: always returns to the course shelf. When already on the Learn
  *  tab the hash doesn't change (no hashchange event), so we also broadcast a home event

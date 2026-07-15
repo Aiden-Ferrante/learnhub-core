@@ -1,6 +1,6 @@
 "use client"
 
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { cn } from "@/lib/utils"
 
 /**

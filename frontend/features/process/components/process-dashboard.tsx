@@ -16,9 +16,9 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { MachineStrip } from "@/components/process/machine-strip"
-import { PipelineGrid } from "@/components/process/pipeline-grid"
-import { cleanCourseTitle } from "@/lib/courses"
+import { MachineStrip } from "@/features/process/components/machine-strip"
+import { PipelineGrid } from "@/features/process/components/pipeline-grid"
+import { cleanCourseTitle } from "@/features/learn/lib/courses"
 import {
   cancelChapterBuild,
   deleteConcept,
@@ -34,7 +34,7 @@ import {
   type CourseChapter,
   type LearnDocumentInfo,
   type SectionOutcome,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import { cn } from "@/lib/utils"
 
 /** Processing dashboard — the extraction UI, rebuilt on the canonical pipeline:

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserDbName } from '@/lib/user-db';
+import { getUserDbName } from '@/lib/server/user-db';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 600;

@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { CourseShelf } from "@/components/learn/course-shelf"
-import { CourseHome } from "@/components/learn/course-home"
-import { ConceptsView } from "@/components/learn/concepts-view"
-import { DrillView } from "@/components/learn/drill-view"
-import { DumpView } from "@/components/learn/dump-view"
-import { PdfBookView } from "@/components/learn/pdf-book-view"
-import { DeepChapter } from "@/components/learn/deep-chapter"
-import { AskPanel } from "@/components/learn/ask-panel"
+import { CourseShelf } from "@/features/learn/components/home/course-shelf"
+import { CourseHome } from "@/features/learn/components/home/course-home"
+import { ConceptsView } from "@/features/learn/components/concepts/concepts-view"
+import { DrillView } from "@/features/learn/components/study/drill-view"
+import { DumpView } from "@/features/learn/components/study/dump-view"
+import { PdfBookView } from "@/features/learn/components/reader/pdf-book-view"
+import { DeepChapter } from "@/features/learn/components/reader/deep-chapter"
+import { AskPanel } from "@/features/learn/components/reader/ask-panel"
 import {
   fetchMastery,
   fetchReviewQueue,
@@ -17,14 +17,14 @@ import {
   type LearnTreeNode,
   type MasteryResponse,
   type WeakestSection,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import {
   fetchReadingProgress,
   saveReadingPosition,
   type ReadingProgress,
-} from "@/lib/reading-progress"
-import { courseFromDocument, isCourseReady, type Course } from "@/lib/courses"
-import { useDocuments } from "@/contexts/document-context"
+} from "@/features/learn/lib/reading-progress"
+import { courseFromDocument, isCourseReady, type Course } from "@/features/learn/lib/courses"
+import { useDocuments } from "@/features/documents/document-context"
 
 type LearnTabProps = {
   onTabChange?: (tab: string) => void

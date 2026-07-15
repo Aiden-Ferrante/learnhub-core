@@ -2,7 +2,7 @@
 
 import { BookOpen, Moon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useReadingTheme, type ReadingTheme } from "@/hooks/use-reading-theme"
+import { useReadingTheme, type ReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 
 /** Small segmented Paper/Dark switch for the reading surfaces. */
 export function ReadingThemeToggle({ className }: { className?: string }) {

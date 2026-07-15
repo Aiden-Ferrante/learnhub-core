@@ -30,14 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { GroupSidebar } from "@/components/learn/group-sidebar"
-import { TodayStrip } from "@/components/learn/today-strip"
+import { GroupSidebar } from "@/features/learn/components/home/group-sidebar"
+import { TodayStrip } from "@/features/learn/components/home/today-strip"
 import {
   countSections,
   deleteLearnDocument,
   type LearnTreeNode,
   type MasteryResponse,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import {
   addGroup,
   buildGroupTree,
@@ -51,9 +51,9 @@ import {
   toggleMembership,
   type CourseGroup,
   type GroupsState,
-} from "@/lib/course-groups"
-import { courseFromDocument, type Course, type CourseStatus } from "@/lib/courses"
-import { useDocuments } from "@/contexts/document-context"
+} from "@/features/learn/lib/course-groups"
+import { courseFromDocument, type Course, type CourseStatus } from "@/features/learn/lib/courses"
+import { useDocuments } from "@/features/documents/document-context"
 
 type CourseShelfProps = {
   liveTree: LearnTreeNode[]

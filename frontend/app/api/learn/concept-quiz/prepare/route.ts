@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { proxyLearnGet, proxyLearnPost } from '@/lib/learn-proxy'
+import { proxyLearnGet, proxyLearnPost } from '@/lib/server/learn-proxy'
 
 export const dynamic = 'force-dynamic'
 

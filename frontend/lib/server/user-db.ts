@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/server/auth'
 
 export type SessionUser = {
   id: string

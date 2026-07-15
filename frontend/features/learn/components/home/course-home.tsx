@@ -17,8 +17,8 @@ import {
   Target,
   Wand2,
 } from "lucide-react"
-import { SyllabusTree } from "@/components/learn/syllabus-tree"
-import { StudyHeatmap } from "@/components/learn/study-heatmap"
+import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
+import { StudyHeatmap } from "@/features/learn/components/home/study-heatmap"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -39,8 +39,8 @@ import {
   type Mistake,
   type TodayPlan,
   type WeakestSection,
-} from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+} from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 
 type CourseHomeProps = {
   course: Course

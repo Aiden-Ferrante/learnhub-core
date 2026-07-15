@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Maximize2, Minimize2, Minus, Plus, Type } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { PROSE_SIZES, type Measure, type ReadingPrefs } from "@/hooks/use-reading-prefs"
+import { PROSE_SIZES, type Measure, type ReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 
 const MEASURES: Measure[] = ["narrow", "normal", "wide"]
 

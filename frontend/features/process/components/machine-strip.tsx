@@ -9,7 +9,7 @@ import {
   setQueuePaused,
   type BuildKind,
   type SystemStatus,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import { cn } from "@/lib/utils"
 
 const KIND_LABEL: Record<BuildKind, string> = {

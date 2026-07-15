@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight, ArrowUpRight } from "lucide-react"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
-import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
+import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import { cn } from "@/lib/utils"
-import type { ConceptLesson } from "@/lib/learn-service"
+import type { ConceptLesson } from "@/features/learn/api"
 
 export const KIND_STYLES: Record<string, string> = {
   definition: "bg-blue-500/15 text-blue-400",

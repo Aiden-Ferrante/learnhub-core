@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ChevronLeft, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import {
   fetchCalibration,
   gradeDrill,
@@ -12,7 +12,7 @@ import {
   type Confidence,
   type DrillGradeResponse,
   type ExamQuestion,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import { cn } from "@/lib/utils"
 
 const CONF: { value: Confidence; label: string }[] = [

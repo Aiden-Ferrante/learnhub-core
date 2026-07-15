@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchSectionFigures, figureUrl, type LearnFigure } from "@/lib/learn-service"
+import { fetchSectionFigures, figureUrl, type LearnFigure } from "@/features/learn/api"
 
 /**
  * The captioned figures near a concept: fetched from the concept's section, narrowed to the

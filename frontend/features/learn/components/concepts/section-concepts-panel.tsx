@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Check, CheckCircle2, ChevronDown, Zap } from "lucide-react"
-import { AnswerFeedback } from "@/components/learn/answer-feedback"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
-import { MathText } from "@/components/learn/markdown-reader"
+import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
+import { MathText } from "@/features/learn/components/reader/markdown-reader"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -15,7 +15,7 @@ import {
   type ConceptLesson,
   type ConceptQuizResult,
   type ConceptQuizSession,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 const QUICK_CHECK_QUESTIONS = 2
 

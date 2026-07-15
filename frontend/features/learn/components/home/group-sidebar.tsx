@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import type { GroupTreeNode } from "@/lib/course-groups"
+import type { GroupTreeNode } from "@/features/learn/lib/course-groups"
 
 type GroupSidebarProps = {
   tree: GroupTreeNode[]

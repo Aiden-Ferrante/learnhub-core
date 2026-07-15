@@ -3,11 +3,11 @@
 import { useState } from "react"
 import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
-import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
-import { KIND_STYLES, prettyScope } from "@/components/learn/concept-card"
-import { SectionFigures } from "@/components/learn/section-figures"
-import { submitReviewGrade, type ConceptLesson, type ReviewGrade } from "@/lib/learn-service"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
+import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
+import { KIND_STYLES, prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { SectionFigures } from "@/features/learn/components/reader/section-figures"
+import { submitReviewGrade, type ConceptLesson, type ReviewGrade } from "@/features/learn/api"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
   { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },

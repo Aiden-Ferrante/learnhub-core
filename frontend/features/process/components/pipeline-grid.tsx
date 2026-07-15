@@ -11,7 +11,7 @@ import {
   type ChapterCoverage,
   type PipelineJobState,
   type PipelineLedgerRow,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import { cn } from "@/lib/utils"
 
 /** Which queue kind a grid column's click enqueues. Audio is presence-only (narrations

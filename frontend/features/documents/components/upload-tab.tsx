@@ -1,6 +1,6 @@
 import { Upload, Table } from "lucide-react"
-import { UploadDocuments } from "@/components/upload-documents"
-import { DocumentsTable } from "@/components/documents-table"
+import { UploadDocuments } from "@/features/documents/components/upload-documents"
+import { DocumentsTable } from "@/features/documents/components/documents-table"
 
 interface UploadTabProps {
   onTabChange: (tab: string) => void

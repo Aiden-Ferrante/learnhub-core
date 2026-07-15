@@ -28,27 +28,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MarkdownReader, MathText } from "@/components/learn/markdown-reader"
+import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
 import { useToast } from "@/hooks/use-toast"
-import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
-import { ReadingControls } from "@/components/learn/reading-controls"
-import { ConceptMasteryDot } from "@/components/learn/concept-mastery-dot"
-import { ConceptQuizPanel } from "@/components/learn/concept-quiz-panel"
-import { ReviewPanel } from "@/components/learn/review-panel"
-import { ExamPanel } from "@/components/learn/exam-panel"
-import { ChapterWalk } from "@/components/learn/chapter-walk"
-import { LockInPanel } from "@/components/learn/lockin-panel"
-import { LessonPanel } from "@/components/learn/lesson-panel"
-import { AudiobookPanel } from "@/components/learn/audiobook-panel"
-import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/lib/learn-path"
+import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
+import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
+import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
+import { ConceptQuizPanel } from "@/features/learn/components/study/concept-quiz-panel"
+import { ReviewPanel } from "@/features/learn/components/study/review-panel"
+import { ExamPanel } from "@/features/learn/components/study/exam-panel"
+import { ChapterWalk } from "@/features/learn/components/study/chapter-walk"
+import { LockInPanel } from "@/features/learn/components/study/lockin-panel"
+import { LessonPanel } from "@/features/learn/components/study/lesson-panel"
+import { AudiobookPanel } from "@/features/learn/components/reader/audiobook-panel"
+import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/features/learn/lib/learn-path"
 import {
   chaptersFromOutline,
   resolveChapterForScope,
   topLevelChapters,
   type Chapter,
-} from "@/components/learn/chapter-reader"
-import { useReadingTheme } from "@/hooks/use-reading-theme"
-import { useReadingPrefs, type Measure } from "@/hooks/use-reading-prefs"
+} from "@/features/learn/components/reader/chapter-reader"
+import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
+import { useReadingPrefs, type Measure } from "@/features/learn/hooks/use-reading-prefs"
 import {
   askTextbook,
   audiobookFileUrl,
@@ -72,8 +72,8 @@ import {
   type DeepChapterResponse,
   type LearnTreeNode,
   type OutlineEntry,
-} from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+} from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 
 type DeepChapterProps = {

@@ -12,8 +12,8 @@ import {
   type AskResponse,
   type SearchMatch,
   type SemanticSearchResponse,
-} from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+} from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 
 type Mode = "ask" | "search"
 

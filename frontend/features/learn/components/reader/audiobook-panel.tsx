@@ -22,7 +22,7 @@ import {
   type AudiobookSource,
   type AudiobookStatusResponse,
   type AudiobookTimeline,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 import {
   buildStripIndex,
   clearReadAlongHighlights,
@@ -31,7 +31,7 @@ import {
   setHighlight,
   type ChunkSpan,
   type StripIndex,
-} from "@/lib/read-along"
+} from "@/features/learn/lib/read-along"
 import { cn } from "@/lib/utils"
 
 type AudiobookPanelProps = {

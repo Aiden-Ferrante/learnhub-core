@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AnswerFeedback } from "@/components/learn/answer-feedback"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
+import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import {
   fetchQuizPrepareStatus,
   prepareQuizQuestions,
@@ -13,7 +13,7 @@ import {
   type ConceptQuizResult,
   type ConceptQuizSession,
   type QuizPrepareStatus,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 /** Deterministic concept MCQ: "which concept does this description match?", distractors are
  *  sibling concepts. Keyless. Records a study event so mastery moves. */

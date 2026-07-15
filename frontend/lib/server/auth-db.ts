@@ -1,4 +1,4 @@
-import { pgPool, withSchema } from '@/lib/pg'
+import { pgPool, withSchema } from '@/lib/server/pg'
 
 // Shared auth lives in the Postgres `auth` schema (was the learnhub_auth Arango db);
 // per-user data lives in a tenant schema named by the user's `dbName` (was a per-user db).

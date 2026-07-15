@@ -1,6 +1,6 @@
 /** Course model for the Learn hub shelf — one course per uploaded document. */
 
-import type { Document } from "@/contexts/document-context"
+import type { Document } from "@/features/documents/document-context"
 
 export type CourseStatus = "ready" | "processing" | "empty"
 

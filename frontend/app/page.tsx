@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { ChevronLeft } from "lucide-react"
 import React from "react"
-import { UploadTab } from "@/components/tabs/UploadTab"
-import { ConfigureTab } from "@/components/tabs/ConfigureTab"
-import { LearnTab } from "@/components/tabs/LearnTab"
+import { UploadTab } from "@/features/documents/components/upload-tab"
+import { ProcessTab } from "@/features/process/components/process-tab"
+import { LearnTab } from "@/features/learn/components/learn-tab"
 
 export default function Home() {
   // Study (Learn) IS the app — no tab chrome; the learning surface gets the whole
@@ -60,7 +60,7 @@ export default function Home() {
             <ChevronLeft className="h-4 w-4" />
             Back to courses
           </button>
-          {activeTab === "upload" ? <UploadTab onTabChange={handleTabChange} /> : <ConfigureTab />}
+          {activeTab === "upload" ? <UploadTab onTabChange={handleTabChange} /> : <ProcessTab />}
         </main>
       )}
     </div>

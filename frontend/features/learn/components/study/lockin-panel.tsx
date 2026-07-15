@@ -8,7 +8,7 @@ import {
   fetchChapterProgress,
   updateChapterStage,
   type LearnTreeNode,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 type LockInPanelProps = {
   scope: string | null

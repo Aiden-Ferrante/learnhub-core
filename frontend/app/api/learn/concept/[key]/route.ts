@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { proxyLearnDelete } from '@/lib/learn-proxy'
+import { proxyLearnDelete } from '@/lib/server/learn-proxy'
 
 export const dynamic = 'force-dynamic'
 

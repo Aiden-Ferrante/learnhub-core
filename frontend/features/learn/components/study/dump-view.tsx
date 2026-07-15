@@ -8,7 +8,7 @@ import {
   displaySectionTitle,
   type LearnTreeNode,
   type RecallResponse,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 type DumpViewProps = {
   /** Top-level chapters to free-recall (the tree's chapter nodes). */

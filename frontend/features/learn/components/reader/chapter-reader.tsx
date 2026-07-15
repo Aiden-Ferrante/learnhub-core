@@ -10,18 +10,18 @@ import {
   Search,
   X,
 } from "lucide-react"
-import { MarkdownReader } from "@/components/learn/markdown-reader"
+import { MarkdownReader } from "@/features/learn/components/reader/markdown-reader"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useReadingTheme, type ReadingTheme } from "@/hooks/use-reading-theme"
-import { useReadingPrefs, type ReadingPrefs } from "@/hooks/use-reading-prefs"
-import { useInBookFind } from "@/hooks/use-in-book-find"
+import { useReadingTheme, type ReadingTheme } from "@/features/learn/hooks/use-reading-theme"
+import { useReadingPrefs, type ReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
+import { useInBookFind } from "@/features/learn/hooks/use-in-book-find"
 import { cn } from "@/lib/utils"
 import {
   fetchSectionContent,
   type LearnTreeNode,
   type OutlineEntry,
   type SectionContentBlock,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 export type Chapter = { key: string; title: string }
 

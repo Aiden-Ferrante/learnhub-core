@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useState, useEffect, useRef } from "react"
-import type { PreparedIngestFile } from "@/lib/convert-pdf"
+import type { PreparedIngestFile } from "@/features/documents/lib/convert-pdf"
 
 export type DocumentAddInput = File | PreparedIngestFile
 

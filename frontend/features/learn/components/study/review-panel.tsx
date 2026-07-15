@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { KIND_STYLES } from "@/components/learn/concept-card"
-import { ConceptMarkdown } from "@/components/learn/concept-markdown"
-import { SectionFigures } from "@/components/learn/section-figures"
+import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
+import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
+import { SectionFigures } from "@/features/learn/components/reader/section-figures"
 import {
   fetchReviewQueue,
   figureUrl,
@@ -13,7 +13,7 @@ import {
   type ReviewCard,
   type ReviewGrade,
   type ReviewQueueResponse,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
   { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },

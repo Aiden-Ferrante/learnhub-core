@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { CheckCircle, AlertCircle, Loader2, Trash2, FileText, Download, Info, Pencil } from "lucide-react"
-import { useDocuments } from "@/contexts/document-context"
-import { useShiftSelect } from "@/hooks/use-shift-select"
+import { useDocuments } from "@/features/documents/document-context"
+import { useShiftSelect } from "@/features/documents/hooks/use-shift-select"
 import {
   AlertDialog,
   AlertDialogAction,

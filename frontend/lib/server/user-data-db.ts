@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg'
-import { withSchema } from '@/lib/pg'
-import { getUserDbName } from '@/lib/user-db'
+import { withSchema } from '@/lib/server/pg'
+import { getUserDbName } from '@/lib/server/user-db'
 
 /** Run a query callback against the session user's tenant schema (was: connect to
  * the user's Arango data database). The client's search_path is pinned to the

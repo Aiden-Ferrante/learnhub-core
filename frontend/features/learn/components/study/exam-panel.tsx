@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ClipboardCheck, Loader2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { AnswerFeedback } from "@/components/learn/answer-feedback"
+import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { cn } from "@/lib/utils"
 import {
   gradeExam,
@@ -12,7 +12,7 @@ import {
   type ExamGradeResponse,
   type ExamQuestion,
   type ExamStartResponse,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 type ExamPanelProps = {
   scope: string | null

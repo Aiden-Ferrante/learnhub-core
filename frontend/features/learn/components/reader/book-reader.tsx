@@ -11,20 +11,20 @@ import {
   resolveChapterFromOutline,
   topLevelChapters,
   type Chapter,
-} from "@/components/learn/chapter-reader"
-import { ReadingThemeToggle } from "@/components/learn/reading-theme-toggle"
-import { ReadingControls } from "@/components/learn/reading-controls"
-import { SyllabusTree } from "@/components/learn/syllabus-tree"
-import { useReadingTheme } from "@/hooks/use-reading-theme"
-import { useReadingPrefs } from "@/hooks/use-reading-prefs"
+} from "@/features/learn/components/reader/chapter-reader"
+import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
+import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
+import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
+import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
+import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 import {
   fetchCourseChapters,
   fetchOutline,
   type LearnTreeNode,
   type MasteryResponse,
   type OutlineEntry,
-} from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+} from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 
 type BookReaderProps = {
   course: Course

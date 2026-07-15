@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react"
 import { ChevronLeft, ExternalLink, FileText, Maximize2, Minimize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { BookReader } from "@/components/learn/book-reader"
-import type { LearnTreeNode, MasteryResponse } from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+import { BookReader } from "@/features/learn/components/reader/book-reader"
+import type { LearnTreeNode, MasteryResponse } from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 
 type PdfBookViewProps = {
   course: Course

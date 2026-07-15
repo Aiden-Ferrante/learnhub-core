@@ -4,8 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import { Upload, AlertCircle, FileText, Loader2 } from "lucide-react"
-import { useDocuments } from "@/contexts/document-context"
-import { isSupportedIngestFile, prepareFilesForIngestion } from "@/lib/convert-pdf"
+import { useDocuments } from "@/features/documents/document-context"
+import { isSupportedIngestFile, prepareFilesForIngestion } from "@/features/documents/lib/convert-pdf"
 import { toast } from "@/hooks/use-toast"
 
 export function UploadDocuments() {

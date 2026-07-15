@@ -1,8 +1,8 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
-import { authConfig } from '@/lib/auth.config'
-import { ensureUserDb, findUserByUsername } from '@/lib/auth-db'
+import { authConfig } from '@/lib/server/auth.config'
+import { ensureUserDb, findUserByUsername } from '@/lib/server/auth-db'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,

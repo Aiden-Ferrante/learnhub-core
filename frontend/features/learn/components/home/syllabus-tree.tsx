@@ -22,7 +22,7 @@ import {
   startExtraction,
   type LearnTreeNode,
   type SectionMastery,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 type ExtractState = "running" | "done" | "error"
 

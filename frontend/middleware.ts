@@ -18,7 +18,7 @@ export default function middleware() {
 // --- ORIGINAL AUTH GATE ------------------------------------------------------
 // import NextAuth from 'next-auth'
 // import { NextResponse } from 'next/server'
-// import { authConfig } from '@/lib/auth.config'
+// import { authConfig } from '@/lib/server/auth.config'
 //
 // const { auth } = NextAuth(authConfig)
 //

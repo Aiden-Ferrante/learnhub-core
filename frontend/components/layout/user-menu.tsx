@@ -1,5 +1,5 @@
 import { LogOut, UserCircle2 } from "lucide-react"
-import { auth, signOut } from "@/lib/auth"
+import { auth, signOut } from "@/lib/server/auth"
 
 export async function UserMenu() {
   const session = await auth()

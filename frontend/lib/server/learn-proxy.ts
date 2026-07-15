@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getLearnServiceBaseUrl } from '@/lib/learn-service'
-import { getUserDbName } from '@/lib/user-db'
+import { getLearnServiceBaseUrl } from '@/lib/server/learn-upstream'
+import { getUserDbName } from '@/lib/server/user-db'
 
 export async function proxyLearnGet(
   upstreamPath: string,

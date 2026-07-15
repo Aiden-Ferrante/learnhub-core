@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, ListTree, RotateCcw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { SectionConceptsPanel } from "@/components/learn/section-concepts-panel"
+import { SectionConceptsPanel } from "@/features/learn/components/concepts/section-concepts-panel"
 import {
   buildChapterWalk,
   fetchSkeleton,
@@ -15,7 +15,7 @@ import {
   type LearnTreeNode,
   type ReviewGrade,
   type SkeletonGrade,
-} from "@/lib/learn-service"
+} from "@/features/learn/api"
 
 type ChapterWalkProps = {
   /** The chapter section key in scope. */

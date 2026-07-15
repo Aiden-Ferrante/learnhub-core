@@ -8,8 +8,8 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import rehypeHighlight from "rehype-highlight"
 import { cn } from "@/lib/utils"
-import type { ReadingTheme } from "@/hooks/use-reading-theme"
-import type { Measure, ProseSize } from "@/hooks/use-reading-prefs"
+import type { ReadingTheme } from "@/features/learn/hooks/use-reading-theme"
+import type { Measure, ProseSize } from "@/features/learn/hooks/use-reading-prefs"
 
 type MarkdownReaderProps = {
   content: string

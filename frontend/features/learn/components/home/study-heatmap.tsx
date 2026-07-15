@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchActivity, type ActivityDay } from "@/lib/learn-service"
+import { fetchActivity, type ActivityDay } from "@/features/learn/api"
 
 const WEEKS = 53
 const DAY_MS = 86_400_000

@@ -1,4 +1,4 @@
-import { proxyLearnPost } from '@/lib/learn-proxy'
+import { proxyLearnPost } from '@/lib/server/learn-proxy'
 
 export const dynamic = 'force-dynamic'
 

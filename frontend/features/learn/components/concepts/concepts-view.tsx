@@ -3,17 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, GraduationCap, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ConceptCard, prettyScope } from "@/components/learn/concept-card"
-import { ConceptDetail } from "@/components/learn/concept-detail"
-import { ReviewPanel } from "@/components/learn/review-panel"
+import { ConceptCard, prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { ConceptDetail } from "@/features/learn/components/concepts/concept-detail"
+import { ReviewPanel } from "@/features/learn/components/study/review-panel"
 import {
   fetchConceptMastery,
   fetchDocumentConcepts,
   fetchDocumentMarkdown,
   type ConceptLesson,
   type ConceptMastery,
-} from "@/lib/learn-service"
-import type { Course } from "@/lib/courses"
+} from "@/features/learn/api"
+import type { Course } from "@/features/learn/lib/courses"
 
 type ConceptsViewProps = {
   course: Course
