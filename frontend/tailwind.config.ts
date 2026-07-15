@@ -31,6 +31,15 @@ const config: Config = {
           dark: "hsl(var(--brand-accent-dark))",
           light: "hsl(var(--brand-accent-light))",
         },
+        // Domain status vocabulary (see globals.css) — text-status-due, bg-status-mastered/15, …
+        status: {
+          mastered: "hsl(var(--status-mastered))",
+          ready: "hsl(var(--status-ready))",
+          due: "hsl(var(--status-due))",
+          fading: "hsl(var(--status-fading))",
+          building: "hsl(var(--status-building))",
+          error: "hsl(var(--status-error))",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

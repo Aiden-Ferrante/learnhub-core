@@ -108,6 +108,17 @@ body {
     --brand: var(--brand-accent);
     --brand-dark: var(--brand-accent-dark);
     --brand-light: var(--brand-accent-light);
+
+    /* Domain status colors — the ONE vocabulary for study/pipeline state.
+       Use via Tailwind `status-*` colors (e.g. text-status-due, bg-status-mastered/15).
+       mastered = retained · ready = available to study · due = review owed now ·
+       fading = will fall due soon · building = pipeline running · error = failed. */
+    --status-mastered: 152 55% 48%;
+    --status-ready: 211 100% 65%;
+    --status-due: 35 92% 55%;
+    --status-fading: 16 85% 58%;
+    --status-building: 265 65% 68%;
+    --status-error: 0 68% 58%;
   }
 
   .light {
@@ -148,6 +159,14 @@ body {
     --brand: var(--brand-accent);
     --brand-dark: var(--brand-accent-dark);
     --brand-light: var(--brand-accent-light);
+
+    /* Domain status colors, deepened for light-mode contrast. */
+    --status-mastered: 152 60% 34%;
+    --status-ready: 211 90% 45%;
+    --status-due: 32 95% 40%;
+    --status-fading: 16 80% 44%;
+    --status-building: 265 55% 50%;
+    --status-error: 0 72% 45%;
   }
 }
 

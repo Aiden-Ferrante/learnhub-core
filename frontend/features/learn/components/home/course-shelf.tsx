@@ -1,8 +1,9 @@
 "use client"
 
+import { StatusPill, type DomainStatus } from "@/components/patterns/status-pill"
+import { ProgressRing } from "@/components/patterns/progress-ring"
 import { useEffect, useMemo, useState } from "react"
 import { BookOpen, GraduationCap, Loader2, MoreVertical, Plus, Trash2, Zap } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
@@ -65,29 +66,13 @@ type CourseShelfProps = {
   onProcess?: () => void
 }
 
-const STATUS_BADGE: Record<CourseStatus, { label: string; variant: "secondary" | "outline" }> = {
-  ready: { label: "Ready", variant: "secondary" },
-  processing: { label: "Processing", variant: "outline" },
-  empty: { label: "Not processed", variant: "outline" },
+const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; pulse?: boolean }> = {
+  ready: { label: "Ready", status: "ready" },
+  processing: { label: "Processing", status: "building", pulse: true },
+  empty: { label: "Not processed", status: "neutral" },
 }
 
 const ROOT_PARENT = "__root__"
-
-/** Small conic-gradient mastery ring, matching CourseHome. */
-function MiniRing({ pct }: { pct: number }) {
-  return (
-    <div
-      className="relative h-12 w-12 shrink-0 rounded-full"
-      style={{
-        background: `conic-gradient(hsl(var(--brand)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
-      }}
-    >
-      <div className="absolute inset-[5px] flex items-center justify-center rounded-full bg-card">
-        <span className="text-xs font-semibold tabular-nums">{pct}%</span>
-      </div>
-    </div>
-  )
-}
 
 function CourseCard({
   course,
@@ -185,9 +170,9 @@ function CourseCard({
 
           <div className="mt-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Badge variant={badge.variant} className="text-[10px]">
+              <StatusPill status={badge.status} pulse={badge.pulse} className="text-[10px]">
                 {badge.label}
-              </Badge>
+              </StatusPill>
               {sections != null &&
                 (loading ? (
                   <Skeleton className="h-3.5 w-16" />
@@ -197,7 +182,7 @@ function CourseCard({
                   </span>
                 ))}
             </div>
-            {overallPct != null && !loading && <MiniRing pct={overallPct} />}
+            {overallPct != null && !loading && <ProgressRing pct={overallPct} size="sm" />}
           </div>
         </div>
       </button>

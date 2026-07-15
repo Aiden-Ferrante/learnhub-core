@@ -24,6 +24,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { fetchTodayPlan, type TodayPlan } from "@/features/learn/api/chapter"
 import { fetchDocumentConcepts } from "@/features/learn/api/concepts"
 import { countSections, displaySectionTitle, findChapterForSection, findNodeBySectionKey, type LearnTreeNode } from "@/features/learn/api/outline"
+import { ProgressRing } from "@/components/patterns/progress-ring"
+import { StatTile } from "@/components/patterns/stat-tile"
 import { enqueueChapterBuild, fetchCourseStatus, type CourseStatus } from "@/features/learn/api/pipeline"
 import { fetchForecast, fetchMistakes, type ForecastResponse, type MasteryResponse, type Mistake, type WeakestSection } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
@@ -58,31 +60,6 @@ function relativeTime(ts: number): string {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86400)}d ago`
-}
-
-/** A low-ink circular progress ring tinted brand over the muted track. */
-function MasteryRing({ pct }: { pct: number }) {
-  return (
-    <div
-      className="relative h-20 w-20 shrink-0 rounded-full"
-      style={{
-        background: `conic-gradient(hsl(var(--brand)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
-      }}
-    >
-      <div className="absolute inset-[6px] flex items-center justify-center rounded-full bg-card">
-        <span className="text-lg font-semibold tabular-nums">{pct}%</span>
-      </div>
-    </div>
-  )
-}
-
-function StatTile({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-lg border bg-background/40 px-3 py-2">
-      <div className="text-lg font-semibold tabular-nums leading-tight">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </div>
-  )
 }
 
 /** One practice mode in the grouped "Practice" menu — its own identity line so the learner
@@ -298,7 +275,7 @@ export function CourseHome({
             <h2 className="text-lg font-semibold leading-tight">{course.title}</h2>
             <p className="text-sm text-muted-foreground">{course.description}</p>
           </div>
-          {mastery && <MasteryRing pct={overallPct} />}
+          {mastery && <ProgressRing pct={overallPct} />}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">

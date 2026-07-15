@@ -1,5 +1,6 @@
 "use client"
 
+import { MeterBar } from "@/components/patterns/meter-bar"
 import { useCallback, useEffect, useState } from "react"
 import { Cpu, ListChecks, Loader2, MemoryStick, Pause, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -113,15 +114,7 @@ export function MachineStrip() {
         {mem && (
           <span className="flex items-center gap-1.5" title="Unified memory (CPU + GPU share it)">
             <MemoryStick className="h-3.5 w-3.5" />
-            <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-              <span
-                className={cn(
-                  "block h-full rounded-full",
-                  memPct > 85 ? "bg-amber-400" : "bg-brand",
-                )}
-                style={{ width: `${memPct}%` }}
-              />
-            </span>
+            <MeterBar pct={memPct} warnAbove={85} />
             {gb(mem.usedBytes)} / {gb(mem.totalBytes)} GB
           </span>
         )}
@@ -183,12 +176,10 @@ export function MachineStrip() {
               </span>
             </div>
             {!!running.total && (
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-brand transition-all"
-                  style={{ width: `${Math.round(((running.done ?? 0) / running.total) * 100)}%` }}
-                />
-              </div>
+              <MeterBar
+                pct={Math.round(((running.done ?? 0) / running.total) * 100)}
+                className="mt-1.5 w-full"
+              />
             )}
           </div>
           {eta && <span className="shrink-0 text-xs text-muted-foreground">{eta}</span>}
