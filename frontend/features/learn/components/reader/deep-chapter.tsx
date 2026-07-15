@@ -26,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
@@ -1045,10 +1046,50 @@ export function DeepChapter({
               title="Jump to a chapter"
             >
               <span className="truncate">{title}</span>
+              {(building || preparing) && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-brand" />}
+              {queuedBuild && <Clock className="h-3 w-3 shrink-0 text-muted-foreground" />}
               <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-96 w-80 overflow-y-auto">
+            {/* Pipeline state for THIS chapter lives with the chapter list, not the toolbar. */}
+            {(building || queuedBuild || preparing || needsPrepare) && (
+              <>
+                {building ? (
+                  <DropdownMenuItem disabled className="gap-2 text-xs">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Building
+                    {currentBuild?.phase === "extract" && currentBuild.total
+                      ? ` · extracting ${currentBuild.done}/${currentBuild.total}`
+                      : currentBuild?.phase === "deep"
+                        ? " · deep layer"
+                        : "…"}
+                  </DropdownMenuItem>
+                ) : queuedBuild ? (
+                  <DropdownMenuItem onSelect={cancelBuildJob} className="gap-2 text-xs">
+                    <Clock className="h-3.5 w-3.5" />
+                    {currentBuild?.notBefore
+                      ? `Queued · ${new Date(currentBuild.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
+                      : "Queued"}
+                    <span className="ml-auto text-muted-foreground">cancel</span>
+                  </DropdownMenuItem>
+                ) : preparing ? (
+                  <DropdownMenuItem disabled className="gap-2 text-xs">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing…
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem onSelect={() => startBuild(null)} className="gap-2 text-xs">
+                      <Wand2 className="h-3.5 w-3.5" /> Build this chapter now
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => startBuild(nextNightEpoch())} className="gap-2 text-xs">
+                      <Clock className="h-3.5 w-3.5" /> Build tonight · 2:00 AM
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+              </>
+            )}
             {chapters.map((c) => {
               const r = readiness[c.key]
               const b = r?.build
@@ -1078,54 +1119,6 @@ export function DeepChapter({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
-        {status && status.totalConcepts > 0 && (
-          <span className="hidden text-xs tabular-nums text-muted-foreground lg:inline">
-            deep layer {status.explained}/{status.totalConcepts}
-          </span>
-        )}
-        {building ? (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            building
-            {currentBuild?.phase === "extract" && currentBuild.total
-              ? ` · extracting ${currentBuild.done}/${currentBuild.total}`
-              : currentBuild?.phase === "deep"
-                ? " · deep layer"
-                : "…"}
-          </span>
-        ) : queuedBuild ? (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
-            {currentBuild?.notBefore
-              ? `queued · ${new Date(currentBuild.notBefore * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`
-              : "queued"}
-            <button type="button" className="ml-0.5 hover:text-foreground" onClick={cancelBuildJob} title="Cancel build">
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ) : preparing ? (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> preparing…
-          </span>
-        ) : (
-          needsPrepare && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs">
-                  <Wand2 className="h-3.5 w-3.5" />
-                  Build chapter
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => startBuild(null)}>Build now</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => startBuild(nextNightEpoch())}>
-                  Build tonight · 2:00 AM
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        )}
         {audioReady && (
           <Button
             type="button"
@@ -1150,20 +1143,6 @@ export function DeepChapter({
           }
         />
         <ReadingThemeToggle />
-        <div className="flex items-center gap-1">
-          <Button
-            type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"
-            disabled={!prevChapter} onClick={() => prevChapter && goChapter(prevChapter.key)}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" /> Prev
-          </Button>
-          <Button
-            type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"
-            disabled={!nextChapter} onClick={() => nextChapter && goChapter(nextChapter.key)}
-          >
-            Next <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
       </div>
 
       {/* Path rail — the guided journey as a rail over ONE surface (the mode-switcher is retired). */}
