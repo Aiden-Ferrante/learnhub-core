@@ -34,11 +34,11 @@ def _run_guides(db, job: dict[str, Any], ctx) -> dict[str, Any]:
 
 
 def _run_skeleton(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return refresh_skeleton(db, job["docId"], job["scope"])
+    return refresh_skeleton(job["docId"], job["scope"])
 
 
 def _run_orient(db, job: dict[str, Any], ctx) -> dict[str, Any]:
-    return refresh_orient(db, job["docId"], job["scope"])
+    return refresh_orient(job["docId"], job["scope"])
 
 
 def install() -> None:
