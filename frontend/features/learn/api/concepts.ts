@@ -19,7 +19,6 @@ export type ConceptLesson = {
   pageEnd?: number | null
   appearsIn?: ConceptProvenance[]
   aliasCount?: number
-  /** 1-2 paragraph expansion of `signal`, pre-generated for the Deep Chapter surface. */
 }
 
 export type DocumentConceptsResponse = {

@@ -17,11 +17,7 @@ import {
 import { downloadDocument } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
-export interface DocumentsTableProps {
-  onTabChange?: (tab: string) => void;
-}
-
-export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
+export function DocumentsTable() {
   const { documents, deleteDocuments, renameDocument } = useDocuments()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -96,8 +92,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
     switch (status) {
       case "New":
         return <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 mr-2"></span>
-      case "Processing":
-        return <Loader2 className="h-3.5 w-3.5 text-yellow-500 mr-2 animate-spin" />
       case "Processed":
         return <CheckCircle className="h-3.5 w-3.5 text-green-500 mr-2" />
       case "Error":
@@ -156,7 +150,6 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
               <th className="w-12 pl-6 py-3"></th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Name</th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Status</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Upload Status</th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right py-3 pr-4">Size (KB)</th>
               <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center py-3 pr-6">Actions</th>
             </tr>
@@ -164,7 +157,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan={6} className="py-16">
+              <td colSpan={5} className="py-16">
                 <div className="flex flex-col items-center justify-center text-center">
                   <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-6 border-2 border-dashed border-brand/20">
                     <FileText className="h-12 w-12 text-brand" />
@@ -224,16 +217,9 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                     {getStatusIcon(doc.status)}
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                       doc.status === 'Processed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                      doc.status === 'Processing' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       doc.status === 'Error' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
                       'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400'
                     }`}>{doc.status}</span>
-                  </div>
-                </td>
-                <td className="py-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-brand" />
-                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">{doc.uploadStatus}</span>
                   </div>
                 </td>
                 <td className="py-4 text-right pr-4">

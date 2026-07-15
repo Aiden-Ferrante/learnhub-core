@@ -58,27 +58,6 @@ export type ExtractStatusResponse = {
   error?: string
 }
 
-// The model picked in the UI. The learn service is local-only (Ollama), so we honor the
-// selection only when it's an Ollama model; otherwise the learn service falls back to
-// LEARN_EXTRACT_MODEL / OLLAMA_MODEL. `selectedModel` is the PRIMARY key — written by the
-// main ModelSelector (Configure / Process Documents tab), which is the picker that drives
-// document processing/extraction. `selectedModelForRAG` is only written by the RAG Query
-// tab's compact selector and is checked second as a fallback. Order matters: reading the RAG
-// key first let a stale RAG selection (e.g. llama3.1:70b) override the Process picker's choice.
-function selectedOllamaModel(): string | undefined {
-  if (typeof window === 'undefined') return undefined
-  for (const key of ['selectedModel', 'selectedModelForRAG']) {
-    try {
-      const raw = localStorage.getItem(key)
-      if (!raw) continue
-      const m = JSON.parse(raw)
-      if (m?.provider === 'ollama' && m?.model) return String(m.model)
-    } catch {
-      // ignore malformed entry, try the next key
-    }
-  }
-  return undefined
-}
 
 // Kick off a background concept extraction. Pass a `scope` (toc: key) for one chapter, OR
 // `sectionKeys` for an exact set (the TOC-preview selection) with `scope = null` (the whole
@@ -93,7 +72,7 @@ export async function startExtraction(
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
-  const useModel = model ?? selectedOllamaModel()
+  const useModel = model
   const payload: Record<string, unknown> = {}
   if (sectionKeys && sectionKeys.length) payload.sectionKeys = sectionKeys
   if (useModel) payload.model = useModel

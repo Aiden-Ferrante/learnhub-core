@@ -1,17 +1,42 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { UploadTab } from "@/features/documents/components/upload-tab"
+import { Table, Upload } from "lucide-react"
+import { DocumentsTable } from "@/features/documents/components/documents-table"
+import { UploadDocuments } from "@/features/documents/components/upload-documents"
 
 export default function UploadPage() {
-  const router = useRouter()
-  // UploadTab still speaks the old tab vocabulary; translate it to routes.
-  const onTabChange = (tab: string) => {
-    router.push(tab === "configure" ? "/process" : tab === "upload" ? "/upload" : "/courses")
-  }
   return (
     <main className="container mx-auto px-6 py-6">
-      <UploadTab onTabChange={onTabChange} />
+      <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+        <div className="w-full lg:w-1/3 space-y-8">
+          <div className="build-card">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
+                <Upload className="h-4 w-4 text-brand" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">Upload Documents</h2>
+            </div>
+            <UploadDocuments />
+          </div>
+        </div>
+
+        <div className="w-full lg:w-2/3">
+          <div className="build-card p-0 overflow-hidden">
+            <div className="p-6 border-b border-border/10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
+                  <Table className="h-4 w-4 text-brand" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">Documents Overview</h2>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Upload and manage the documents your courses are built from
+              </p>
+            </div>
+            <DocumentsTable />
+          </div>
+        </div>
+      </div>
     </main>
   )
 }

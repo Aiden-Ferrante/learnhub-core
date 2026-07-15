@@ -188,19 +188,6 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
         if not briefing:
             briefing = build_briefing(doc_id, scope, allow_generate=False)
 
-        augments: dict[str, dict[str, Any]] = {}
-        if section_keys:
-            with db() as conn:
-                for r in conn.execute(
-                    "SELECT section_key AS sk, objectives, recap FROM section_augment "
-                    "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
-                    {"d": doc_id, "ks": section_keys},
-                ).fetchall():
-                    augments[r["sk"]] = {
-                        "objectives": r.get("objectives") or [],
-                        "recap": r.get("recap") or "",
-                    }
-
         return {
             "docId": doc_id,
             "scope": scope,
@@ -209,9 +196,6 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
             "blocks": blocks,
             "concepts": concepts,
             "sections": sec.get("sections", []),
-            "augments": augments,
-            "pageStart": content.get("pageStart"),
-            "pageEnd": content.get("pageEnd"),
             "status": deep_status(doc_id, scope, list(section_keys)),
         }
     except Exception as exc:  # noqa: BLE001

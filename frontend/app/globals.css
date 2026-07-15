@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 /* Inter typography patterns (Channel brand) */
-@import url('../styles/build-typography.css');
 
 :root {
   /* Off-white, not pure white — calmer reading contrast (premium-tool restraint). */
@@ -573,4 +572,35 @@ body {
 ::highlight(txt2k-read-word) {
   background-color: rgb(118 185 0 / 0.45);
   color: inherit;
+}
+
+/* Survivors of the legacy build-typography sheet (hash-tab era) — everything else was dead. */
+.build-gradient-text {
+  background: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--brand-light)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.build-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 2rem;
+  transition: all 0.2s ease;
+}
+
+.build-card:hover {
+  border-color: hsl(var(--brand) / 0.3);
+  box-shadow: 0 8px 32px hsl(var(--brand) / 0.1);
+  transform: translateY(-2px);
+}
+
+.dark .build-card {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.dark .build-card:hover {
+  background: hsl(var(--card) / 0.9);
 }

@@ -10,13 +10,12 @@ export type DocumentAddInput = File | PreparedIngestFile
 export type Document = {
   id: string
   name: string
-  status: "New" | "Processing" | "Processed" | "Error"
-  uploadStatus: "Uploading" | "Uploaded"
+  status: "New" | "Processed" | "Error"
+  uploadStatus: "Uploaded"
   size: string
   file: File
   content?: string
   error?: string
-  extractedDate?: Date
   convertedFromPdf?: boolean
   originalPdfName?: string
   /** Learn-service document id (content namespace) — keys reader/markdown lookups. */
@@ -30,7 +29,6 @@ type DocumentContextType = {
   isInitialized: boolean
   addDocuments: (items: DocumentAddInput[]) => void
   deleteDocuments: (documentIds: string[]) => void
-  clearDocuments: () => void
   renameDocument: (documentId: string, name: string) => void
 }
 
@@ -72,17 +70,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         file = new File([blob], doc.name, { type: 'text/plain' })
       } else {
         file = new File([], doc.name, { type: 'text/plain' })
-      }
-      // Processing state lives in the tab that ran it; a persisted "Processing"
-      // status means the run was interrupted (reload/crash) and would otherwise
-      // spin forever and block re-processing.
-      if (doc.status === 'Processing') {
-        return {
-          ...doc,
-          file,
-          status: 'Error',
-          error: 'Processing was interrupted — run Process again.',
-        }
       }
       return { ...doc, file }
     })
@@ -188,17 +175,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     setDocuments((prev) => prev.filter((doc) => !documentIds.includes(doc.id)))
   }
 
-  const clearDocuments = () => {
-    setDocuments([])
-    // Explicit clear — the route ignores empty PUTs by default (wipe guard), so
-    // signal intent with ?clear=1.
-    fetch('/api/documents?clear=1', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documents: [] }),
-    }).catch((error) => console.error('Error clearing documents:', error))
-  }
-
   const renameDocument = (documentId: string, name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
@@ -214,7 +190,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         isInitialized,
         addDocuments,
         deleteDocuments,
-        clearDocuments,
         renameDocument,
       }}
     >

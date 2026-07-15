@@ -18,7 +18,6 @@ type DrillViewProps = {
   /** A chapter scope, or null = whole-course (cross-chapter interleaving). */
   scope: string | null
   docId?: string
-  title?: string
   onBack: () => void
   /** Bubble up after grading so mastery/forecast refresh. */
   onDone?: () => void
@@ -26,7 +25,7 @@ type DrillViewProps = {
 
 /** Adaptive practice drill: quizzes the concepts you most need (missed first, then weakest,
  *  interleaved). Ungraded — it's deliberate practice, not a test. Keyboard 1-9 to answer. */
-export function DrillView({ scope, docId, title, onBack, onDone }: DrillViewProps) {
+export function DrillView({ scope, docId, onBack, onDone }: DrillViewProps) {
   const [questions, setQuestions] = useState<ExamQuestion[] | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [fromMisses, setFromMisses] = useState(0)
@@ -127,7 +126,7 @@ export function DrillView({ scope, docId, title, onBack, onDone }: DrillViewProp
         </button>
         <span className="flex items-center gap-2 text-sm font-medium">
           <Target className="h-4 w-4 text-brand" />
-          {title || "Practice your weak spots"}
+          {"Practice your weak spots"}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">

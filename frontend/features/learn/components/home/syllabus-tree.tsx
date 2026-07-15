@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
 import { getExtractionStatus, startExtraction } from "@/features/learn/api/pipeline"
 import { type SectionMastery } from "@/features/learn/api/progress"
@@ -29,7 +30,6 @@ type SyllabusTreeProps = {
   loading?: boolean
   docId?: string | null
   /** Collapse to top-level chapters only — no drilling into sub-sections. */
-  chaptersOnly?: boolean
   /** Open a concept clicked in the tree (its detail view). Omit to hide concept leaves. */
   onSelectConcept?: (conceptKey: string) => void
   /** Grow with content (page scrolls) instead of scrolling inside a fixed box —
@@ -53,7 +53,7 @@ function ExtractButton({
         ? "Extracted — click to re-run"
         : state === "error"
           ? "Extraction failed — click to retry"
-          : "Extract this chapter's knowledge into the graph (background, ~15 min for a chapter)"
+          : "Extract this chapter's concepts (background, ~15 min for a chapter)"
   return (
     <button
       type="button"
@@ -82,25 +82,6 @@ function ExtractButton({
   )
 }
 
-function MasteryDot({ mastery }: { mastery: SectionMastery | undefined }) {
-  if (!mastery || mastery.attempts === 0) {
-    return (
-      <span
-        className="mt-1 h-2 w-2 shrink-0 rounded-full border border-muted-foreground/40"
-        title="Not studied yet"
-        aria-hidden
-      />
-    )
-  }
-  const pct = Math.round(mastery.mastery * 100)
-  return (
-    <span
-      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand"
-      style={{ opacity: 0.2 + 0.8 * Math.min(1, Math.max(0, mastery.mastery)) }}
-      title={`Mastery ${pct}%${mastery.isRollup ? " (rolled up)" : ""}`}
-    />
-  )
-}
 
 function nodeMatchesFilter(node: LearnTreeNode, filter: string): boolean {
   const f = filter.toLowerCase()
@@ -121,7 +102,6 @@ function TreeRow({
   onExtract,
   extractState,
   numbers,
-  chaptersOnly,
   onSelectConcept,
 }: {
   node: LearnTreeNode
@@ -135,16 +115,14 @@ function TreeRow({
   onExtract?: (scope: string) => void
   extractState?: Record<string, ExtractState>
   numbers: Map<string, string>
-  chaptersOnly?: boolean
   onSelectConcept?: (conceptKey: string) => void
 }) {
   if (filter && !nodeMatchesFilter(node, filter)) return null
 
   // Concept leaves render under their section like sub-entries — the concept layer made
   // visible in the course's main navigation, not hidden behind the Concepts view.
-  const conceptLeaves = (onSelectConcept && !chaptersOnly && node.concepts) || []
-  // Chapters-only: collapse the tree to its top level — no expanding into sub-sections.
-  const hasChildren = (node.children.length > 0 || conceptLeaves.length > 0) && !chaptersOnly
+  const conceptLeaves = (onSelectConcept && node.concepts) || []
+  const hasChildren = node.children.length > 0 || conceptLeaves.length > 0
   const isExpanded = expanded.has(node.id)
   const isSelected = node.sectionKey != null && node.sectionKey === selectedScope
   const isSection = node.isSection
@@ -183,7 +161,12 @@ function TreeRow({
           <span className="w-4 shrink-0" />
         )}
         {isSection ? (
-          <MasteryDot mastery={node.sectionKey ? masteryBySection?.[node.sectionKey] : undefined} />
+          <ConceptMasteryDot
+            mastery={node.sectionKey ? masteryBySection?.[node.sectionKey]?.mastery : undefined}
+            attempts={node.sectionKey ? masteryBySection?.[node.sectionKey]?.attempts : undefined}
+            isRollup={node.sectionKey ? masteryBySection?.[node.sectionKey]?.isRollup : undefined}
+            className="mt-1"
+          />
         ) : null}
         <button
           type="button"
@@ -292,7 +275,6 @@ export function SyllabusTree({
   masteryBySection,
   loading,
   docId,
-  chaptersOnly,
   onSelectConcept,
   autoHeight,
 }: SyllabusTreeProps) {
@@ -419,7 +401,6 @@ export function SyllabusTree({
           onExtract={handleExtract}
           extractState={extractState}
           numbers={numbers}
-          chaptersOnly={chaptersOnly}
           onSelectConcept={onSelectConcept}
         />
       ))}
@@ -438,8 +419,7 @@ export function SyllabusTree({
             className="pl-9 h-9"
           />
         </div>
-        {!chaptersOnly && (
-          <>
+        <>
             <button
               type="button"
               className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -458,23 +438,13 @@ export function SyllabusTree({
             >
               <ChevronsDownUp className="h-4 w-4" />
             </button>
-          </>
-        )}
+        </>
       </div>
       {autoHeight ? (
         <div className="px-2 pb-2">{rows}</div>
       ) : (
         <ScrollArea className="flex-1 px-2 pb-2">{rows}</ScrollArea>
       )}
-      {selectedScope ? (
-        <button
-          type="button"
-          className="mx-2 mb-2 text-xs text-muted-foreground hover:text-foreground underline"
-          onClick={() => onSelectScope(null, null)}
-        >
-          Clear selection (study whole graph)
-        </button>
-      ) : null}
     </div>
   )
 }

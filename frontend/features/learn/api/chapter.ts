@@ -80,22 +80,6 @@ export async function updateChapterStage(
   return parseJsonResponse<ChapterProgress>(res)
 }
 
-export type OrientResponse = {
-  docId?: string
-  scope?: string | null
-  objectives: string[]
-  watchFor: string[]
-  error?: string
-}
-
-export async function fetchOrient(scope: string | null, doc?: string): Promise<OrientResponse> {
-  const params = new URLSearchParams()
-  if (scope) params.set('scope', scope)
-  if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/orient?${params}`, { cache: 'no-store' })
-  return parseJsonResponse<OrientResponse>(res)
-}
-
 // ---------------------------------------------------------------------------
 // Deep Chapter — the one-call reading-first chapter surface
 // ---------------------------------------------------------------------------
@@ -109,7 +93,6 @@ export type DeepChapterBriefing = {
 }
 
 export type DeepChapterStatus = {
-  totalConcepts: number
   running: boolean
   briefing: boolean
 }
@@ -121,10 +104,6 @@ export type DeepChapterResponse = {
   markdown: string
   blocks: SectionContentBlock[]
   concepts: ConceptLesson[]
-  sections: { sectionKey: string; title: string; essence?: string; depth?: number }[]
-  augments: Record<string, { objectives: string[]; recap: string }>
-  pageStart?: number | null
-  pageEnd?: number | null
   status: DeepChapterStatus
   error?: string
 }
@@ -175,18 +154,5 @@ export async function fetchTodayPlan(doc: string, hintScope?: string | null): Pr
   if (hintScope) params.set('scope', hintScope)
   const res = await fetch(`/api/learn/plan?${params}`, { cache: 'no-store' })
   return parseJsonResponse<TodayPlan>(res)
-}
-
-export async function prepareDeepChapter(
-  doc: string,
-  scope: string,
-): Promise<DeepChapterStatus & { started?: boolean; error?: string }> {
-  const params = new URLSearchParams({ doc, scope })
-  const res = await fetch(`/api/learn/deep-chapter/prepare?${params}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: '{}',
-  })
-  return parseJsonResponse<DeepChapterStatus & { started?: boolean }>(res)
 }
 

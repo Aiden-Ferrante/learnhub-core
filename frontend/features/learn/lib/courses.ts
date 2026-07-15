@@ -2,7 +2,7 @@
 
 import type { Document } from "@/features/documents/document-context"
 
-export type CourseStatus = "ready" | "processing" | "empty"
+export type CourseStatus = "ready" | "empty"
 
 export type CourseFormat = "pdf" | "epub" | "html"
 
@@ -47,11 +47,7 @@ export function courseFromDocument(doc: Document): Course {
       // by learnDocId — a course with one is ready regardless of the KG triple
       // pipeline's doc.status, which only the Upload/KG tabs care about. The
       // doc.status fallback covers legacy docs processed before learnDocId existed.
-      doc.learnDocId || doc.status === "Processed"
-        ? "ready"
-        : doc.status === "Processing"
-          ? "processing"
-          : "empty",
+      doc.learnDocId || doc.status === "Processed" ? "ready" : "empty",
     format: doc.convertedFromPdf ? "pdf" : undefined,
     learnDocId: doc.learnDocId,
   }

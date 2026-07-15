@@ -9,14 +9,13 @@ import { displaySectionTitle, type LearnTreeNode } from "@/features/learn/api/ou
 type LockInPanelProps = {
   scope: string | null
   docId?: string
-  nextSection?: LearnTreeNode | null
   onNavigate?: (node: LearnTreeNode) => void
   onDone?: () => void
 }
 
 /** The closing stage: confirm the chapter, drop its concepts into spaced review, and point
  *  to what's next. */
-export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: LockInPanelProps) {
+export function LockInPanel({ scope, docId, onNavigate, onDone }: LockInPanelProps) {
   const [stages, setStages] = useState<Record<string, { done?: boolean; pass?: boolean }>>({})
   const [locked, setLocked] = useState(false)
 
@@ -81,20 +80,6 @@ export function LockInPanel({ scope, docId, nextSection, onNavigate, onDone }: L
         </p>
       </div>
 
-      {nextSection && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Up next</p>
-            <p className="truncate text-sm font-medium">
-              {displaySectionTitle(nextSection.label, nextSection.title)}
-            </p>
-          </div>
-          <Button type="button" size="sm" className="shrink-0" onClick={() => onNavigate?.(nextSection)}>
-            Continue
-            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
 
       {locked ? (
         <div className="flex items-center gap-2.5 rounded-lg border border-brand/40 bg-brand/10 p-3 animate-in fade-in-0 zoom-in-95 duration-300">

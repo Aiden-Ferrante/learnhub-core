@@ -74,7 +74,6 @@ type CourseShelfProps = {
 
 const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; pulse?: boolean }> = {
   ready: { label: "Ready", status: "ready" },
-  processing: { label: "Processing", status: "building", pulse: true },
   empty: { label: "Not processed", status: "neutral" },
 }
 
