@@ -312,6 +312,8 @@ export function DeepChapter({
   const { toast } = useToast()
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [resumed, setResumed] = useState(false)
+  // Briefing concept-chip cloud: capped at 8 until expanded.
+  const [allChips, setAllChips] = useState(false)
   // Chapter scroll progress (0–100) — drives the hairline under the chrome.
   const [readPct, setReadPct] = useState(0)
   const [notes, setNotes] = useState<MarginNote[]>([])
@@ -598,6 +600,7 @@ export function DeepChapter({
     setNotes([])
     setResumed(false)
     setReadPct(0)
+    setAllChips(false)
     load()
   }, [load])
 
@@ -1318,15 +1321,17 @@ export function DeepChapter({
               <div ref={briefingRef} className={cn("mb-6 rounded-lg border p-4", cardCls)}>
                 {/* Once oriented, the briefing folds to one line — the prose is the point. */}
                 <details open={!stages.orient}>
-                  <summary className={cn("flex cursor-pointer list-none items-center gap-2 text-xs font-medium", mutedCls)}>
-                    <BookOpen className="h-3.5 w-3.5" />
-                    <span>Chapter briefing</span>
-                    {stages.orient && (
-                      <span className="flex items-center gap-1 text-brand">
+                  <summary className="flex cursor-pointer list-none items-center gap-2">
+                    <BookOpen className={cn("h-4 w-4", mutedCls)} />
+                    <span className="text-sm font-semibold">Chapter briefing</span>
+                    {stages.orient ? (
+                      <span className="flex items-center gap-1 text-xs text-status-mastered">
                         <Check className="h-3 w-3" /> oriented
                       </span>
+                    ) : (
+                      <span className={cn("text-xs", mutedCls)}>what this chapter teaches</span>
                     )}
-                    <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                    <ChevronDown className={cn("ml-auto h-3.5 w-3.5", mutedCls)} />
                   </summary>
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {briefing.objectives.length > 0 && (
@@ -1361,7 +1366,7 @@ export function DeepChapter({
                   )}
                 </div>
                 {briefing.sections.length > 0 && (
-                  <details className="mt-4 border-t pt-3" open={briefing.sections.length <= 8}>
+                  <details className="mt-4 border-t pt-3 lg:hidden" open={briefing.sections.length <= 8}>
                     <summary className={cn("cursor-pointer text-xs font-semibold uppercase tracking-wide", mutedCls)}>
                       The road through · {briefing.sections.length} sections
                     </summary>
@@ -1384,8 +1389,8 @@ export function DeepChapter({
                   </div>
                 )}
                 {briefing.keyConcepts.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
-                    {briefing.keyConcepts.map((c, i) => {
+                  <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-3">
+                    {(allChips ? briefing.keyConcepts : briefing.keyConcepts.slice(0, 8)).map((c, i) => {
                       const idx = indexByName.get(c.name.trim().toLowerCase())
                       return (
                         <button
@@ -1402,6 +1407,18 @@ export function DeepChapter({
                         </button>
                       )
                     })}
+                    {!allChips && briefing.keyConcepts.length > 8 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setAllChips(true)
+                        }}
+                        className={cn("rounded-full border border-dashed px-2 py-0.5 text-xs", mutedCls, "hover:text-brand")}
+                      >
+                        +{briefing.keyConcepts.length - 8} more
+                      </button>
+                    )}
                   </div>
                 )}
                 </details>
