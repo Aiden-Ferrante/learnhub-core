@@ -24,7 +24,7 @@ import time
 import numpy as np
 
 from app.content.documents import fetch_latest_document
-from app.platform.arango import connect_arango
+from app.platform.db import db
 from app.extraction.extract import _load_section_blocks
 from app.platform.llm import ollama_structured_completion
 from app.platform.llm_schemas import GuidedScript
@@ -130,7 +130,7 @@ def segment_text(text: str, max_chars: int = 280) -> list[str]:
 # Source text (text | concepts)
 # --------------------------------------------------------------------------- #
 
-def _scope_segments_text(db, doc_id: str, scope: str | None) -> list[str]:
+def _scope_segments_text(doc_id: str, scope: str | None) -> list[str]:
     """Chapter's source markdown (per section, heading first), cleaned + segmented."""
     sections = _load_section_blocks(doc_id, scope=scope)
     segs: list[str] = []
@@ -146,18 +146,18 @@ def _scope_section_keys(doc_id: str, scope: str | None) -> list[str]:
     return [s.section_key for s in _load_section_blocks(doc_id, scope=scope)]
 
 
-def _scope_segments_concepts(db, doc_id: str, scope: str | None) -> list[str]:
+def _scope_segments_concepts(doc_id: str, scope: str | None) -> list[str]:
     """Chapter's concept lessons as a clean audio summary, in reading order."""
     keys = _scope_section_keys(doc_id, scope)
     if not keys:
         return []
-    rows = list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey IN @ks "
-            "SORT c.sectionKey, c.order RETURN {name: c.name, signal: c.signal}",
-            bind_vars={"d": doc_id, "ks": keys},
-        )
-    )
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT name, signal FROM concepts "
+            "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+            'ORDER BY section_key, "order"',
+            {"d": doc_id, "ks": keys},
+        ).fetchall()
     segs: list[str] = []
     for r in rows:
         name = (r.get("name") or "").strip()
@@ -193,14 +193,13 @@ def _spoken(s: object) -> str:
     return re.sub(r"[*_`#]", "", str(s or "")).strip()
 
 
-def _concepts_for_section(db, doc_id: str, section_key: str) -> list[dict]:
-    return list(
-        db.aql.execute(
-            "FOR c IN concepts FILTER c.docId == @d AND c.sectionKey == @s SORT c.order "
-            "RETURN {name: c.name, signal: c.signal}",
-            bind_vars={"d": doc_id, "s": section_key},
-        )
-    )
+def _concepts_for_section(doc_id: str, section_key: str) -> list[dict]:
+    with db() as conn:
+        return conn.execute(
+            'SELECT name, signal FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s '
+            'ORDER BY "order"',
+            {"d": doc_id, "s": section_key},
+        ).fetchall()
 
 
 def _guided_script_for_section(heading: str, passages: list[str], concepts: list[dict],
@@ -220,7 +219,7 @@ def _guided_script_for_section(heading: str, passages: list[str], concepts: list
     return obj if isinstance(obj, dict) else None
 
 
-def _scope_segments_guided(db, doc_id: str, scope: str | None, model=None, on_progress=None) -> list[str]:
+def _scope_segments_guided(doc_id: str, scope: str | None, model=None, on_progress=None) -> list[str]:
     """Verbatim passages spliced with concept-grounded tutor scaffolding (single voice).
     All LLM script-writing happens here, BEFORE any TTS, so the single-GPU model cache
     swaps once (script model → Orpheus) instead of per section."""
@@ -236,7 +235,7 @@ def _scope_segments_guided(db, doc_id: str, scope: str | None, model=None, on_pr
         if head and not head.lower().startswith("toc:"):
             out.append(f"{head}.")
         script = _guided_script_for_section(
-            head or s.section_key, passages, _concepts_for_section(db, doc_id, s.section_key), model
+            head or s.section_key, passages, _concepts_for_section(doc_id, s.section_key), model
         )
         comments_by: dict[int, list[str]] = {}
         intro, takeaways = "", []
@@ -258,12 +257,12 @@ def _scope_segments_guided(db, doc_id: str, scope: str | None, model=None, on_pr
     return out
 
 
-def chapter_segments(db, doc_id: str, scope: str | None, source: str, on_progress=None) -> list[str]:
+def chapter_segments(doc_id: str, scope: str | None, source: str, on_progress=None) -> list[str]:
     if source == "concepts":
-        return _scope_segments_concepts(db, doc_id, scope)
+        return _scope_segments_concepts(doc_id, scope)
     if source == "guided":
-        return _scope_segments_guided(db, doc_id, scope, on_progress=on_progress)
-    return _scope_segments_text(db, doc_id, scope)
+        return _scope_segments_guided(doc_id, scope, on_progress=on_progress)
+    return _scope_segments_text(doc_id, scope)
 
 
 # --------------------------------------------------------------------------- #
@@ -340,7 +339,6 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
     (service restart, crash) resumes from the last finished chunk on the next request
     instead of losing hours of GPU time."""
     t0 = time.time()
-    db = connect_arango()
     if doc_id is None:
         doc = (fetch_latest_document() or {}).get("document")
         doc_id = doc.get("id") if doc else None
@@ -359,7 +357,7 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
         if manifest.get("voice") in VOICES:
             voice = manifest["voice"]
     else:
-        segments = chapter_segments(db, doc_id, scope, source, on_progress=on_progress)
+        segments = chapter_segments(doc_id, scope, source, on_progress=on_progress)
         # Drop consecutive duplicates (e.g. a heading that the section body repeats).
         deduped: list[str] = []
         for seg in segments:
@@ -547,8 +545,7 @@ def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "tex
     if source == "guided":
         return {"error": "no timeline for this narration (guided script predates timelines — regenerate)"}
     try:
-        db = connect_arango()
-        segments = chapter_segments(db, doc_id, scope, source)
+        segments = chapter_segments(doc_id, scope, source)
         deduped: list[str] = []
         for seg in segments:  # same dedup make_audiobook applies before synthesis
             if deduped and seg.strip().lower() == deduped[-1].strip().lower():
