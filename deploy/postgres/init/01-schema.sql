@@ -69,8 +69,9 @@ CREATE TABLE concept_reviews (
 CREATE INDEX ON concept_reviews (doc_id, due);
 
 CREATE TABLE study_events (
-  key text PRIMARY KEY, doc text, section_key text, concept_key text,
-  kind text, correct boolean, ts timestamptz);
+  key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc text, section_key text, concept_key text,
+  kind text, correct boolean, ts timestamptz,
+  confidence text, triple_id text, stem text, expected text);
 CREATE INDEX ON study_events (doc, ts);
 CREATE INDEX ON study_events (concept_key);
 
