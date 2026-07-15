@@ -8,10 +8,12 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- ── shared auth (was learnhub_auth.users) ───────────────────────────────
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE TABLE auth.users (
-  username    text PRIMARY KEY,
-  password    text NOT NULL,        -- existing hash, verbatim
-  schema_name text NOT NULL,        -- was users.dbName → the tenant schema
-  created_at  timestamptz DEFAULT now()
+  username      text PRIMARY KEY,
+  password_hash text NOT NULL,      -- was passwordHash, verbatim
+  display_name  text,
+  role          text,
+  schema_name   text NOT NULL,      -- was users.dbName → the tenant schema
+  created_at    timestamptz
 );
 
 -- ── default tenant schema (matches today's DB name) ─────────────────────
@@ -26,9 +28,9 @@ CREATE TABLE documents (
   page_block_count int, has_page_provenance boolean, created_at timestamptz);
 
 CREATE TABLE app_documents (
-  key text PRIMARY KEY, id text, learn_doc_id text, name text, file text,
+  key text PRIMARY KEY, id text, learn_doc_id text, name text, file jsonb,
   status text, upload_status text, processing_method text, original_pdf_name text,
-  converted_from_pdf boolean, "order" int, size bigint,
+  converted_from_pdf boolean, "order" int, size text,
   selected_section_keys jsonb, metadata jsonb,
   extracted_date timestamptz, last_updated timestamptz);
 
