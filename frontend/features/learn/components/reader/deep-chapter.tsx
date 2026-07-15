@@ -312,6 +312,8 @@ export function DeepChapter({
   const { toast } = useToast()
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [resumed, setResumed] = useState(false)
+  // Chapter scroll progress (0–100) — drives the hairline under the chrome.
+  const [readPct, setReadPct] = useState(0)
   const [notes, setNotes] = useState<MarginNote[]>([])
   const [wide, setWide] = useState(false)
   // Chapter outline (locked to THIS chapter): derived from the rendered headings,
@@ -595,6 +597,7 @@ export function DeepChapter({
     setDrawer(null)
     setNotes([])
     setResumed(false)
+    setReadPct(0)
     load()
   }, [load])
 
@@ -628,6 +631,8 @@ export function DeepChapter({
     const box = scrollRef.current
     if (!box || !chapterKey || !data?.markdown) return
     lastScrollTop.current = box.scrollTop
+    const denom = box.scrollHeight - box.clientHeight
+    setReadPct(denom > 0 ? Math.min(100, Math.round((box.scrollTop / denom) * 100)) : 100)
     // Read stage: reaching the tail of the chapter marks it read (soft gate).
     if (!readMarked.current && !stages.read && box.scrollTop + box.clientHeight >= box.scrollHeight * 0.92) {
       readMarked.current = true
@@ -1237,6 +1242,14 @@ export function DeepChapter({
           </button>
         </div>
       )}
+
+      {/* Reading-progress hairline — how far through the chapter you are. */}
+      <div className="h-0.5 shrink-0 bg-border/40">
+        <div
+          className="h-full bg-brand/80 transition-[width] duration-150 ease-out"
+          style={{ width: `${readPct}%` }}
+        />
+      </div>
 
       <div
         ref={scrollRef}
