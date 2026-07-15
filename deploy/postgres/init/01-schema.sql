@@ -78,8 +78,8 @@ CREATE INDEX ON study_events (doc, ts);
 CREATE INDEX ON study_events (concept_key);
 
 CREATE TABLE chapter_builds (
-  key text PRIMARY KEY, doc_id text, scope text, phase text, status text, done int, total int,
-  error text, requested_at timestamptz, started_at timestamptz, finished_at timestamptz, not_before timestamptz);
+  key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc_id text, scope text, phase text, status text, done int, total int,
+  error text, requested_at bigint, started_at bigint, finished_at bigint, not_before bigint, kind text, payload jsonb, cancel_requested boolean);
 
 CREATE TABLE chapter_progress    (key text PRIMARY KEY, doc_id text, scope text, stages jsonb);
 CREATE TABLE chapter_orient      (key text PRIMARY KEY, doc_id text, scope text, objectives jsonb, watch_for jsonb, created_at timestamptz);
