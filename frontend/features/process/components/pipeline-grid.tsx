@@ -2,16 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, Clock, Loader2, Minus, RotateCcw, TriangleAlert, X } from "lucide-react"
-import {
-  cancelChapterBuild,
-  enqueueChapterBuild,
-  fetchCoverage,
-  fetchJobsLedger,
-  type BuildKind,
-  type ChapterCoverage,
-  type PipelineJobState,
-  type PipelineLedgerRow,
-} from "@/features/learn/api"
+import { cancelChapterBuild, enqueueChapterBuild, fetchCoverage, fetchJobsLedger, type BuildKind, type ChapterCoverage, type PipelineJobState, type PipelineLedgerRow } from "@/features/learn/api/pipeline"
 import { cn } from "@/lib/utils"
 
 /** Which queue kind a grid column's click enqueues. Audio is presence-only (narrations

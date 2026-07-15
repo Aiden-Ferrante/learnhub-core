@@ -49,30 +49,14 @@ import {
 } from "@/features/learn/components/reader/chapter-reader"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs, type Measure } from "@/features/learn/hooks/use-reading-prefs"
-import {
-  askTextbook,
-  audiobookFileUrl,
-  cancelChapterBuild,
-  enqueueChapterBuild,
-  fetchChapterProgress,
-  fetchChaptersReadiness,
-  fetchConceptMastery,
-  fetchCourseChapters,
-  fetchDeepChapter,
-  fetchOutline,
-  flattenChapterOutline,
-  fetchReviewQueue,
-  getAudiobookStatus,
-  recordEngagement,
-  updateChapterStage,
-  type AskResponse,
-  type ChapterReadiness,
-  type ConceptLesson,
-  type ConceptMastery,
-  type DeepChapterResponse,
-  type LearnTreeNode,
-  type OutlineEntry,
-} from "@/features/learn/api"
+import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
+import { fetchChapterProgress, fetchCourseChapters, fetchDeepChapter, updateChapterStage, type DeepChapterResponse } from "@/features/learn/api/chapter"
+import { type ConceptLesson } from "@/features/learn/api/concepts"
+import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
+import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
+import { fetchConceptMastery, recordEngagement, type ConceptMastery } from "@/features/learn/api/progress"
+import { fetchReviewQueue } from "@/features/learn/api/review"
+import { askTextbook, type AskResponse } from "@/features/learn/api/search"
 import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 

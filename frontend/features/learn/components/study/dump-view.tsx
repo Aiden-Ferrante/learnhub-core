@@ -3,12 +3,8 @@
 import { useMemo, useState } from "react"
 import { Brain, ChevronLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  checkRecall,
-  displaySectionTitle,
-  type LearnTreeNode,
-  type RecallResponse,
-} from "@/features/learn/api"
+import { displaySectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
+import { checkRecall, type RecallResponse } from "@/features/learn/api/quiz"
 
 type DumpViewProps = {
   /** Top-level chapters to free-recall (the tree's chapter nodes). */

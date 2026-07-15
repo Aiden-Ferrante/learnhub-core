@@ -19,22 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { MachineStrip } from "@/features/process/components/machine-strip"
 import { PipelineGrid } from "@/features/process/components/pipeline-grid"
 import { cleanCourseTitle } from "@/features/learn/lib/courses"
-import {
-  cancelChapterBuild,
-  deleteConcept,
-  enqueueChapterBuild,
-  fetchChapterBuilds,
-  fetchChaptersReadiness,
-  fetchCourseChapters,
-  fetchLearnDocuments,
-  fetchSectionConcepts,
-  type ChapterBuildJob,
-  type ChapterReadiness,
-  type ConceptLesson,
-  type CourseChapter,
-  type LearnDocumentInfo,
-  type SectionOutcome,
-} from "@/features/learn/api"
+import { fetchCourseChapters, type CourseChapter } from "@/features/learn/api/chapter"
+import { deleteConcept, fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
+import { cancelChapterBuild, enqueueChapterBuild, fetchChapterBuilds, fetchChaptersReadiness, fetchLearnDocuments, type ChapterBuildJob, type ChapterReadiness, type LearnDocumentInfo, type SectionOutcome } from "@/features/learn/api/pipeline"
 import { cn } from "@/lib/utils"
 
 /** Processing dashboard — the extraction UI, rebuilt on the canonical pipeline:

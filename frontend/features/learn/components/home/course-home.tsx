@@ -21,25 +21,11 @@ import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
 import { StudyHeatmap } from "@/features/learn/components/home/study-heatmap"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  countSections,
-  displaySectionTitle,
-  enqueueChapterBuild,
-  fetchCourseStatus,
-  fetchDocumentConcepts,
-  fetchForecast,
-  fetchMistakes,
-  fetchTodayPlan,
-  findChapterForSection,
-  findNodeBySectionKey,
-  type CourseStatus,
-  type ForecastResponse,
-  type LearnTreeNode,
-  type MasteryResponse,
-  type Mistake,
-  type TodayPlan,
-  type WeakestSection,
-} from "@/features/learn/api"
+import { fetchTodayPlan, type TodayPlan } from "@/features/learn/api/chapter"
+import { fetchDocumentConcepts } from "@/features/learn/api/concepts"
+import { countSections, displaySectionTitle, findChapterForSection, findNodeBySectionKey, type LearnTreeNode } from "@/features/learn/api/outline"
+import { enqueueChapterBuild, fetchCourseStatus, type CourseStatus } from "@/features/learn/api/pipeline"
+import { fetchForecast, fetchMistakes, type ForecastResponse, type MasteryResponse, type Mistake, type WeakestSection } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 
 type CourseHomeProps = {

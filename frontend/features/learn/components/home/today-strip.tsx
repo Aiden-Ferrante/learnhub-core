@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { CalendarCheck2, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ReviewPanel } from "@/features/learn/components/study/review-panel"
-import { fetchStudyDebt, type StudyDebt } from "@/features/learn/api"
+import { fetchStudyDebt, type StudyDebt } from "@/features/learn/api/progress"
 
 /**
  * The one-tap daily drill entry on the Learn front door: whole-library review debt in one

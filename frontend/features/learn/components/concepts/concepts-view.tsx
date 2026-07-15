@@ -6,13 +6,9 @@ import { Button } from "@/components/ui/button"
 import { ConceptCard, prettyScope } from "@/features/learn/components/concepts/concept-card"
 import { ConceptDetail } from "@/features/learn/components/concepts/concept-detail"
 import { ReviewPanel } from "@/features/learn/components/study/review-panel"
-import {
-  fetchConceptMastery,
-  fetchDocumentConcepts,
-  fetchDocumentMarkdown,
-  type ConceptLesson,
-  type ConceptMastery,
-} from "@/features/learn/api"
+import { fetchDocumentConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
+import { fetchDocumentMarkdown } from "@/features/learn/api/content"
+import { fetchConceptMastery, type ConceptMastery } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 
 type ConceptsViewProps = {

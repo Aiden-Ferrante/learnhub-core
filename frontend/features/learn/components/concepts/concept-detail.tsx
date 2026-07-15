@@ -7,7 +7,8 @@ import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-ma
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import { KIND_STYLES, prettyScope } from "@/features/learn/components/concepts/concept-card"
 import { SectionFigures } from "@/features/learn/components/reader/section-figures"
-import { submitReviewGrade, type ConceptLesson, type ReviewGrade } from "@/features/learn/api"
+import { type ConceptLesson } from "@/features/learn/api/concepts"
+import { submitReviewGrade, type ReviewGrade } from "@/features/learn/api/review"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
   { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },

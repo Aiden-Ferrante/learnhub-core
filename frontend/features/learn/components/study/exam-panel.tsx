@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { cn } from "@/lib/utils"
-import {
-  gradeExam,
-  startExam,
-  type ExamGradeResponse,
-  type ExamQuestion,
-  type ExamStartResponse,
-} from "@/features/learn/api"
+import { gradeExam, startExam, type ExamGradeResponse, type ExamQuestion, type ExamStartResponse } from "@/features/learn/api/quiz"
 
 type ExamPanelProps = {
   scope: string | null

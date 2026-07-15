@@ -15,14 +15,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import {
-  getExtractionStatus,
-  numberSections,
-  numberedSectionTitle,
-  startExtraction,
-  type LearnTreeNode,
-  type SectionMastery,
-} from "@/features/learn/api"
+import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
+import { getExtractionStatus, startExtraction } from "@/features/learn/api/pipeline"
+import { type SectionMastery } from "@/features/learn/api/progress"
 
 type ExtractState = "running" | "done" | "error"
 

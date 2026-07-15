@@ -5,7 +5,8 @@ import { ChevronLeft, ExternalLink, FileText, Maximize2, Minimize2 } from "lucid
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BookReader } from "@/features/learn/components/reader/book-reader"
-import type { LearnTreeNode, MasteryResponse } from "@/features/learn/api"
+import { type LearnTreeNode } from "@/features/learn/api/outline"
+import { type MasteryResponse } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 
 type PdfBookViewProps = {

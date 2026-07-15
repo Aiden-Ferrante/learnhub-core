@@ -17,13 +17,9 @@ import { ReadingControls } from "@/features/learn/components/reader/reading-cont
 import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
-import {
-  fetchCourseChapters,
-  fetchOutline,
-  type LearnTreeNode,
-  type MasteryResponse,
-  type OutlineEntry,
-} from "@/features/learn/api"
+import { fetchCourseChapters } from "@/features/learn/api/chapter"
+import { fetchOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
+import { type MasteryResponse } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 
 type BookReaderProps = {

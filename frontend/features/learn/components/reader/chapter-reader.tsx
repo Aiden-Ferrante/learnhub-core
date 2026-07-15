@@ -16,12 +16,8 @@ import { useReadingTheme, type ReadingTheme } from "@/features/learn/hooks/use-r
 import { useReadingPrefs, type ReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 import { useInBookFind } from "@/features/learn/hooks/use-in-book-find"
 import { cn } from "@/lib/utils"
-import {
-  fetchSectionContent,
-  type LearnTreeNode,
-  type OutlineEntry,
-  type SectionContentBlock,
-} from "@/features/learn/api"
+import { fetchSectionContent, type SectionContentBlock } from "@/features/learn/api/content"
+import { type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 
 export type Chapter = { key: string; title: string }
 

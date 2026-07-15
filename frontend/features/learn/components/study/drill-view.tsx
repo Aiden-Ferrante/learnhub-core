@@ -4,15 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { ChevronLeft, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
-import {
-  fetchCalibration,
-  gradeDrill,
-  startDrill,
-  type CalibrationResponse,
-  type Confidence,
-  type DrillGradeResponse,
-  type ExamQuestion,
-} from "@/features/learn/api"
+import { fetchCalibration, type CalibrationResponse } from "@/features/learn/api/progress"
+import { gradeDrill, startDrill, type Confidence, type DrillGradeResponse, type ExamQuestion } from "@/features/learn/api/quiz"
 import { cn } from "@/lib/utils"
 
 const CONF: { value: Confidence; label: string }[] = [

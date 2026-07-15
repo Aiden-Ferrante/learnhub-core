@@ -5,15 +5,8 @@ import { Button } from "@/components/ui/button"
 import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { SectionFigures } from "@/features/learn/components/reader/section-figures"
-import {
-  fetchReviewQueue,
-  figureUrl,
-  submitFigureReviewGrade,
-  submitReviewGrade,
-  type ReviewCard,
-  type ReviewGrade,
-  type ReviewQueueResponse,
-} from "@/features/learn/api"
+import { figureUrl } from "@/features/learn/api/content"
+import { fetchReviewQueue, submitFigureReviewGrade, submitReviewGrade, type ReviewCard, type ReviewGrade, type ReviewQueueResponse } from "@/features/learn/api/review"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
   { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },

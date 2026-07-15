@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Cpu, ListChecks, Loader2, MemoryStick, Pause, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  cancelChapterBuild,
-  fetchSystemStatus,
-  setQueuePaused,
-  type BuildKind,
-  type SystemStatus,
-} from "@/features/learn/api"
+import { cancelChapterBuild, fetchSystemStatus, setQueuePaused, type BuildKind, type SystemStatus } from "@/features/learn/api/pipeline"
 import { cn } from "@/lib/utils"
 
 const KIND_LABEL: Record<BuildKind, string> = {

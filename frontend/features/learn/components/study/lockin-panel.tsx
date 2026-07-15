@@ -3,12 +3,8 @@
 import { useEffect, useState } from "react"
 import { ArrowRight, CheckCircle2, Circle, PartyPopper, Repeat } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  displaySectionTitle,
-  fetchChapterProgress,
-  updateChapterStage,
-  type LearnTreeNode,
-} from "@/features/learn/api"
+import { fetchChapterProgress, updateChapterStage } from "@/features/learn/api/chapter"
+import { displaySectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
 
 type LockInPanelProps = {
   scope: string | null

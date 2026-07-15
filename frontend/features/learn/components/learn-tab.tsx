@@ -9,15 +9,9 @@ import { DumpView } from "@/features/learn/components/study/dump-view"
 import { PdfBookView } from "@/features/learn/components/reader/pdf-book-view"
 import { DeepChapter } from "@/features/learn/components/reader/deep-chapter"
 import { AskPanel } from "@/features/learn/components/reader/ask-panel"
-import {
-  fetchMastery,
-  fetchReviewQueue,
-  fetchTocTree,
-  findNodeBySectionKey,
-  type LearnTreeNode,
-  type MasteryResponse,
-  type WeakestSection,
-} from "@/features/learn/api"
+import { fetchTocTree, findNodeBySectionKey, type LearnTreeNode } from "@/features/learn/api/outline"
+import { fetchMastery, type MasteryResponse, type WeakestSection } from "@/features/learn/api/progress"
+import { fetchReviewQueue } from "@/features/learn/api/review"
 import {
   fetchReadingProgress,
   saveReadingPosition,

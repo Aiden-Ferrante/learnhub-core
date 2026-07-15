@@ -4,11 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
-import {
-  fetchSectionConcepts,
-  submitReviewGrade,
-  type ConceptLesson,
-} from "@/features/learn/api"
+import { fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
+import { submitReviewGrade } from "@/features/learn/api/review"
 
 /** Guided walkthrough: step a section's concepts in order, read each, then self-check —
  *  "Got it" (grade Good) or "Needs review" (grade Again) feeds the spaced-repetition schedule. */

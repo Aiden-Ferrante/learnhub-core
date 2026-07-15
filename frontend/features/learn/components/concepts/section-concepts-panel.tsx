@@ -8,14 +8,8 @@ import { MathText } from "@/features/learn/components/reader/markdown-reader"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import {
-  fetchSectionConcepts,
-  startConceptQuiz,
-  submitConceptAnswer,
-  type ConceptLesson,
-  type ConceptQuizResult,
-  type ConceptQuizSession,
-} from "@/features/learn/api"
+import { fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
+import { startConceptQuiz, submitConceptAnswer, type ConceptQuizResult, type ConceptQuizSession } from "@/features/learn/api/quiz"
 
 const QUICK_CHECK_QUESTIONS = 2
 

@@ -32,12 +32,9 @@ import {
 } from "@/components/ui/select"
 import { GroupSidebar } from "@/features/learn/components/home/group-sidebar"
 import { TodayStrip } from "@/features/learn/components/home/today-strip"
-import {
-  countSections,
-  deleteLearnDocument,
-  type LearnTreeNode,
-  type MasteryResponse,
-} from "@/features/learn/api"
+import { countSections, type LearnTreeNode } from "@/features/learn/api/outline"
+import { deleteLearnDocument } from "@/features/learn/api/pipeline"
+import { type MasteryResponse } from "@/features/learn/api/progress"
 import {
   addGroup,
   buildGroupTree,

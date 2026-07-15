@@ -13,16 +13,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import {
-  audiobookFileUrl,
-  fetchAudiobookTimeline,
-  fetchAudiobookVoices,
-  getAudiobookStatus,
-  startAudiobook,
-  type AudiobookSource,
-  type AudiobookStatusResponse,
-  type AudiobookTimeline,
-} from "@/features/learn/api"
+import { audiobookFileUrl, fetchAudiobookTimeline, fetchAudiobookVoices, getAudiobookStatus, startAudiobook, type AudiobookSource, type AudiobookStatusResponse, type AudiobookTimeline } from "@/features/learn/api/audiobook"
 import {
   buildStripIndex,
   clearReadAlongHighlights,

@@ -5,15 +5,7 @@ import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
-import {
-  fetchQuizPrepareStatus,
-  prepareQuizQuestions,
-  startConceptQuiz,
-  submitConceptAnswer,
-  type ConceptQuizResult,
-  type ConceptQuizSession,
-  type QuizPrepareStatus,
-} from "@/features/learn/api"
+import { fetchQuizPrepareStatus, prepareQuizQuestions, startConceptQuiz, submitConceptAnswer, type ConceptQuizResult, type ConceptQuizSession, type QuizPrepareStatus } from "@/features/learn/api/quiz"
 
 /** Deterministic concept MCQ: "which concept does this description match?", distractors are
  *  sibling concepts. Keyless. Records a study event so mastery moves. */

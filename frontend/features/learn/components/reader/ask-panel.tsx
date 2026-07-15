@@ -4,15 +4,7 @@ import { useEffect, useState } from "react"
 import { ChevronLeft, Loader2, Search, Sparkles } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import {
-  askTextbook,
-  buildSearchIndex,
-  fetchSearchIndexStatus,
-  semanticSearch,
-  type AskResponse,
-  type SearchMatch,
-  type SemanticSearchResponse,
-} from "@/features/learn/api"
+import { askTextbook, buildSearchIndex, fetchSearchIndexStatus, semanticSearch, type AskResponse, type SearchMatch, type SemanticSearchResponse } from "@/features/learn/api/search"
 import type { Course } from "@/features/learn/lib/courses"
 
 type Mode = "ask" | "search"
