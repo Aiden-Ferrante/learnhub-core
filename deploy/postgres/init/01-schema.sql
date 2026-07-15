@@ -64,8 +64,9 @@ CREATE TABLE content_vectors (
 CREATE INDEX ON content_vectors USING hnsw (embedding vector_cosine_ops);
 
 CREATE TABLE concept_reviews (
-  key text PRIMARY KEY, doc_id text, section_key text, due timestamptz, ease real,
-  interval int, reps int, lapses int, state text, last_grade int, last_review timestamptz);
+  key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc_id text, section_key text, due timestamptz, ease real,
+  interval int, reps int, lapses int, state text, last_grade int, last_review timestamptz,
+  item_type text, chapter_scope text, first_review timestamptz, caption text, page int, "order" int);
 CREATE INDEX ON concept_reviews (doc_id, due);
 
 CREATE TABLE study_events (
