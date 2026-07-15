@@ -12,12 +12,12 @@ import random
 import time
 import uuid
 
-from app.platform.db import db
+from app.platform import db
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.exam import _doc_pool
-from app.content.scope import scope_section_keys
+from app.content import scope_section_keys
 from app.study.mastery import compute_mastery, record_quiz_event
-from app.content.documents import resolve_doc_id
+from app.content import resolve_doc_id
 
 _TTL = 60 * 60
 _DRILL: dict[str, dict] = {}

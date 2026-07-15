@@ -19,10 +19,17 @@ deploy/    docker-compose + service images (app, learn, ollama, sentence-transfo
 
 ## Backend packages (`backend/app/`)
 
-Dependency rule: **`platform` ← `content` ← domains ← `overview` ← `pipeline` ← `api`**.
+Dependency rule: **`platform` ← `content` ← domains ← {`overview`, `pipeline`} ← `api`** (overview and pipeline are siblings).
 Domains may import `platform`, `content`, and another domain's *public* functions;
 never each other's internals, never anything above them. `api` is thin routers only.
 There are **zero import cycles** (checked by AST; keep it that way).
+
+**The module-hub contract** (docs/module-hubs.md, enforced by `scripts/check_hubs.py` in CI):
+every package's `__init__.py` is its **facade** — the only thing another package may import
+(`from app.study import grade_review`, never `from app.study.reviews import ...`), holding
+imports + the package's documentation docstring and nothing else. Private (underscore) names
+never cross a package boundary. Tests may deep-import; `app/main.py` is the assembly point.
+The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 
 | Package | Owns |
 |---|---|

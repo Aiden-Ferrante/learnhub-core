@@ -26,10 +26,10 @@ from langgraph.graph import END, START, StateGraph
 
 from psycopg.types.json import Json
 
-from app.platform.db import db
+from app.platform import db
 from app.study.concept_quiz_gen import _name_variants
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import AuthoredSet
+from app.platform import ollama_structured_completion
+from app.platform import AuthoredSet
 
 # Authoring is GPU-bound on a single model, so it runs sequentially. The critic pass roughly
 # doubles per-concept time (~1 concept/min for a 30B). Override with a smaller/faster model to

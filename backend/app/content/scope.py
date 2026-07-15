@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.platform.db import db
+from app.platform import db
 
 _NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
 _CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")

@@ -8,15 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.content.documents import resolve_doc_id
-from app.content.scope import scope_section_keys
+from app.content import resolve_doc_id
+from app.content import scope_section_keys
 from app.pipeline.build import run_extract
 from app.pipeline.ingest import run_convert
-from app.extraction.reading_guide import author_guides_sync
-from app.extraction.skeleton import refresh_orient, refresh_skeleton
-from app.media.audiobook import run_audiobook
+from app.extraction import author_guides_sync
+from app.extraction import refresh_orient, refresh_skeleton
+from app.media import run_audiobook
 from app.platform import jobs
-from app.study.concept_quiz_llm import author_scope_sync
+from app.study import author_scope_sync
 
 
 def _latest_doc_id() -> str | None:

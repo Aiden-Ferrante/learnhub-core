@@ -17,8 +17,8 @@ import os
 import time
 from typing import Any
 
-from app.content.toc_tree import get_toc_tree
-from app.platform.db import db
+from app.content import get_toc_tree
+from app.platform import db
 
 
 def _alpha() -> float:

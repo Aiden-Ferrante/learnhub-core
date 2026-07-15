@@ -11,8 +11,8 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from app.content.store import persist_document
-from app.content.math_markdown import normalize_math_in_markdown
+from app.content import persist_document
+from app.content import normalize_math_in_markdown
 from app.ingestion.reader import PdfConvertError, convert_document
 
 # Limits are env-tunable; 0 disables a limit. Conversion runs as a background job, so there's

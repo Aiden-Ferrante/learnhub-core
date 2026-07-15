@@ -14,9 +14,9 @@ from typing import Any
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.platform.db import db
+from app.platform import db
 from app.search.concept_resolve import embed_texts
-from app.platform.llm import get_chat_model
+from app.platform import get_chat_model
 
 VECTORS = "content_vectors"
 SECTION_CONTENT = "section_content"

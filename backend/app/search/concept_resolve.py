@@ -20,15 +20,6 @@ _EMBED_URL = (os.environ.get("SENTENCE_TRANSFORMER_URL") or "http://sentence-tra
 
 # Generic words that don't distinguish one concept from another — ignored when comparing names
 # so "Decomposition Axiom" vs "Intersection Axiom" compare as {decomposition} vs {intersection}.
-_GENERIC_NAME_TOKENS = {
-    "axiom", "theorem", "rule", "law", "principle", "definition", "lemma", "corollary",
-    "proposition", "property", "method", "result", "notation", "the", "of", "a", "an",
-    "for", "and", "to", "in", "on", "s",
-}
-
-
-def _sig_tokens(name: str) -> set[str]:
-    return {t for t in re.findall(r"[a-z0-9]+", (name or "").lower()) if t not in _GENERIC_NAME_TOKENS and len(t) > 1}
 
 
 def embed_texts(texts: list[str], timeout: int = 60) -> list[list[float]] | None:
@@ -49,8 +40,3 @@ def embed_texts(texts: list[str], timeout: int = 60) -> list[list[float]] | None
         return None
 
 
-def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    return dot / (na * nb) if na and nb else 0.0

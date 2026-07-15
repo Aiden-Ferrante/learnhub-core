@@ -23,11 +23,11 @@ import time
 
 import numpy as np
 
-from app.content.documents import resolve_doc_id
-from app.platform.db import db
-from app.content.scope import load_section_blocks
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import GuidedScript
+from app.content import resolve_doc_id
+from app.platform import db
+from app.content import load_section_blocks
+from app.platform import ollama_structured_completion
+from app.platform import GuidedScript
 from app.media.tts_orpheus import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
 
 AUDIO_DIR = os.environ.get("AUDIOBOOK_DIR", "/shared/audiobooks")
@@ -445,7 +445,7 @@ def _audio_scope(scope: str | None, source: str) -> str:
 
 
 def _find_audiobook_job(doc_id: str, scope: str | None, source: str) -> dict | None:
-    from app.platform.jobs import list_builds
+    from app.platform import list_builds
 
     for b in list_builds(doc_id, kind="audiobook").get("builds", []):
         if b.get("source") == source and (b.get("realScope") or None) == (scope or None):
@@ -468,7 +468,7 @@ def run_audiobook(job: dict, ctx) -> dict:
 
 def start_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
                     voice: str = DEFAULT_VOICE) -> dict:
-    from app.platform.jobs import enqueue_build
+    from app.platform import enqueue_build
 
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:

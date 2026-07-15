@@ -55,6 +55,20 @@ def existing_descriptions(text: str) -> dict[str, str]:
     return out
 
 
+def facade_summary(pkg: str) -> str | None:
+    """First paragraph of the package facade's docstring — the hub's documentation
+    (docs/module-hubs.md). Written once in __init__.py, surfaced here automatically."""
+    init = ROOT / "backend" / "app" / pkg / "__init__.py"
+    if not init.exists():
+        return None
+    import ast as _ast
+
+    doc = _ast.get_docstring(_ast.parse(init.read_text()))
+    if not doc:
+        return None
+    return " ".join(doc.split("\n\n")[0].split())
+
+
 def build_backend_region(desc: dict[str, str]) -> str:
     lines: list[str] = []
     for pkg, blurb in PACKAGES:
@@ -64,6 +78,9 @@ def build_backend_region(desc: dict[str, str]) -> str:
         ordered = [f for f in prev if f in on_disk]  # keep curated order
         ordered += sorted(f for f in on_disk if f not in ordered)  # append new files
         lines.append(f"### {pkg}/ — {blurb}\n")
+        summary = facade_summary(pkg)
+        if summary:
+            lines.append(f"> {summary} — [`__init__.py`](backend/app/{pkg}/__init__.py) is the facade: import this package, not its modules.\n")
         lines.append("| File | Purpose |")
         lines.append("|---|---|")
         for f in ordered:

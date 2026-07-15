@@ -19,18 +19,18 @@ import threading
 import time
 from typing import Any
 
-from app.content.documents import resolve_doc_id
-from app.content.store import fetch_section_content
+from app.content import resolve_doc_id
+from app.content import fetch_section_content
 from psycopg.types.json import Json
 
-from app.platform.db import db
+from app.platform import db
 
 # One backfill per (doc, scope) at a time — same guard pattern as concept_quiz_llm.
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
 
 
-def _bkey(doc_id: str, scope: str | None) -> str:
+def briefing_key(doc_id: str, scope: str | None) -> str:
     return hashlib.sha256(f"{doc_id}|{scope or 'ALL'}".encode()).hexdigest()[:16]
 
 
@@ -108,7 +108,7 @@ def build_briefing(doc_id: str, scope: str | None, allow_generate: bool = False)
             "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
             "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, sections=EXCLUDED.sections, "
             "key_concepts=EXCLUDED.key_concepts, concept_count=EXCLUDED.concept_count, created_at=EXCLUDED.created_at",
-            {"k": _bkey(doc_id, scope), "d": doc_id, "sc": scope, "obj": Json(objectives),
+            {"k": briefing_key(doc_id, scope), "d": doc_id, "sc": scope, "obj": Json(objectives),
              "wf": Json(watch_for), "sec": Json(sections), "kc": Json(key_concepts), "cc": concept_count},
         )
     return briefing
@@ -150,7 +150,7 @@ def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict
     del section_keys  # kept for signature stability at the two call sites
     with db() as conn:
         has_briefing = conn.execute(
-            "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s", {"k": _bkey(doc_id, scope)}
+            "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s", {"k": briefing_key(doc_id, scope)}
         ).fetchone() is not None
     with _inflight_lock:
         running = f"{doc_id}|{scope or 'ALL'}" in _inflight
@@ -183,7 +183,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
                 'SELECT doc_id AS "docId", scope, objectives, watch_for AS "watchFor", sections, '
                 'key_concepts AS "keyConcepts", concept_count AS "conceptCount" '
                 "FROM deep_chapter_briefing WHERE key = %(k)s",
-                {"k": _bkey(doc_id, scope)},
+                {"k": briefing_key(doc_id, scope)},
             ).fetchone()
         if not briefing:
             briefing = build_briefing(doc_id, scope, allow_generate=False)

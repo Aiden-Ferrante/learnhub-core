@@ -12,13 +12,13 @@ import hashlib
 import re
 import time
 
-from app.content.documents import resolve_doc_id
+from app.content import resolve_doc_id
 from psycopg.types.json import Json
 
-from app.platform.db import db
-from app.content.scope import load_section_blocks
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import Orient, Skeleton
+from app.platform import db
+from app.content import load_section_blocks
+from app.platform import ollama_structured_completion
+from app.platform import Orient, Skeleton
 
 PROGRESS = "chapter_progress"
 
@@ -26,7 +26,7 @@ PROGRESS = "chapter_progress"
 GRADE_VALUE = {"missed": 1, "partial": 2, "most": 3, "nailed": 4}
 
 
-def _key(doc_id: str, scope: str | None) -> str:
+def chapter_cache_key(doc_id: str, scope: str | None) -> str:
     return hashlib.sha256(f"{doc_id}|{scope or 'ALL'}".encode()).hexdigest()[:16]
 
 
@@ -176,7 +176,7 @@ def refresh_skeleton(doc_id: str, scope: str | None) -> dict:
             "VALUES (%(k)s,%(d)s,%(sc)s,%(sections)s,%(pv)s, now()) "
             "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
             "sections=EXCLUDED.sections, prompt_version=EXCLUDED.prompt_version, created_at=EXCLUDED.created_at",
-            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections),
+            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections),
              "pv": SKELETON_PROMPT_VERSION},
         )
     return {"sections": len(sections)}
@@ -186,7 +186,7 @@ def _enqueue_refresh(kind: str, doc_id: str, scope: str | None) -> None:
     """Queue a background regeneration (never generate inside a read request — the reader
     would hang for the LLM). Lazy import: build_queue imports this module's runners."""
     try:
-        from app.platform.jobs import enqueue_build
+        from app.platform import enqueue_build
 
         enqueue_build(doc_id, scope or "", kind=kind)
     except Exception:  # noqa: BLE001 — refresh is best-effort; the read path must not break
@@ -209,7 +209,7 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
         with db() as conn:
             existing = conn.execute(
                 "SELECT sections, prompt_version FROM chapter_skeletons WHERE key = %(k)s",
-                {"k": _key(doc_id, scope)},
+                {"k": chapter_cache_key(doc_id, scope)},
             ).fetchone()
         if existing and existing.get("sections"):
             # Stale = generated under an older prompt; only then queue a background refresh.
@@ -281,7 +281,7 @@ def refresh_orient(doc_id: str, scope: str | None) -> dict:
             "VALUES (%(k)s,%(d)s,%(sc)s,%(obj)s,%(wf)s, now()) "
             "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
             "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, created_at=EXCLUDED.created_at",
-            {"k": _key(doc_id, scope), "d": doc_id, "sc": scope,
+            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sc": scope,
              "obj": Json(data.get("objectives")), "wf": Json(data.get("watchFor"))},
         )
     return {"objectives": len(data.get("objectives") or []), "watchFor": len(data.get("watchFor") or [])}
@@ -301,7 +301,7 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
         with db() as conn:
             existing = conn.execute(
                 'SELECT objectives, watch_for AS "watchFor" FROM chapter_orient WHERE key = %(k)s',
-                {"k": _key(doc_id, scope)},
+                {"k": chapter_cache_key(doc_id, scope)},
             ).fetchone()
         if existing and (existing.get("objectives") or existing.get("watchFor")):
             return {"docId": doc_id, "scope": scope, "objectives": existing["objectives"], "watchFor": existing["watchFor"]}
@@ -322,7 +322,7 @@ def get_chapter_progress(doc_id: str | None, scope: str | None) -> dict:
             return {"stages": {}}
         with db() as conn:
             rec = conn.execute(
-                "SELECT stages FROM chapter_progress WHERE key = %(k)s", {"k": _key(doc_id, scope)}
+                "SELECT stages FROM chapter_progress WHERE key = %(k)s", {"k": chapter_cache_key(doc_id, scope)}
             ).fetchone()
         return {"docId": doc_id, "scope": scope, "stages": (rec or {}).get("stages") or {}}
     except Exception as exc:  # noqa: BLE001
@@ -335,7 +335,7 @@ def update_stage(doc_id: str | None, scope: str | None, stage: str, data: dict) 
         doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
-        k = _key(doc_id, scope)
+        k = chapter_cache_key(doc_id, scope)
         with db() as conn:
             rec = conn.execute(
                 "SELECT stages FROM chapter_progress WHERE key = %(k)s", {"k": k}

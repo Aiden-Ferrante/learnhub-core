@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from app.ingestion.pdf_convert import PdfConvertError, convert_pdf_bytes
+from app.ingestion import PdfConvertError, convert_pdf_bytes
 from app.pipeline.lifecycle import on_converted
 
 __all__ = [

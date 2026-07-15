@@ -128,6 +128,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ### platform/ — the floor (everything depends on this)
 
+> Platform — the floor every package stands on. — [`__init__.py`](backend/app/platform/__init__.py) is the facade: import this package, not its modules.
+
 | File | Purpose |
 |---|---|
 | [`llm.py`](backend/app/platform/llm.py) | Ollama client — free-text + structured/JSON completions |
@@ -136,6 +138,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`db.py`](backend/app/platform/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
 
 ### content/ — the book itself
+
+> Content — the book itself, and the one scope resolver. — [`__init__.py`](backend/app/content/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
@@ -152,12 +156,16 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ### ingestion/ — PDF in
 
+> Ingestion — PDF in. — [`__init__.py`](backend/app/ingestion/__init__.py) is the facade: import this package, not its modules.
+
 | File | Purpose |
 |---|---|
 | [`reader.py`](backend/app/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
 | [`pdf_convert.py`](backend/app/ingestion/pdf_convert.py) | Conversion job driver |
 
 ### extraction/ — LLM generation passes
+
+> Extraction — the LLM generation passes over stored content. — [`__init__.py`](backend/app/extraction/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
@@ -170,6 +178,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`eval_gate.py`](backend/app/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
 
 ### study/ — learning state
+
+> Study — the learning loop over extracted concepts. — [`__init__.py`](backend/app/study/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
@@ -186,12 +196,16 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ### search/ — embeddings + semantic search
 
+> Search — embeddings + retrieval over the content layer. — [`__init__.py`](backend/app/search/__init__.py) is the facade: import this package, not its modules.
+
 | File | Purpose |
 |---|---|
 | [`semantic_search.py`](backend/app/search/semantic_search.py) | Embed query → top-k content blocks + `ask` |
 | [`concept_resolve.py`](backend/app/search/concept_resolve.py) | Embedding helper for concept resolution |
 
 ### media/ — audiobooks
+
+> Media — audio renditions of chapters. — [`__init__.py`](backend/app/media/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
@@ -200,12 +214,16 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ### overview/ — cross-domain read models
 
+> Overview — cross-domain read models. — [`__init__.py`](backend/app/overview/__init__.py) is the facade: import this package, not its modules.
+
 | File | Purpose |
 |---|---|
 | [`plan.py`](backend/app/overview/plan.py) | Today plan (resume point, reviews due, next chapter) |
 | [`coverage.py`](backend/app/overview/coverage.py) | Chapter × artifact-kind readiness/coverage grids |
 
 ### pipeline/ — the conductor — document lifecycle + job runners
+
+> Pipeline — the conductor over the document lifecycle. — [`__init__.py`](backend/app/pipeline/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
@@ -215,6 +233,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`registry.py`](backend/app/pipeline/registry.py) | Composition root — registers every job-kind runner |
 
 ### api/ — thin routers + composition root
+
+> API — thin HTTP routers over the domains. — [`__init__.py`](backend/app/api/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|

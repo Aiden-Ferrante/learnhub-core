@@ -20,14 +20,14 @@ import time
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 
-from app.content.documents import resolve_doc_id
+from app.content import resolve_doc_id
 from psycopg.types.json import Json
 
-from app.content.scope import SectionExtractInput, load_section_blocks
-from app.content.sections import _clean_heading_markup
-from app.platform.db import db
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import ConceptResult
+from app.content import SectionExtractInput, load_section_blocks
+from app.content import clean_heading_markup
+from app.platform import db
+from app.platform import ollama_structured_completion
+from app.platform import ConceptResult
 
 _KINDS = ("definition", "theorem", "principle", "result", "method")
 
@@ -49,7 +49,7 @@ def _norm_part(s: object) -> str:
 
 
 def normalize_entity(name: object) -> str:
-    return _clean_heading_markup(str(name or "")).strip()
+    return clean_heading_markup(str(name or "")).strip()
 
 
 def build_user_prompt(inp: SectionExtractInput) -> str:

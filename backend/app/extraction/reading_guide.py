@@ -13,13 +13,13 @@ import hashlib
 import os
 from typing import Any
 
-from app.content.documents import resolve_doc_id
+from app.content import resolve_doc_id
 from psycopg.types.json import Json
 
-from app.platform.db import db
-from app.content.scope import load_section_blocks
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import ReadingGuide
+from app.platform import db
+from app.content import load_section_blocks
+from app.platform import ollama_structured_completion
+from app.platform import ReadingGuide
 
 # Reuse the quiz authoring model override unless a reading-specific one is set.
 _AUTHOR_MODEL = (
@@ -121,7 +121,7 @@ def _enqueue_backfill(doc: str | None, scope: str | None) -> None:
     """Queue guide authoring on the processing ledger (visible, restart-safe) —
     replaces the old fire-and-forget daemon thread. Best-effort."""
     try:
-        from app.platform.jobs import enqueue_build
+        from app.platform import enqueue_build
 
         enqueue_build(doc, scope or "", kind="guides")
     except Exception:  # noqa: BLE001 — the read path must not break on a queue hiccup
@@ -141,7 +141,7 @@ def guide_status(doc: str | None, scope: str | None) -> dict[str, Any]:
     # Running = a guides job for this scope is live on the ledger (was an in-process flag).
     running = False
     try:
-        from app.platform.jobs import list_builds
+        from app.platform import list_builds
 
         running = any(
             j.get("scope") == (scope or "") and j.get("status") in ("queued", "running")
@@ -166,7 +166,7 @@ def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
         depth_by: dict[str, int] = {}
         ess_by: dict[str, str] = {}
         try:
-            from app.extraction.skeleton import _attach_depths, _key as _skel_key
+            from app.extraction.skeleton import _attach_depths, chapter_cache_key as _skel_key
 
             secs = [{"sectionKey": b["sectionKey"], "heading": b["heading"]} for b in blocks]
             _attach_depths(doc, secs)

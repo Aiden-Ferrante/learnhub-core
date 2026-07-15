@@ -9,9 +9,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.content.documents import resolve_doc_id
-from app.extraction.concept_store import fetch_document_concepts, fetch_section_concepts
-from app.platform.jobs import enqueue_build, list_builds
+from app.content import resolve_doc_id
+from app.extraction import fetch_document_concepts, fetch_section_concepts
+from app.platform import enqueue_build, list_builds
 
 router = APIRouter()
 

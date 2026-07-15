@@ -26,7 +26,7 @@ from typing import Protocol
 import fitz  # PyMuPDF
 import pymupdf4llm
 
-from app.content.math_markdown import replacement_char_ratio
+from app.content import replacement_char_ratio
 
 # A single converter instance is reused across requests so Docling's heavy formula/layout
 # models load ONCE, not per conversion (which was slow + churned GPU memory → "fetch

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 
-from app.platform.jobs import enqueue_build
+from app.platform import enqueue_build
 
 
 def autochain_enabled() -> bool:

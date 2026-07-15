@@ -36,7 +36,7 @@ def _configure(conn: Connection) -> None:
 # dict_row so ported queries read rows by column name (aliased back to the camelCase
 # keys the callers expect, e.g. SELECT doc_id AS "docId").
 _pool = ConnectionPool(
-    _DSN, min_size=1, max_size=8,
+    _DSN, min_size=1, max_size=8, open=True,
     kwargs={"autocommit": True, "row_factory": dict_row}, configure=_configure,
 )
 

@@ -25,8 +25,8 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-from app.content.scope import scope_section_keys
-from app.platform.db import db
+from app.content import scope_section_keys
+from app.platform import db
 from app.study import srs
 from app.study.mastery import record_quiz_event
 

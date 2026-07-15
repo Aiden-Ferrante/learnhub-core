@@ -11,10 +11,10 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-from app.platform.db import db
+from app.platform import db
 from app.extraction.concept_store import fetch_section_concepts
-from app.platform.llm import _ollama_model, ollama_structured_completion
-from app.platform.llm_schemas import Augment
+from app.platform import ollama_model, ollama_structured_completion
+from app.platform import Augment
 
 AUGMENT = "section_augment"
 
@@ -28,7 +28,7 @@ _KIND_VERB = {
 
 
 def _augment_model() -> str:
-    return os.environ.get("LEARN_AUGMENT_MODEL") or _ollama_model()
+    return os.environ.get("LEARN_AUGMENT_MODEL") or ollama_model()
 
 
 def _akey(doc_id: str, section_key: str) -> str:

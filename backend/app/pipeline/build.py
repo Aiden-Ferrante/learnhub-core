@@ -17,9 +17,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from app.content.store import fetch_section_content
-from app.extraction.concept_store import concept_count
-from app.extraction.concepts_extract import extract_concepts_document
+from app.content import fetch_section_content
+from app.extraction import concept_count
+from app.extraction import extract_concepts_document
 
 
 def _scope_keys(doc_id: str, scope: str) -> list[str] | None:
@@ -62,7 +62,7 @@ def run_extract(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     })
     # Best-effort: keep semantic search current with the freshly-extracted content.
     try:
-        from app.search.semantic_search import ensure_index
+        from app.search import ensure_index
 
         ensure_index(doc_id)
     except Exception:  # noqa: BLE001 — indexing must never fail the extraction
@@ -70,7 +70,7 @@ def run_extract(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     # Quality gate: critic-grade a sample of what was just written and put the score on
     # the ledger row next to outcomes — extraction quality as a regression number.
     try:
-        from app.extraction.eval_gate import eval_enabled, evaluate_extraction_sample
+        from app.extraction import eval_enabled, evaluate_extraction_sample
 
         if eval_enabled():
             ctx.patch({"phase": "eval"})

@@ -37,7 +37,7 @@ class PageBlock:
     headings: list[dict] = field(default_factory=list)
 
 
-def _clean_heading_markup(s: str) -> str:
+def clean_heading_markup(s: str) -> str:
     """Strip PDF/HTML export noise from heading text (mirrors cleanHeadingMarkup)."""
     t = s or ""
     t = re.sub(r"<[^>]+>", "", t)
@@ -70,7 +70,7 @@ def split_markdown_sections(markdown: str) -> list[SectionBlock]:
     for order, (line_idx, level, raw) in enumerate(heads):
         end = heads[order + 1][0] if order + 1 < len(heads) else len(lines)
         body = "\n".join(lines[line_idx:end]).strip()
-        cleaned = _clean_heading_markup(raw)
+        cleaned = clean_heading_markup(raw)
         nm = _LEADING_NUMBER.match(cleaned)
         number_key = nm.group(1) if nm else None
         if number_key:

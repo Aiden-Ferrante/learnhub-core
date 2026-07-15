@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import re
 
-from app.content.sections import PageBlock, SectionBlock, _NUMERIC_KEY, _clean_heading_markup
+from app.content.sections import PageBlock, SectionBlock, _NUMERIC_KEY, clean_heading_markup
 
 # --------------------------------------------------------------------------- #
 # Page provenance (pure, unit-testable — no DB)
 # --------------------------------------------------------------------------- #
 
 def _heading_text_norm(s: str) -> str:
-    return re.sub(r"\s+", " ", _clean_heading_markup(s or "")).strip().lower()
+    return re.sub(r"\s+", " ", clean_heading_markup(s or "")).strip().lower()
 
 
 def match_section_start_pages(

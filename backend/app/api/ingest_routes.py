@@ -14,11 +14,11 @@ from __future__ import annotations
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.content.documents import fetch_latest_document
-from app.content.documents import find_by_source_hash
-from app.ingestion.pdf_convert import source_hash_of
-from app.pipeline.ingest import prepare_upload
-from app.platform.jobs import enqueue_build, list_builds
+from app.content import fetch_latest_document
+from app.content import find_by_source_hash
+from app.ingestion import source_hash_of
+from app.pipeline import prepare_upload
+from app.platform import enqueue_build, list_builds
 
 router = APIRouter()
 

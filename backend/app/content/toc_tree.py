@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.content.documents import resolve_doc_id
-from app.platform.db import db
+from app.platform import db
 
 
 @dataclass

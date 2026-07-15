@@ -33,7 +33,7 @@ from app.content.outline import (
 from app.content.pages import build_page_blocks, section_page_ranges
 from app.content.scope import scope_blocks
 from app.content.sections import split_markdown_sections
-from app.platform.db import db
+from app.platform import db
 
 DOCUMENTS = "documents"
 SECTION_CONTENT = "section_content"

@@ -6,7 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.extraction.deep_chapter import fetch_deep_chapter, prepare_deep_chapter
+from app.extraction import fetch_deep_chapter, prepare_deep_chapter
 
 router = APIRouter()
 

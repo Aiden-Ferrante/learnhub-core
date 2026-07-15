@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from app.platform.db import db
+from app.platform import db
 
 router = APIRouter()
 

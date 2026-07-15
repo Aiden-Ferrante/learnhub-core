@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from app.platform.db import db
+from app.platform import db
 
 DOCUMENTS = "documents"
 

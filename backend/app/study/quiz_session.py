@@ -16,8 +16,8 @@ import uuid
 from threading import Lock
 from typing import Any
 
-from app.content.scope import scope_section_keys
-from app.platform.db import db
+from app.content import scope_section_keys
+from app.platform import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import (
@@ -121,7 +121,7 @@ def answer_quiz(session_id: str, choice_index: int) -> tuple[dict[str, Any], int
 def _quiz_job_running(doc: str | None, scope: str | None) -> bool:
     """Is a ledgered quiz-authoring job queued/running for this scope?"""
     try:
-        from app.platform.jobs import list_builds
+        from app.platform import list_builds
 
         for j in list_builds(doc, kind="quizzes").get("builds", []):
             if j.get("scope") == scope and j.get("status") in ("queued", "running"):
@@ -144,7 +144,7 @@ def prepare_quizzes(doc: str | None, scope: str) -> dict[str, Any]:
     """Author ALL of a chapter's application questions up front — enqueued on the processing
     ledger (visible in the pipeline grid, survives restarts) rather than a fire-and-forget
     thread. Returns current status."""
-    from app.platform.jobs import enqueue_build
+    from app.platform import enqueue_build
 
     enqueue_build(doc, scope, kind="quizzes")
     keys = scope_section_keys(doc, scope)

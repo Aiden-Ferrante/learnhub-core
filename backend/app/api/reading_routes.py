@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.platform.db import db
-from app.extraction.reading_guide import fetch_reading_guide, guide_status
+from app.platform import db
+from app.extraction import fetch_reading_guide, guide_status
 
 router = APIRouter()
 
@@ -40,7 +40,7 @@ def api_reading_guide_prepare(body: dict = Body(default=None)) -> JSONResponse:
     if not scope:
         return JSONResponse({"error": "scope required"}, status_code=400)
     try:
-        from app.platform.jobs import enqueue_build
+        from app.platform import enqueue_build
 
         enqueue_build(doc, scope, kind="guides")
         status = guide_status(doc, scope)

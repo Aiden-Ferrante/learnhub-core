@@ -11,16 +11,16 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from app.content.scope import scope_blocks
-from app.extraction.concept_store import concept_count
-from app.extraction.deep_chapter import _bkey as briefing_key
-from app.extraction.reading_guide import guide_status
-from app.extraction.skeleton import SKELETON_PROMPT_VERSION, _key as chapter_cache_key
-from app.media.audiobook import audiobook_path, timeline_path
-from app.platform.db import db
-from app.content.documents import resolve_doc_id
-from app.platform.jobs import KINDS, list_builds
-from app.study.concept_quiz_llm import scope_question_status
+from app.content import scope_blocks
+from app.extraction import concept_count
+from app.extraction import briefing_key
+from app.extraction import guide_status
+from app.extraction import SKELETON_PROMPT_VERSION, chapter_cache_key
+from app.media import audiobook_path, timeline_path
+from app.platform import db
+from app.content import resolve_doc_id
+from app.platform import KINDS, list_builds
+from app.study import scope_question_status
 
 
 def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:

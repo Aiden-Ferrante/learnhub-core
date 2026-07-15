@@ -7,14 +7,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.overview.coverage import chapters_coverage, chapters_readiness
-from app.platform.jobs import (
-    KINDS,
-    cancel_build,
-    enqueue_build,
-    ensure_worker,
-    list_builds,
-)
+from app.overview import chapters_coverage, chapters_readiness
+from app.platform import KINDS, cancel_build, enqueue_build, ensure_worker, list_builds
 
 router = APIRouter()
 

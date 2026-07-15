@@ -12,14 +12,14 @@ import random
 import time
 import uuid
 
-from app.platform.db import db
+from app.platform import db
 from app.study.cards import is_quizzable, nearest_distractor_names
 from app.study.concept_quiz_gen import build_concept_question, public_concept_question
 from app.study.concept_quiz_llm import ensure_questions_async, servable_from_cached
-from app.content.scope import scope_section_keys
+from app.content import scope_section_keys
 from app.study.mastery import record_quiz_event
-from app.content.documents import resolve_doc_id
-from app.extraction.skeleton import update_stage
+from app.content import resolve_doc_id
+from app.extraction import update_stage
 
 PASS_PCT = 80
 _TTL = 60 * 60  # an exam session is valid for an hour

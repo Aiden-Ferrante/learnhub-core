@@ -8,9 +8,9 @@ name: code map
 on:
   push:
     branches: [main]
-    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
+    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py']
   pull_request:
-    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py']
+    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py']
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Enforce the module-hub contract (always, hard fail)
+        run: python scripts/check_hubs.py
 
       - name: Check map is current (pull requests)
         if: github.event_name == 'pull_request'

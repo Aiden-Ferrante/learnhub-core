@@ -11,14 +11,9 @@ import time
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.study.mastery import compute_concept_mastery
-from app.study.quiz_session import (
-    answer_quiz,
-    prepare_quizzes,
-    quiz_prepare_status,
-    start_quiz_session,
-)
-from app.study.reviews import build_review_queue, grade_review
+from app.study import compute_concept_mastery
+from app.study import answer_quiz, prepare_quizzes, quiz_prepare_status, start_quiz_session
+from app.study import build_review_queue, grade_review
 
 router = APIRouter()
 
@@ -60,7 +55,7 @@ def api_section_augment(
     key: str, doc: str | None = Query(None), refresh: bool = Query(False)
 ) -> JSONResponse:
     """LLM-generated learning objectives + recap for a section (cached; keyless fallback)."""
-    from app.extraction.augment import section_augment
+    from app.extraction import section_augment
 
     return JSONResponse(section_augment(doc, key, force=refresh))
 

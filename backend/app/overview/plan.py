@@ -15,10 +15,10 @@ import re
 import time
 from typing import Any
 
-from app.content.documents import resolve_doc_id
-from app.content.chapters import chapter_units
+from app.content import resolve_doc_id
+from app.content import chapter_units
 from app.overview.coverage import chapters_readiness
-from app.platform.db import db
+from app.platform import db
 
 # Mirrors lib/learn-path.ts PATH_STAGES — keep in sync (stage keys are the contract).
 STAGE_ORDER: list[tuple[str, str]] = [

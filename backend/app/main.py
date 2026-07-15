@@ -6,42 +6,32 @@ from pathlib import Path
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from app.content.store import fetch_outline, fetch_section_content
-from app.content.documents import fetch_latest_document, resolve_doc_id
-from app.content.elements import fetch_elements, figure_path
-from app.api.admin_routes import router as admin_router
-from app.pipeline.registry import install as install_job_runners
-from app.content.toc_tree import get_toc_tree
-from app.platform.db import set_request_db_name
-from app.api.audiobook_routes import router as audiobook_router
-from app.api.learning_path_routes import router as learning_path_router
-from app.api.build_routes import router as build_router
-from app.api.concept_study_routes import router as concept_study_router
-from app.api.deep_chapter_routes import router as deep_chapter_router
-from app.api.extract_routes import router as extract_router
-from app.api.ingest_routes import router as ingest_router
-from app.study.mastery import compute_activity, compute_calibration, compute_forecast, compute_mastery, record_engagement
-from app.api.reading_routes import router as reading_router
-from app.api.search_routes import router as search_router
-from app.api.study_routes import router as study_router
-from app.api.system_routes import router as system_router
+from app.api import all_routers
+from app.content import (
+    fetch_elements,
+    fetch_latest_document,
+    fetch_outline,
+    fetch_section_content,
+    figure_path,
+    get_toc_tree,
+    resolve_doc_id,
+)
+from app.pipeline import install as install_job_runners
+from app.platform import set_request_db_name
+from app.study import (
+    compute_activity,
+    compute_calibration,
+    compute_forecast,
+    compute_mastery,
+    record_engagement,
+)
 
 app = FastAPI(title="Learn Hub", version="0.2.0")
 
-# Connect the platform jobs ledger to its domain runners (composition root).
+# Assembly: connect the jobs ledger to its runners, then mount every router (composition root).
 install_job_runners()
-app.include_router(study_router)
-app.include_router(ingest_router)
-app.include_router(extract_router)
-app.include_router(concept_study_router)
-app.include_router(audiobook_router)
-app.include_router(learning_path_router)
-app.include_router(deep_chapter_router)
-app.include_router(build_router)
-app.include_router(reading_router)
-app.include_router(search_router)
-app.include_router(admin_router)
-app.include_router(system_router)
+for _router in all_routers:
+    app.include_router(_router)
 
 
 @app.middleware("http")

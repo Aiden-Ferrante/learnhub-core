@@ -16,9 +16,9 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from app.platform.db import db
-from app.platform.llm import ollama_structured_completion
-from app.platform.llm_schemas import ConceptVerdict
+from app.platform import db
+from app.platform import ollama_structured_completion
+from app.platform import ConceptVerdict
 
 EVAL_SYSTEM = (
     "You are a strict reviewer of concept-lessons extracted from a textbook. For ONE "

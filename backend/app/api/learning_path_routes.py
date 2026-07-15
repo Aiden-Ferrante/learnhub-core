@@ -6,18 +6,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.content.chapters import chapter_units
-from app.study.drill import grade_drill, start_drill
-from app.study.exam import grade_exam, start_exam
-from app.overview.plan import build_plan
-from app.study.recall import check_recall
-from app.extraction.skeleton import (
-    fetch_orient,
-    fetch_skeleton,
-    get_chapter_progress,
-    record_skeleton_grade,
-    update_stage,
-)
+from app.content import chapter_units
+from app.study import grade_drill, start_drill
+from app.study import grade_exam, start_exam
+from app.overview import build_plan
+from app.study import check_recall
+from app.extraction import fetch_orient, fetch_skeleton, get_chapter_progress, record_skeleton_grade, update_stage
 
 router = APIRouter()
 

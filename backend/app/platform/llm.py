@@ -32,7 +32,7 @@ def ollama_base_url() -> str:
     return base[:-3].rstrip("/") if base.endswith("/v1") else base
 
 
-def _ollama_model() -> str:
+def ollama_model() -> str:
     return os.environ.get("OLLAMA_MODEL") or "llama3.1:8b"
 
 
@@ -60,7 +60,7 @@ def get_chat_model(
     Ollama daemon), so we make a fresh client per request to honour the model picker.
     """
     kwargs: dict[str, Any] = {
-        "model": model or _ollama_model(),
+        "model": model or ollama_model(),
         "base_url": ollama_base_url(),
         "temperature": temperature,
         "num_ctx": _num_ctx(),

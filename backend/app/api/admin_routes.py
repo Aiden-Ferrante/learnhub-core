@@ -18,8 +18,8 @@ from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Json
 
-from app.content.store import fetch_outline
-from app.platform.db import db
+from app.content import fetch_outline
+from app.platform import db
 
 router = APIRouter()
 

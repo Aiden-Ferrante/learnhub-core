@@ -7,8 +7,8 @@ here, keeping readers decoupled from the extraction pipeline.
 
 from __future__ import annotations
 
-from app.content.documents import resolve_doc_id
-from app.platform.db import db
+from app.content import resolve_doc_id
+from app.platform import db
 
 
 
@@ -70,7 +70,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
                     {"d": doc_id},
                 ).fetchall()
             if blocks:
-                from app.content.scope import scope_blocks
+                from app.content import scope_blocks
 
                 # One shared resolver (outline-first) — this used to skip the outline
                 # step and could under-count a mixed-keyspace chapter's concepts.

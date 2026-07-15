@@ -16,7 +16,7 @@ from typing import Any
 
 from app.content.documents import resolve_doc_id
 from app.content.toc_tree import get_toc_tree
-from app.platform.db import db
+from app.platform import db
 
 
 def chapter_units(doc_id: str | None) -> dict[str, Any]:

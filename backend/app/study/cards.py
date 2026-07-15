@@ -13,8 +13,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.search.concept_resolve import _cosine, _sig_tokens, embed_texts
-from app.platform.db import db
+from app.search import embed_texts
+from app.platform import db
+
+
+# Name-token helpers (moved from search — quiz distractors are their only consumer).
+_GENERIC_NAME_TOKENS = {
+    "axiom", "theorem", "rule", "law", "principle", "definition", "lemma", "corollary",
+    "proposition", "property", "method", "result", "notation", "the", "of", "a", "an",
+    "for", "and", "to", "in", "on", "s",
+}
+
+
+def _sig_tokens(name: str) -> set[str]:
+    return {t for t in re.findall(r"[a-z0-9]+", (name or "").lower()) if t not in _GENERIC_NAME_TOKENS and len(t) > 1}
+
 
 CONCEPTS = "concepts"
 

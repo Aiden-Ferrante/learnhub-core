@@ -12,8 +12,8 @@ import httpx
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from app.platform.jobs import queue_summary, set_queue_paused
-from app.platform.llm import ollama_base_url
+from app.platform import queue_summary, set_queue_paused
+from app.platform import ollama_base_url
 
 router = APIRouter()
 

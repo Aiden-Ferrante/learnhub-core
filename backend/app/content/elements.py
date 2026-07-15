@@ -15,7 +15,7 @@ from pathlib import Path
 from app.content.documents import fetch_latest_document
 from app.content.scope import is_ancestor_section_key
 from app.content.sections import SectionBlock
-from app.platform.db import db
+from app.platform import db
 
 ELEMENTS = "elements"
 

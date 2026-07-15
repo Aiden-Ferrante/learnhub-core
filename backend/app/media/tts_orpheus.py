@@ -31,7 +31,7 @@ _TOKEN_RE = re.compile(r"<custom_token_(\d+)>")
 
 
 def _generate_url() -> str:
-    from app.platform.llm import ollama_base_url
+    from app.platform import ollama_base_url
 
     return ollama_base_url() + "/api/generate"
 

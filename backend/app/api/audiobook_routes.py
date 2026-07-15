@@ -8,15 +8,9 @@ import os
 from fastapi import APIRouter, Body
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.media.audiobook import (
-    audiobook_path,
-    audiobook_status,
-    audiobook_timeline,
-    list_audiobooks,
-    start_audiobook,
-)
-from app.content.documents import resolve_doc_id
-from app.media.tts_orpheus import VOICES
+from app.media import audiobook_path, audiobook_status, audiobook_timeline, list_audiobooks, start_audiobook
+from app.content import resolve_doc_id
+from app.media import VOICES
 
 router = APIRouter()
 
