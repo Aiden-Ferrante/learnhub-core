@@ -1434,52 +1434,85 @@ export function DeepChapter({
               </div>
             )}
 
-            {/* Close the loop — the study actions live on the same surface, as drawers. */}
-            {!loading && data?.markdown && (
-              <div className={cn("mt-10 rounded-lg border p-5", cardCls)}>
-                <div className="text-sm font-semibold">Close the loop</div>
-                <p className={cn("mt-0.5 text-xs", mutedCls)}>
-                  Lock in what you just read — everything opens right here.
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("walk")}>
-                    <Network className="h-3.5 w-3.5" />
-                    Learn top-down{stages.skeleton ? " ✓" : ""}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("quiz")}>
-                    <GraduationCap className="h-3.5 w-3.5" />
-                    Quiz{stages.quizzes ? " ✓" : ""}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("exam")}>
-                    <Brain className="h-3.5 w-3.5" />
-                    Exam{stages.exam ? " ✓" : ""}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("lockin")}>
-                    <Check className="h-3.5 w-3.5" />
-                    Lock in{stages.lockin ? " ✓" : ""}
-                  </Button>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Review{dueCount > 0 ? ` · ${dueCount} due` : ""}
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("tutor")}>
-                    <MessageCircleQuestion className="h-3.5 w-3.5" />
-                    Tutor
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("listen")}>
-                    <Headphones className="h-3.5 w-3.5" />
-                    Listen
-                  </Button>
+            {/* Close the loop — one primary action (the path's next stage), the rest quiet. */}
+            {!loading && data?.markdown && (() => {
+              const studyActions = [
+                { stage: "skeleton", drawer: "walk" as const, label: "Learn top-down", Icon: Network },
+                { stage: "quizzes", drawer: "quiz" as const, label: "Quiz", Icon: GraduationCap },
+                { stage: "exam", drawer: "exam" as const, label: "Exam", Icon: Brain },
+                { stage: "lockin", drawer: "lockin" as const, label: "Lock in", Icon: Check },
+              ]
+              const nextAction = studyActions.find((a) => !stages[a.stage])
+              return (
+                <div className={cn("mt-10 overflow-hidden rounded-lg border", cardCls)}>
+                  <div className="p-5">
+                    <div className="text-sm font-semibold">Close the loop</div>
+                    <p className={cn("mt-0.5 text-xs", mutedCls)}>
+                      Lock in what you just read — everything opens right here.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {studyActions.map(({ stage, drawer: d, label, Icon }) => {
+                        const done = !!stages[stage]
+                        const isPrimary = nextAction?.stage === stage
+                        return (
+                          <Button
+                            key={stage}
+                            type="button"
+                            variant={isPrimary ? "default" : "outline"}
+                            size="sm"
+                            className={cn("h-8 gap-1.5 text-xs", !isPrimary && done && "opacity-80")}
+                            onClick={() => setDrawer(d)}
+                          >
+                            {done ? <Check className="h-3.5 w-3.5 text-status-mastered" /> : <Icon className="h-3.5 w-3.5" />}
+                            {isPrimary ? `Continue the path · ${label}` : label}
+                          </Button>
+                        )
+                      })}
+                      {!nextAction && dueCount > 0 && (
+                        <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Review · {dueCount} due
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {(nextAction || dueCount === 0) && (
+                        <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("review")}>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Review{dueCount > 0 ? ` · ${dueCount} due` : ""}
+                        </Button>
+                      )}
+                      <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("tutor")}>
+                        <MessageCircleQuestion className="h-3.5 w-3.5" />
+                        Tutor
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setDrawer("listen")}>
+                        <Headphones className="h-3.5 w-3.5" />
+                        Listen
+                      </Button>
+                    </div>
+                  </div>
                   {nextChapter && (
-                    <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => goChapter(nextChapter.key)}>
-                      Next: {nextChapter.title} <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => goChapter(nextChapter.key)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 border-t px-5 py-3 text-left text-sm transition-colors",
+                        paper ? "hover:bg-[#efe8da]" : "hover:bg-muted/40",
+                      )}
+                    >
+                      <span className={cn("shrink-0 text-xs", mutedCls)}>
+                        Up next · Chapter {chapterIdx + 2} of {chapters.length}
+                      </span>
+                      <span className="flex min-w-0 items-center gap-1 font-medium">
+                        <span className="truncate">{nextChapter.title}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      </span>
+                    </button>
                   )}
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* Margin notes (wide screens): first mentions surface as Tufte-style sidenotes. */}
