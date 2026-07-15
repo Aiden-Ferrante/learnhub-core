@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { EmptyState } from "@/components/patterns/empty-state"
 import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
 import { useToast } from "@/hooks/use-toast"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
@@ -366,6 +367,9 @@ export function DeepChapter({
   const scrollSaveAt = useRef(0)
   const spyAt = useRef(0)
   const headingEls = useRef<HTMLElement[]>([])
+  // Where the scroll-restore landed — the resumed chip dismisses once the reader
+  // scrolls meaningfully away from it (they've chosen to read on).
+  const restoredAt = useRef(0)
   // Last REAL reading position. When leaving a chapter the content unmounts first and the
   // browser clamps scrollTop to 0 before effect cleanups run — saving the live value there
   // would always persist 0. handleScroll keeps this ref honest (and ignores the clamp event,
@@ -614,6 +618,7 @@ export function DeepChapter({
     const saved = Number(localStorage.getItem(scrollKey) || 0)
     box.scrollTop = saved
     lastScrollTop.current = box.scrollTop
+    restoredAt.current = box.scrollTop
     if (saved > 400) setResumed(true)
     return () => {
       try {
@@ -636,6 +641,7 @@ export function DeepChapter({
     lastScrollTop.current = box.scrollTop
     const denom = box.scrollHeight - box.clientHeight
     setReadPct(denom > 0 ? Math.min(100, Math.round((box.scrollTop / denom) * 100)) : 100)
+    if (resumed && Math.abs(box.scrollTop - restoredAt.current) > 150) setResumed(false)
     // Read stage: reaching the tail of the chapter marks it read (soft gate).
     if (!readMarked.current && !stages.read && box.scrollTop + box.clientHeight >= box.scrollHeight * 0.92) {
       readMarked.current = true
@@ -1428,10 +1434,18 @@ export function DeepChapter({
             {/* The reader spine. */}
             {reader}
             {!loading && !error && data && !data.markdown && (
-              <div className={cn("rounded-lg border p-6 text-sm", cardCls, mutedCls)}>
-                This scope has no readable content of its own
-                {nextChapter ? " — try the next chapter." : "."}
-              </div>
+              <EmptyState
+                icon={<BookOpen />}
+                title="Nothing to read here"
+                description="This scope has no readable content of its own — it may be a Part divider or front matter."
+                action={
+                  nextChapter ? (
+                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => goChapter(nextChapter.key)}>
+                      Next: {nextChapter.title} <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
 
             {/* Close the loop — one primary action (the path's next stage), the rest quiet. */}
