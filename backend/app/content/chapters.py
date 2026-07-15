@@ -16,7 +16,7 @@ from typing import Any
 
 from app.content.documents import fetch_latest_document
 from app.content.arango_tree import get_toc_tree
-from app.platform.arango import connect_arango
+from app.platform.db import db
 
 
 def _resolve_doc_id(doc_id: str | None) -> str | None:
@@ -28,7 +28,6 @@ def _resolve_doc_id(doc_id: str | None) -> str | None:
 
 def chapter_units(doc_id: str | None) -> dict[str, Any]:
     try:
-        db = connect_arango()
         doc_id = _resolve_doc_id(doc_id)
         if not doc_id:
             return {"error": "no document found"}
@@ -39,12 +38,12 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
 
         from app.content.scope import _blocks_in_scope, _scope_keys_from_outline, _section_level_fn
 
-        rows = list(
-            db.aql.execute(
-                "FOR b IN section_content FILTER b.docId == @d SORT b.order RETURN b",
-                bind_vars={"d": doc_id},
-            )
-        )
+        with db() as conn:
+            rows = conn.execute(
+                'SELECT section_key AS "sectionKey", "order", heading, level '
+                'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+                {"d": doc_id},
+            ).fetchall()
         block_keys = {r.get("sectionKey") for r in rows}
         level_of = _section_level_fn(doc_id)
 
