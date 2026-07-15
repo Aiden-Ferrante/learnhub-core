@@ -27,7 +27,7 @@ DOCUMENTS = "documents"
 CONCEPTS = "concepts"
 SECTION_CONTENT = "section_content"
 # Fields a curator may edit on a concept (everything else — provenance, keys — is read-only).
-_EDITABLE = {"name", "signal", "source", "kind", "questions"}
+_EDITABLE = {"name", "signal", "source", "kind"}
 
 
 @router.get("/api/documents")
@@ -228,18 +228,17 @@ def api_search(
 
 @router.patch("/api/concept/{key}")
 def api_update_concept(key: str, body: dict = Body(...)) -> JSONResponse:
-    """Edit a concept's curatable fields (name, signal, source, kind, questions).
+    """Edit a concept's curatable fields (name, signal, source, kind).
     Keys/provenance are immutable; review history is keyed by the concept ``_key`` (untouched)."""
     patch: dict[str, Any] = {k: v for k, v in (body or {}).items() if k in _EDITABLE}
     if not patch:
         return JSONResponse(
             {"error": f"no editable fields; allowed: {sorted(_EDITABLE)}"}, status_code=400
         )
-    # "questions" is a jsonb column; the rest are plain text.
     sets, params = [], {"key": key}
     for f, v in patch.items():
         sets.append(f'"{f}" = %({f})s')
-        params[f] = Json(v) if f == "questions" else v
+        params[f] = v
     try:
         with db() as conn:
             row = conn.execute(

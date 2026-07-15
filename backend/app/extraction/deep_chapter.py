@@ -1,25 +1,20 @@
-"""Deep Chapter — pre-generated overlay for the reading-first chapter surface.
+"""Deep Chapter — the assembled reading-first chapter surface.
 
-Two non-destructive, idempotent artifacts layered on the existing pipeline:
+One non-destructive, idempotent artifact: ``deep_chapter_briefing`` — a chapter
+briefing ASSEMBLED from the already-cached artifacts (orient objectives/watch-fors
++ skeleton essences + key concepts), cached per (doc, scope). Per-section recaps
+(``section_augment``) are warmed alongside it.
 
-- ``deep_chapter_briefing`` (collection): a chapter briefing ASSEMBLED from the
-  already-cached artifacts (orient objectives/watch-fors + skeleton essences +
-  key concepts) — no new LLM pass of its own, cached per (doc, scope).
-- ``concepts.deepExplanation`` (field): a 1-2 paragraph expansion of each
-  concept's one-line ``signal``, grounded in its verbatim ``source`` passage.
-  Only concepts missing the field are generated, so re-processing never
-  duplicates work.
-
-The pass runs eagerly at document-processing time (hooked at the end of
-``extract_concepts_document``) and can be backfilled for already-processed
-documents via POST /api/deep-chapter/prepare. The GET assembler never calls
-the LLM — it serves whatever is cached, so opening a chapter is always fast.
+Per-concept "deep explanations" were retired (2026-07-15): they were a second,
+UNGROUNDED explanation competing with the grounded ``signal``; the concept record
+now has one explanation of record. The GET assembler never calls the LLM — it
+serves whatever is cached, so opening a chapter is always fast; POST
+/api/deep-chapter/prepare backfills briefing + recaps in the background.
 """
 
 from __future__ import annotations
 
 import hashlib
-import os
 import threading
 import time
 from typing import Any
@@ -29,7 +24,6 @@ from app.content.store import fetch_section_content
 from psycopg.types.json import Json
 
 from app.platform.db import db
-from app.platform.llm import _ollama_model, ollama_chat_completion
 
 BRIEFING = "deep_chapter_briefing"
 CONCEPTS = "concepts"
@@ -37,14 +31,6 @@ CONCEPTS = "concepts"
 # One backfill per (doc, scope) at a time — same guard pattern as concept_quiz_llm.
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
-
-
-def _deep_model() -> str:
-    return (
-        os.environ.get("LEARN_DEEP_MODEL")
-        or os.environ.get("LEARN_AUGMENT_MODEL")
-        or _ollama_model()
-    )
 
 
 def _bkey(doc_id: str, scope: str | None) -> str:
@@ -61,72 +47,6 @@ def _resolve_doc_id(doc_id: str | None) -> str | None:
 def _scope_section_keys(doc_id: str, scope: str) -> list[str]:
     content = fetch_section_content(scope, doc_id)
     return sorted({b.get("sectionKey") for b in content.get("blocks", []) if b.get("sectionKey")})
-
-
-# --------------------------------------------------------------------------- #
-# Per-concept deep explanations
-# --------------------------------------------------------------------------- #
-
-DEEP_SYSTEM = (
-    "You expand a textbook concept into a short deep explanation for a learner who just met "
-    "it in the text. You are given the concept's name, kind, a one-line signal, and the "
-    "verbatim source passage. Write 1-2 short paragraphs of "
-    "plain prose that: state what the concept is in the learner's own terms, unpack how it "
-    "works or why it holds, and say when or why it matters. Ground every claim in the source passage — never invent "
-    "facts, numbers, or scope beyond it. No headings, no bullet points, no 'the author' or "
-    "'this section' — output only the explanation prose."
-)
-
-
-def _explain_one(concept: dict[str, Any], model: str | None = None) -> str | None:
-    user = (
-        f"Concept: {concept.get('name')}\n"
-        f"Kind: {concept.get('kind')}\n"
-        f"Signal: {concept.get('signal')}\n"
-        + f"Source passage:\n{(concept.get('source') or '').strip()}"
-    )
-    for _ in range(2):
-        text, _err = ollama_chat_completion(
-            [{"role": "system", "content": DEEP_SYSTEM}, {"role": "user", "content": user}],
-            temperature=0.3,
-            model=model or _deep_model(),
-        )
-        if text and len(text.strip()) > 80:
-            return text.strip()
-    return None
-
-
-def generate_deep_explanations(
-    doc_id: str, section_keys: list[str], model: str | None = None
-) -> dict[str, Any]:
-    """Fill ``deepExplanation`` for every in-scope concept still missing one.
-
-    Sequential on purpose: a single GPU-resident model is compute-bound, so
-    concurrent requests only time-slice the GPU (same reasoning as the quiz
-    authoring pass)."""
-    if not section_keys:
-        return {"explainedNow": 0, "explainFailed": 0}
-    with db() as conn:
-        rows = conn.execute(
-            "SELECT key, name, kind, signal, source FROM concepts "
-            "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
-            "AND (deep_explanation IS NULL OR deep_explanation = '') "
-            'ORDER BY section_key, "order"',
-            {"d": doc_id, "ks": section_keys},
-        ).fetchall()
-    done = failed = 0
-    for r in rows:
-        text = _explain_one(r, model)
-        if text:
-            with db() as conn:
-                conn.execute(
-                    "UPDATE concepts SET deep_explanation = %(t)s, deep_explained_at = now() WHERE key = %(k)s",
-                    {"t": text, "k": r["key"]},
-                )
-            done += 1
-        else:
-            failed += 1
-    return {"explainedNow": done, "explainFailed": failed}
 
 
 # --------------------------------------------------------------------------- #
@@ -209,9 +129,9 @@ def build_briefing(doc_id: str, scope: str | None, allow_generate: bool = False)
 # --------------------------------------------------------------------------- #
 
 def generate_deep_chapter_artifacts(
-    doc_id: str, scope: str | None, section_keys: list[str], model: str | None = None
+    doc_id: str, scope: str | None, section_keys: list[str]
 ) -> dict[str, Any]:
-    """The eager pass: briefing + per-section recap cache warm + deep explanations.
+    """The backfill pass: briefing + per-section recap cache warm.
 
     Every stage is error-isolated; a failure in one never blocks the others."""
     out: dict[str, Any] = {"docId": doc_id, "scope": scope}
@@ -232,26 +152,19 @@ def generate_deep_chapter_artifacts(
         except Exception:  # noqa: BLE001
             pass
     out["augmentsWarmed"] = warmed
-
-    try:
-        out.update(generate_deep_explanations(doc_id, section_keys or [], model=model))
-    except Exception as exc:  # noqa: BLE001
-        out["explainError"] = str(exc)
     return out
 
 
 def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict[str, Any]:
-    """Readiness of the overlay for a scope: explanation coverage + briefing presence."""
-    total = explained = 0
+    """Readiness of the overlay for a scope: briefing presence (+ recap warm state via prepare).
+
+    ``explained`` mirrors ``totalConcepts`` — per-concept deep explanations were retired, so
+    the surface reads as complete; the keys stay until the frontend trims the Deep read UI."""
+    total = 0
     with db() as conn:
         if section_keys:
             total = conn.execute(
                 "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
-                {"d": doc_id, "ks": section_keys},
-            ).fetchone()["n"]
-            explained = conn.execute(
-                "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
-                "AND deep_explanation IS NOT NULL AND deep_explanation <> ''",
                 {"d": doc_id, "ks": section_keys},
             ).fetchone()["n"]
         has_briefing = conn.execute(
@@ -261,7 +174,7 @@ def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict
         running = f"{doc_id}|{scope or 'ALL'}" in _inflight
     return {
         "totalConcepts": total,
-        "explained": explained,
+        "explained": total,
         "running": running,
         "briefing": has_briefing,
     }
@@ -287,19 +200,9 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
 
         sec = fetch_section_concepts(scope, doc_id)
         concepts = sec.get("concepts", [])
-        # Attach deepExplanation (fetch_section_concepts' projection omits it).
-        keys = [c.get("conceptKey") for c in concepts if c.get("conceptKey")]
-        deep_by_key: dict[str, str] = {}
-        if keys:
-            with db() as conn:
-                for r in conn.execute(
-                    "SELECT key, deep_explanation AS deep FROM concepts "
-                    "WHERE key = ANY(%(ks)s::text[]) AND deep_explanation IS NOT NULL",
-                    {"ks": keys},
-                ).fetchall():
-                    deep_by_key[r["key"]] = r["deep"]
+        # deepExplanation retired — key kept (None) until the frontend trims the Deep read UI.
         for c in concepts:
-            c["deepExplanation"] = deep_by_key.get(c.get("conceptKey") or "")
+            c["deepExplanation"] = None
 
         with db() as conn:
             briefing = conn.execute(

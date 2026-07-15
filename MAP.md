@@ -134,7 +134,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`llm_schemas.py`](backend/app/platform/llm_schemas.py) | Pydantic schemas for structured LLM output |
 | [`jobs.py`](backend/app/platform/jobs.py) | Persistent job ledger + worker; runners injected (no domain imports) |
 | [`seedling_client.py`](backend/app/platform/seedling_client.py) | Optional vaultwriter seam (distilled-concept export) |
-| [`db.py`](backend/app/platform/db.py) | _(describe me)_ |
+| [`db.py`](backend/app/platform/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
 
 ### content/ — the book itself
 
@@ -162,13 +162,14 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 | File | Purpose |
 |---|---|
-| [`extract.py`](backend/app/extraction/extract.py) | Section loading + structural edges for extraction |
+| [`extract.py`](backend/app/extraction/extract.py) | Section loading + scope resolution for extraction |
 | [`concepts_extract.py`](backend/app/extraction/concepts_extract.py) | Concept extraction (the write side) |
 | [`concept_store.py`](backend/app/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
-| [`deep_chapter.py`](backend/app/extraction/deep_chapter.py) | Chapter briefing + per-section explanations |
+| [`deep_chapter.py`](backend/app/extraction/deep_chapter.py) | Assembled chapter briefing (+ recap warm) for the reading surface |
 | [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`augment.py`](backend/app/extraction/augment.py) | Section learning objectives + recap |
+| [`eval_gate.py`](backend/app/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
 
 ### study/ — learning state
 
@@ -212,7 +213,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 | File | Purpose |
 |---|---|
-| [`build.py`](backend/app/pipeline/build.py) | Phase 2 runners: `extract` (core) / `deep` (overlay) / `build` |
+| [`build.py`](backend/app/pipeline/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
 | [`ingest.py`](backend/app/pipeline/ingest.py) | Phase 1: stash upload + `convert` job runner |
 | [`lifecycle.py`](backend/app/pipeline/lifecycle.py) | Per-document state + auto-chain `converted → extract` |
 | [`registry.py`](backend/app/pipeline/registry.py) | Composition root — registers every job-kind runner |
@@ -229,7 +230,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`ingest_routes.py`](backend/app/api/ingest_routes.py) | PDF upload → conversion |
 | [`learning_path_routes.py`](backend/app/api/learning_path_routes.py) | Learning-path (drill/exam/recall) |
 | [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + deep-chapter reads |
-| [`deep_chapter_routes.py`](backend/app/api/deep_chapter_routes.py) | Deep-chapter overlay |
+| [`deep_chapter_routes.py`](backend/app/api/deep_chapter_routes.py) | Deep-chapter reading surface (briefing + recaps) |
 | [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
 | [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
@@ -324,20 +325,20 @@ itself is only three files (teal): [`extract.py`](backend/app/extraction/extract
 chapter's sections and builds the prompt, [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
 calls the LLM and writes concepts, and [`concept_store.py`](backend/app/extraction/concept_store.py)
 is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/pipeline/build.py))
-runs these as queue jobs (`extract` / `deep` / `build`). Four other LLM *generation passes*
-(coral) live in the folder but are triggered independently — only `deep_chapter` runs as part
-of the `build` job, as the overlay after concepts are written.
+runs these as queue jobs (`extract`; `build` is a compat alias). Four other LLM *generation passes*
+(coral) live in the folder and are triggered independently — `deep_chapter` assembles
+the reading briefing from cached artifacts (its per-concept explanations were retired).
 Two dependencies live outside the folder: `concepts_extract` calls
 `platform/llm.py` for the model, and the pipeline runners are dispatched by
 `platform/jobs.py` (the one queue).
 
 ```mermaid
 flowchart TD
-  build["pipeline/build.py<br/>extract · deep · build runners"]
+  build["pipeline/build.py<br/>extract runner + eval gate"]
   extract["extract.py<br/>sections + prompt"]
   concepts["concepts_extract.py<br/>LLM → concepts"]
   store["concept_store.py<br/>read concepts"]
-  deep["deep_chapter.py<br/>briefing + explain"]
+  deep["deep_chapter.py<br/>assembled briefing"]
   skeleton["skeleton.py<br/>chapter essences"]
   guide["reading_guide.py<br/>section guides"]
   augment["augment.py<br/>objectives + recap"]

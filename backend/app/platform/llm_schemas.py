@@ -115,3 +115,16 @@ class GuidedScript(BaseModel):
     intro: str
     comments: List[GuidedComment] = Field(default_factory=list)
     takeaways: List[str]
+
+
+# --------------------------------------------------------------------------- #
+# extraction/eval_gate.py — the extraction-quality critic verdict
+# --------------------------------------------------------------------------- #
+
+class ConceptVerdict(BaseModel):
+    """Critic verdict for one extracted concept (all three must hold to pass)."""
+
+    grounded: bool = Field(description="every claim in signal is stated in source_sentence")
+    informative: bool = Field(description="signal explains the concept, not merely restates its name")
+    durable: bool = Field(description="a teachable general concept, not a one-off fact/statistic/opinion")
+    reason: str = Field(description="one short sentence justifying the weakest judgment")

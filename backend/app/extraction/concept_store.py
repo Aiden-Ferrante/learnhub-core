@@ -93,7 +93,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
 
         with db() as conn:
             rows = conn.execute(
-                'SELECT key AS "conceptKey", name, kind, signal, source, questions, '
+                'SELECT key AS "conceptKey", name, kind, signal, source, '
                 'section_key AS "sectionKey", "order", page_start AS "pageStart", page_end AS "pageEnd" '
                 "FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
                 {"d": doc_id, "ks": scope_keys},
@@ -154,7 +154,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
             return {"docId": None, "concepts": []}
         with db() as conn:
             rows = conn.execute(
-                'SELECT key, NULL AS canon, name, kind, signal, source, questions, '
+                'SELECT key, NULL AS canon, name, kind, signal, source, '
                 'section_key AS "sectionKey", page_start AS "pageStart", page_end AS "pageEnd", "order" '
                 "FROM concepts WHERE doc_id = %(d)s",
                 {"d": doc_id},
@@ -180,7 +180,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
                     "kind": rep["kind"],
                     "signal": rep["signal"],
                     "source": rep.get("source"),
-                    "questions": rep.get("questions") or [],
+                    "questions": [],  # extraction-era questions retired; quiz_questions is the live store
                     "sectionKey": rep["sectionKey"],
                     "pageStart": rep.get("pageStart"),
                     "pageEnd": rep.get("pageEnd"),

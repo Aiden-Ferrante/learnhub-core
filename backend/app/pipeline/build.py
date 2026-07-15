@@ -1,13 +1,11 @@
-"""Job runners for the extraction phase: core ``extract`` + ``deep`` enrichment.
+"""Job runner for concept extraction.
 
 Runs inside the platform jobs worker; registered by pipeline/registry.py. Ledger writes go
 through the JobCtx — extraction outcomes are patched onto the job row so the Process
 dashboard can show WHY sections produced 0 concepts.
 
-The phases are separable job kinds:
-  - ``extract``: core concept extraction only (no overlay).
-  - ``deep``:    the Deep Chapter enrichment overlay for an already-extracted scope.
-  - ``build``:   compatibility — ``extract`` then ``deep``, the pre-split behavior.
+``build`` is a compatibility alias for ``extract`` (clients still enqueue it): the deep
+per-concept-explanation overlay was retired, so extraction is the whole build.
 
 Extraction inputs may ride on the job row as a payload: ``sectionKeys`` (an exact set,
 the TOC-preview selection), ``model`` (override), and ``force`` (re-extract even when the
@@ -22,8 +20,6 @@ from typing import Any
 from app.content.store import fetch_section_content
 from app.extraction.concept_store import concept_count
 from app.extraction.concepts_extract import extract_concepts_document
-from app.extraction.deep_chapter import generate_deep_chapter_artifacts
-from app.platform.db import db
 
 
 def _scope_keys(doc_id: str, scope: str) -> list[str] | None:
@@ -32,16 +28,6 @@ def _scope_keys(doc_id: str, scope: str) -> list[str] | None:
     keys = sorted({b.get("sectionKey") for b in content.get("blocks", []) if b.get("sectionKey")})
     return keys or None
 
-
-def _all_section_keys(doc_id: str) -> list[str]:
-    """Every section key stored for a document (whole-doc scope)."""
-    with db() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT section_key FROM section_content "
-            "WHERE doc_id = %(d)s AND section_key IS NOT NULL",
-            {"d": doc_id},
-        ).fetchall()
-    return sorted(r["section_key"] for r in rows)
 
 
 def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
@@ -63,7 +49,7 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     res = asyncio.run(
         extract_concepts_document(
             doc_id=doc_id, scope=scope, section_keys=section_keys, model=model,
-            on_progress=ctx.progress, generate_deep=False,
+            on_progress=ctx.progress,
         )
     )
     if res.get("error"):
@@ -72,7 +58,7 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
     ctx.patch({
         "outcomes": (res.get("outcomes") or [])[:200],
         "concepts": res.get("concepts"),
-        "summary": {k: res.get(k) for k in ("sections", "extracted", "concepts", "questions", "seconds", "errors")},
+        "summary": {k: res.get(k) for k in ("sections", "extracted", "concepts", "seconds", "errors")},
     })
     # Best-effort: keep semantic search current with the freshly-extracted content.
     try:
@@ -81,28 +67,17 @@ def run_extract(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
         ensure_index(doc_id)
     except Exception:  # noqa: BLE001 — indexing must never fail the extraction
         pass
+    # Quality gate: critic-grade a sample of what was just written and put the score on
+    # the ledger row next to outcomes — extraction quality as a regression number.
+    try:
+        from app.extraction.eval_gate import eval_enabled, evaluate_extraction_sample
+
+        if eval_enabled():
+            ctx.patch({"phase": "eval"})
+            eval_keys = section_keys or (_scope_keys(doc_id, scope) if scope else None)
+            report = evaluate_extraction_sample(doc_id, eval_keys)
+            ctx.patch({"phase": None, **({"eval": report} if report else {})})
+    except Exception:  # noqa: BLE001 — the eval must never fail the extraction
+        pass
     return None
 
-
-def run_deep(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
-    """Deep Chapter enrichment overlay (briefing + per-section recaps + per-concept deep
-    explanations). Section set: the job's ``sectionKeys``, else the scope's span, else the
-    whole document. Assumes concepts already exist; idempotent."""
-    doc_id, scope = job["docId"], (job.get("scope") or None)
-    section_keys = job.get("sectionKeys")
-    if not section_keys:
-        section_keys = _scope_keys(doc_id, scope) if scope else _all_section_keys(doc_id)
-    if not section_keys:
-        return {"error": "no readable content in this scope"}
-    ctx.check_cancel()
-    ctx.patch({"phase": "deep", "done": 0, "total": 0})
-    generate_deep_chapter_artifacts(doc_id, scope, section_keys)
-    return None
-
-
-def run_build(db, job: dict[str, Any], ctx) -> dict[str, Any] | None:
-    """Compatibility runner (pre-split behavior): core extraction then the deep overlay."""
-    err = run_extract(db, job, ctx)
-    if err:
-        return err
-    return run_deep(db, job, ctx)

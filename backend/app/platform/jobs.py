@@ -63,7 +63,7 @@ def _row_to_job(row: dict[str, Any]) -> dict[str, Any]:
     })
     return job
 
-KINDS = ("convert", "build", "extract", "deep", "quizzes", "guides", "skeleton", "orient", "audiobook")
+KINDS = ("convert", "build", "extract", "quizzes", "guides", "skeleton", "orient", "audiobook")
 
 _worker_lock = threading.Lock()
 _worker_started = False

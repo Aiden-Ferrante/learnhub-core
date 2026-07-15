@@ -47,15 +47,7 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
     for scope in scopes:
         keys = sorted({b.get("sectionKey") for b in _blocks_in_scope(rows, scope, level_of) if b.get("sectionKey")})
         concepts = concept_count(doc_id, list(keys))
-        explained = 0
         with db() as conn:
-            if keys:
-                explained = conn.execute(
-                    "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s "
-                    "AND section_key = ANY(%(ks)s::text[]) AND deep_explanation IS NOT NULL "
-                    "AND deep_explanation <> ''",
-                    {"d": doc_id, "ks": list(keys)},
-                ).fetchone()["n"]
             briefing = conn.execute(
                 "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s",
                 {"k": briefing_key(doc_id, scope)},
@@ -63,7 +55,9 @@ def chapters_readiness(doc_id: str | None, scopes: list[str]) -> dict[str, Any]:
         job = jobs.get(scope)
         out[scope] = {
             "concepts": concepts,
-            "explained": explained,
+            # deepExplanation retired — mirrors `concepts` so readiness UIs read "complete"
+            # until the frontend trims the Deep read metric.
+            "explained": concepts,
             "briefing": briefing,
             "build": {
                 "status": job.get("status"),

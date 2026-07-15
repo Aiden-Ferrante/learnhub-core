@@ -17,6 +17,7 @@ import hashlib
 import os
 import time
 from dataclasses import dataclass, replace
+from difflib import SequenceMatcher
 
 from app.content.documents import fetch_latest_document
 from psycopg.types.json import Json
@@ -91,18 +92,11 @@ CONCEPT_SYSTEM_PROMPT = (
 # --------------------------------------------------------------------------- #
 
 @dataclass(frozen=True)
-class ConceptQuestion:
-    q: str
-    a: str
-
-
-@dataclass(frozen=True)
 class ExtractedConcept:
     name: str
     kind: str
     signal: str
     source: str
-    questions: tuple[ConceptQuestion, ...]
 
 
 @dataclass(frozen=True)
@@ -159,21 +153,7 @@ def parse_concepts_response(obj: object, stats: dict | None = None) -> list[Extr
         kind = str(c.get("kind") or "").strip().lower()
         if kind not in _KINDS:
             kind = "result"
-        questions: list[ConceptQuestion] = []
-        for q in c.get("questions") or []:
-            if isinstance(q, dict):
-                qq, aa = _norm_part(q.get("q")), _norm_part(q.get("a"))
-                if qq and aa:
-                    questions.append(ConceptQuestion(q=qq, a=aa))
-        out.append(
-            ExtractedConcept(
-                name=name,
-                kind=kind,
-                signal=signal,
-                source=source,
-                questions=tuple(questions),
-            )
-        )
+        out.append(ExtractedConcept(name=name, kind=kind, signal=signal, source=source))
     return out
 
 
@@ -194,8 +174,40 @@ def concept_key(doc_id: str, section_key: str, name: str) -> str:
     return hashlib.sha256(f"{doc_id}|{section_key}|{name.lower()}".encode()).hexdigest()[:16]
 
 
+def match_renamed_concepts(
+    old: list[tuple[str, str]], new: list[tuple[str, str]], threshold: float = 0.75
+) -> dict[str, str]:
+    """Greedy best-match of RENAMED concepts by name similarity: ``old``/``new`` are
+    ``(key, name)`` pairs; returns ``{old_key: new_key}``, each new key used at most once.
+
+    The identity contract (docs/concept-identity.md): a concept's key is a hash of its
+    name, so an unchanged name keeps its key and never enters this matcher. This handles
+    the rename case — 'LLM' → 'Large language model' — so a re-extraction that improves
+    a name carries the learner's review history forward instead of orphaning it."""
+    def norm(s: str) -> str:
+        return " ".join((s or "").lower().split())
+
+    scored: list[tuple[float, str, str]] = []
+    for ok, on in ((k, norm(n)) for k, n in old):
+        for nk, nn in ((k, norm(n)) for k, n in new):
+            r = SequenceMatcher(None, on, nn).ratio()
+            if r >= threshold:
+                scored.append((r, ok, nk))
+    scored.sort(key=lambda t: (-t[0], t[1], t[2]))  # best ratio first; ties deterministic
+    used_old: set[str] = set()
+    used_new: set[str] = set()
+    out: dict[str, str] = {}
+    for _r, ok, nk in scored:
+        if ok in used_old or nk in used_new:
+            continue
+        used_old.add(ok)
+        used_new.add(nk)
+        out[ok] = nk
+    return out
+
+
 # --------------------------------------------------------------------------- #
-# ArangoDB write path
+# Write path
 # --------------------------------------------------------------------------- #
 
 def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
@@ -214,11 +226,44 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
                 "kind": c.kind,
                 "signal": c.signal,
                 "source": c.source,
-                "questions": Json([{"q": q.q, "a": q.a} for q in c.questions]),
                 "order": idx,
             }
         )
+    new_keys = {r["key"] for r in rows}
     with db() as conn, conn.transaction():
+        # Review continuity across renames: before wiping the old rows, re-key the SM-2
+        # review row (and the study-event history) of any REVIEWED concept whose name —
+        # and therefore key — changed, onto its best-matching successor. A re-extraction
+        # that improves names must not punish past study time (docs/concept-identity.md).
+        old = conn.execute(
+            "SELECT key, name FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
+            {"d": sc.doc_id, "s": sc.section_key},
+        ).fetchall()
+        old_keys = {o["key"] for o in old}
+        vanished = [o for o in old if o["key"] not in new_keys]
+        if vanished and rows:
+            reviewed = {
+                r["key"]
+                for r in conn.execute(
+                    "SELECT key FROM concept_reviews WHERE key = ANY(%(ks)s::text[])",
+                    {"ks": [o["key"] for o in vanished]},
+                ).fetchall()
+            }
+            carried = match_renamed_concepts(
+                [(o["key"], o["name"]) for o in vanished if o["key"] in reviewed],
+                [(r["key"], r["name"]) for r in rows if r["key"] not in old_keys],
+            )
+            for old_key, new_key in carried.items():
+                moved = conn.execute(
+                    "UPDATE concept_reviews SET key = %(n)s WHERE key = %(o)s "
+                    "AND NOT EXISTS (SELECT 1 FROM concept_reviews WHERE key = %(n)s)",
+                    {"n": new_key, "o": old_key},
+                ).rowcount
+                if moved:
+                    conn.execute(
+                        "UPDATE study_events SET concept_key = %(n)s WHERE concept_key = %(o)s",
+                        {"n": new_key, "o": old_key},
+                    )
         conn.execute(
             "DELETE FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
             {"d": sc.doc_id, "s": sc.section_key},
@@ -226,12 +271,12 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
         if rows:
             conn.cursor().executemany(
                 'INSERT INTO concepts (key, doc_id, section_key, page_start, page_end, name, kind, '
-                'signal, source, questions, "order", created_at) VALUES (%(key)s,%(doc_id)s,%(section_key)s,'
-                '%(page_start)s,%(page_end)s,%(name)s,%(kind)s,%(signal)s,%(source)s,%(questions)s,%(order)s, now()) '
+                'signal, source, "order", created_at) VALUES (%(key)s,%(doc_id)s,%(section_key)s,'
+                '%(page_start)s,%(page_end)s,%(name)s,%(kind)s,%(signal)s,%(source)s,%(order)s, now()) '
                 "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
                 "page_start=EXCLUDED.page_start, page_end=EXCLUDED.page_end, name=EXCLUDED.name, "
                 "kind=EXCLUDED.kind, signal=EXCLUDED.signal, source=EXCLUDED.source, "
-                'questions=EXCLUDED.questions, "order"=EXCLUDED."order", created_at=EXCLUDED.created_at',
+                '"order"=EXCLUDED."order", created_at=EXCLUDED.created_at',
                 rows,
             )
 
@@ -324,18 +369,13 @@ async def extract_concepts_document(
     concurrency: int = 3,
     model: str | None = None,
     on_progress=None,
-    generate_deep: bool | None = None,
 ) -> dict:
     """Build concept-lessons for a document (``scope=toc:1`` = one chapter). Background-job
     friendly; failures are isolated per section. ``model`` overrides the extraction model
     (the UI-selected Ollama model); falls back to LEARN_EXTRACT_MODEL / OLLAMA_MODEL.
 
     ``on_progress(done, total, current_section_key)`` is invoked (if given) as each section
-    finishes, so a polling client can render a live progress bar.
-
-    ``generate_deep`` controls the eager Deep Chapter overlay: the pipeline runs deep as its
-    own enrichment job and passes ``False``; the legacy ``/api/extract`` path passes ``None``,
-    which falls back to the ``LEARN_DEEP_PREGEN`` env (default on) to preserve its behavior."""
+    finishes, so a polling client can render a live progress bar."""
     t0 = time.time()
     if doc_id is None:
         doc = (fetch_latest_document() or {}).get("document")
@@ -387,33 +427,9 @@ async def extract_concepts_document(
         on_progress(total, total, "finalizing")
 
     total_concepts = 0
-    total_questions = 0
     for sc in results:
         write_section_concepts(sc)
         total_concepts += len(sc.concepts)
-        total_questions += sum(len(c.questions) for c in sc.concepts)
-
-    # Deep Chapter overlay (assembled briefing + per-section recaps + per-concept deep
-    # explanations). The pipeline runs this as a separate "deep" enrichment job, so
-    # ``generate_deep=False`` skips it here; when None, the legacy LEARN_DEEP_PREGEN env
-    # decides (default on) so the /api/extract path keeps its eager overlay.
-    # Idempotent and error-isolated: a failure here never fails the extraction.
-    do_deep = generate_deep if generate_deep is not None else os.environ.get("LEARN_DEEP_PREGEN", "1") != "0"
-    if do_deep:
-        try:
-            from app.extraction.deep_chapter import generate_deep_chapter_artifacts
-
-            if on_progress:
-                on_progress(total, total, "deep chapter overlay")
-            deep = await asyncio.to_thread(
-                generate_deep_chapter_artifacts,
-                db, doc_id, scope, [s.section_key for s in sections], model,
-            )
-            for k in ("briefingError", "explainError"):
-                if deep.get(k):
-                    errors.append(f"deep-chapter: {deep[k]}")
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"deep-chapter: {exc}")
 
     # No embedding-based dedup (resolution): each section contributes its key concepts (name +
     # kind + grounded signal). The read path groups by canonicalKey OR the concept's own key,
@@ -428,7 +444,6 @@ async def extract_concepts_document(
         "sections": len(sections),
         "extracted": len(results),
         "concepts": total_concepts,
-        "questions": total_questions,
         "canonicalConcepts": total_concepts,
         "mergedConcepts": 0,
         "outcomes": outcomes,
