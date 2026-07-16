@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { EmptyState } from "@/components/patterns/empty-state"
-import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
+import { MarkdownReader } from "@/features/learn/components/reader/markdown-reader"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
 import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
 import { PATH_STAGES, firstIncompleteStage } from "@/features/learn/lib/learn-path"
@@ -42,8 +42,6 @@ import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 import {
   DRAWER_TITLES,
-  HALF_MEASURE,
-  KIND_COLOR,
   layoutNotes,
   numberOutlineItems,
   relevelHeadings,
@@ -53,7 +51,10 @@ import {
   nextNightEpoch,
 } from "./lib"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
+import { BriefingCard } from "./briefing-card"
 import { ConceptPopover } from "./concept-popover"
+import { MarginNotes } from "./margin-notes"
+import { OutlineRail } from "./outline-rail"
 import { NarrationBar, useNarration } from "./narration-bar"
 import { StudyDrawerPanel } from "./study-drawer"
 import { useChapterPath } from "./use-chapter-path"
@@ -112,8 +113,6 @@ export function GuidedReading({
   // chapter_progress is the same store the old lesson flow wrote, so history carries over.
   const { stages, loadProgress, markStage, noteQuizAnswer } = useChapterPath(chapterKey, docId)
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
-  // Briefing concept-chip cloud: capped at 8 until expanded.
-  const [allChips, setAllChips] = useState(false)
   const [notes, setNotes] = useState<MarginNote[]>([])
   const [wide, setWide] = useState(false)
   // Chapter outline (locked to THIS chapter): derived from the rendered headings,
@@ -199,7 +198,6 @@ export function GuidedReading({
     setActive(null)
     setDrawer(null)
     setNotes([])
-    setAllChips(false)
   }, [docId, chapterKey])
 
   // Scroll: persist/restore, progress %, resumed chip, scroll-spy, read soft gate.
@@ -705,40 +703,14 @@ export function GuidedReading({
        
       >
         <div className="mx-auto flex max-w-[110rem] justify-center gap-8">
-          {/* Chapter outline — always in view while reading, locked to THIS chapter.
-              Fills the dead left margin; scroll-spy shows where you are. */}
-          {railItems.length > 0 && (
-            <nav className="sticky top-0 hidden max-h-[calc(100dvh-220px)] w-56 shrink-0 self-start overflow-y-auto pb-4 pr-1 pt-1 lg:block">
-              <div className={cn("mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide", mutedCls)}>
-                In this chapter
-              </div>
-              <div className="space-y-0.5">
-                {railItems.map((it, j) => (
-                  <button
-                    key={it.key}
-                    type="button"
-                    title={it.number ? `${it.number} ${it.text}` : it.text}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (it.target >= 0)
-                        headingEls.current[it.target]?.scrollIntoView({ behavior: "smooth", block: "start" })
-                    }}
-                    className={cn(
-                      "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
-                      j === activeRail
-                        ? "bg-brand/10 font-medium text-brand"
-                        : cn(mutedCls, paper ? "hover:bg-paper-card" : "hover:bg-muted/50", "hover:opacity-100"),
-                      it.target < 0 && "cursor-default opacity-60",
-                    )}
-                    style={{ paddingLeft: `${8 + it.depthPad * 12}px` }}
-                  >
-                    {it.number && <span className="mr-1.5 tabular-nums opacity-60">{it.number}</span>}
-                    {it.text}
-                  </button>
-                ))}
-              </div>
-            </nav>
-          )}
+          {/* Chapter outline — always in view while reading, locked to THIS chapter. */}
+          <OutlineRail
+            items={railItems}
+            activeIndex={activeRail}
+            onJump={(i) => headingEls.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            paper={paper}
+            mutedCls={mutedCls}
+          />
 
           <div ref={wrapperRef} className="relative min-w-0 flex-1">
             <div className="mx-auto max-w-[104ch]">
@@ -761,111 +733,16 @@ export function GuidedReading({
 
             {/* Briefing — what this chapter teaches, assembled from the pre-generated layer. */}
             {briefing && (
-              <div ref={briefingRef} className={cn("mb-6 rounded-lg border p-4", cardCls)}>
-                {/* Once oriented, the briefing folds to one line — the prose is the point. */}
-                <details open={!stages.orient}>
-                  <summary className="flex cursor-pointer list-none items-center gap-2">
-                    <BookOpen className={cn("h-4 w-4", mutedCls)} />
-                    <span className="text-sm font-semibold">Chapter briefing</span>
-                    {stages.orient ? (
-                      <span className="flex items-center gap-1 text-xs text-status-mastered">
-                        <Check className="h-3 w-3" /> oriented
-                      </span>
-                    ) : (
-                      <span className={cn("text-xs", mutedCls)}>what this chapter teaches</span>
-                    )}
-                    <ChevronDown className={cn("ml-auto h-3.5 w-3.5", mutedCls)} />
-                  </summary>
-                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  {briefing.objectives.length > 0 && (
-                    <div>
-                      <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
-                        You&apos;ll be able to
-                      </div>
-                      <ul className="space-y-1 text-sm opacity-90">
-                        {briefing.objectives.map((o, i) => (
-                          <li key={i} className="flex gap-2">
-                            <span className="text-brand">•</span>
-                            <MathText text={o} />
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {briefing.watchFor.length > 0 && (
-                    <div>
-                      <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
-                        Watch for
-                      </div>
-                      <ul className="space-y-1 text-sm opacity-90">
-                        {briefing.watchFor.map((w, i) => (
-                          <li key={i} className="flex gap-2">
-                            <span className="text-amber-400">•</span>
-                            <MathText text={w} />
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-                {briefing.sections.length > 0 && (
-                  <details className="mt-4 border-t pt-3 lg:hidden" open={briefing.sections.length <= 8}>
-                    <summary className={cn("cursor-pointer text-xs font-semibold uppercase tracking-wide", mutedCls)}>
-                      The road through · {briefing.sections.length} sections
-                    </summary>
-                    <div className="mt-1.5 space-y-1">
-                      {briefing.sections.map((s, i) => (
-                        <div key={`${s.sectionKey}-${i}`} className="text-sm" style={{ paddingLeft: `${(s.depth ?? 0) * 12}px` }}>
-                          <span className="opacity-90">{s.heading}</span>
-                          {s.essence && <span className={mutedCls}> — {s.essence}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-                {!stages.orient && (
-                  <div className="mt-4 border-t pt-3">
-                    <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => markStage("orient")}>
-                      <Check className="h-3.5 w-3.5" />
-                      I&apos;m oriented — start reading
-                    </Button>
-                  </div>
-                )}
-                {briefing.keyConcepts.length > 0 && (
-                  <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-3">
-                    {(allChips ? briefing.keyConcepts : briefing.keyConcepts.slice(0, 8)).map((c, i) => {
-                      const idx = indexByName.get(c.name.trim().toLowerCase())
-                      return (
-                        <button
-                          key={`${c.name}-${i}`}
-                          type="button"
-                          data-concept={idx}
-                          className={cn(
-                            "rounded-full border px-2 py-0.5 text-xs",
-                            KIND_COLOR[c.kind] ?? "border-border text-muted-foreground",
-                          )}
-                          title={c.signal}
-                        >
-                          {c.name}
-                        </button>
-                      )
-                    })}
-                    {!allChips && briefing.keyConcepts.length > 8 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setAllChips(true)
-                        }}
-                        className={cn("rounded-full border border-dashed px-2 py-0.5 text-xs", mutedCls, "hover:text-brand")}
-                      >
-                        +{briefing.keyConcepts.length - 8} more
-                      </button>
-                    )}
-                  </div>
-                )}
-                </details>
-              </div>
+              <BriefingCard
+                key={chapterKey}
+                briefing={briefing}
+                oriented={!!stages.orient}
+                onOrient={() => markStage("orient")}
+                conceptIndexByName={indexByName}
+                cardCls={cardCls}
+                mutedCls={mutedCls}
+                containerRef={briefingRef}
+              />
             )}
 
             {/* The reader spine. */}
@@ -908,30 +785,15 @@ export function GuidedReading({
           </div>
 
           {/* Margin notes (wide screens): first mentions surface as Tufte-style sidenotes. */}
-          {wide &&
-            notes.map((n) => (
-              <button
-                key={n.key}
-                type="button"
-                className={cn(
-                  "absolute hidden w-52 rounded-md border border-transparent p-1.5 text-left transition-colors min-[1440px]:block",
-                  paper ? "hover:border-paper-border hover:bg-paper-card" : "hover:border-border hover:bg-card",
-                )}
-                style={{ top: n.top, left: `calc(50% + ${HALF_MEASURE[prefs.measure]} + 28px)` }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                  setActive({ idx: n.idx, x: Math.max(16, r.left - 440), y: r.top })
-                }}
-              >
-                <div className={cn("truncate text-xs font-medium", paper ? "text-paper-ink-strong" : "text-foreground/90")}>
-                  {n.name}
-                </div>
-                <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>
-                  <MathText text={n.signal} />
-                </div>
-              </button>
-            ))}
+          {wide && (
+            <MarginNotes
+              notes={notes}
+              measure={prefs.measure}
+              paper={paper}
+              mutedCls={mutedCls}
+              onOpen={(idx, x, y) => setActive({ idx, x, y })}
+            />
+          )}
           </div>
         </div>
       </div>
