@@ -17,7 +17,13 @@ import time
 import pytest
 
 from app.platform import db
-from app.study.reviews import build_review_queue, chapter_review_key, grade_review
+from app.study.reviews import (
+    build_review_queue,
+    chapter_review_key,
+    figure_review_key,
+    grade_review,
+    skeleton_review_key,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -127,3 +133,61 @@ def test_chapter_item_regrade_round_trip(clean_pgtest_rows):
             {"d": DOC},
         ).fetchone()["n"]
     assert n >= 2
+
+
+def test_skeleton_item_seed_then_regrade(clean_pgtest_rows):
+    """First grade carries the snapshot (doc + sectionKey + children) and SEEDS the row;
+    the queue re-grade addresses it by its skel- key."""
+    now = time.time()
+    body = {
+        "skeleton": True, "doc": DOC, "sectionKey": SCOPE, "heading": "Test branch",
+        "chapterScope": SCOPE,
+        "children": [{"heading": "Sub A", "essence": "does A"}, {"heading": "Sub B"}],
+    }
+    payload, status = grade_review(body, "", 3, now)  # seed via snapshot, no key
+    assert status == 200, payload
+    key = skeleton_review_key(DOC, SCOPE)
+    assert payload["conceptKey"] == key
+
+    # The seeded row carries item_type + the children snapshot.
+    with db() as conn:
+        row = conn.execute(
+            "SELECT item_type, jsonb_array_length(children) AS kids FROM concept_reviews WHERE key = %(k)s",
+            {"k": key},
+        ).fetchone()
+    assert row["item_type"] == "skeleton" and row["kids"] == 2
+
+    # Re-grade by key (no snapshot) — the is_new=False upsert path.
+    payload2, status2 = grade_review({}, key, 2, now + 1)
+    assert status2 == 200, payload2
+
+    with db() as conn:
+        n = conn.execute(
+            "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'recall'",
+            {"d": DOC},
+        ).fetchone()["n"]
+    assert n >= 2
+
+
+def test_figure_item_seed_then_regrade(clean_pgtest_rows):
+    """Figure first grade carries doc + figureOrder + caption; re-grade by fig- key."""
+    now = time.time()
+    body = {
+        "figure": True, "doc": DOC, "figureOrder": 7, "caption": "Figure 1. A diagram.",
+        "sectionKey": SCOPE, "page": 12, "chapterScope": SCOPE,
+    }
+    payload, status = grade_review(body, "", 3, now)
+    assert status == 200, payload
+    key = figure_review_key(DOC, 7)
+    assert payload["conceptKey"] == key
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT item_type, figure_order, caption FROM concept_reviews WHERE key = %(k)s",
+            {"k": key},
+        ).fetchone()
+    assert row["item_type"] == "figure" and row["figure_order"] == 7
+    assert row["caption"] == "Figure 1. A diagram."
+
+    payload2, status2 = grade_review({}, key, 4, now + 1)
+    assert status2 == 200, payload2
