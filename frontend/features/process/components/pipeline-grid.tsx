@@ -5,6 +5,7 @@ import { Check, Clock, Loader2, Minus, RotateCcw, TriangleAlert, X } from "lucid
 import { cancelChapterBuild, enqueueChapterBuild, type BuildKind } from "@/features/learn/api/pipeline"
 import { fetchCoverage, fetchJobsLedger, type ChapterCoverage, type PipelineJobState, type PipelineLedgerRow } from "@/features/process/api/pipeline"
 import { cn } from "@/lib/utils"
+import { usePolling } from "@/hooks/use-polling"
 
 /** Which queue kind a grid column's click enqueues. Audio is presence-only (narrations
  *  need a voice/source choice — that stays in the Listen drawer). */
@@ -218,13 +219,7 @@ export function PipelineGrid({ docId }: { docId: string }) {
   )
   // Poll fast while jobs are active, slow when idle — jobs can be enqueued from
   // anywhere (course home, the MCP server), so the grid must notice them on its own.
-  useEffect(() => {
-    if (timer.current) window.clearInterval(timer.current)
-    timer.current = window.setInterval(load, active.length ? 6000 : 20000)
-    return () => {
-      if (timer.current) window.clearInterval(timer.current)
-    }
-  }, [active.length, load])
+  usePolling(load, active.length ? 6000 : 20000)
 
   const build = useCallback(
     (scope: string, kind: BuildKind) => {

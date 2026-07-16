@@ -24,6 +24,7 @@ import { deleteConcept, fetchSectionConcepts, type ConceptLesson } from "@/featu
 import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterBuildJob, type ChapterReadiness, type SectionOutcome } from "@/features/learn/api/pipeline"
 import { fetchChapterBuilds, fetchLearnDocuments, type LearnDocumentInfo } from "@/features/process/api/pipeline"
 import { cn } from "@/lib/utils"
+import { usePolling } from "@/hooks/use-polling"
 
 /** Processing dashboard — the extraction UI, rebuilt on the canonical pipeline:
  *  /api/chapters (one chapter list), /api/build/readiness (the ladder), and the
@@ -239,11 +240,7 @@ export function ProcessDashboard() {
     () => builds.some((b) => b.status === "queued" || b.status === "running"),
     [builds],
   )
-  useEffect(() => {
-    if (!anyActive) return
-    const t = setInterval(load, 8000)
-    return () => clearInterval(t)
-  }, [anyActive, load])
+  usePolling(load, anyActive ? 8000 : null)
 
   const jobFor = useCallback(
     (scope: string) => builds.find((b) => b.scope === scope) ?? null,

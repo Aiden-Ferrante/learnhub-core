@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { CalendarCheck2, GraduationCap, Upload, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { usePolling } from "@/hooks/use-polling"
 import { fetchStudyDebt } from "@/features/learn/api/progress"
 
 const LINKS = [
@@ -20,21 +21,16 @@ export function AppNav() {
   const pathname = usePathname()
   const [dueNow, setDueNow] = useState(0)
 
-  useEffect(() => {
-    let cancelled = false
-    const load = () =>
+  usePolling(
+    () =>
       fetchStudyDebt(7)
         .then((d) => {
-          if (!cancelled && !d.error) setDueNow(d.dueNow)
+          if (!d.error) setDueNow(d.dueNow)
         })
-        .catch(() => {})
-    load()
-    const t = setInterval(load, 5 * 60 * 1000)
-    return () => {
-      cancelled = true
-      clearInterval(t)
-    }
-  }, [])
+        .catch(() => {}),
+    5 * 60 * 1000,
+    { leading: true },
+  )
 
   return (
     <nav className="flex items-center gap-1" aria-label="Primary">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cancelChapterBuild, type BuildKind } from "@/features/learn/api/pipeline"
 import { fetchSystemStatus, setQueuePaused, type SystemStatus } from "@/features/process/api/pipeline"
 import { cn } from "@/lib/utils"
+import { usePolling } from "@/hooks/use-polling"
 
 const KIND_LABEL: Record<BuildKind, string> = {
   build: "Building",
@@ -54,11 +55,7 @@ export function MachineStrip() {
     }
   }, [])
 
-  useEffect(() => {
-    load()
-    const t = setInterval(load, 5000)
-    return () => clearInterval(t)
-  }, [load])
+  usePolling(load, 5000, { leading: true })
 
   const togglePause = async () => {
     if (!status) return

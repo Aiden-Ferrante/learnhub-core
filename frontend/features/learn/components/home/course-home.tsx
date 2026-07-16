@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useAsyncData } from "@/hooks/use-async-data"
 import {
   BookMarked,
   BookOpen,
@@ -121,69 +122,24 @@ export function CourseHome({
   onRetry,
 }: CourseHomeProps) {
   const sectionsTotal = useMemo(() => countSections(tree), [tree])
-  const [mistakes, setMistakes] = useState<Mistake[]>([])
+  // Mistakes are supplementary — a failure here must not break the page.
+  const { data: mistakesData } = useAsyncData(() => fetchMistakes(course.id, 5), [course.id])
+  const mistakes: Mistake[] = mistakesData && !mistakesData.error ? mistakesData.mistakes : []
 
-  useEffect(() => {
-    let cancelled = false
-    fetchMistakes(course.id, 5)
-      .then((data) => {
-        if (!cancelled && !data.error) setMistakes(data.mistakes)
-      })
-      .catch(() => {
-        // mistakes are supplementary — a failure here must not break the page
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [course.id])
-
-  const [conceptCount, setConceptCount] = useState<number | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    fetchDocumentConcepts(course.learnDocId)
-      .then((d) => {
-        if (!cancelled && !d.error) setConceptCount(d.concepts.length)
-      })
-      .catch(() => {
-        // concept count is supplementary
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [course.learnDocId])
+  // Concept count is supplementary.
+  const { data: conceptsData } = useAsyncData(() => fetchDocumentConcepts(course.learnDocId), [course.learnDocId])
+  const conceptCount = conceptsData && !conceptsData.error ? conceptsData.concepts.length : null
 
   // Pipeline status: drives the hero progress strip AND tells the empty shell WHY it's
   // empty (dead content link vs no TOC vs simply not processed yet).
-  const [pipeline, setPipeline] = useState<CoursePipelineStatus | null>(null)
-  useEffect(() => {
-    if (!course.learnDocId) {
-      setPipeline(null)
-      return
-    }
-    let cancelled = false
-    fetchCourseStatus(course.learnDocId)
-      .then((s) => {
-        if (!cancelled) setPipeline(s)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [course.learnDocId])
+  const { data: pipeline } = useAsyncData(
+    () => (course.learnDocId ? fetchCourseStatus(course.learnDocId) : null),
+    [course.learnDocId],
+  )
 
   // Forgetting forecast — what's fading, so review becomes a daily, actionable habit.
-  const [forecast, setForecast] = useState<ForecastResponse | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    fetchForecast(course.learnDocId)
-      .then((f) => {
-        if (!cancelled && !f.error) setForecast(f)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [course.learnDocId])
+  const { data: forecastData } = useAsyncData(() => fetchForecast(course.learnDocId), [course.learnDocId])
+  const forecast = forecastData && !forecastData.error ? forecastData : null
 
   const { studied, needsReview } = useMemo(() => {
     const leaves = mastery

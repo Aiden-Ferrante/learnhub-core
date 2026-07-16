@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { fetchQuizPrepareStatus, prepareQuizQuestions, startConceptQuiz, submitConceptAnswer, type ConceptQuizResult, type ConceptQuizSession, type QuizPrepareStatus } from "@/features/learn/api/quiz"
+import { usePolling } from "@/hooks/use-polling"
 
 /** Deterministic concept MCQ: "which concept does this description match?", distractors are
  *  sibling concepts. Keyless. Records a study event so mastery moves. */
@@ -65,11 +66,7 @@ export function ConceptQuizPanel({
       .then((s) => !s.error && setPrep(s))
       .catch(() => {})
   }, [autoKicked, prep, scope, docId])
-  useEffect(() => {
-    if (!prep?.running) return
-    const id = setInterval(loadStatus, 5000)
-    return () => clearInterval(id)
-  }, [prep?.running, loadStatus])
+  usePolling(loadStatus, prep?.running ? 5000 : null)
 
   const answer = useCallback(
     (i: number) => {

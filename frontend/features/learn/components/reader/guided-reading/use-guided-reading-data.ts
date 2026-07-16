@@ -13,6 +13,7 @@ import { fetchConceptMastery, type ConceptMastery } from "@/features/learn/api/p
 import { fetchReviewQueue } from "@/features/learn/api/review"
 import { type CourseChapter } from "@/features/learn/lib/toc"
 import { guidedChapters } from "./lib"
+import { usePolling } from "@/hooks/use-polling"
 
 /** Everything the guided-reading surface FETCHES, in one hook: the document outline, the
  *  canonical chapter list, the chapter payload (with its prepare-poll), the per-chapter
@@ -113,11 +114,7 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
 
   // Keep the ladder live while anything is queued/building, and reload the open
   // chapter the moment its own build lands.
-  useEffect(() => {
-    if (!anyBuildActive) return
-    const t = setInterval(loadReadiness, 10000)
-    return () => clearInterval(t)
-  }, [anyBuildActive, loadReadiness])
+  usePolling(loadReadiness, anyBuildActive ? 10000 : null)
 
   const prevBuildStatus = useRef<string | null>(null)
   useEffect(() => {
@@ -128,20 +125,16 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
   }, [currentBuild?.status])
 
   // Poll while a prepare/build pass runs so explanations stream in as they finish.
-  useEffect(() => {
-    if (!preparing && !building) return
-    const t = setInterval(async () => {
-      if (!chapterKey) return
-      try {
-        const d = await fetchGuidedReading(docId, chapterKey)
-        setData(d)
-        if (!d.status?.running) setPreparing(false)
-      } catch {
-        setPreparing(false)
-      }
-    }, 6000)
-    return () => clearInterval(t)
-  }, [preparing, building, docId, chapterKey])
+  usePolling(async () => {
+    if (!chapterKey) return
+    try {
+      const d = await fetchGuidedReading(docId, chapterKey)
+      setData(d)
+      if (!d.status?.running) setPreparing(false)
+    } catch {
+      setPreparing(false)
+    }
+  }, preparing || building ? 6000 : null)
 
   const startBuild = async (at?: number | null) => {
     if (!chapterKey) return
