@@ -11,6 +11,8 @@ that improve the DETERMINISTIC fallback and the choice of WHAT to quiz:
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from app.search import embed_texts

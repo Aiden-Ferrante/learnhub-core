@@ -100,3 +100,12 @@ def test_eval_summarize_verdicts():
     assert r["sampled"] == 3 and r["graded"] == 2 and r["passed"] == 1
     assert r["score"] == 0.5
     assert r["failures"][0]["name"] == "b" and r["failures"][0]["informative"] is False
+
+
+def test_sig_tokens_tokenizes_names():
+    # Regression: _sig_tokens moved into cards.py without its `re` import (NameError at
+    # runtime only on the nearest-distractor path) — calling it here keeps that caught.
+    from app.study.cards import _sig_tokens
+
+    toks = _sig_tokens("Weight update magnitude")
+    assert "weight" in toks and "update" in toks and "magnitude" in toks
