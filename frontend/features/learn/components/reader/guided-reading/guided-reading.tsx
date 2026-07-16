@@ -30,21 +30,12 @@ import { EmptyState } from "@/components/patterns/empty-state"
 import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
 import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
-import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
-import { ConceptQuizPanel } from "@/features/learn/components/study/concept-quiz-panel"
-import { ReviewPanel } from "@/features/learn/components/study/review-panel"
-import { ExamPanel } from "@/features/learn/components/study/exam-panel"
-import { ChapterWalk } from "@/features/learn/components/study/chapter-walk"
-import { LockInPanel } from "@/features/learn/components/study/lockin-panel"
-import { LessonPanel } from "@/features/learn/components/study/lesson-panel"
-import { AudiobookPanel } from "@/features/learn/components/reader/audiobook-panel"
 import { PATH_STAGES, firstIncompleteStage } from "@/features/learn/lib/learn-path"
 import {
 } from "@/features/learn/components/reader/chapter-reader"
 import { type CourseChapter } from "@/features/learn/lib/toc"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
-import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
 import { flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import { recordEngagement } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
@@ -62,6 +53,9 @@ import {
   nextNightEpoch,
 } from "./lib"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
+import { ConceptPopover } from "./concept-popover"
+import { NarrationBar, useNarration } from "./narration-bar"
+import { StudyDrawerPanel } from "./study-drawer"
 import { useChapterPath } from "./use-chapter-path"
 import { useGuidedReadingData } from "./use-guided-reading-data"
 import { useReaderScroll } from "./use-reader-scroll"
@@ -79,28 +73,6 @@ type GuidedReadingProps = {
 }
 
 // ---------------------------------------------------------------------------
-
-function CheckReveal({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs">
-      <div className="font-medium text-foreground/90">
-        Check yourself: <MathText text={q} className="inline-block" />
-      </div>
-      {open ? (
-        <MathText text={a} className="mt-1 text-muted-foreground" />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="mt-1 text-brand hover:underline"
-        >
-          Reveal answer
-        </button>
-      )}
-    </div>
-  )
-}
 
 export function GuidedReading({
   course,
@@ -150,17 +122,11 @@ export function GuidedReading({
   // Concept highlighter wash (default on; toggle lives in the Aa reading settings).
   const [highlightConcepts, setHighlightConcepts] = useState(true)
   // Narration: play the chapter's audiobook file when one has already been generated.
-  const [audioReady, setAudioReady] = useState(false)
-  const [playerOpen, setPlayerOpen] = useState(false)
-  const [narrSpeed, setNarrSpeed] = useState(1)
-  const narrAudioRef = useRef<HTMLAudioElement>(null)
-  const narrSaveAt = useRef(0)
+  const { audioReady, playerOpen, togglePlayer } = useNarration(chapterKey, docId)
 
   useEffect(() => {
     try {
       setHighlightConcepts(localStorage.getItem("txt2k:concept-highlight") !== "0")
-      const s = Number(localStorage.getItem("txt2k:audio-speed"))
-      if (s >= 0.5 && s <= 3) setNarrSpeed(s)
     } catch {
       // storage unavailable
     }
@@ -256,35 +222,6 @@ export function GuidedReading({
   useEffect(() => {
     if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
   }, [data?.markdown, chapterKey, docId])
-
-  // Narration availability: show the play control only when this chapter's audiobook
-  // file already exists — generation stays an explicit act (the Listen drawer).
-  useEffect(() => {
-    setAudioReady(false)
-    setPlayerOpen(false)
-    if (!chapterKey) return
-    let alive = true
-    getAudiobookStatus(chapterKey, docId, "text")
-      .then((st) => {
-        if (alive && st.status === "done") setAudioReady(true)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [chapterKey, docId])
-
-  const cycleNarrSpeed = () => {
-    const steps = [1, 1.25, 1.5, 1.75, 2]
-    const next = steps[(steps.indexOf(narrSpeed) + 1) % steps.length] ?? 1
-    setNarrSpeed(next)
-    if (narrAudioRef.current) narrAudioRef.current.playbackRate = next
-    try {
-      localStorage.setItem("txt2k:audio-speed", String(next))
-    } catch {
-      // storage unavailable
-    }
-  }
 
   const goChapter = (key: string) => {
     setChapterKey(key)
@@ -660,7 +597,7 @@ export function GuidedReading({
             variant={playerOpen ? "default" : "ghost"}
             size="sm"
             className="h-7 gap-1.5 px-2 text-xs"
-            onClick={() => setPlayerOpen((o) => !o)}
+            onClick={togglePlayer}
             title="Narration — this chapter has generated audio"
           >
             <Headphones className="h-3.5 w-3.5" />
@@ -749,49 +686,7 @@ export function GuidedReading({
 
       {/* Narration mini-player — read along; position/speed persist (shared with the Listen drawer). */}
       {playerOpen && audioReady && chapterKey && (
-        <div className="flex items-center gap-2 border-b bg-card/70 px-4 py-1.5">
-          <audio
-            ref={narrAudioRef}
-            controls
-            preload="metadata"
-            src={audiobookFileUrl(chapterKey, docId, "text")}
-            className="h-8 min-w-0 flex-1 max-w-2xl"
-            onLoadedMetadata={() => {
-              const el = narrAudioRef.current
-              if (!el) return
-              el.playbackRate = narrSpeed
-              try {
-                const t = Number(localStorage.getItem(`txt2k:audio-pos:${chapterKey}:text`))
-                if (t > 0 && t < el.duration - 2) el.currentTime = t
-              } catch {
-                // storage unavailable
-              }
-            }}
-            onTimeUpdate={() => {
-              const el = narrAudioRef.current
-              if (!el) return
-              const now = Date.now()
-              if (now - narrSaveAt.current < 2000) return
-              narrSaveAt.current = now
-              try {
-                localStorage.setItem(`txt2k:audio-pos:${chapterKey}:text`, String(Math.floor(el.currentTime)))
-              } catch {
-                // storage unavailable
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={cycleNarrSpeed}
-            className="rounded border px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground hover:text-foreground"
-            title="Playback speed"
-          >
-            {narrSpeed}×
-          </button>
-          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setPlayerOpen(false)}>
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <NarrationBar chapterKey={chapterKey} docId={docId} onClose={togglePlayer} />
       )}
 
       {/* Reading-progress hairline — how far through the chapter you are. */}
@@ -1057,92 +952,29 @@ export function GuidedReading({
 
       {/* Concept popover — anchored to the clicked term. */}
       {activeConcept && active && (
-        <div
-          className="fixed z-50 w-[min(26rem,90vw)] rounded-lg border bg-popover p-3 shadow-xl"
-          style={{
-            left: Math.min(active.x, window.innerWidth - Math.min(430, window.innerWidth * 0.92)),
-            top: Math.min(active.y, window.innerHeight - 320),
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mb-1.5 flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ConceptMasteryDot mastery={activeMastery?.mastery} attempts={activeMastery?.attempts} />
-              <span className="text-sm font-semibold">{activeConcept.name}</span>
-              <span
-                className={cn(
-                  "rounded-full border px-1.5 py-0.5 text-[10px]",
-                  KIND_COLOR[activeConcept.kind] ?? "border-border text-muted-foreground",
-                )}
-              >
-                {activeConcept.kind}
-              </span>
-            </div>
-            <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setActive(null)}>
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="max-h-72 space-y-2 overflow-y-auto pr-1 text-sm">
-            <MathText text={activeConcept.signal} className="text-foreground/90" />
-            {activeConcept.questions?.[0] && (
-              <CheckReveal q={activeConcept.questions[0].q} a={activeConcept.questions[0].a} />
-            )}
-          </div>
-        </div>
+        <ConceptPopover
+          concept={activeConcept}
+          mastery={activeMastery}
+          x={active.x}
+          y={active.y}
+          onClose={() => setActive(null)}
+        />
       )}
 
       {/* Study drawer — quiz / review / exam over the same surface (spec §8 step 5). */}
       {drawer && (
-        <div className="absolute inset-y-0 right-0 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
-          <div className="flex items-center justify-between border-b px-4 py-2">
-            <div className="text-xs font-medium text-muted-foreground">
-              {DRAWER_TITLES[drawer]} · {title}
-            </div>
-            <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setDrawer(null)}>
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {drawer === "quiz" && (
-              <ConceptQuizPanel
-                scope={chapterKey}
-                docId={docId}
-                onAnswered={() => {
-                  refreshMastery()
-                  // Quizzes soft gate: a real round of retrieval marks the stage.
-                  noteQuizAnswer()
-                }}
-              />
-            )}
-            {drawer === "review" && chapterKey && (
-              <ReviewPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />
-            )}
-            {drawer === "exam" && (
-              <ExamPanel
-                scope={chapterKey}
-                docId={docId}
-                onGraded={() => {
-                  refreshMastery()
-                  loadProgress() // exam stage is written server-side on a passing grade
-                }}
-                onDrillMisses={() => setDrawer("quiz")}
-                onLockIn={() => setDrawer("lockin")}
-              />
-            )}
-            {drawer === "walk" && (
-              <ChapterWalk
-                scope={chapterKey}
-                docId={docId}
-                tree={tree}
-                onAnswered={refreshMastery}
-                onComplete={() => loadProgress()} // walk grades the skeleton stage itself
-              />
-            )}
-            {drawer === "lockin" && <LockInPanel scope={chapterKey} docId={docId} onDone={loadProgress} />}
-            {drawer === "tutor" && <LessonPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />}
-            {drawer === "listen" && <AudiobookPanel scope={chapterKey} docId={docId} />}
-          </div>
-        </div>
+        <StudyDrawerPanel
+          drawer={drawer}
+          title={title}
+          chapterKey={chapterKey}
+          docId={docId}
+          tree={tree}
+          onClose={() => setDrawer(null)}
+          onSwitch={setDrawer}
+          onRefreshMastery={refreshMastery}
+          onQuizAnswered={noteQuizAnswer}
+          onProgress={loadProgress}
+        />
       )}
     </div>
   )
