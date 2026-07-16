@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react"
 import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
-import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
+import { KIND_BADGE } from "@/features/learn/components/concepts/kind-palette"
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import type { ConceptLesson } from "@/features/learn/api/concepts"
 import type { ConceptMastery } from "@/features/learn/api/progress"
@@ -67,7 +67,7 @@ function ConceptRow({
         <span
           className={cn(
             "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
-            KIND_STYLES[entry.kind || ""] || "bg-muted text-muted-foreground",
+            KIND_BADGE[entry.kind || ""] || "bg-muted text-muted-foreground",
           )}
         >
           {entry.kind || "concept"}

@@ -5,7 +5,7 @@ import { BookOpen, Check, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MathText } from "@/features/learn/components/reader/markdown-reader"
 import type { GuidedReadingBriefing } from "@/features/learn/api/chapter"
-import { KIND_COLOR } from "./lib"
+import { KIND_CHIP } from "@/features/learn/components/concepts/kind-palette"
 import { cn } from "@/lib/utils"
 
 /** The chapter briefing — what this chapter teaches, assembled from the pre-generated layer.
@@ -115,7 +115,7 @@ export function BriefingCard({
                   data-concept={idx}
                   className={cn(
                     "rounded-full border px-2 py-0.5 text-xs",
-                    KIND_COLOR[c.kind] ?? "border-border text-muted-foreground",
+                    KIND_CHIP[c.kind] ?? "border-border text-muted-foreground",
                   )}
                   title={c.signal}
                 >

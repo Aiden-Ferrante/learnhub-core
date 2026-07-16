@@ -6,23 +6,7 @@ import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-ma
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import { cn } from "@/lib/utils"
 import { type ConceptLesson } from "@/features/learn/api/concepts"
-
-export const KIND_STYLES: Record<string, string> = {
-  definition: "bg-blue-500/15 text-blue-400",
-  theorem: "bg-purple-500/15 text-purple-400",
-  principle: "bg-amber-500/15 text-amber-400",
-  result: "bg-emerald-500/15 text-emerald-400",
-  method: "bg-rose-500/15 text-rose-400",
-}
-
-/** Left-edge accent per kind — lets you tell concept types apart while scanning a list. */
-const KIND_BORDER: Record<string, string> = {
-  definition: "border-l-blue-500/60",
-  theorem: "border-l-purple-500/60",
-  principle: "border-l-amber-500/60",
-  result: "border-l-emerald-500/60",
-  method: "border-l-rose-500/60",
-}
+import { KIND_BADGE, KIND_BORDER } from "@/features/learn/components/concepts/kind-palette"
 
 export function prettyScope(key?: string): string {
   if (!key) return ""
@@ -44,7 +28,7 @@ export function ConceptCard({
   onOpen?: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const kindClass = KIND_STYLES[c.kind] || "bg-muted text-muted-foreground"
+  const kindClass = KIND_BADGE[c.kind] || "bg-muted text-muted-foreground"
   const elsewhere = (c.appearsIn || []).filter((p) => p.sectionKey !== c.sectionKey)
   const pageLabel = c.pageStart
     ? c.pageEnd && c.pageEnd !== c.pageStart

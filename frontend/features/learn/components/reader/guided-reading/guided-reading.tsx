@@ -48,8 +48,8 @@ import {
   resolveGuidedChapter,
   type MarginNote,
   type StudyDrawer,
-  nextNightEpoch,
 } from "./lib"
+import { nextNightEpoch } from "@/lib/schedule"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
 import { BriefingCard } from "./briefing-card"
 import { ConceptPopover } from "./concept-popover"

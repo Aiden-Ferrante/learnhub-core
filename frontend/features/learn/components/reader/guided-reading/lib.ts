@@ -11,14 +11,6 @@ import {
 import type { Measure } from "@/features/learn/hooks/use-reading-prefs"
 import type { LearnTreeNode, OutlineEntry } from "@/features/learn/api/outline"
 
-export const KIND_COLOR: Record<string, string> = {
-  definition: "text-kind-definition border-kind-definition/30 bg-kind-definition/10",
-  theorem: "text-kind-theorem border-kind-theorem/30 bg-kind-theorem/10",
-  principle: "text-kind-principle border-kind-principle/30 bg-kind-principle/10",
-  result: "text-kind-result border-kind-result/30 bg-kind-result/10",
-  method: "text-kind-method border-kind-method/30 bg-kind-method/10",
-}
-
 export type StudyDrawer = "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen" | null
 
 export const DRAWER_TITLES: Record<Exclude<StudyDrawer, null>, string> = {
@@ -137,10 +129,3 @@ export function numberOutlineItems(
   })
 }
 
-/** Epoch seconds for the next 2:00 AM — the "build tonight" schedule slot. */
-export function nextNightEpoch(): number {
-  const d = new Date()
-  d.setHours(2, 0, 0, 0)
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-  return Math.floor(d.getTime() / 1000)
-}

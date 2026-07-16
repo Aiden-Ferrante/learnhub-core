@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useAsyncData } from "@/hooks/use-async-data"
+import { nextNightEpoch } from "@/lib/schedule"
 import {
   BookMarked,
   BookOpen,
@@ -175,10 +176,7 @@ export function CourseHome({
     if (!plan?.nextUnbuilt) return
     setQueueBusy(true)
     try {
-      const d = new Date()
-      d.setHours(2, 0, 0, 0)
-      if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-      await enqueueChapterBuild(planDocId, plan.nextUnbuilt.key, Math.floor(d.getTime() / 1000))
+      await enqueueChapterBuild(planDocId, plan.nextUnbuilt.key, nextNightEpoch())
     } catch {
       // surfaced by the next plan reload
     }

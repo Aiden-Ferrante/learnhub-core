@@ -5,17 +5,12 @@ import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
-import { KIND_STYLES, prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { KIND_BADGE } from "@/features/learn/components/concepts/kind-palette"
 import { SectionFigures } from "@/features/learn/components/reader/section-figures"
 import { type ConceptLesson } from "@/features/learn/api/concepts"
 import { submitReviewGrade, type ReviewGrade } from "@/features/learn/api/review"
-
-const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
-  { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
-  { grade: 2, label: "Hard", cls: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" },
-  { grade: 3, label: "Good", cls: "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10" },
-  { grade: 4, label: "Easy", cls: "border-blue-500/40 text-blue-400 hover:bg-blue-500/10" },
-]
+import { GRADES } from "@/features/learn/components/study/grade-scale"
 
 type ConceptDetailProps = {
   concept: ConceptLesson
@@ -40,7 +35,7 @@ export function ConceptDetail({
 }: ConceptDetailProps) {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
   const [graded, setGraded] = useState<string | null>(null)
-  const kindClass = KIND_STYLES[c.kind] || "bg-muted text-muted-foreground"
+  const kindClass = KIND_BADGE[c.kind] || "bg-muted text-muted-foreground"
   const where = sectionTitle || prettyScope(c.sectionKey)
   const elsewhere = (c.appearsIn || []).filter((p) => p.sectionKey !== c.sectionKey)
 

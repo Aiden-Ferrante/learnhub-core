@@ -25,18 +25,12 @@ import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type C
 import { fetchChapterBuilds, fetchLearnDocuments, type LearnDocumentInfo } from "@/features/process/api/pipeline"
 import { cn } from "@/lib/utils"
 import { usePolling } from "@/hooks/use-polling"
+import { nextNightEpoch } from "@/lib/schedule"
 
 /** Processing dashboard — the extraction UI, rebuilt on the canonical pipeline:
  *  /api/chapters (one chapter list), /api/build/readiness (the ladder), and the
  *  chapter build queue (with per-section extraction outcomes). Replaces the
  *  legacy triple-era Process tab. */
-
-function nextNightEpoch(): number {
-  const d = new Date()
-  d.setHours(2, 0, 0, 0)
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-  return Math.floor(d.getTime() / 1000)
-}
 
 /** The receipt's payload: what was actually extracted, inspectable and cullable in place.
  *  Junk concepts die here in one tap instead of surviving into quizzes and reviews. */

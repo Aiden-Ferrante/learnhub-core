@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
+import { KIND_CHIP } from "@/features/learn/components/concepts/kind-palette"
 import { QuizChoiceList } from "@/features/learn/components/study/quiz-choice-list"
 import { useConceptQuizSession } from "@/features/learn/components/study/use-concept-quiz"
 import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
@@ -139,14 +140,6 @@ function ConceptQuickCheck({
       ) : null}
     </div>
   )
-}
-
-const KIND_CHIP: Record<string, string> = {
-  definition: "text-sky-400 border-sky-400/30",
-  theorem: "text-purple-400 border-purple-400/30",
-  principle: "text-amber-400 border-amber-400/30",
-  result: "text-emerald-400 border-emerald-400/30",
-  method: "text-rose-400 border-rose-400/30",
 }
 
 type RecallMark = "got" | "fuzzy"

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
+import { KIND_BADGE } from "@/features/learn/components/concepts/kind-palette"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
 import { submitReviewGrade } from "@/features/learn/api/review"
@@ -79,7 +79,7 @@ export function LessonPanel({
     )
   }
 
-  const kindClass = KIND_STYLES[c.kind] || "bg-muted text-muted-foreground"
+  const kindClass = KIND_BADGE[c.kind] || "bg-muted text-muted-foreground"
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">

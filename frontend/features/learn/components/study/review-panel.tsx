@@ -2,19 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { KIND_STYLES } from "@/features/learn/components/concepts/concept-card"
+import { KIND_BADGE } from "@/features/learn/components/concepts/kind-palette"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
 import { SectionFigures } from "@/features/learn/components/reader/section-figures"
 import { figureUrl } from "@/features/learn/api/content"
 import { fetchReviewQueue, submitFigureReviewGrade, submitReviewGrade, type ReviewCard, type ReviewGrade, type ReviewQueueResponse } from "@/features/learn/api/review"
+import { GRADES } from "@/features/learn/components/study/grade-scale"
 import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
-
-const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
-  { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
-  { grade: 2, label: "Hard", cls: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" },
-  { grade: 3, label: "Good", cls: "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10" },
-  { grade: 4, label: "Easy", cls: "border-blue-500/40 text-blue-400 hover:bg-blue-500/10" },
-]
 
 /** Spaced-repetition recall: name → recall → reveal signal/source → self-grade (Again/Hard/Good/Easy).
  *  Keyless. `scope` = the chapter/section being studied (sessions are chapter-scoped). */
@@ -140,7 +134,7 @@ export function ReviewPanel({
   const kindClass =
     isSkeleton || isFigure || isChapter
       ? "bg-brand/15 text-brand"
-      : KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
+      : KIND_BADGE[card.kind] || "bg-muted text-muted-foreground"
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">

@@ -6,7 +6,7 @@ import { MathText } from "@/features/learn/components/reader/markdown-reader"
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
 import type { ConceptLesson } from "@/features/learn/api/concepts"
 import type { ConceptMastery } from "@/features/learn/api/progress"
-import { KIND_COLOR } from "./lib"
+import { KIND_CHIP } from "@/features/learn/components/concepts/kind-palette"
 import { cn } from "@/lib/utils"
 
 function CheckReveal({ q, a }: { q: string; a: string }) {
@@ -62,7 +62,7 @@ export function ConceptPopover({
           <span
             className={cn(
               "rounded-full border px-1.5 py-0.5 text-[10px]",
-              KIND_COLOR[concept.kind] ?? "border-border text-muted-foreground",
+              KIND_CHIP[concept.kind] ?? "border-border text-muted-foreground",
             )}
           >
             {concept.kind}
