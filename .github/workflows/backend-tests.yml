@@ -1,0 +1,55 @@
+name: backend tests
+
+# The pure unit suite plus the real-Postgres integration tests (LEARN_PG_TESTS=1).
+# The latter walk grade/queue round-trips against an actual pgvector Postgres seeded from
+# deploy/postgres/init/01-schema.sql — catching server-side binding quirks and schema drift
+# that DB-fixtured unit tests can't (see docs/testing.md).
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'deploy/postgres/init/**', '.github/workflows/backend-tests.yml']
+  pull_request:
+    paths: ['backend/**', 'deploy/postgres/init/**', '.github/workflows/backend-tests.yml']
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: learnhub
+          POSTGRES_PASSWORD: learnhub_local
+          POSTGRES_DB: learnhub
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U learnhub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # Matches the default DSN in app/platform/db.py — the seeded service is the test DB.
+      POSTGRES_DSN: host=localhost port=5432 user=learnhub password=learnhub_local dbname=learnhub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt pytest
+
+      - name: Apply schema to the Postgres service
+        env:
+          PGPASSWORD: learnhub_local
+        run: psql -h localhost -U learnhub -d learnhub -f deploy/postgres/init/01-schema.sql
+
+      - name: Unit + integration tests
+        working-directory: backend
+        env:
+          LEARN_PG_TESTS: '1'
+        run: python -m pytest -q
