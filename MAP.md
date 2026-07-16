@@ -171,11 +171,11 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 |---|---|
 | [`concepts_extract.py`](backend/app/extraction/concepts_extract.py) | Concept extraction (the write side) |
 | [`concept_store.py`](backend/app/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
-| [`deep_chapter.py`](backend/app/extraction/deep_chapter.py) | Assembled chapter briefing (+ recap warm) for the reading surface |
 | [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`augment.py`](backend/app/extraction/augment.py) | Section learning objectives + recap |
 | [`eval_gate.py`](backend/app/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
+| [`guided_reading.py`](backend/app/extraction/guided_reading.py) | _(describe me)_ |
 
 ### study/ — learning state
 
@@ -248,12 +248,12 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`ingest_routes.py`](backend/app/api/ingest_routes.py) | PDF upload → conversion |
 | [`learning_path_routes.py`](backend/app/api/learning_path_routes.py) | Learning-path (drill/exam/recall) |
 | [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + deep-chapter reads |
-| [`deep_chapter_routes.py`](backend/app/api/deep_chapter_routes.py) | Deep-chapter reading surface (briefing + recaps) |
 | [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
 | [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
 | [`content_routes.py`](backend/app/api/content_routes.py) | _(describe me)_ |
 | [`mastery_routes.py`](backend/app/api/mastery_routes.py) | _(describe me)_ |
+| [`guided_reading_routes.py`](backend/app/api/guided_reading_routes.py) | _(describe me)_ |
 
 <!-- GEN:backend END -->
 

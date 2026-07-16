@@ -51,7 +51,7 @@ import {
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs, type Measure } from "@/features/learn/hooks/use-reading-prefs"
 import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
-import { fetchChapterProgress, fetchCourseChapters, fetchDeepChapter, updateChapterStage, type DeepChapterResponse } from "@/features/learn/api/chapter"
+import { fetchChapterProgress, fetchCourseChapters, fetchGuidedReading, updateChapterStage, type GuidedReadingResponse } from "@/features/learn/api/chapter"
 import { type ConceptLesson } from "@/features/learn/api/concepts"
 import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
@@ -60,7 +60,7 @@ import { fetchReviewQueue } from "@/features/learn/api/review"
 import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 
-type DeepChapterProps = {
+type GuidedReadingProps = {
   course: Course
   /** Initial position — any section key (e.g. the reading position); resolved to its chapter. */
   scope: string | null
@@ -83,7 +83,7 @@ const KIND_COLOR: Record<string, string> = {
 /** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
  *  wherever they exist — outline depth 0 can be Parts/front-matter (e.g. DDIA), which carry
  *  no section content of their own. Fall back to depth-0 outline entries, then the TOC tree. */
-function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): CourseChapter[] {
+function guidedChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): CourseChapter[] {
   const numbered = (outline || []).filter((e) => /^toc:\d+$/.test(e.sectionKey || ""))
   if (numbered.length) return numbered.map((e) => ({ key: e.sectionKey, title: e.title || e.sectionKey }))
   const fromOutline = chaptersFromOutline(outline)
@@ -94,7 +94,7 @@ function deepChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): CourseCha
 /** Resolve any incoming position to a key that is GUARANTEED to be one of `chapters` —
  *  resolveChapterForScope's tree fallback can return a top-level Part node, which carries
  *  no section content of its own and would render an empty surface. */
-function resolveDeepChapter(chapters: CourseChapter[], tree: LearnTreeNode[], scope: string | null): string | null {
+function resolveGuidedChapter(chapters: CourseChapter[], tree: LearnTreeNode[], scope: string | null): string | null {
   if (chapters.length === 0) return null
   if (!scope) return chapters[0].key
   if (chapters.some((c) => c.key === scope)) return scope
@@ -280,21 +280,21 @@ function layoutNotes(notes: MarginNote[]): MarginNote[] {
   return sorted
 }
 
-export function DeepChapter({
+export function GuidedReading({
   course,
   scope,
   tree,
   onBack,
   onScopeChange,
   initialDrawer,
-}: DeepChapterProps) {
+}: GuidedReadingProps) {
   const docId = course.learnDocId ?? course.id
   const [theme] = useReadingTheme()
   const [prefs, setPrefs] = useReadingPrefs()
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [outlineReady, setOutlineReady] = useState(false)
   const [chapterKey, setChapterKey] = useState<string | null>(null)
-  const [data, setData] = useState<DeepChapterResponse | null>(null)
+  const [data, setData] = useState<GuidedReadingResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
@@ -398,7 +398,7 @@ export function DeepChapter({
     return () => mq.removeEventListener("change", sync)
   }, [])
 
-  // Chapter list: numbered outline chapters where available (see deepChapters).
+  // Chapter list: numbered outline chapters where available (see guidedChapters).
   useEffect(() => {
     let alive = true
     fetchOutline(docId)
@@ -427,7 +427,7 @@ export function DeepChapter({
   }, [docId])
 
   const chapters = useMemo(
-    () => canonChapters ?? deepChapters(outline, tree),
+    () => canonChapters ?? guidedChapters(outline, tree),
     [canonChapters, outline, tree],
   )
 
@@ -442,7 +442,7 @@ export function DeepChapter({
   // Resolve the incoming position (any section key, or nothing) to its owning chapter.
   useEffect(() => {
     if (chapterKey || !outlineReady || chapters.length === 0) return
-    const resolved = resolveDeepChapter(chapters, tree, scope)
+    const resolved = resolveGuidedChapter(chapters, tree, scope)
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
 
@@ -577,7 +577,7 @@ export function DeepChapter({
     setLoading(true)
     setError(null)
     try {
-      const d = await fetchDeepChapter(docId, chapterKey)
+      const d = await fetchGuidedReading(docId, chapterKey)
       setData(d)
       setPreparing(Boolean(d.status?.running))
     } catch (e) {
@@ -697,7 +697,7 @@ export function DeepChapter({
     const t = setInterval(async () => {
       if (!chapterKey) return
       try {
-        const d = await fetchDeepChapter(docId, chapterKey)
+        const d = await fetchGuidedReading(docId, chapterKey)
         setData(d)
         if (!d.status?.running) setPreparing(false)
       } catch {

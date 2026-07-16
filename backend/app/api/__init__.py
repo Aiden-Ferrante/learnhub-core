@@ -9,7 +9,7 @@ from app.api.audiobook_routes import router as _audiobook_routes
 from app.api.build_routes import router as _build_routes
 from app.api.concept_study_routes import router as _concept_study_routes
 from app.api.content_routes import router as _content_routes
-from app.api.deep_chapter_routes import router as _deep_chapter_routes
+from app.api.guided_reading_routes import router as _guided_reading_routes
 from app.api.extract_routes import router as _extract_routes
 from app.api.ingest_routes import router as _ingest_routes
 from app.api.learning_path_routes import router as _learning_path_routes
@@ -25,7 +25,7 @@ all_routers = [
     _build_routes,
     _concept_study_routes,
     _content_routes,
-    _deep_chapter_routes,
+    _guided_reading_routes,
     _extract_routes,
     _ingest_routes,
     _learning_path_routes,

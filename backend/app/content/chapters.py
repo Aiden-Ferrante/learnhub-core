@@ -1,7 +1,7 @@
 """Canonical chapter units — THE single source for "what are this book's chapters".
 
 The course dashboard's syllabus tree (get_toc_tree) is the outline of record.
-Every other surface — the deep-chapter picker, the book reader's chapter list,
+Every other surface — the guided-reading picker, the book reader's chapter list,
 the Today plan — must derive its chapter list from here, so they cannot drift.
 
 A unit is a tree node that actually spans section content; content-less

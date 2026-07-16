@@ -9,7 +9,7 @@ Per-concept "deep explanations" were retired (2026-07-15): they were a second,
 UNGROUNDED explanation competing with the grounded ``signal``; the concept record
 now has one explanation of record. The GET assembler never calls the LLM — it
 serves whatever is cached, so opening a chapter is always fast; POST
-/api/deep-chapter/prepare backfills briefing + recaps in the background.
+/api/guided-reading/prepare backfills briefing + recaps in the background.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ def build_briefing(doc_id: str, scope: str | None, allow_generate: bool = False)
 # Orchestrator (eager post-extraction pass) + backfill + status + assembler
 # --------------------------------------------------------------------------- #
 
-def generate_deep_chapter_artifacts(
+def generate_guided_reading_artifacts(
     doc_id: str, scope: str | None, section_keys: list[str]
 ) -> dict[str, Any]:
     """The backfill pass: briefing + per-section recap cache warm.
@@ -157,7 +157,7 @@ def deep_status(doc_id: str, scope: str | None, section_keys: list[str]) -> dict
     return {"running": running, "briefing": has_briefing}
 
 
-def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
+def fetch_guided_reading(doc_id: str | None, scope: str) -> dict[str, Any]:
     """One-call assembler for the Deep Chapter surface: briefing + full chapter
     markdown + concepts (with deep explanations) + cached section recaps.
 
@@ -204,7 +204,7 @@ def fetch_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
 
 def _prepare_worker(doc_id: str, scope: str, sig: str) -> None:
     try:
-        generate_deep_chapter_artifacts(doc_id, scope, _scope_section_keys(doc_id, scope))
+        generate_guided_reading_artifacts(doc_id, scope, _scope_section_keys(doc_id, scope))
     except Exception:  # noqa: BLE001 — best-effort backfill
         pass
     finally:
@@ -212,7 +212,7 @@ def _prepare_worker(doc_id: str, scope: str, sig: str) -> None:
             _inflight.discard(sig)
 
 
-def prepare_deep_chapter(doc_id: str | None, scope: str) -> dict[str, Any]:
+def prepare_guided_reading(doc_id: str | None, scope: str) -> dict[str, Any]:
     """Fire-and-forget backfill of the overlay for an already-processed scope."""
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:

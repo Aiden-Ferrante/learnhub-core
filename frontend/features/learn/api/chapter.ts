@@ -84,7 +84,7 @@ export async function updateChapterStage(
 // Deep Chapter — the one-call reading-first chapter surface
 // ---------------------------------------------------------------------------
 
-export type DeepChapterBriefing = {
+export type GuidedReadingBriefing = {
   objectives: string[]
   watchFor: string[]
   sections: { sectionKey: string; heading: string; essence?: string; depth?: number }[]
@@ -92,26 +92,26 @@ export type DeepChapterBriefing = {
   conceptCount?: number
 }
 
-export type DeepChapterStatus = {
+export type GuidedReadingStatus = {
   running: boolean
   briefing: boolean
 }
 
-export type DeepChapterResponse = {
+export type GuidedReadingResponse = {
   docId?: string
   scope: string
-  briefing: DeepChapterBriefing | null
+  briefing: GuidedReadingBriefing | null
   markdown: string
   blocks: SectionContentBlock[]
   concepts: ConceptLesson[]
-  status: DeepChapterStatus
+  status: GuidedReadingStatus
   error?: string
 }
 
-export async function fetchDeepChapter(doc: string, scope: string): Promise<DeepChapterResponse> {
+export async function fetchGuidedReading(doc: string, scope: string): Promise<GuidedReadingResponse> {
   const params = new URLSearchParams({ doc, scope })
-  const res = await fetch(`/api/learn/deep-chapter?${params}`, { cache: 'no-store' })
-  return parseJsonResponse<DeepChapterResponse>(res)
+  const res = await fetch(`/api/learn/guided-reading?${params}`, { cache: 'no-store' })
+  return parseJsonResponse<GuidedReadingResponse>(res)
 }
 
 // --- Canonical chapters ---------------------------------------------------------

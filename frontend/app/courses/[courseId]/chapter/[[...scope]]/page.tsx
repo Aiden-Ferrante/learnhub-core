@@ -2,7 +2,7 @@
 
 import { Suspense, use, useCallback, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { DeepChapter } from "@/features/learn"
+import { GuidedReading } from "@/features/learn"
 import { CourseFallback } from "@/features/learn"
 import { useCourseData } from "@/features/learn"
 import { scopeFromSegments, scopeToPath } from "@/features/learn"
@@ -43,7 +43,7 @@ function ChapterInner({ params }: { params: Params }) {
 
   return (
     <main className="mx-auto w-full px-4 pb-3 pt-3">
-      <DeepChapter
+      <GuidedReading
         course={data.course}
         scope={scope}
         tree={data.tree}
