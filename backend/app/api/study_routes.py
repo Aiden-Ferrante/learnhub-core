@@ -1,8 +1,8 @@
-"""API routes over the study-event floor served to MCP clients.
+"""API routes over the study-event floor.
 
-One survivor of the concept-layer pivot: /api/mistakes (recent wrong answers).
-The triple-era deck/quiz/exam/Socratic surfaces were removed with the triple
-pipeline — concept_study_routes owns quizzing now.
+/api/mistakes (recent wrong answers) survives from the concept-layer pivot —
+concept_study_routes owns quizzing. /api/study/sessions serves the derived
+working-session view of the same event floor.
 """
 
 from __future__ import annotations
@@ -12,8 +12,19 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from app.platform import db
+from app.study import fetch_sessions
 
 router = APIRouter()
+
+
+@router.get("/api/study/sessions")
+def api_study_sessions(
+    doc: str | None = Query(None),
+    days: int = Query(90, ge=1, le=730),
+) -> dict[str, Any]:
+    """Working sessions derived from the study-event floor (gap-clustered, newest first),
+    with a summary strip. Optionally scoped to one course."""
+    return fetch_sessions(doc, days=days)
 
 
 @router.get("/api/mistakes")

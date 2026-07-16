@@ -193,6 +193,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`drill.py`](backend/app/study/drill.py) | Drill on weak concepts |
 | [`exam.py`](backend/app/study/exam.py) | Exam mode (multi-question scoring) |
 | [`recall.py`](backend/app/study/recall.py) | Recall vs. recognition check |
+| [`sessions.py`](backend/app/study/sessions.py) | _(describe me)_ |
 
 ### search/ — embeddings + semantic search
 

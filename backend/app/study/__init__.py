@@ -1,11 +1,12 @@
 """Study — the learning loop over extracted concepts.
 
 Owns: the append-only study_events floor + mastery/activity/forecast/calibration
-read models (mastery), SM-2 review scheduling incl. skeleton/figure recall
-(reviews, srs), quiz sessions (quiz_session), exams (exam), drills (drill), free
-recall (recall), LLM quiz authoring with its critic (concept_quiz_llm,
-concept_quiz_gen), and distractor selection (cards). Depends on: content,
-extraction (chapter stage ledger), search (embeddings), platform.
+read models (mastery), FSRS review scheduling incl. skeleton/figure recall
+(reviews, srs), derived working sessions (sessions), quiz sessions (quiz_session),
+exams (exam), drills (drill), free recall (recall), LLM quiz authoring with its
+critic (concept_quiz_llm, concept_quiz_gen), and distractor selection (cards).
+Depends on: content, extraction (chapter stage ledger), search (embeddings),
+platform.
 """
 
 from app.study.concept_quiz_llm import author_scope_sync, scope_question_status
@@ -15,6 +16,7 @@ from app.study.mastery import compute_activity, compute_calibration, compute_con
 from app.study.quiz_session import answer_quiz, prepare_quizzes, quiz_prepare_status, start_quiz_session
 from app.study.recall import check_recall
 from app.study.reviews import build_review_queue, grade_review
+from app.study.sessions import fetch_sessions
 
 __all__ = [
     "answer_quiz",
@@ -26,6 +28,7 @@ __all__ = [
     "compute_concept_mastery",
     "compute_forecast",
     "compute_mastery",
+    "fetch_sessions",
     "grade_drill",
     "grade_exam",
     "grade_review",
