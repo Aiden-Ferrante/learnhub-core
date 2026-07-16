@@ -247,7 +247,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`audiobook_routes.py`](backend/app/api/audiobook_routes.py) | Audiobook generation/status |
 | [`ingest_routes.py`](backend/app/api/ingest_routes.py) | PDF upload → conversion |
 | [`learning_path_routes.py`](backend/app/api/learning_path_routes.py) | Learning-path (drill/exam/recall) |
-| [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + deep-chapter reads |
+| [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + guided-reading reads |
 | [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
 | [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
@@ -346,7 +346,7 @@ builds the prompt, calls the LLM and writes concepts (section loading + scope re
 come from `content/scope.py`, the shared owner), and [`concept_store.py`](backend/app/extraction/concept_store.py)
 is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/pipeline/build.py))
 runs these as queue jobs (`extract`; `build` is a compat alias). Four other LLM *generation passes*
-(coral) live in the folder and are triggered independently — `deep_chapter` assembles
+(coral) live in the folder and are triggered independently — `guided_reading` assembles
 the reading briefing from cached artifacts (its per-concept explanations were retired).
 Two dependencies live outside the folder: `concepts_extract` calls
 `platform/llm.py` for the model, and the pipeline runners are dispatched by
@@ -357,7 +357,7 @@ flowchart TD
   build["pipeline/build.py<br/>extract runner + eval gate"]
   concepts["concepts_extract.py<br/>LLM → concepts"]
   store["concept_store.py<br/>read concepts"]
-  deep["deep_chapter.py<br/>assembled briefing"]
+  deep["guided_reading.py<br/>assembled briefing"]
   skeleton["skeleton.py<br/>chapter essences"]
   guide["reading_guide.py<br/>section guides"]
   augment["augment.py<br/>objectives + recap"]
@@ -376,7 +376,7 @@ flowchart TD
   click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
   click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concepts_extract.py"
   click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concept_store.py"
-  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/deep_chapter.py"
+  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/guided_reading.py"
   click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/skeleton.py"
   click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/reading_guide.py"
   click augment "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/augment.py"
