@@ -110,8 +110,10 @@ def set_queue_paused(paused: bool) -> dict[str, Any]:
 
 
 def _bkey(doc_id: str, scope: str, kind: str = "build") -> str:
-    # "build" keeps the pre-kind key so existing rows stay addressable.
-    raw = f"{doc_id}|{scope}" if kind == "build" else f"{doc_id}|{scope}|{kind}"
+    # `build` and `extract` are the SAME work (one runner) — both keep the pre-kind key, so a
+    # manual /api/extract and an autochained extract dedup to one row and legacy build rows
+    # stay addressable. Every other kind gets its own namespace.
+    raw = f"{doc_id}|{scope}" if kind in ("build", "extract") else f"{doc_id}|{scope}|{kind}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -273,12 +275,16 @@ def list_builds(doc_id: str | None, kind: str | None = "build") -> dict[str, Any
     doc_id = _resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
+    # `build` and `extract` are one kind — asking for either returns both (+ legacy NULL rows,
+    # which are builds), so an autochained extract is visible to the build-filtering poller.
+    kinds = None if kind is None else (["build", "extract"] if kind in ("build", "extract") else [kind])
+    include_null = kinds is not None and "build" in kinds
     with db() as conn:
         rows = conn.execute(
             f"SELECT * FROM {BUILDS} WHERE doc_id = %(d)s "
-            "AND (%(k)s::text IS NULL OR kind = %(k)s OR (%(k)s = 'build' AND kind IS NULL)) "
+            "AND (%(kinds)s::text[] IS NULL OR kind = ANY(%(kinds)s) OR (%(nul)s AND kind IS NULL)) "
             "ORDER BY requested_at",
-            {"d": doc_id, "k": kind},
+            {"d": doc_id, "kinds": kinds, "nul": include_null},
         ).fetchall()
     return {"docId": doc_id, "builds": [_row_to_job(r) for r in rows]}
 

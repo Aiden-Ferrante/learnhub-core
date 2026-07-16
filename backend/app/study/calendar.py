@@ -76,3 +76,48 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
         "horizonDays": days,
         "tracked": tracked,
     }
+
+
+def build_study_debt(days: int = 7) -> dict[str, Any]:
+    """The compact cross-course rollup for external surfaces (nav badge, morning vault
+    briefing): what's due NOW and what fades within ``days``, per course and in total.
+    A leaner sibling of build_review_calendar — counts only, no per-day grid."""
+    now = int(time.time())
+    horizon = now + max(1, days) * 86400
+    try:
+        with db() as conn:
+            titles = {
+                r["k"]: r["t"]
+                for r in conn.execute("SELECT key AS k, title AS t FROM documents").fetchall()
+            }
+            rows = conn.execute(
+                "SELECT doc_id AS d, "
+                "SUM(CASE WHEN due <= to_timestamp(%(now)s) THEN 1 ELSE 0 END) AS due, "
+                "SUM(CASE WHEN due > to_timestamp(%(now)s) AND due <= to_timestamp(%(hz)s) "
+                "THEN 1 ELSE 0 END) AS soon, "
+                "COUNT(*) AS tracked "
+                "FROM concept_reviews WHERE due IS NOT NULL GROUP BY doc_id",
+                {"now": now, "hz": horizon},
+            ).fetchall()
+    except Exception as exc:  # noqa: BLE001 — soft error, never 500
+        return {"dueNow": 0, "fadingSoon": 0, "tracked": 0, "days": days, "courses": [], "error": str(exc)}
+
+    courses = [
+        {
+            "doc": r["d"],
+            "title": titles.get(r["d"]) or r["d"],
+            "dueNow": int(r["due"] or 0),
+            "fadingSoon": int(r["soon"] or 0),
+            "tracked": int(r["tracked"] or 0),
+        }
+        for r in rows
+        if r.get("d") in titles  # skip reviews orphaned by deleted courses
+    ]
+    courses.sort(key=lambda c: (-c["dueNow"], -c["fadingSoon"]))
+    return {
+        "dueNow": sum(c["dueNow"] for c in courses),
+        "fadingSoon": sum(c["fadingSoon"] for c in courses),
+        "tracked": sum(c["tracked"] for c in courses),
+        "days": days,
+        "courses": courses,
+    }

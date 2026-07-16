@@ -13,9 +13,18 @@ def test_build_kind_keeps_the_pre_kind_key():
 
 
 def test_other_kinds_get_distinct_keys():
-    keys = {_bkey("doc1", "toc:1", k) for k in KINDS}
-    assert len(keys) == len(KINDS)  # no collisions across kinds
+    # Every kind EXCEPT the build/extract alias pair gets its own namespace.
+    distinct = [k for k in KINDS if k != "extract"]  # extract deliberately shares build's key
+    keys = {_bkey("doc1", "toc:1", k) for k in distinct}
+    assert len(keys) == len(distinct)  # no collisions among the rest
     assert _bkey("doc1", "toc:1", "quizzes") != _bkey("doc1", "toc:2", "quizzes")
+
+
+def test_build_and_extract_share_one_key():
+    # They run the identical runner — the same (doc, scope) work must dedup to one row, and
+    # both must hit the legacy sha(doc|scope) rows. (Fixes: autochained extract invisible to
+    # the build-filtering status poller.)
+    assert _bkey("doc1", "toc:1", "extract") == _bkey("doc1", "toc:1", "build")
 
 
 def test_kinds_registry_shape():

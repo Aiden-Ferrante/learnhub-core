@@ -16,8 +16,8 @@ from app.platform import enqueue_build, list_builds
 router = APIRouter()
 
 # Map the persistent queue's job status onto the legacy extract-status vocabulary the
-# client polls (idle | running | done | error). Extraction now runs as a queue "build"
-# job (concepts + deep overlay) — same net behavior as the retired in-memory runner.
+# client polls (idle | running | done | error). Extraction runs as a queue "extract" job
+# (the "build" kind is a back-compat alias for the same runner and dedups to the same row).
 _STATUS = {"queued": "running", "running": "running", "done": "done",
            "error": "error", "canceled": "idle"}
 
@@ -41,7 +41,7 @@ async def api_extract(
         payload["sectionKeys"] = section_keys
     if model:
         payload["model"] = model
-    data = enqueue_build(doc, scope or "", kind="build", payload=payload)
+    data = enqueue_build(doc, scope or "", kind="extract", payload=payload)
     if data.get("error"):
         return JSONResponse({"status": "error", "error": data["error"]}, status_code=503)
     return JSONResponse({"status": "running", "docId": data.get("docId"), "scope": scope})
@@ -53,7 +53,7 @@ def api_extract_status(doc: str | None = None, scope: str | None = None) -> JSON
     doc_id = resolve_doc_id(doc)
     if not doc_id:
         return JSONResponse({"status": "idle", "scope": scope})
-    builds = list_builds(doc_id, kind="build").get("builds", [])
+    builds = list_builds(doc_id, kind="extract").get("builds", [])
     job = next((b for b in builds if (b.get("scope") or "") == (scope or "")), None)
     if not job:
         return JSONResponse({"status": "idle", "scope": scope, "docId": doc_id})

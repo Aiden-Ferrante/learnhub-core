@@ -9,7 +9,7 @@ Depends on: content, extraction (chapter stage ledger), search (embeddings),
 platform.
 """
 
-from app.study.calendar import build_review_calendar
+from app.study.calendar import build_review_calendar, build_study_debt
 from app.study.concept_quiz_llm import author_scope_sync, scope_question_status
 from app.study.drill import grade_drill, start_drill
 from app.study.exam import grade_exam, start_exam
@@ -24,6 +24,7 @@ __all__ = [
     "author_scope_sync",
     "build_review_calendar",
     "build_review_queue",
+    "build_study_debt",
     "check_recall",
     "compute_activity",
     "compute_calibration",

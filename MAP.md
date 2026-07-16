@@ -252,6 +252,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
 | [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
+| [`content_routes.py`](backend/app/api/content_routes.py) | _(describe me)_ |
+| [`mastery_routes.py`](backend/app/api/mastery_routes.py) | _(describe me)_ |
 
 <!-- GEN:backend END -->
 

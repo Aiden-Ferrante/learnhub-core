@@ -395,55 +395,6 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=503)
 
 
-@router.get("/api/study-debt")
-def api_study_debt(days: int = Query(7)) -> JSONResponse:
-    """Cross-course review debt for external surfaces (the morning vault briefing).
-    Everything else here is per-doc; this is the one whole-library rollup: what's due NOW
-    and what fades within ``days``, per course and in total."""
-    import time as _time
-
-    try:
-        now = int(_time.time())
-        horizon = now + max(1, days) * 86400
-        with db() as conn:
-            titles = {
-                r["k"]: r["t"]
-                for r in conn.execute('SELECT key AS k, title AS t FROM documents').fetchall()
-            }
-            rows = conn.execute(
-                "SELECT doc_id AS d, "
-                "SUM(CASE WHEN due <= to_timestamp(%(now)s) THEN 1 ELSE 0 END) AS due, "
-                "SUM(CASE WHEN due > to_timestamp(%(now)s) AND due <= to_timestamp(%(hz)s) "
-                "THEN 1 ELSE 0 END) AS soon, "
-                "COUNT(*) AS tracked "
-                "FROM concept_reviews WHERE due IS NOT NULL GROUP BY doc_id",
-                {"now": now, "hz": horizon},
-            ).fetchall()
-        courses = [
-            {
-                "doc": r["d"],
-                "title": titles.get(r["d"]) or r["d"],
-                "dueNow": int(r["due"] or 0),
-                "fadingSoon": int(r["soon"] or 0),
-                "tracked": int(r["tracked"] or 0),
-            }
-            for r in rows
-            if r.get("d") in titles  # skip reviews orphaned by deleted courses
-        ]
-        courses.sort(key=lambda c: (-c["dueNow"], -c["fadingSoon"]))
-        return JSONResponse(
-            {
-                "dueNow": sum(c["dueNow"] for c in courses),
-                "fadingSoon": sum(c["fadingSoon"] for c in courses),
-                "tracked": sum(c["tracked"] for c in courses),
-                "days": days,
-                "courses": courses,
-            }
-        )
-    except Exception as exc:  # noqa: BLE001
-        return JSONResponse({"error": str(exc)}, status_code=503)
-
-
 @router.put("/api/concept/{key}/questions")
 def api_set_concept_questions(key: str, body: dict = Body(...)) -> JSONResponse:
     """Replace a concept's cached quiz questions (``quizQuestions``). Pass ``{"questions": [...]}``

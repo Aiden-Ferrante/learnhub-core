@@ -82,7 +82,9 @@ are external contracts; this table is the disambiguator instead.
 - New backend code goes in the domain package it belongs to; if a route handler grows
   logic, move the logic into the domain and keep the handler thin.
 - The jobs queue never imports domains — new job kinds register a runner in
-  `api/wiring.py`.
+  `pipeline/registry.py` (called by `main.py` at startup).
+- `main.py` is a composition root: the app, tenancy middleware, `/health`, and the landing
+  page — nothing else. Every route lives in a router under `api/`.
 - Scope resolution (chapter → section keys) always goes through `content/scope.py`,
   so no two surfaces can disagree about a chapter's extent.
 - Rebuild the affected image after backend/frontend changes:

@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from app.platform import db
-from app.study import build_review_calendar, fetch_sessions
+from app.study import build_review_calendar, build_study_debt, fetch_sessions
 
 router = APIRouter()
 
@@ -22,6 +22,13 @@ def api_review_calendar(days: int = Query(60, ge=1, le=365)) -> dict[str, Any]:
     """Whole-library review calendar: per-day due counts (per course, per item type) over
     the horizon, plus the overdue pile. Powers the /study planner."""
     return build_review_calendar(days=days)
+
+
+@router.get("/api/study-debt")
+def api_study_debt(days: int = Query(7)) -> dict[str, Any]:
+    """The compact cross-course review-debt rollup (nav badge, morning vault briefing):
+    what's due now and what fades within ``days``, per course and in total."""
+    return build_study_debt(days=days)
 
 
 @router.get("/api/study/sessions")
