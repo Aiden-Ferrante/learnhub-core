@@ -15,7 +15,7 @@ from app.study.exam import grade_exam, start_exam
 from app.study.mastery import compute_activity, compute_calibration, compute_concept_mastery, compute_forecast, compute_mastery, record_engagement
 from app.study.quiz_session import answer_quiz, prepare_quizzes, quiz_prepare_status, start_quiz_session
 from app.study.recall import check_recall
-from app.study.reviews import build_review_queue, grade_review
+from app.study.reviews import build_review_queue, ensure_chapter_item, grade_review
 from app.study.sessions import fetch_sessions
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     "compute_concept_mastery",
     "compute_forecast",
     "compute_mastery",
+    "ensure_chapter_item",
     "fetch_sessions",
     "grade_drill",
     "grade_exam",

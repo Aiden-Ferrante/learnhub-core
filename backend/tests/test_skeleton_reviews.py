@@ -116,3 +116,49 @@ def test_new_figure_card_is_new_and_keyed_like_its_future_row():
     assert card["due"] is None
     assert card["conceptKey"] == figure_review_key("doc1", 13)
     assert card["signal"] == "Figure 1-1."
+
+
+# ---- chapter-resurface items (seeded by reading; same review envelope) ----
+
+from app.study.reviews import (
+    CHAPTER_KEY_PREFIX,
+    chapter_card,
+    chapter_review_key,
+)
+
+
+def test_chapter_review_key_deterministic_prefixed_and_distinct():
+    a = chapter_review_key("doc1", "toc:1")
+    assert a == chapter_review_key("doc1", "toc:1")
+    assert a.startswith(CHAPTER_KEY_PREFIX)
+    assert chapter_review_key("doc1", "toc:2") != a
+    assert chapter_review_key("doc2", "toc:1") != a
+    # A chapter key never collides with a skeleton key for the same doc+scope.
+    assert a != skeleton_review_key("doc1", "toc:1")
+
+
+def test_chapter_card_shape_and_fallbacks():
+    row = {
+        "key": "chap-abc",
+        "heading": "1 Introduction",
+        "sectionKey": "toc:1",
+        "children": [{"heading": "Language models", "essence": "Token, vocab, masked vs AR"}],
+        "docId": "doc1",
+        "state": "review",
+        "due": 42.0,
+        "ease": 2.5,
+        "stability": 3.1,
+    }
+    card = chapter_card(row)
+    assert card["itemType"] == "chapter"
+    assert card["conceptKey"] == "chap-abc"
+    assert card["name"] == "1 Introduction"
+    assert card["kind"] == "chapter"
+    assert card["children"] == row["children"]
+    assert card["due"] == 42.0
+    # Scheduler internals stay off the card.
+    assert "ease" not in card and "stability" not in card
+
+    bare = chapter_card({"key": "chap-x", "sectionKey": "toc:2"})
+    assert bare["name"] == "toc:2"
+    assert bare["children"] == []

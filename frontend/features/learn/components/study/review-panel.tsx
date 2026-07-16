@@ -141,8 +141,9 @@ export function ReviewPanel({
 
   const isSkeleton = card.itemType === "skeleton"
   const isFigure = card.itemType === "figure"
+  const isChapter = card.itemType === "chapter"
   const kindClass =
-    isSkeleton || isFigure
+    isSkeleton || isFigure || isChapter
       ? "bg-brand/15 text-brand"
       : KIND_STYLES[card.kind] || "bg-muted text-muted-foreground"
 
@@ -169,7 +170,7 @@ export function ReviewPanel({
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold">{card.name}</span>
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
-            {isSkeleton ? "structure" : card.kind}
+            {isSkeleton ? "structure" : isChapter ? "resurface" : card.kind}
           </span>
           {card.state === "new" && (
             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">new</span>
@@ -189,9 +190,11 @@ export function ReviewPanel({
             <p className="text-sm text-muted-foreground">
               {isSkeleton
                 ? "Rebuild this branch from memory — what sits under it, and what does each part say?"
-                : isFigure
-                  ? "What does this figure show?"
-                  : "Recall what this concept means."}
+                : isChapter
+                  ? "You read this chapter a while ago — recall its main threads before they fade."
+                  : isFigure
+                    ? "What does this figure show?"
+                    : "Recall what this concept means."}
             </p>
             <Button onClick={() => setRevealed(true)}>
               Reveal <kbd className="ml-2 rounded bg-muted px-1 text-[10px]">space</kbd>
@@ -209,7 +212,7 @@ export function ReviewPanel({
             )}
             <p className="text-sm font-medium">{card.signal}</p>
           </div>
-        ) : isSkeleton ? (
+        ) : isSkeleton || isChapter ? (
           <ul className="flex-1 space-y-1.5 text-sm">
             {(card.children ?? []).map((c, i) => (
               <li key={i} className="leading-snug">

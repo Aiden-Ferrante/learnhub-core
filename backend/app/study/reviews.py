@@ -10,7 +10,9 @@ so "rebuild this branch from memory" resurfaces on the same SM-2 clock as concep
 The branch's children (headings + essences) are snapshotted on the row at grade time —
 a book's structure is static, and the snapshot lets the review reveal re-show the truth
 without resolving the TOC tree. Figure-recall items (``fig-…``) work the same way:
-front = the image, reveal = the caption.
+front = the image, reveal = the caption. Chapter-resurface items (``chap-…``) are seeded
+by READING (ensure_chapter_item, an implicit first-exposure Good) so everything studied —
+not just quizzed concepts — fades and comes back through the same queue.
 
 Functions here return plain payload dicts (plus an HTTP status for grading);
 the route layer only parses input and wraps JSON.
@@ -87,6 +89,7 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
 
 SKELETON_KEY_PREFIX = "skel-"
 FIGURE_KEY_PREFIX = "fig-"
+CHAPTER_KEY_PREFIX = "chap-"
 
 
 def skeleton_review_key(doc_id: str, section_key: str) -> str:
@@ -125,6 +128,91 @@ def skeleton_card(row: dict[str, Any]) -> dict[str, Any]:
         "state": row.get("state", "review"),
         "due": row.get("due"),
     }
+
+
+def chapter_review_key(doc_id: str, scope: str) -> str:
+    """Deterministic review-row key for a chapter resurface item — reading a chapter enters
+    it into the decay cycle under this key (idempotent per doc + chapter scope)."""
+    digest = hashlib.sha256(f"{doc_id}|chap|{scope}".encode()).hexdigest()[:16]
+    return CHAPTER_KEY_PREFIX + digest
+
+
+def chapter_card(row: dict[str, Any]) -> dict[str, Any]:
+    """A due chapter-resurface card: front = 'what did this chapter cover?', reveal = the
+    chapter's structure snapshot (skeleton headings + essences, or top concepts)."""
+    return {
+        "itemType": "chapter",
+        "conceptKey": row.get("key"),
+        "name": row.get("heading") or row.get("sectionKey"),
+        "kind": "chapter",
+        "signal": "",
+        "children": row.get("children") or [],
+        "sectionKey": row.get("sectionKey"),
+        "docId": row.get("docId"),
+        "state": row.get("state", "review"),
+        "due": row.get("due"),
+    }
+
+
+def _chapter_snapshot(doc_id: str, scope: str) -> tuple[str | None, list[dict[str, str]]]:
+    """(heading, reveal children) for a chapter resurface row: the chapter walk's skeleton
+    if one exists, else the chapter's top concepts as heading/essence pairs."""
+    heading: str | None = None
+    children: list[dict[str, str]] = []
+    with db() as conn:
+        row = conn.execute(
+            "SELECT heading FROM section_content WHERE doc_id = %(d)s AND section_key = %(s)s LIMIT 1",
+            {"d": doc_id, "s": scope},
+        ).fetchone()
+        if row and row.get("heading"):
+            heading = str(row["heading"]).strip() or None
+        skel = conn.execute(
+            "SELECT sections FROM chapter_skeletons WHERE doc_id = %(d)s AND scope = %(s)s LIMIT 1",
+            {"d": doc_id, "s": scope},
+        ).fetchone()
+    if skel and skel.get("sections"):
+        children = clean_skeleton_children(skel["sections"])
+        if not heading and children:
+            heading = children[0]["heading"]
+    if not children:
+        span = scope_section_keys(doc_id, scope)
+        if span:
+            with db() as conn:
+                concepts = conn.execute(
+                    'SELECT name, signal, section_key AS "sectionKey" FROM concepts '
+                    'WHERE doc_id = %(d)s ORDER BY "order"',
+                    {"d": doc_id},
+                ).fetchall()
+            children = [
+                {"heading": c["name"], "essence": (c.get("signal") or "")[:120]}
+                for c in concepts
+                if c.get("sectionKey") in span
+            ][:8]
+    return heading, children
+
+
+def ensure_chapter_item(doc_id: str, scope: str, now: float | None = None) -> bool:
+    """Enter a chapter into the decay cycle on first read: seed a resurface review row with
+    an implicit first-exposure Good (due in a few days). Idempotent — later reads never touch
+    the row (re-reading is not recall; only grading moves the schedule). Returns True when a
+    row was created. Best-effort: never raises into the engagement path."""
+    if not doc_id or not scope:
+        return False
+    now = now or time.time()
+    try:
+        key = chapter_review_key(doc_id, scope)
+        with db() as conn:
+            if conn.execute("SELECT 1 FROM concept_reviews WHERE key = %(k)s", {"k": key}).fetchone():
+                return False
+        heading, children = _chapter_snapshot(doc_id, scope)
+        state = srs.schedule(srs.new_state(now), 3, now)  # reading = first successful exposure
+        with db() as conn:
+            _upsert_review(conn, key, doc_id, scope, state, is_new=True,
+                           extra={"itemType": "chapter", "heading": heading,
+                                  "chapterScope": scope, "children": children or None})
+        return True
+    except Exception:  # noqa: BLE001 — seeding must never break the read path
+        return False
 
 
 def figure_review_key(doc_id: str, order: int) -> str:
@@ -207,16 +295,16 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
             for r in conn.execute(
                 "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
                 "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
-                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'figure'))",
+                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'figure', 'chapter'))",
                 {"doc": doc},
             ).fetchall():
                 reviews[r["key"]] = r
-            # Skeleton (structure-recall) and figure-recall cards.
+            # Skeleton (structure-recall), figure-recall, and chapter-resurface cards.
             typed_rows = conn.execute(
                 'SELECT key, doc_id AS "docId", extract(epoch from due)::float8 AS due, state, '
                 'item_type AS "itemType", chapter_scope AS "chapterScope", section_key AS "sectionKey", '
                 'caption, page, "order", heading, children, figure_order AS "figureOrder" '
-                "FROM concept_reviews WHERE item_type IN ('skeleton', 'figure') "
+                "FROM concept_reviews WHERE item_type IN ('skeleton', 'figure', 'chapter') "
                 "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
                 {"doc": doc},
             ).fetchall()
@@ -229,6 +317,7 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
         ]
         skeleton_rows = [r for r in typed_rows if r.get("itemType") == "skeleton"]
         figure_rows = [r for r in typed_rows if r.get("itemType") == "figure"]
+        chapter_rows = [r for r in typed_rows if r.get("itemType") == "chapter"]
         # Chapter sessions also OFFER the chapter's unseeded captioned figures as new cards.
         new_figures: list[dict[str, Any]] = []
         if doc and span:
@@ -270,6 +359,12 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
             due.append(figure_card(r))
         else:
             later += 1
+    # Chapter resurface items are seeded (never offered as "new") — due only.
+    for r in chapter_rows:
+        if float(r.get("due", 0)) <= now:
+            due.append(chapter_card(r))
+        else:
+            later += 1
     due.sort(key=lambda x: x.get("due") or 0)
     # Deliberate chapter study: all its new concepts, then its unseeded figures.
     served_new = new + new_figures
@@ -287,6 +382,8 @@ def grade_review(body: dict, concept_key: str, grade: int, now: float) -> tuple[
         return _grade_skeleton_item(body, concept_key, grade, now)
     if body.get("figure") or concept_key.startswith(FIGURE_KEY_PREFIX):
         return _grade_figure_item(body, concept_key, grade, now)
+    if concept_key.startswith(CHAPTER_KEY_PREFIX):
+        return _grade_chapter_item(concept_key, grade, now)
     if not concept_key:
         return {"error": "conceptKey and grade (1-4) are required"}, 400
     try:
@@ -376,6 +473,45 @@ def _grade_skeleton_item(body: dict, concept_key: str, grade: int, now: float) -
     )
     return {
         "conceptKey": key,
+        "due": next_state["due"],
+        "intervalDays": next_state["interval"],
+        "state": next_state["state"],
+    }, 200
+
+
+def _grade_chapter_item(concept_key: str, grade: int, now: float) -> tuple[dict[str, Any], int]:
+    """Advance one chapter-resurface item and log a ``resurface`` study event. Rows are only
+    ever created by ``ensure_chapter_item`` (reading), so grades always address an existing
+    ``chap-…`` key from the queue."""
+    try:
+        with db() as conn:
+            existing = conn.execute(
+                _REVIEW_STATE_SELECT.replace(
+                    " FROM concept_reviews",
+                    ', doc_id AS "docId", section_key AS "sectionKey", heading FROM concept_reviews',
+                ) + " WHERE key = %(k)s",
+                {"k": concept_key},
+            ).fetchone()
+        if not existing:
+            return {"error": "unknown chapter item"}, 404
+        doc_id = existing.get("docId")
+        section_key = existing.get("sectionKey")
+        next_state = srs.schedule(existing, grade, now)
+        with db() as conn:
+            _upsert_review(conn, concept_key, doc_id, section_key, next_state, is_new=False,
+                           extra={"itemType": "chapter"})
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}, 500
+
+    record_quiz_event(
+        section_key,
+        correct=(grade >= 3),
+        doc=doc_id,
+        stem=existing.get("heading") or section_key,
+        kind="resurface",
+    )
+    return {
+        "conceptKey": concept_key,
         "due": next_state["due"],
         "intervalDays": next_state["interval"],
         "state": next_state["state"],

@@ -23,6 +23,7 @@ from app.study import (
     compute_calibration,
     compute_forecast,
     compute_mastery,
+    ensure_chapter_item,
     record_engagement,
 )
 
@@ -87,6 +88,9 @@ def api_engagement(body: dict = Body(default=None)) -> JSONResponse:
     scope = body.get("scope")
     if kind and scope:
         record_engagement(kind, scope, doc=body.get("doc"), concept_key=body.get("conceptKey"))
+        # Reading a chapter enters it into the decay cycle (idempotent, best-effort).
+        if kind == "read" and body.get("doc"):
+            ensure_chapter_item(str(body["doc"]), str(scope))
     return JSONResponse({"ok": True})
 
 

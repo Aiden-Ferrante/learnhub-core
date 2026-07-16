@@ -19,9 +19,10 @@ export type ReviewCard = {
   pageEnd?: number | null
   /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
    *  seeded by the chapter walk's self-grades. 'figure' = a figure-recall card (image front,
-   *  caption reveal), seeded by chapter-scoped review. Absent/'concept' = a concept card. */
-  itemType?: 'concept' | 'skeleton' | 'figure'
-  /** Skeleton cards only: the branch's true children, snapshotted at walk time. */
+   *  caption reveal), seeded by chapter-scoped review. 'chapter' = a chapter-resurface card
+   *  (recall what the chapter covered), seeded by reading. Absent/'concept' = a concept card. */
+  itemType?: 'concept' | 'skeleton' | 'figure' | 'chapter'
+  /** Skeleton/chapter cards only: the true structure snapshot for the reveal. */
   children?: { heading: string; essence?: string }[]
   /** Figure cards only: the figure's reading-order n for /api/learn/figure. */
   figureOrder?: number | null
