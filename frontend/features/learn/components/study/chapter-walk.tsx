@@ -7,6 +7,7 @@ import { SectionConceptsPanel } from "@/features/learn/components/concepts/secti
 import { fetchSkeleton, gradeSkeleton, type SkeletonGrade } from "@/features/learn/api/chapter"
 import { buildChapterWalk, findNodeBySectionKey, numberSections, numberedSectionTitle, type LearnTreeNode } from "@/features/learn/api/outline"
 import { submitSkeletonReviewGrade, type ReviewGrade } from "@/features/learn/api/review"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 
 type ChapterWalkProps = {
   /** The chapter section key in scope. */
@@ -223,22 +224,15 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
 
   // → reveals a skeleton step; on concept steps it advances. A revealed skeleton step waits for
   // a self-grade click (kept off inputs the panels use).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowRight" || e.metaKey || e.ctrlKey || e.altKey) return
-      const t = e.target as HTMLElement | null
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
-      if (t && t.isContentEditable) return
-      e.preventDefault()
-      if (step?.kind === "skeleton") {
-        if (!revealed) setRevealed(true)
-      } else {
-        goNext()
-      }
+  useStudyHotkeys((e) => {
+    if (e.key !== "ArrowRight" || e.metaKey || e.ctrlKey || e.altKey) return
+    e.preventDefault()
+    if (step?.kind === "skeleton") {
+      if (!revealed) setRevealed(true)
+    } else {
+      goNext()
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [step, revealed, goNext])
+  })
 
   const onRecallChange = (v: string) => {
     setRecall(v)

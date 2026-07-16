@@ -5,7 +5,10 @@ import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-markdown"
-import { fetchQuizPrepareStatus, prepareQuizQuestions, startConceptQuiz, submitConceptAnswer, type ConceptQuizResult, type ConceptQuizSession, type QuizPrepareStatus } from "@/features/learn/api/quiz"
+import { fetchQuizPrepareStatus, prepareQuizQuestions, type QuizPrepareStatus } from "@/features/learn/api/quiz"
+import { QuizChoiceList } from "@/features/learn/components/study/quiz-choice-list"
+import { useConceptQuizSession } from "@/features/learn/components/study/use-concept-quiz"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 import { usePolling } from "@/hooks/use-polling"
 
 /** Deterministic concept MCQ: "which concept does this description match?", distractors are
@@ -19,23 +22,7 @@ export function ConceptQuizPanel({
   docId?: string
   onAnswered?: () => void
 }) {
-  const [session, setSession] = useState<ConceptQuizSession | null>(null)
-  const [picked, setPicked] = useState<number | null>(null)
-  const [result, setResult] = useState<ConceptQuizResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const start = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setPicked(null)
-    setSession(null)
-    startConceptQuiz(scope, docId)
-      .then((s) => (s.error ? setError(s.error) : setSession(s)))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to start quiz"))
-      .finally(() => setLoading(false))
-  }, [scope, docId])
+  const { session, picked, result, loading, error, start, answer } = useConceptQuizSession(scope, docId, onAnswered)
 
   useEffect(() => {
     start()
@@ -68,42 +55,19 @@ export function ConceptQuizPanel({
   }, [autoKicked, prep, scope, docId])
   usePolling(loadStatus, prep?.running ? 5000 : null)
 
-  const answer = useCallback(
-    (i: number) => {
-      if (!session || result) return
-      setPicked(i)
-      submitConceptAnswer(session.sessionId, i)
-        .then((r) => {
-          if (r.error) setError(r.error)
-          else {
-            setResult(r)
-            onAnswered?.()
-          }
-        })
-        .catch((e) => setError(e instanceof Error ? e.message : "Failed to submit"))
-    },
-    [session, result, onAnswered],
-  )
-
   // Keyboard: 1-9 pick a choice; Enter advances after answering.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return
-      if (result && e.key === "Enter") {
+  useStudyHotkeys((e) => {
+    if (result && e.key === "Enter") {
+      e.preventDefault()
+      start()
+    } else if (session && !result && /^[1-9]$/.test(e.key)) {
+      const i = Number(e.key) - 1
+      if (i < session.choices.length) {
         e.preventDefault()
-        start()
-      } else if (session && !result && /^[1-9]$/.test(e.key)) {
-        const i = Number(e.key) - 1
-        if (i < session.choices.length) {
-          e.preventDefault()
-          answer(i)
-        }
+        answer(i)
       }
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [session, result, answer, start])
+  })
 
   if (loading) return <p className="p-4 text-sm text-muted-foreground">Building a question…</p>
   if (error)
@@ -136,31 +100,7 @@ export function ConceptQuizPanel({
 
       <ConceptMarkdown content={session.stem} className="text-sm" />
 
-      <div className="grid gap-2">
-        {session.choices.map((c, i) => {
-          const isCorrect = result && c === result.expected
-          const isPicked = picked === i
-          const cls = !result
-            ? "border-border hover:border-brand/50"
-            : isCorrect
-              ? "border-emerald-500/60 bg-emerald-500/10"
-              : isPicked
-                ? "border-rose-500/60 bg-rose-500/10"
-                : "border-border opacity-60"
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={!!result}
-              onClick={() => answer(i)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${cls}`}
-            >
-              <kbd className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{i + 1}</kbd>
-              <span>{c}</span>
-            </button>
-          )
-        })}
-      </div>
+      <QuizChoiceList choices={session.choices} picked={picked} result={result} onPick={answer} />
 
       {result && (
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">

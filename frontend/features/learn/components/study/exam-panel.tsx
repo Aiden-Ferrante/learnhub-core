@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { AnswerFeedback } from "@/features/learn/components/study/answer-feedback"
 import { cn } from "@/lib/utils"
 import { gradeExam, startExam, type ExamGradeResponse, type ExamQuestion, type ExamStartResponse } from "@/features/learn/api/quiz"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 
 type ExamPanelProps = {
   scope: string | null
@@ -84,22 +85,15 @@ export function ExamPanel({ scope, docId, onGraded, onDrillMisses, onLockIn }: E
     [questions, sessionId, answers, idx, onGraded],
   )
 
-  // Number keys 1-9 answer the current question (guard inputs).
-  useEffect(() => {
-    if (!questions || result || busy) return
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable) return
-      const n = Number(e.key)
-      const choices = questions[idx]?.choices.length ?? 0
-      if (Number.isInteger(n) && n >= 1 && n <= choices) {
-        e.preventDefault()
-        answer(n - 1)
-      }
+  // Number keys 1-9 answer the current question.
+  useStudyHotkeys((e) => {
+    const n = Number(e.key)
+    const choices = questions?.[idx]?.choices.length ?? 0
+    if (Number.isInteger(n) && n >= 1 && n <= choices) {
+      e.preventDefault()
+      answer(n - 1)
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [questions, idx, result, busy, answer])
+  }, Boolean(questions && !result && !busy))
 
   if (!scope) {
     return <p className="p-6 text-sm text-muted-foreground">Open a chapter to take its exam.</p>

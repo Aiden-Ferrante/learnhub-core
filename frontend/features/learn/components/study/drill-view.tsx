@@ -7,6 +7,7 @@ import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-ma
 import { fetchCalibration, type CalibrationResponse } from "@/features/learn/api/progress"
 import { gradeDrill, startDrill, type Confidence, type DrillGradeResponse, type ExamQuestion } from "@/features/learn/api/quiz"
 import { cn } from "@/lib/utils"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 
 const CONF: { value: Confidence; label: string }[] = [
   { value: "guess", label: "Guessing" },
@@ -93,25 +94,19 @@ export function DrillView({ scope, docId, onBack, onDone }: DrillViewProps) {
     [questions, result, busy, pending, answers, confidences, idx, sessionId, onDone, docId],
   )
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!questions || result || busy) return
-      const t = e.target as HTMLElement | null
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
-      if (pending === null && /^[1-9]$/.test(e.key)) {
-        const i = Number(e.key) - 1
-        if (i < (questions[idx]?.choices.length ?? 0)) {
-          e.preventDefault()
-          setPending(i)
-        }
-      } else if (pending !== null && /^[1-3]$/.test(e.key)) {
+  useStudyHotkeys((e) => {
+    if (!questions || result || busy) return
+    if (pending === null && /^[1-9]$/.test(e.key)) {
+      const i = Number(e.key) - 1
+      if (i < (questions[idx]?.choices.length ?? 0)) {
         e.preventDefault()
-        commit(CONF[Number(e.key) - 1].value)
+        setPending(i)
       }
+    } else if (pending !== null && /^[1-3]$/.test(e.key)) {
+      e.preventDefault()
+      commit(CONF[Number(e.key) - 1].value)
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [questions, idx, result, busy, pending, commit])
+  })
 
   const header = (
     <div className="space-y-1.5">

@@ -7,6 +7,7 @@ import { ConceptMarkdown } from "@/features/learn/components/concepts/concept-ma
 import { SectionFigures } from "@/features/learn/components/reader/section-figures"
 import { figureUrl } from "@/features/learn/api/content"
 import { fetchReviewQueue, submitFigureReviewGrade, submitReviewGrade, type ReviewCard, type ReviewGrade, type ReviewQueueResponse } from "@/features/learn/api/review"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 
 const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
   { grade: 1, label: "Again", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
@@ -94,22 +95,16 @@ export function ReviewPanel({
   )
 
   // Keyboard: space/enter reveals; 1-4 grade once revealed.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return
-      if (!card) return
-      if (!revealed && (e.key === " " || e.key === "Enter")) {
-        e.preventDefault()
-        setRevealed(true)
-      } else if (revealed && ["1", "2", "3", "4"].includes(e.key)) {
-        e.preventDefault()
-        grade(Number(e.key) as ReviewGrade)
-      }
+  useStudyHotkeys((e) => {
+    if (!card) return
+    if (!revealed && (e.key === " " || e.key === "Enter")) {
+      e.preventDefault()
+      setRevealed(true)
+    } else if (revealed && ["1", "2", "3", "4"].includes(e.key)) {
+      e.preventDefault()
+      grade(Number(e.key) as ReviewGrade)
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [card, revealed, grade])
+  })
 
   if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading review queue…</p>
   if (error) return <p className="p-4 text-sm text-destructive">{error}</p>

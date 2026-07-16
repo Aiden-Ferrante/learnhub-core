@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { fetchSectionConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
-import { startConceptQuiz, submitConceptAnswer, type ConceptQuizResult, type ConceptQuizSession } from "@/features/learn/api/quiz"
+import { QuizChoiceList } from "@/features/learn/components/study/quiz-choice-list"
+import { useConceptQuizSession } from "@/features/learn/components/study/use-concept-quiz"
+import { useStudyHotkeys } from "@/features/learn/hooks/use-study-hotkeys"
 
 const QUICK_CHECK_QUESTIONS = 2
 
@@ -26,24 +28,20 @@ function ConceptQuickCheck({
   onAnswered?: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [session, setSession] = useState<ConceptQuizSession | null>(null)
-  const [picked, setPicked] = useState<number | null>(null)
-  const [result, setResult] = useState<ConceptQuizResult | null>(null)
   const [answered, setAnswered] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const nextQuestion = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setPicked(null)
-    setSession(null)
-    startConceptQuiz(scope, docId)
-      .then((s) => (s.error ? setError(s.error) : setSession(s)))
-      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't build a check"))
-      .finally(() => setLoading(false))
-  }, [scope, docId])
+  const onQuizAnswered = useCallback(() => {
+    setAnswered((n) => n + 1)
+    onAnswered?.()
+  }, [onAnswered])
+  const {
+    session,
+    picked,
+    result,
+    loading,
+    error,
+    start: nextQuestion,
+    answer: choose,
+  } = useConceptQuizSession(scope, docId, onQuizAnswered)
 
   const begin = () => {
     setOpen(true)
@@ -51,44 +49,23 @@ function ConceptQuickCheck({
     nextQuestion()
   }
 
-  const choose = (i: number) => {
-    if (!session || result) return
-    setPicked(i)
-    submitConceptAnswer(session.sessionId, i)
-      .then((r) => {
-        if (r.error) {
-          setError(r.error)
-          return
-        }
-        setResult(r)
-        setAnswered((n) => n + 1)
-        onAnswered?.()
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to submit"))
-  }
-
   const finished = answered >= QUICK_CHECK_QUESTIONS && !!result
 
   // Keyboard: 1-9 pick a choice; Enter advances to the next question (matches the kbd hints).
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
-      if (session && !result && /^[1-9]$/.test(e.key)) {
-        const i = Number(e.key) - 1
-        if (i < session.choices.length) {
-          e.preventDefault()
-          choose(i)
-        }
-      } else if (result && !finished && e.key === "Enter") {
+  // useStudyHotkeys registers ONCE — the old inline listener re-registered every render
+  // because `choose` wasn't memoized.
+  useStudyHotkeys((e) => {
+    if (session && !result && /^[1-9]$/.test(e.key)) {
+      const i = Number(e.key) - 1
+      if (i < session.choices.length) {
         e.preventDefault()
-        nextQuestion()
+        choose(i)
       }
+    } else if (result && !finished && e.key === "Enter") {
+      e.preventDefault()
+      nextQuestion()
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, session, result, finished, choose, nextQuestion])
+  }, open)
 
   if (!open) {
     return (
@@ -138,36 +115,7 @@ function ConceptQuickCheck({
       ) : session ? (
         <div className="flex flex-col gap-2">
           <ConceptMarkdown content={session.stem} className="text-sm" />
-          <div className="grid gap-1.5">
-            {session.choices.map((c, i) => {
-              const isCorrect = result && c === result.expected
-              const isPicked = picked === i
-              const cls = !result
-                ? "border-border hover:border-brand/50"
-                : isCorrect
-                  ? "border-emerald-500/60 bg-emerald-500/10"
-                  : isPicked
-                    ? "border-rose-500/60 bg-rose-500/10"
-                    : "border-border opacity-60"
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={!!result}
-                  onClick={() => choose(i)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors",
-                    cls,
-                  )}
-                >
-                  <kbd className="rounded bg-muted px-1 text-[10px] text-muted-foreground">
-                    {i + 1}
-                  </kbd>
-                  <span>{c}</span>
-                </button>
-              )
-            })}
-          </div>
+          <QuizChoiceList choices={session.choices} picked={picked} result={result} onPick={choose} size="sm" />
           {result && (
             <div className="flex flex-col gap-2 pt-0.5">
               <div className="flex items-center justify-between gap-2">
