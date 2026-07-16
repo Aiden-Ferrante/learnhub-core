@@ -60,6 +60,27 @@ frontend/
    app/page.tsx#default in the React Client Manifest"; fixed in 15.2.9, but the explicit
    imports are the better design regardless.)
 
+## Identifiers — `Course.id` vs `Course.learnDocId`
+
+A course carries **two** ids and they are not interchangeable:
+
+- **`Course.id`** (= `app_documents.id`, = `app_documents.key`) — the app-document-id. It is
+  what appears in the URL `/courses/<id>` and identifies the course card.
+- **`Course.learnDocId`** (= `app_documents.learn_doc_id`, = the backend's `documents.key`) —
+  the learn-doc-key. **Everything the learn backend serves — outline, concepts, mastery,
+  reviews, chapters — is keyed by this**, exposed to the proxy routes as `?doc=…`.
+
+So any call into the learn API keys by the learn-doc-key, with a fallback for legacy rows
+that never got one:
+
+```ts
+const docKey = course.learnDocId ?? course.id   // the one resolution, do it once
+```
+
+That `?? course.id` fallback exists because early `app_documents` rows used the app id
+directly as the learn key (no separate `learn_doc_id`). New uploads always set both. When you
+add a study/content call, key it by `learnDocId ?? id` — never by `id` alone.
+
 ## Where does new code go?
 
 | You are adding… | It goes in… |

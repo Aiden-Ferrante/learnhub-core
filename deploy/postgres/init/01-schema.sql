@@ -71,6 +71,9 @@ CREATE TABLE concept_reviews (
   stability real, difficulty real, step int);
 CREATE INDEX ON concept_reviews (doc_id, due);
 
+-- NOTE: `doc` here is the learn-doc-key (= documents.key = every other table's `doc_id`).
+-- It is spelled `doc` rather than `doc_id` for historical reasons; see ARCHITECTURE.md
+-- "Identifiers". Same value, different column name — the one naming wart in the schema.
 CREATE TABLE study_events (
   key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc text, section_key text, concept_key text,
   kind text, correct boolean, ts timestamptz,

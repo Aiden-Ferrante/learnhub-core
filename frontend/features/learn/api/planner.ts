@@ -51,9 +51,11 @@ export type SessionsResponse = {
   error?: string
 }
 
-export async function fetchSessions(days = 90, doc?: string): Promise<SessionsResponse> {
+// `docId` is the learn-doc-key (course.learnDocId), matching the rest of features/learn/api;
+// it becomes the backend's ?doc= query param. See frontend ARCHITECTURE.md "Identifiers".
+export async function fetchSessions(days = 90, docId?: string): Promise<SessionsResponse> {
   const params = new URLSearchParams({ days: String(days) })
-  if (doc) params.set('doc', doc)
+  if (docId) params.set('doc', docId)
   const res = await fetch(`/api/learn/study-sessions?${params}`, { cache: 'no-store' })
   return parseJsonResponse<SessionsResponse>(res)
 }

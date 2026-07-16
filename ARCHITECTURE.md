@@ -56,6 +56,27 @@ work — conversion, extraction, every enrichment pass, and audiobook TTS — ru
 job systems. An upload auto-chains to core extraction (`LEARN_AUTOCHAIN`, default on), so a
 converted document becomes studyable without a manual build. See [MAP.md](MAP.md) § 4.
 
+## Identifiers — the two document ids
+
+There are **two** ids for a document and they are not interchangeable. Confusing them is the
+single easiest way to get an empty result from a query that "should" work.
+
+| Name | Where it lives | Used for |
+|---|---|---|
+| **learn-doc-key** | `documents.key` (PK). Every backend table references it as `doc_id` — `concepts`, `section_content`, `elements`, `concept_reviews`, `chapter_*`, `content_vectors`, … | The canonical id in the backend. Every content/study/enrichment row is keyed by it. |
+| **app-document-id** | `app_documents.key` = `app_documents.id` (same value) | The frontend's id for a course card and the id in the URL `/courses/<id>`. Backend content code never sees it. |
+
+The bridge is one column: **`app_documents.learn_doc_id → documents.key`**. The frontend
+resolves it before any content/study call (see the frontend ARCHITECTURE's Identifiers note).
+
+**Backend parameter convention:** a parameter named `doc` or `doc_id` is *always* the
+**learn-doc-key**, never the app id. Both spellings mean the same thing — `doc_id` matches the
+column, `doc` is the HTTP query-string key (`?doc=…`) threaded through the study read-models.
+The one column wart is `study_events.doc` (named `doc`, not `doc_id`, for historical reasons —
+annotated in `01-schema.sql`); it still holds the learn-doc-key. A blanket rename was
+deliberately *not* done — the names are consistent within each scope, and `?doc=` / the columns
+are external contracts; this table is the disambiguator instead.
+
 ## Conventions
 
 - New backend code goes in the domain package it belongs to; if a route handler grows
