@@ -12,9 +12,16 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from app.platform import db
-from app.study import fetch_sessions
+from app.study import build_review_calendar, fetch_sessions
 
 router = APIRouter()
+
+
+@router.get("/api/review-calendar")
+def api_review_calendar(days: int = Query(60, ge=1, le=365)) -> dict[str, Any]:
+    """Whole-library review calendar: per-day due counts (per course, per item type) over
+    the horizon, plus the overdue pile. Powers the /study planner."""
+    return build_review_calendar(days=days)
 
 
 @router.get("/api/study/sessions")

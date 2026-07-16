@@ -194,6 +194,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`exam.py`](backend/app/study/exam.py) | Exam mode (multi-question scoring) |
 | [`recall.py`](backend/app/study/recall.py) | Recall vs. recognition check |
 | [`sessions.py`](backend/app/study/sessions.py) | _(describe me)_ |
+| [`calendar.py`](backend/app/study/calendar.py) | _(describe me)_ |
 
 ### search/ — embeddings + semantic search
 
