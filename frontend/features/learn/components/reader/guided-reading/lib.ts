@@ -136,3 +136,11 @@ export function numberOutlineItems(
     return { ...it, num }
   })
 }
+
+/** Epoch seconds for the next 2:00 AM — the "build tonight" schedule slot. */
+export function nextNightEpoch(): number {
+  const d = new Date()
+  d.setHours(2, 0, 0, 0)
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+  return Math.floor(d.getTime() / 1000)
+}

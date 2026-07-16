@@ -45,27 +45,25 @@ import { type CourseChapter } from "@/features/learn/lib/toc"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
-import { fetchCourseChapters, fetchGuidedReading, type GuidedReadingResponse } from "@/features/learn/api/chapter"
-import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
-import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
-import { fetchConceptMastery, recordEngagement, type ConceptMastery } from "@/features/learn/api/progress"
-import { fetchReviewQueue } from "@/features/learn/api/review"
+import { flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
+import { recordEngagement } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 import {
   DRAWER_TITLES,
   HALF_MEASURE,
   KIND_COLOR,
-  guidedChapters,
   layoutNotes,
   numberOutlineItems,
   relevelHeadings,
   resolveGuidedChapter,
   type MarginNote,
   type StudyDrawer,
+  nextNightEpoch,
 } from "./lib"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
 import { useChapterPath } from "./use-chapter-path"
+import { useGuidedReadingData } from "./use-guided-reading-data"
 import { useReaderScroll } from "./use-reader-scroll"
 
 type GuidedReadingProps = {
@@ -115,17 +113,29 @@ export function GuidedReading({
   const docId = course.learnDocId ?? course.id
   const [theme] = useReadingTheme()
   const [prefs, setPrefs] = useReadingPrefs()
-  const [outline, setOutline] = useState<OutlineEntry[]>([])
-  const [outlineReady, setOutlineReady] = useState(false)
   const [chapterKey, setChapterKey] = useState<string | null>(null)
-  const [data, setData] = useState<GuidedReadingResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [preparing, setPreparing] = useState(false)
-  const [masteryByKey, setMasteryByKey] = useState<Record<string, ConceptMastery>>({})
-  const [masteredThreshold, setMasteredThreshold] = useState(0.75)
-  const [dueCount, setDueCount] = useState(0)
-  const [readiness, setReadiness] = useState<Record<string, ChapterReadiness>>({})
+  // Everything fetched — outline, chapters, the chapter payload (+ prepare poll),
+  // readiness (+ build poll), build actions, and the mastery layer.
+  const {
+    outline,
+    outlineReady,
+    chapters,
+    data,
+    loading,
+    error,
+    preparing,
+    load,
+    readiness,
+    currentBuild,
+    building,
+    queuedBuild,
+    startBuild,
+    cancelBuildJob,
+    masteryByKey,
+    masteredThreshold,
+    dueCount,
+    refreshMastery,
+  } = useGuidedReadingData(docId, chapterKey, tree)
   // Path stepper: the chapter's stage machine (orient/read/skeleton/quizzes/exam/lockin);
   // chapter_progress is the same store the old lesson flow wrote, so history carries over.
   const { stages, loadProgress, markStage, noteQuizAnswer } = useChapterPath(chapterKey, docId)
@@ -203,39 +213,6 @@ export function GuidedReading({
     return () => mq.removeEventListener("change", sync)
   }, [])
 
-  // Chapter list: numbered outline chapters where available (see guidedChapters).
-  useEffect(() => {
-    let alive = true
-    fetchOutline(docId)
-      .then((o) => alive && setOutline(o.outline || []))
-      .catch(() => {})
-      .finally(() => alive && setOutlineReady(true))
-    return () => {
-      alive = false
-    }
-  }, [docId])
-
-  // Canonical chapter list from /api/chapters — the SAME derivation the dashboard
-  // tree and the Today plan use. The outline-rule fallback only covers the moment
-  // before the fetch lands (or a backend error).
-  const [canonChapters, setCanonChapters] = useState<CourseChapter[] | null>(null)
-  useEffect(() => {
-    let alive = true
-    fetchCourseChapters(docId)
-      .then((r) => {
-        if (alive && r.chapters?.length) setCanonChapters(r.chapters.map((c) => ({ key: c.key, title: c.title })))
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [docId])
-
-  const chapters = useMemo(
-    () => canonChapters ?? guidedChapters(outline, tree),
-    [canonChapters, outline, tree],
-  )
-
   // Within-chapter outline from the SAME tree + numbering the dashboard renders.
   const treeOutline = useMemo(
     () => (chapterKey ? flattenChapterOutline(tree, chapterKey) : []),
@@ -251,116 +228,13 @@ export function GuidedReading({
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
 
-  // Per-chapter readiness ladder (raw → partial → deep) + any build jobs.
-  const loadReadiness = useCallback(async () => {
-    if (chapters.length === 0) return
-    try {
-      const r = await fetchChaptersReadiness(docId, chapters.map((c) => c.key))
-      setReadiness(r.chapters || {})
-    } catch {
-      // readiness is supplementary — never break the reader
-    }
-  }, [docId, chapters])
-
+  // Chapter switch: close transient UI (popover/drawer/notes/chip cloud).
   useEffect(() => {
-    loadReadiness()
-  }, [loadReadiness])
-
-  const currentBuild = chapterKey ? readiness[chapterKey]?.build ?? null : null
-  const building = currentBuild?.status === "running"
-  const queuedBuild = currentBuild?.status === "queued"
-  const anyBuildActive = useMemo(
-    () =>
-      Object.values(readiness).some(
-        (r) => r.build && (r.build.status === "queued" || r.build.status === "running"),
-      ),
-    [readiness],
-  )
-
-  // Keep the ladder live while anything is queued/building, and reload the open
-  // chapter the moment its own build lands.
-  useEffect(() => {
-    if (!anyBuildActive) return
-    const t = setInterval(loadReadiness, 10000)
-    return () => clearInterval(t)
-  }, [anyBuildActive, loadReadiness])
-
-  const prevBuildStatus = useRef<string | null>(null)
-  useEffect(() => {
-    const s = currentBuild?.status ?? null
-    if (prevBuildStatus.current === "running" && s !== "running") load()
-    prevBuildStatus.current = s
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBuild?.status])
-
-  const nextNightEpoch = () => {
-    const d = new Date()
-    d.setHours(2, 0, 0, 0)
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-    return Math.floor(d.getTime() / 1000)
-  }
-
-  const startBuild = async (at?: number | null) => {
-    if (!chapterKey) return
-    try {
-      await enqueueChapterBuild(docId, chapterKey, at)
-    } catch {
-      // surfaced via readiness on the next poll
-    }
-    loadReadiness()
-  }
-
-  const cancelBuildJob = async () => {
-    if (!chapterKey) return
-    try {
-      await cancelChapterBuild(docId, chapterKey)
-    } catch {
-      // ignore
-    }
-    loadReadiness()
-  }
-
-  const refreshMastery = useCallback(() => {
-    fetchConceptMastery(docId)
-      .then((r) => {
-        setMasteryByKey(r.byConcept || {})
-        if (r.masteredThreshold) setMasteredThreshold(r.masteredThreshold)
-      })
-      .catch(() => {})
-    if (chapterKey) {
-      fetchReviewQueue(docId, chapterKey, 1)
-        .then((r) => setDueCount(r.counts?.due ?? 0))
-        .catch(() => {})
-    }
-  }, [docId, chapterKey])
-
-  useEffect(() => {
-    refreshMastery()
-  }, [refreshMastery])
-
-  const load = useCallback(async () => {
-    if (!chapterKey) return
-    setLoading(true)
-    setError(null)
-    try {
-      const d = await fetchGuidedReading(docId, chapterKey)
-      setData(d)
-      setPreparing(Boolean(d.status?.running))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load chapter")
-    } finally {
-      setLoading(false)
-    }
-  }, [docId, chapterKey])
-
-  useEffect(() => {
-    setData(null)
     setActive(null)
     setDrawer(null)
     setNotes([])
     setAllChips(false)
-    load()
-  }, [load])
+  }, [docId, chapterKey])
 
   // Scroll: persist/restore, progress %, resumed chip, scroll-spy, read soft gate.
   const {
@@ -411,22 +285,6 @@ export function GuidedReading({
       // storage unavailable
     }
   }
-
-  // Poll while a prepare/build pass runs so explanations stream in as they finish.
-  useEffect(() => {
-    if (!preparing && !building) return
-    const t = setInterval(async () => {
-      if (!chapterKey) return
-      try {
-        const d = await fetchGuidedReading(docId, chapterKey)
-        setData(d)
-        if (!d.status?.running) setPreparing(false)
-      } catch {
-        setPreparing(false)
-      }
-    }, 6000)
-    return () => clearInterval(t)
-  }, [preparing, building, docId, chapterKey])
 
   const goChapter = (key: string) => {
     setChapterKey(key)
