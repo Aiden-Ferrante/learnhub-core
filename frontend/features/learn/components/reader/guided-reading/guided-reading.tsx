@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { EmptyState } from "@/components/patterns/empty-state"
 import { MarkdownReader, MathText } from "@/features/learn/components/reader/markdown-reader"
-import { useToast } from "@/hooks/use-toast"
 import { ReadingThemeToggle } from "@/features/learn/components/reader/reading-theme-toggle"
 import { ReadingControls } from "@/features/learn/components/reader/reading-controls"
 import { ConceptMasteryDot } from "@/features/learn/components/concepts/concept-mastery-dot"
@@ -39,14 +38,14 @@ import { ChapterWalk } from "@/features/learn/components/study/chapter-walk"
 import { LockInPanel } from "@/features/learn/components/study/lockin-panel"
 import { LessonPanel } from "@/features/learn/components/study/lesson-panel"
 import { AudiobookPanel } from "@/features/learn/components/reader/audiobook-panel"
-import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/features/learn/lib/learn-path"
+import { PATH_STAGES, firstIncompleteStage } from "@/features/learn/lib/learn-path"
 import {
 } from "@/features/learn/components/reader/chapter-reader"
 import { type CourseChapter } from "@/features/learn/lib/toc"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
-import { fetchChapterProgress, fetchCourseChapters, fetchGuidedReading, updateChapterStage, type GuidedReadingResponse } from "@/features/learn/api/chapter"
+import { fetchCourseChapters, fetchGuidedReading, type GuidedReadingResponse } from "@/features/learn/api/chapter"
 import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
 import { fetchConceptMastery, recordEngagement, type ConceptMastery } from "@/features/learn/api/progress"
@@ -66,6 +65,7 @@ import {
   type StudyDrawer,
 } from "./lib"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
+import { useChapterPath } from "./use-chapter-path"
 import { useReaderScroll } from "./use-reader-scroll"
 
 type GuidedReadingProps = {
@@ -126,10 +126,9 @@ export function GuidedReading({
   const [masteredThreshold, setMasteredThreshold] = useState(0.75)
   const [dueCount, setDueCount] = useState(0)
   const [readiness, setReadiness] = useState<Record<string, ChapterReadiness>>({})
-  // Path rail: {stageKey: done} from chapter_progress — the same store the old
-  // lesson flow wrote, so history carries over.
-  const [stages, setStages] = useState<Record<string, boolean>>({})
-  const { toast } = useToast()
+  // Path stepper: the chapter's stage machine (orient/read/skeleton/quizzes/exam/lockin);
+  // chapter_progress is the same store the old lesson flow wrote, so history carries over.
+  const { stages, loadProgress, markStage, noteQuizAnswer } = useChapterPath(chapterKey, docId)
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   // Briefing concept-chip cloud: capped at 8 until expanded.
   const [allChips, setAllChips] = useState(false)
@@ -172,8 +171,6 @@ export function GuidedReading({
   const rootRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const briefingRef = useRef<HTMLDivElement>(null)
-  // Soft-gate counter for the quiz stage (nothing else reports it).
-  const quizAnswers = useRef(0)
   const headingEls = useRef<HTMLElement[]>([])
 
   const paper = theme === "paper"
@@ -253,44 +250,6 @@ export function GuidedReading({
     const resolved = resolveGuidedChapter(chapters, tree, scope)
     if (resolved) setChapterKey(resolved)
   }, [chapterKey, outlineReady, chapters, tree, scope])
-
-  // Path progress for the open chapter (orient/read/skeleton/quizzes/exam/lockin).
-  const loadProgress = useCallback(async () => {
-    if (!chapterKey) return
-    try {
-      const p = await fetchChapterProgress(chapterKey, docId)
-      setStages(doneMap(p.stages))
-    } catch {
-      // progress is supplementary — never break the reader
-    }
-  }, [chapterKey, docId])
-
-  useEffect(() => {
-    setStages({})
-    quizAnswers.current = 0
-    loadProgress()
-  }, [loadProgress])
-
-  const markStage = useCallback(
-    (key: string) => {
-      if (!chapterKey) return
-      // Announce the flip — the rail's checkmark alone is easy to miss, and "what now?"
-      // is the question every stage completion raises.
-      if (!stages[key]) {
-        const i = PATH_STAGES.findIndex((p) => p.key === key)
-        const next = PATH_STAGES[i + 1]
-        toast({
-          title: `${PATH_STAGES[i]?.label ?? key} complete ✓`,
-          description: next ? `Next: ${next.label} — ${next.lead}` : "Chapter path complete.",
-        })
-      }
-      setStages((s) => ({ ...s, [key]: true }))
-      updateChapterStage(chapterKey, docId, key, { done: true })
-        .then(() => loadProgress())
-        .catch(() => {})
-    },
-    [chapterKey, docId, loadProgress, stages, toast],
-  )
 
   // Per-chapter readiness ladder (raw → partial → deep) + any build jobs.
   const loadReadiness = useCallback(async () => {
@@ -1293,8 +1252,7 @@ export function GuidedReading({
                 onAnswered={() => {
                   refreshMastery()
                   // Quizzes soft gate: a real round of retrieval marks the stage.
-                  quizAnswers.current += 1
-                  if (quizAnswers.current >= 5 && !stages.quizzes) markStage("quizzes")
+                  noteQuizAnswer()
                 }}
               />
             )}
