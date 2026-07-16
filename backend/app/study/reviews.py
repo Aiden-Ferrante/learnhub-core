@@ -32,6 +32,7 @@ from app.study.mastery import record_quiz_event
 # Read a review row into an srs state dict (epoch floats; camelCase keys srs/schedule expect).
 _REVIEW_STATE_SELECT = (
     'SELECT extract(epoch from due)::float8 AS due, interval, ease, reps, lapses, state, '
+    'stability, difficulty, step, '
     'last_grade AS "lastGrade", extract(epoch from last_review)::float8 AS "lastReview", '
     'extract(epoch from first_review)::float8 AS "firstReview" FROM concept_reviews'
 )
@@ -45,6 +46,7 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
         "key": key, "doc_id": doc_id, "section_key": section_key,
         "due": st["due"], "ease": st.get("ease"), "interval": st.get("interval"),
         "reps": st.get("reps"), "lapses": st.get("lapses"), "state": st.get("state"),
+        "stab": st.get("stability"), "diff": st.get("difficulty"), "step": st.get("step"),
         "lg": st.get("lastGrade"), "lr": st.get("lastReview"),
         "fr": st.get("lastReview") if is_new else None,
         "it": extra.get("itemType"), "cs": extra.get("chapterScope"),
@@ -55,15 +57,17 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
     }
     conn.execute(
         'INSERT INTO concept_reviews (key, doc_id, section_key, due, ease, interval, reps, lapses, '
-        'state, last_grade, last_review, first_review, item_type, chapter_scope, caption, page, "order", '
+        'state, stability, difficulty, step, '
+        'last_grade, last_review, first_review, item_type, chapter_scope, caption, page, "order", '
         "heading, children, figure_order) "
         "VALUES (%(key)s,%(doc_id)s,%(section_key)s, to_timestamp(%(due)s), %(ease)s,%(interval)s,"
-        "%(reps)s,%(lapses)s,%(state)s,%(lg)s, to_timestamp(%(lr)s), "
+        "%(reps)s,%(lapses)s,%(state)s,%(stab)s,%(diff)s,%(step)s,%(lg)s, to_timestamp(%(lr)s), "
         "CASE WHEN %(fr)s IS NULL THEN NULL ELSE to_timestamp(%(fr)s) END, %(it)s,%(cs)s,%(cap)s,%(pg)s,%(ord)s,"
         "%(hd)s,%(ch)s,%(fo)s) "
         "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
         "due=EXCLUDED.due, ease=EXCLUDED.ease, interval=EXCLUDED.interval, reps=EXCLUDED.reps, "
         "lapses=EXCLUDED.lapses, state=EXCLUDED.state, last_grade=EXCLUDED.last_grade, "
+        "stability=EXCLUDED.stability, difficulty=EXCLUDED.difficulty, step=EXCLUDED.step, "
         "last_review=EXCLUDED.last_review, "
         "first_review=COALESCE(concept_reviews.first_review, EXCLUDED.first_review), "
         "item_type=COALESCE(concept_reviews.item_type, EXCLUDED.item_type), "

@@ -66,7 +66,9 @@ CREATE TABLE concept_reviews (
   key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc_id text, section_key text, due timestamptz, ease real,
   interval double precision, reps int, lapses int, state text, last_grade int, last_review timestamptz,
   item_type text, chapter_scope text, first_review timestamptz, caption text, page int, "order" int,
-  heading text, children jsonb, figure_order int);
+  heading text, children jsonb, figure_order int,
+  -- FSRS memory (2026-07-16 scheduler swap); ease/interval kept for legacy rows + display
+  stability real, difficulty real, step int);
 CREATE INDEX ON concept_reviews (doc_id, due);
 
 CREATE TABLE study_events (
