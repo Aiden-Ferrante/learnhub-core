@@ -66,6 +66,7 @@ import {
   type StudyDrawer,
 } from "./lib"
 import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
+import { useReaderScroll } from "./use-reader-scroll"
 
 type GuidedReadingProps = {
   course: Course
@@ -130,17 +131,13 @@ export function GuidedReading({
   const [stages, setStages] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
-  const [resumed, setResumed] = useState(false)
   // Briefing concept-chip cloud: capped at 8 until expanded.
   const [allChips, setAllChips] = useState(false)
-  // Chapter scroll progress (0–100) — drives the hairline under the chrome.
-  const [readPct, setReadPct] = useState(0)
   const [notes, setNotes] = useState<MarginNote[]>([])
   const [wide, setWide] = useState(false)
   // Chapter outline (locked to THIS chapter): derived from the rendered headings,
   // so it always matches what's on screen. Scroll-spy highlights where you are.
   const [outlineItems, setOutlineItems] = useState<{ text: string; level: number }[]>([])
-  const [activeOutline, setActiveOutline] = useState(-1)
   // Concept highlighter wash (default on; toggle lives in the Aa reading settings).
   const [highlightConcepts, setHighlightConcepts] = useState(true)
   // Narration: play the chapter's audiobook file when one has already been generated.
@@ -173,23 +170,11 @@ export function GuidedReading({
   const [active, setActive] = useState<{ idx: number; x: number; y: number } | null>(null)
 
   const rootRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const briefingRef = useRef<HTMLDivElement>(null)
-  // Soft-gate counters for the two stages nothing else reports.
+  // Soft-gate counter for the quiz stage (nothing else reports it).
   const quizAnswers = useRef(0)
-  const readMarked = useRef(false)
-  const scrollSaveAt = useRef(0)
-  const spyAt = useRef(0)
   const headingEls = useRef<HTMLElement[]>([])
-  // Where the scroll-restore landed — the resumed chip dismisses once the reader
-  // scrolls meaningfully away from it (they've chosen to read on).
-  const restoredAt = useRef(0)
-  // Last REAL reading position. When leaving a chapter the content unmounts first and the
-  // browser clamps scrollTop to 0 before effect cleanups run — saving the live value there
-  // would always persist 0. handleScroll keeps this ref honest (and ignores the clamp event,
-  // which arrives while data is null).
-  const lastScrollTop = useRef(0)
 
   const paper = theme === "paper"
   // Cards sit on the reading surface, so they follow it: warm on paper, app-dark otherwise.
@@ -283,7 +268,6 @@ export function GuidedReading({
   useEffect(() => {
     setStages({})
     quizAnswers.current = 0
-    readMarked.current = false
     loadProgress()
   }, [loadProgress])
 
@@ -415,71 +399,26 @@ export function GuidedReading({
     setActive(null)
     setDrawer(null)
     setNotes([])
-    setResumed(false)
-    setReadPct(0)
     setAllChips(false)
     load()
   }, [load])
 
-  // Scroll: restore the saved position for this chapter once content is up, else start at top.
-  // Synchronous (no rAF) — frames don't advance in hidden tabs, and the effect runs post-commit
-  // anyway. The cleanup writes the final position when leaving the chapter.
-  const scrollKey = `txt2k:deep-scroll:${docId}:${chapterKey ?? ""}`
-  useEffect(() => {
-    const box = scrollRef.current
-    if (!box || !data?.markdown) return
-    const saved = Number(localStorage.getItem(scrollKey) || 0)
-    box.scrollTop = saved
-    lastScrollTop.current = box.scrollTop
-    restoredAt.current = box.scrollTop
-    if (saved > 400) setResumed(true)
-    return () => {
-      try {
-        localStorage.setItem(scrollKey, String(Math.round(lastScrollTop.current)))
-      } catch {
-        // storage may be unavailable
-      }
-    }
-  }, [data?.markdown, scrollKey])
-
-  useEffect(() => {
-    if (!resumed) return
-    const t = setTimeout(() => setResumed(false), 6000)
-    return () => clearTimeout(t)
-  }, [resumed])
-
-  const handleScroll = () => {
-    const box = scrollRef.current
-    if (!box || !chapterKey || !data?.markdown) return
-    lastScrollTop.current = box.scrollTop
-    const denom = box.scrollHeight - box.clientHeight
-    setReadPct(denom > 0 ? Math.min(100, Math.round((box.scrollTop / denom) * 100)) : 100)
-    if (resumed && Math.abs(box.scrollTop - restoredAt.current) > 150) setResumed(false)
-    // Read stage: reaching the tail of the chapter marks it read (soft gate).
-    if (!readMarked.current && !stages.read && box.scrollTop + box.clientHeight >= box.scrollHeight * 0.92) {
-      readMarked.current = true
-      markStage("read")
-    }
-    // Outline scroll-spy (throttled): the last heading above the reading line is "here".
-    const spyNow = Date.now()
-    if (spyNow - spyAt.current >= 150 && headingEls.current.length) {
-      spyAt.current = spyNow
-      const boxTop = box.getBoundingClientRect().top
-      let idx = -1
-      headingEls.current.forEach((el, i) => {
-        if (el.getBoundingClientRect().top - boxTop <= 96) idx = i
-      })
-      setActiveOutline((cur) => (cur === idx ? cur : idx))
-    }
-    const now = Date.now()
-    if (now - scrollSaveAt.current < 300) return
-    scrollSaveAt.current = now
-    try {
-      localStorage.setItem(scrollKey, String(Math.round(box.scrollTop)))
-    } catch {
-      // storage may be unavailable
-    }
-  }
+  // Scroll: persist/restore, progress %, resumed chip, scroll-spy, read soft gate.
+  const {
+    scrollRef,
+    readPct,
+    resumed,
+    dismissResumed,
+    activeOutline,
+    setActiveOutline,
+    handleScroll,
+  } = useReaderScroll({
+    scrollKey: `txt2k:deep-scroll:${docId}:${chapterKey ?? ""}`,
+    contentReady: Boolean(data?.markdown),
+    alreadyRead: !!stages.read,
+    onReadEnd: () => markStage("read"),
+    getHeadings: () => headingEls.current,
+  })
 
   useEffect(() => {
     if (data?.markdown && chapterKey) recordEngagement("read", chapterKey, docId)
@@ -1292,7 +1231,7 @@ export function GuidedReading({
           className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full border bg-popover px-3 py-1.5 text-xs shadow-lg hover:bg-muted"
           onClick={() => {
             scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-            setResumed(false)
+            dismissResumed()
           }}
         >
           Resumed where you left off — back to top
