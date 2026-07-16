@@ -42,23 +42,30 @@ import { AudiobookPanel } from "@/features/learn/components/reader/audiobook-pan
 import { PATH_STAGES, doneMap, firstIncompleteStage } from "@/features/learn/lib/learn-path"
 import {
 } from "@/features/learn/components/reader/chapter-reader"
-import {
-  chaptersFromOutline,
-  resolveChapterForScope,
-  topLevelChapters,
-  type CourseChapter,
-} from "@/features/learn/lib/toc"
+import { type CourseChapter } from "@/features/learn/lib/toc"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
-import { useReadingPrefs, type Measure } from "@/features/learn/hooks/use-reading-prefs"
+import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
 import { audiobookFileUrl, getAudiobookStatus } from "@/features/learn/api/audiobook"
 import { fetchChapterProgress, fetchCourseChapters, fetchGuidedReading, updateChapterStage, type GuidedReadingResponse } from "@/features/learn/api/chapter"
-import { type ConceptLesson } from "@/features/learn/api/concepts"
 import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
 import { fetchConceptMastery, recordEngagement, type ConceptMastery } from "@/features/learn/api/progress"
 import { fetchReviewQueue } from "@/features/learn/api/review"
 import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
+import {
+  DRAWER_TITLES,
+  HALF_MEASURE,
+  KIND_COLOR,
+  guidedChapters,
+  layoutNotes,
+  numberOutlineItems,
+  relevelHeadings,
+  resolveGuidedChapter,
+  type MarginNote,
+  type StudyDrawer,
+} from "./lib"
+import { annotateNode, buildConceptRegex, masteryTint, masteryWash } from "./concept-annotations"
 
 type GuidedReadingProps = {
   course: Course
@@ -70,159 +77,6 @@ type GuidedReadingProps = {
   onScopeChange?: (sectionKey: string) => void
   /** Open a drawer once the chapter resolves (e.g. course-home "Review all" lands here). */
   initialDrawer?: "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen"
-}
-
-const KIND_COLOR: Record<string, string> = {
-  definition: "text-kind-definition border-kind-definition/30 bg-kind-definition/10",
-  theorem: "text-kind-theorem border-kind-theorem/30 bg-kind-theorem/10",
-  principle: "text-kind-principle border-kind-principle/30 bg-kind-principle/10",
-  result: "text-kind-result border-kind-result/30 bg-kind-result/10",
-  method: "text-kind-method border-kind-method/30 bg-kind-method/10",
-}
-
-/** The reading units for the deep surface. Numbered chapters (`toc:N`) are the real units
- *  wherever they exist — outline depth 0 can be Parts/front-matter (e.g. DDIA), which carry
- *  no section content of their own. Fall back to depth-0 outline entries, then the TOC tree. */
-function guidedChapters(outline: OutlineEntry[], tree: LearnTreeNode[]): CourseChapter[] {
-  const numbered = (outline || []).filter((e) => /^toc:\d+$/.test(e.sectionKey || ""))
-  if (numbered.length) return numbered.map((e) => ({ key: e.sectionKey, title: e.title || e.sectionKey }))
-  const fromOutline = chaptersFromOutline(outline)
-  if (fromOutline.length) return fromOutline
-  return topLevelChapters(tree)
-}
-
-/** Resolve any incoming position to a key that is GUARANTEED to be one of `chapters` —
- *  resolveChapterForScope's tree fallback can return a top-level Part node, which carries
- *  no section content of its own and would render an empty surface. */
-function resolveGuidedChapter(chapters: CourseChapter[], tree: LearnTreeNode[], scope: string | null): string | null {
-  if (chapters.length === 0) return null
-  if (!scope) return chapters[0].key
-  if (chapters.some((c) => c.key === scope)) return scope
-  const num = /^toc:(\d+)/.exec(scope) // e.g. reading position toc:1.2 → chapter toc:1
-  if (num && chapters.some((c) => c.key === `toc:${num[1]}`)) return `toc:${num[1]}`
-  const { chapterKey } = resolveChapterForScope(chapters, tree, scope)
-  if (chapterKey && chapters.some((c) => c.key === chapterKey)) return chapterKey
-  return chapters[0].key
-}
-
-function normHeading(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim()
-}
-
-/** The converter stores every heading as `##`, so chapters read as one flat wall. The document
- *  outline knows the real nesting — re-level heading lines (outside code fences) from it. */
-function relevelHeadings(markdown: string, outline: OutlineEntry[], chapterKey: string | null): string {
-  if (!outline?.length || !chapterKey) return markdown
-  const depthByTitle = new Map<string, number>()
-  let chapterDepth: number | null = null
-  for (const e of outline) {
-    const t = normHeading(e.title || "")
-    if (t && !depthByTitle.has(t)) depthByTitle.set(t, e.listDepth)
-    if (e.sectionKey === chapterKey && chapterDepth === null) chapterDepth = e.listDepth
-  }
-  if (chapterDepth === null) return markdown
-  const base = chapterDepth
-  let inFence = false
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (/^(```|~~~)/.test(line)) inFence = !inFence
-      if (inFence) return line
-      const m = /^(#{1,6})\s+(.*)$/.exec(line)
-      if (!m) return line
-      const d = depthByTitle.get(normHeading(m[2]))
-      if (d === undefined) return line
-      const level = Math.min(5, Math.max(2, 2 + (d - base)))
-      return "#".repeat(level) + " " + m[2]
-    })
-    .join("\n")
-}
-
-/** Underline tint = live mastery state: unseen (quiet invite), learning, due again (amber),
- *  mastered (solid). This is where the reader meets the retention loop. */
-function masteryTint(m: ConceptMastery | undefined, threshold: number): string {
-  if (!m || !m.attempts) return "border-dotted border-brand/50"
-  if (m.mastery >= threshold) return "border-solid border-brand/60"
-  if (m.due != null && m.due <= Date.now() / 1000) return "border-dotted border-amber-400/80"
-  return "border-dotted border-brand/90"
-}
-
-/** Highlighter wash (toggleable in reading settings): brightest on unseen concepts,
- *  amber when due, nearly invisible once mastered — the chapter fades as you learn it. */
-function masteryWash(m: ConceptMastery | undefined, threshold: number): string {
-  if (m && m.attempts) {
-    if (m.mastery >= threshold) return "rounded-[3px] bg-brand/[0.05]"
-    if (m.due != null && m.due <= Date.now() / 1000) return "rounded-[3px] bg-amber-400/10"
-  }
-  return "rounded-[3px] bg-brand/10"
-}
-
-// ---------------------------------------------------------------------------
-// Inline concept annotation: concept-name mentions inside prose become live
-// spans. Marked first-per-paragraph statelessly here; a post-render DOM pass
-// dedupes to first-per-chapter (see the layout effect in the component).
-// ---------------------------------------------------------------------------
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function buildConceptRegex(concepts: ConceptLesson[]): RegExp | null {
-  const names = Array.from(new Set(concepts.map((c) => c.name.trim()).filter((n) => n.length >= 3)))
-  if (names.length === 0) return null
-  names.sort((a, b) => b.length - a.length)
-  return new RegExp(`\\b(${names.map(escapeRegExp).join("|")})\\b`, "gi")
-}
-
-function annotateNode(
-  children: React.ReactNode,
-  regex: RegExp,
-  indexByName: Map<string, number>,
-  seen: Set<string>,
-  classForIdx: (idx: number) => string,
-): React.ReactNode {
-  return React.Children.map(children, (child) => {
-    if (typeof child === "string") {
-      const parts: React.ReactNode[] = []
-      let last = 0
-      regex.lastIndex = 0
-      for (let m = regex.exec(child); m; m = regex.exec(child)) {
-        const name = m[1].toLowerCase()
-        const idx = indexByName.get(name)
-        if (idx === undefined || seen.has(name)) continue
-        seen.add(name)
-        parts.push(child.slice(last, m.index))
-        parts.push(
-          <button
-            key={`${name}-${m.index}`}
-            type="button"
-            data-concept={idx}
-            className={cn(
-              "dc-term cursor-pointer rounded-sm border-b bg-transparent p-0 text-inherit hover:bg-brand/10",
-              classForIdx(idx),
-            )}
-          >
-            {m[1]}
-          </button>,
-        )
-        last = m.index + m[1].length
-      }
-      if (parts.length === 0) return child
-      parts.push(child.slice(last))
-      return parts
-    }
-    // Recurse into simple inline elements (em/strong/…) but never into code,
-    // links, or KaTeX output — annotating those would corrupt them.
-    if (React.isValidElement(child)) {
-      const tag = typeof child.type === "string" ? child.type : null
-      const cls = String((child.props as { className?: string }).className ?? "")
-      if (!tag || ["code", "pre", "a"].includes(tag) || /katex|math/.test(cls)) return child
-      const inner = (child.props as { children?: React.ReactNode }).children
-      if (inner === undefined) return child
-      return React.cloneElement(child, undefined, annotateNode(inner, regex, indexByName, seen, classForIdx))
-    }
-    return child
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -247,37 +101,6 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
       )}
     </div>
   )
-}
-
-type MarginNote = { key: string; idx: number; top: number; name: string; signal: string }
-type StudyDrawer = "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen" | null
-
-const DRAWER_TITLES: Record<Exclude<StudyDrawer, null>, string> = {
-  quiz: "Chapter quiz",
-  review: "Review",
-  exam: "Chapter exam",
-  walk: "Learn — top-down walk",
-  lockin: "Lock in",
-  tutor: "Tutor",
-  listen: "Listen",
-}
-
-/** Half the prose measure — where the margin-note column starts (center + half + gap).
- *  Mirrors MEASURE_CLASS in markdown-reader (70/85/100ch). */
-const HALF_MEASURE: Record<Measure, string> = {
-  narrow: "35ch",
-  normal: "42.5ch",
-  wide: "50ch",
-}
-
-function layoutNotes(notes: MarginNote[]): MarginNote[] {
-  const sorted = [...notes].sort((a, b) => a.top - b.top)
-  let floor = 0
-  for (const n of sorted) {
-    n.top = Math.max(n.top, floor)
-    floor = n.top + 84
-  }
-  return sorted
 }
 
 export function GuidedReading({
@@ -884,28 +707,10 @@ export function GuidedReading({
     setActive(null)
   }
 
-  // Numbered outline, same convention as the course-dashboard syllabus: the book's own
-  // numbers win (headings that already start with one aren't re-prefixed); otherwise
-  // synthesize hierarchical numbers under the chapter's number (toc:2 → 2.1, 2.1.1, …).
-  const numberedOutline = useMemo(() => {
-    if (outlineItems.length === 0) return []
-    const m = chapterKey ? /^toc:(\d+)$/.exec(chapterKey) : null
-    const chapterNum = m ? m[1] : null
-    // Depth is relative to the chapter heading's level — an unmatched `##` deep in the
-    // chapter (e.g. an un-outlined "Summary") must not shift every section down a level.
-    const baseSub = (outlineItems[0]?.level ?? 2) + 1
-    const counters: number[] = []
-    return outlineItems.map((it, i) => {
-      if (i === 0) return { ...it, num: chapterNum ?? "" }
-      if (/^\d+(\.\d+)*[\s.]/.test(it.text)) return { ...it, num: "" }
-      const depth = Math.max(0, it.level - baseSub)
-      counters.splice(depth + 1)
-      counters[depth] = (counters[depth] || 0) + 1
-      for (let d = 0; d < depth; d++) if (!counters[d]) counters[d] = 1
-      const num = [chapterNum, ...counters.slice(0, depth + 1)].filter(Boolean).join(".")
-      return { ...it, num }
-    })
-  }, [outlineItems, chapterKey])
+  const numberedOutline = useMemo(
+    () => numberOutlineItems(outlineItems, chapterKey),
+    [outlineItems, chapterKey],
+  )
 
   // Rail ↔ text binding: match the canonical outline items to the rendered headings
   // and stamp the DASHBOARD's numbers onto them (idempotent DOM pass). Falls back to
