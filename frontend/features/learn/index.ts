@@ -19,6 +19,7 @@ export { ReadingThemeToggle } from "@/features/learn/components/reader/reading-t
 export { DrillView } from "@/features/learn/components/study/drill-view"
 export { DumpView } from "@/features/learn/components/study/dump-view"
 export { StudyPlanner } from "@/features/learn/components/study/study-planner"
+export { useCourseChapters } from "@/features/learn/hooks/use-course-chapters"
 export { useCourseData } from "@/features/learn/hooks/use-course-data"
 export { chapterHref, scopeFromSegments, scopeToPath } from "@/features/learn/lib/scope-url"
 export {

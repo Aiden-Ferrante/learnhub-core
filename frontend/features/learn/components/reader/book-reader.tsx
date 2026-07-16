@@ -10,7 +10,7 @@ import { ReadingControls } from "@/features/learn/components/reader/reading-cont
 import { SyllabusTree } from "@/features/learn/components/home/syllabus-tree"
 import { useReadingTheme } from "@/features/learn/hooks/use-reading-theme"
 import { useReadingPrefs } from "@/features/learn/hooks/use-reading-prefs"
-import { fetchCourseChapters } from "@/features/learn/api/chapter"
+import { useCourseChapters } from "@/features/learn/hooks/use-course-chapters"
 import { fetchOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import { type MasteryResponse } from "@/features/learn/api/progress"
 import type { Course } from "@/features/learn/lib/courses"
@@ -42,27 +42,13 @@ export function BookReader({
   const [pipOk, setPipOk] = useState(false)
   const [outline, setOutline] = useState<OutlineEntry[]>([])
 
-  // Canonical chapters from /api/chapters — the same derivation as the course
-  // dashboard and the deep surface, so this list can never disagree with them.
-  // The outline/tree rules only bridge the moment before the fetch lands.
-  const [canonChapters, setCanonChapters] = useState<CourseChapter[] | null>(null)
-  useEffect(() => {
-    let alive = true
-    fetchCourseChapters(course.learnDocId ?? course.id)
-      .then((r) => {
-        if (alive && r.chapters?.length) setCanonChapters(r.chapters.map((c) => ({ key: c.key, title: c.title })))
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [course.learnDocId, course.id])
-
-  const chapters = useMemo(() => {
-    if (canonChapters?.length) return canonChapters
+  // Canonical chapters (see useCourseChapters) — the outline/tree rules only bridge
+  // the moment before the fetch lands.
+  const chapterFallback = useMemo(() => {
     const fromOutline = chaptersFromOutline(outline)
     return fromOutline.length ? fromOutline : topLevelChapters(tree)
-  }, [canonChapters, outline, tree])
+  }, [outline, tree])
+  const chapters = useCourseChapters(course.learnDocId ?? course.id, chapterFallback)
   // Sidebar shows the full outline hierarchy when available (else the TOC tree).
   const sidebarTree = useMemo(() => (outline.length ? outlineToTree(outline) : tree), [outline, tree])
   const lastKey = `txt2k:book-chapter:${course.learnDocId ?? course.id}`

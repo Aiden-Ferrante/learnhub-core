@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { PanelLeft, X } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { ChapterReader } from "@/features/learn"
-import { chaptersFromOutline, outlineToTree, resolveChapterForScope, resolveChapterFromOutline, topLevelChapters, type CourseChapter } from "@/features/learn"
+import { chaptersFromOutline, outlineToTree, resolveChapterForScope, resolveChapterFromOutline, topLevelChapters, useCourseChapters } from "@/features/learn"
 import { SyllabusTree } from "@/features/learn"
 import { ReadingThemeToggle } from "@/features/learn"
 import { fetchOutline, fetchTocTree, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
@@ -15,7 +15,6 @@ function ReaderInner() {
   const params = useSearchParams()
   const doc = params.get("doc") || undefined
   const initialScope = params.get("scope")
-  const [chapters, setChapters] = useState<CourseChapter[]>([])
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [tree, setTree] = useState<LearnTreeNode[]>([])
   const [mastery, setMastery] = useState<MasteryResponse | null>(null)
@@ -35,19 +34,8 @@ function ReaderInner() {
       try {
         const [o, t] = await Promise.all([fetchOutline(doc), fetchTocTree(doc).catch(() => null)])
         if (!active) return
-        const ol = o.error ? [] : o.outline || []
-        const tr = t?.tree || []
-        let chs = chaptersFromOutline(ol)
-        let resolved = resolveChapterFromOutline(chs, ol, initialScope)
-        if (!chs.length) {
-          chs = topLevelChapters(tr)
-          resolved = resolveChapterForScope(chs, tr, initialScope)
-        }
-        setOutline(ol)
-        setTree(tr)
-        setChapters(chs)
-        setChapterKey(resolved.chapterKey)
-        setSub(resolved.sub)
+        setOutline(o.error ? [] : o.outline || [])
+        setTree(t?.tree || [])
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Failed to load reader")
       } finally {
@@ -60,7 +48,32 @@ function ReaderInner() {
     return () => {
       active = false
     }
+  }, [doc])
+
+  // Canonical chapter list (useCourseChapters) — this popped-out reader used to derive
+  // chapters from the outline/tree ONLY and had drifted from every other surface;
+  // adopting the canonical fetch is a deliberate behavior fix. The outline/tree rules
+  // remain the pre-fetch fallback.
+  const chapterFallback = useMemo(() => {
+    const chs = chaptersFromOutline(outline)
+    return chs.length ? chs : topLevelChapters(tree)
+  }, [outline, tree])
+  const chapters = useCourseChapters(doc, chapterFallback)
+
+  // Resolve the incoming scope once outline + chapters are up; re-resolve if the
+  // URL's scope changes (the effect below resets the resolution).
+  useEffect(() => {
+    setChapterKey(null)
+    setSub(null)
   }, [doc, initialScope])
+  useEffect(() => {
+    if (chapterKey || loading || chapters.length === 0) return
+    const r = outline.length
+      ? resolveChapterFromOutline(chapters, outline, initialScope)
+      : resolveChapterForScope(chapters, tree, initialScope)
+    setChapterKey(r.chapterKey)
+    setSub(r.sub)
+  }, [chapterKey, loading, chapters, outline, tree, initialScope])
 
   const onSelectScope = useCallback(
     (scope: string | null) => {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { fetchCourseChapters, fetchGuidedReading, type GuidedReadingResponse } from "@/features/learn/api/chapter"
+import { fetchGuidedReading, type GuidedReadingResponse } from "@/features/learn/api/chapter"
 import { fetchOutline, type LearnTreeNode, type OutlineEntry } from "@/features/learn/api/outline"
 import {
   cancelChapterBuild,
@@ -11,7 +11,7 @@ import {
 } from "@/features/learn/api/pipeline"
 import { fetchConceptMastery, type ConceptMastery } from "@/features/learn/api/progress"
 import { fetchReviewQueue } from "@/features/learn/api/review"
-import { type CourseChapter } from "@/features/learn/lib/toc"
+import { useCourseChapters } from "@/features/learn/hooks/use-course-chapters"
 import { guidedChapters } from "./lib"
 import { usePolling } from "@/hooks/use-polling"
 
@@ -23,7 +23,6 @@ import { usePolling } from "@/hooks/use-polling"
 export function useGuidedReadingData(docId: string, chapterKey: string | null, tree: LearnTreeNode[]) {
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [outlineReady, setOutlineReady] = useState(false)
-  const [canonChapters, setCanonChapters] = useState<CourseChapter[] | null>(null)
   const [data, setData] = useState<GuidedReadingResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,25 +44,10 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
     }
   }, [docId])
 
-  // …and the canonical list from /api/chapters — the SAME derivation the dashboard
-  // tree and the Today plan use. The outline-rule fallback only covers the moment
-  // before the fetch lands (or a backend error).
-  useEffect(() => {
-    let alive = true
-    fetchCourseChapters(docId)
-      .then((r) => {
-        if (alive && r.chapters?.length) setCanonChapters(r.chapters.map((c) => ({ key: c.key, title: c.title })))
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [docId])
-
-  const chapters = useMemo(
-    () => canonChapters ?? guidedChapters(outline, tree),
-    [canonChapters, outline, tree],
-  )
+  // …and the canonical list (see useCourseChapters); guidedChapters' outline rule
+  // only covers the moment before the fetch lands (or a backend error).
+  const chapterFallback = useMemo(() => guidedChapters(outline, tree), [outline, tree])
+  const chapters = useCourseChapters(docId, chapterFallback)
 
   // The chapter payload itself.
   const load = useCallback(async () => {
