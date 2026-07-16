@@ -3,20 +3,15 @@ the old (empty) qdrant RAG.
 
 Embeds each ``section_content`` block once (via the already-running sentence-transformers MiniLM,
 384-d) into the ``content_vectors`` table, then answers queries with pgvector cosine (``<=>``,
-HNSW-indexed) — Postgres is the one store, no separate vector DB. ``ask()`` retrieves the top
-passages and has Ollama write a grounded, cited answer. Everything local/keyless.
+HNSW-indexed) — Postgres is the one store, no separate vector DB. Everything local/keyless.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-
 from app.platform import db
 from app.search.concept_resolve import embed_texts
-from app.platform import get_chat_model
 
 VECTORS = "content_vectors"
 SECTION_CONTENT = "section_content"
@@ -28,15 +23,6 @@ _STORE_CHARS = 2400  # how much block text we keep for answer context
 def _vec_literal(emb: list[float]) -> str:
     """pgvector text literal for an embedding — ``[0.1,0.2,…]`` (cast ``::vector`` in SQL)."""
     return "[" + ",".join(repr(float(x)) for x in emb) + "]"
-
-ANSWER_SYSTEM = (
-    "You answer questions strictly from the provided textbook passages. Rules:\n"
-    "- Use ONLY the sources; do not add outside facts. If the sources don't answer it, say so.\n"
-    "- Cite the passages you use inline as [1], [2], … matching the source numbers.\n"
-    "- Be concise and direct; prefer the book's own terminology.\n"
-    "- If sources conflict or are partial, say what they do and don't establish."
-)
-
 
 def index_status(doc: str | None = None) -> dict[str, Any]:
     """How many of a doc's content blocks are embedded yet."""
@@ -104,7 +90,7 @@ def ensure_index(doc: str | None = None, limit: int = 100000) -> dict[str, Any]:
 
 
 def _top_matches(query: str, doc: str | None, k: int) -> tuple[list[dict[str, Any]], int]:
-    """The one retrieval path (search + ask): embed the query, pgvector-cosine top-k.
+    """The retrieval path: embed the query, pgvector-cosine top-k.
     Returns ``(rows, indexed_count)``; raises RuntimeError when the embedder is down."""
     qv = embed_texts([query])
     if not qv:
@@ -151,55 +137,3 @@ def semantic_search(query: str, doc: str | None = None, k: int = 8) -> dict[str,
         for r in rows
     ]
     return {"query": query, "matches": matches, "indexed": indexed}
-
-
-_ASK_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        ("system", ANSWER_SYSTEM),
-        ("human", "Question: {query}\n\nSources:\n{context}\n\nAnswer using only the sources above, citing [n]."),
-    ]
-)
-
-
-def _format_context(rows: list[dict[str, Any]]) -> str:
-    """Numbered source block the answer cites against — `[n] (p.X, heading)` then the passage."""
-    return "\n\n".join(
-        f"[{n}] (p.{r.get('pageStart')}, {r.get('heading') or r.get('sectionKey')})\n"
-        f"{(r.get('text') or '')[:1200]}"
-        for n, r in enumerate(rows, start=1)
-    )
-
-
-def ask(query: str, doc: str | None = None, k: int = 6, model: str | None = None) -> dict[str, Any]:
-    """Retrieve the top passages (same pgvector path as ``semantic_search``) and have Ollama
-    answer grounded in them, via the LCEL prompt chain. Citations are assembled from the
-    retrieved rows outside the LLM step so the [1][2] numbering matches the sources."""
-    if not (query or "").strip():
-        return {"answer": None, "citations": [], "error": "empty query"}
-    try:
-        rows, indexed = _top_matches(query, doc, k)
-    except Exception as e:  # noqa: BLE001 — embedder/db down → graceful error
-        return {"answer": None, "citations": [], "error": str(e)}
-    if not rows:
-        return {
-            "answer": None,
-            "citations": [],
-            "error": "no embeddings yet — call ensure_index for this doc",
-        }
-
-    chain = _ASK_PROMPT | get_chat_model(model=model, temperature=0.3) | StrOutputParser()
-    try:
-        answer = chain.invoke({"query": query, "context": _format_context(rows)})
-    except Exception as e:  # noqa: BLE001
-        return {"answer": None, "citations": [], "error": str(e)}
-
-    citations = [
-        {
-            "n": n,
-            "sectionKey": r.get("sectionKey"),
-            "heading": r.get("heading"),
-            "page": r.get("pageStart"),
-        }
-        for n, r in enumerate(rows, start=1)
-    ]
-    return {"query": query, "answer": answer, "citations": citations}

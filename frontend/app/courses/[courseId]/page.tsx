@@ -36,7 +36,6 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onOpenConcept={(conceptKey) =>
           router.push(`/courses/${courseId}/concepts?concept=${encodeURIComponent(conceptKey)}`)
         }
-        onAsk={() => router.push(`/courses/${courseId}/ask`)}
         onDrill={() => router.push(`/courses/${courseId}/drill`)}
         onBrainDump={() => router.push(`/courses/${courseId}/dump`)}
         onBackToShelf={() => router.push("/courses")}

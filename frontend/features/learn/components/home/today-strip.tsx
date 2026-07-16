@@ -1,19 +1,16 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CalendarCheck2, Sparkles, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ReviewPanel } from "@/features/learn/components/study/review-panel"
+import { CalendarCheck2 } from "lucide-react"
 import { fetchStudyDebt, type StudyDebt } from "@/features/learn/api/progress"
 
 /**
- * The one-tap daily drill entry on the Learn front door: whole-library review debt in one
- * line, one button into a mixed session (due concepts + due skeleton rebuilds across every
- * course, then the day's capped intake of new concepts). No course navigation required.
+ * The review-debt banner on the Learn front door: whole-library due counts in one line,
+ * pointing at the courses that need attention. Studying itself is chapter-scoped — open
+ * a course and review from there (the cross-library session was retired 2026-07-15).
  */
 export function TodayStrip() {
   const [debt, setDebt] = useState<StudyDebt | null>(null)
-  const [open, setOpen] = useState(false)
 
   const load = useCallback(() => {
     fetchStudyDebt()
@@ -71,40 +68,8 @@ export function TodayStrip() {
               : "Sessions also introduce a few new concepts each day."}
           </p>
         </div>
-        <Button
-          size="sm"
-          variant={caughtUp ? "outline" : "default"}
-          className="shrink-0 gap-1.5"
-          onClick={() => setOpen(true)}
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          {caughtUp ? "Learn something new" : `Review ${due} now`}
-        </Button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <div className="flex h-[min(85vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-xl border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b px-4 py-2.5">
-              <span className="text-sm font-medium">Today&rsquo;s session — all courses</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => {
-                  setOpen(false)
-                  load() // debt changed while grading
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="min-h-0 flex-1">
-              <ReviewPanel scope={null} onAnswered={() => {}} />
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

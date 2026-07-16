@@ -13,12 +13,11 @@ export function scopeFromSegments(segments: string[] | undefined): string | null
 export function chapterHref(
   courseId: string,
   scope: string | null,
-  opts?: { drawer?: string; all?: boolean },
+  opts?: { drawer?: string },
 ): string {
   const base = `/courses/${courseId}/chapter${scope ? `/${scopeToPath(scope)}` : ""}`
   const params = new URLSearchParams()
   if (opts?.drawer) params.set("drawer", opts.drawer)
-  if (opts?.all) params.set("all", "1")
   const qs = params.toString()
   return qs ? `${base}?${qs}` : base
 }

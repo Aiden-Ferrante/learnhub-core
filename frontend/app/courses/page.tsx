@@ -15,7 +15,6 @@ export default function CoursesPage() {
         liveCourseId={null}
         onSelect={(course) => router.push(`/courses/${course.id}`)}
         onContinue={(course, sectionKey) => router.push(chapterHref(course.id, sectionKey))}
-        onReview={(course) => router.push(chapterHref(course.id, null, { drawer: "review", all: true }))}
         onNewCourse={() => router.push("/upload")}
         onProcess={() => router.push("/process")}
       />

@@ -57,7 +57,6 @@ import { fetchOutline, flattenChapterOutline, type LearnTreeNode, type OutlineEn
 import { cancelChapterBuild, enqueueChapterBuild, fetchChaptersReadiness, type ChapterReadiness } from "@/features/learn/api/pipeline"
 import { fetchConceptMastery, recordEngagement, type ConceptMastery } from "@/features/learn/api/progress"
 import { fetchReviewQueue } from "@/features/learn/api/review"
-import { askTextbook, type AskResponse } from "@/features/learn/api/search"
 import type { Course } from "@/features/learn/lib/courses"
 import { cn } from "@/lib/utils"
 
@@ -71,8 +70,6 @@ type DeepChapterProps = {
   onScopeChange?: (sectionKey: string) => void
   /** Open a drawer once the chapter resolves (e.g. course-home "Review all" lands here). */
   initialDrawer?: "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen"
-  /** Review drawer covers the whole course (scope=null) instead of just this chapter. */
-  reviewWholeCourse?: boolean
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -290,7 +287,6 @@ export function DeepChapter({
   onBack,
   onScopeChange,
   initialDrawer,
-  reviewWholeCourse,
 }: DeepChapterProps) {
   const docId = course.learnDocId ?? course.id
   const [theme] = useReadingTheme()
@@ -352,9 +348,6 @@ export function DeepChapter({
 
   // Inline concept popover (event-delegated so the reader never re-renders on open/close).
   const [active, setActive] = useState<{ idx: number; x: number; y: number } | null>(null)
-  // Select → explain.
-  const [selChip, setSelChip] = useState<{ text: string; x: number; y: number } | null>(null)
-  const [explain, setExplain] = useState<{ q: string; res: AskResponse | null; loading: boolean } | null>(null)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -597,8 +590,6 @@ export function DeepChapter({
   useEffect(() => {
     setData(null)
     setActive(null)
-    setSelChip(null)
-    setExplain(null)
     setDrawer(null)
     setNotes([])
     setResumed(false)
@@ -887,38 +878,10 @@ export function DeepChapter({
       const idx = Number(el.dataset.concept)
       const r = el.getBoundingClientRect()
       setActive({ idx, x: r.left, y: r.bottom + 6 })
-      setSelChip(null)
       e.stopPropagation()
       return
     }
     setActive(null)
-  }
-
-  const handleMouseUp = () => {
-    const sel = window.getSelection()
-    const text = sel?.toString().trim() ?? ""
-    if (!sel || sel.isCollapsed || text.length < 8 || text.length > 600) {
-      setSelChip(null)
-      return
-    }
-    const r = sel.getRangeAt(0).getBoundingClientRect()
-    setSelChip({ text, x: r.left + r.width / 2, y: r.top - 8 })
-  }
-
-  const runExplain = async (text: string) => {
-    setSelChip(null)
-    const q = `Explain this passage from the book in plain terms: "${text}"`
-    setExplain({ q: text, res: null, loading: true })
-    try {
-      const res = await askTextbook(docId, q)
-      setExplain({ q: text, res, loading: false })
-    } catch (e) {
-      setExplain({
-        q: text,
-        res: { answer: e instanceof Error ? e.message : "Failed to answer", citations: [] },
-        loading: false,
-      })
-    }
   }
 
   // Numbered outline, same convention as the course-dashboard syllabus: the book's own
@@ -1283,7 +1246,7 @@ export function DeepChapter({
         onScroll={handleScroll}
         className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-5", paper && "reading-surface-paper")}
         onClick={handleReaderClick}
-        onMouseUp={handleMouseUp}
+       
       >
         <div className="mx-auto flex max-w-[110rem] justify-center gap-8">
           {/* Chapter outline — always in view while reading, locked to THIS chapter.
@@ -1567,54 +1530,6 @@ export function DeepChapter({
         </div>
       )}
 
-      {/* Select → explain chip. */}
-      {selChip && (
-        <button
-          type="button"
-          className="fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1.5 rounded-full border bg-popover px-3 py-1 text-xs shadow-lg hover:bg-muted"
-          style={{ left: selChip.x, top: selChip.y }}
-          onClick={() => runExplain(selChip.text)}
-        >
-          <Sparkles className="h-3 w-3 text-brand" />
-          Explain this
-        </button>
-      )}
-
-      {/* Explain drawer — grounded answer over the same surface, reader stays put. */}
-      {explain && (
-        <div className="absolute inset-y-0 right-0 z-40 w-[min(28rem,95vw)] overflow-y-auto border-l bg-card p-4 shadow-2xl">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div className="text-xs font-medium text-muted-foreground">Explain</div>
-            <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setExplain(null)}>
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <blockquote className="mb-3 border-l-2 border-brand/40 pl-2 text-xs italic text-muted-foreground">
-            {explain.q}
-          </blockquote>
-          {explain.loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Thinking with the book…
-            </div>
-          ) : (
-            <>
-              <div className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-                {explain.res?.answer ?? "No answer."}
-              </div>
-              {(explain.res?.citations?.length ?? 0) > 0 && (
-                <div className="mt-3 space-y-1 border-t pt-2 text-xs text-muted-foreground">
-                  {explain.res!.citations.map((c) => (
-                    <div key={c.n}>
-                      [{c.n}] {c.heading ?? c.sectionKey} {c.page != null ? `· p.${c.page}` : ""}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
       {/* Study drawer — quiz / review / exam over the same surface (spec §8 step 5). */}
       {drawer && (
         <div className="absolute inset-y-0 right-0 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
@@ -1639,8 +1554,8 @@ export function DeepChapter({
                 }}
               />
             )}
-            {drawer === "review" && (
-              <ReviewPanel scope={reviewWholeCourse ? null : chapterKey} docId={docId} onAnswered={refreshMastery} />
+            {drawer === "review" && chapterKey && (
+              <ReviewPanel scope={chapterKey} docId={docId} onAnswered={refreshMastery} />
             )}
             {drawer === "exam" && (
               <ExamPanel

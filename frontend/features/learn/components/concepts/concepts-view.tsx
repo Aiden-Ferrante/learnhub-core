@@ -5,7 +5,6 @@ import { ChevronLeft, GraduationCap, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConceptCard, prettyScope } from "@/features/learn/components/concepts/concept-card"
 import { ConceptDetail } from "@/features/learn/components/concepts/concept-detail"
-import { ReviewPanel } from "@/features/learn/components/study/review-panel"
 import { fetchDocumentConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
 import { fetchDocumentMarkdown } from "@/features/learn/api/content"
 import { fetchConceptMastery, type ConceptMastery } from "@/features/learn/api/progress"
@@ -18,7 +17,7 @@ type ConceptsViewProps = {
   initialConceptKey?: string | null
 }
 
-type Mode = "list" | "detail" | "session"
+type Mode = "list" | "detail"
 
 export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsViewProps) {
   const [concepts, setConcepts] = useState<ConceptLesson[]>([])
@@ -101,27 +100,6 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
     }
   }, [initialConceptKey, concepts])
 
-  if (mode === "session") {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setMode("list")
-              loadMastery()
-            }}
-            className="gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" /> Exit
-          </Button>
-          <span className="text-sm font-medium">{course.title} · review</span>
-        </div>
-        <ReviewPanel scope={null} docId={course.learnDocId} onAnswered={loadMastery} />
-      </div>
-    )
-  }
 
   if (mode === "detail" && selected) {
     const sm = masteryFor(selected)
@@ -153,11 +131,6 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
             <span className="text-xs text-muted-foreground">
               {concepts.length} concept{concepts.length === 1 ? "" : "s"}
             </span>
-          )}
-          {concepts.length > 0 && (
-            <Button size="sm" className="gap-1.5" onClick={() => setMode("session")}>
-              <GraduationCap className="h-4 w-4" /> Study
-            </Button>
           )}
         </div>
       </div>

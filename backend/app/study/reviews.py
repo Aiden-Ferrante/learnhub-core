@@ -19,7 +19,6 @@ the route layer only parses input and wraps JSON.
 from __future__ import annotations
 
 import hashlib
-import os
 import time
 from typing import Any
 
@@ -81,20 +80,9 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
 # Course/library-wide review sessions introduce at most this many never-reviewed concepts per
 # day (Anki-style intake discipline) so a big backlog can't flood a session. Chapter-scoped
 # review is exempt — studying a chapter is a deliberate "learn these now" action.
-NEW_PER_DAY = int(os.getenv("LEARN_NEW_PER_DAY", "10"))
 
 SKELETON_KEY_PREFIX = "skel-"
 FIGURE_KEY_PREFIX = "fig-"
-
-
-def day_start(now: float) -> float:
-    """Epoch of local midnight for ``now`` — the boundary for the daily new-card allowance."""
-    lt = time.localtime(now)
-    return now - (lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec)
-
-
-def new_allowance(cap: int, introduced_today: int) -> int:
-    return max(0, int(cap) - max(0, int(introduced_today)))
 
 
 def skeleton_review_key(doc_id: str, section_key: str) -> str:
@@ -195,25 +183,15 @@ def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
     }
 
 
-def build_review_queue(
-    doc: str | None,
-    scope: str | None,
-    limit: int = 40,
-    new_limit: int | None = None,
-    day_start_ts: float | None = None,
-) -> dict[str, Any]:
-    """Concepts to review now: due cards (earliest first) then new (unseen) cards. ``scope`` =
-    a sectionKey limits to that section; omit for the whole-course queue.
-
-    Without a scope, new-card intake is capped per local day (``new_limit``, default
-    LEARN_NEW_PER_DAY): the queue serves due cards plus at most (cap − introduced-today) new
-    ones. ``day_start_ts`` lets the client pass its own midnight so the day boundary follows
-    the learner's timezone, not the server's."""
+def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str, Any]:
+    """Concepts to review now for ONE chapter/section scope: due cards (earliest first)
+    then the scope's new (unseen) cards and unseeded figures. Studying is deliberately
+    chapter-scoped — the course-wide session was retired 2026-07-15."""
     now = time.time()
     try:
         # A chapter scope spans ALL its sub-sections (same reading-order span the reader and
         # quiz use) — exact-key matching misses everything under a chapter node.
-        span = scope_section_keys(doc, scope) if scope else None
+        span = scope_section_keys(doc, scope)
         with db() as conn:
             concepts = conn.execute(
                 'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
@@ -240,17 +218,16 @@ def build_review_queue(
             ).fetchall()
         if span is not None:
             concepts = [c for c in concepts if c.get("sectionKey") in span]
-        if scope is not None:
-            typed_rows = [
-                r
-                for r in typed_rows
-                if r.get("chapterScope") == scope or (span and r.get("sectionKey") in span)
-            ]
+        typed_rows = [
+            r
+            for r in typed_rows
+            if r.get("chapterScope") == scope or (span and r.get("sectionKey") in span)
+        ]
         skeleton_rows = [r for r in typed_rows if r.get("itemType") == "skeleton"]
         figure_rows = [r for r in typed_rows if r.get("itemType") == "figure"]
-        # Chapter-scoped sessions also OFFER the chapter's unseeded captioned figures as new cards.
+        # Chapter sessions also OFFER the chapter's unseeded captioned figures as new cards.
         new_figures: list[dict[str, Any]] = []
-        if scope is not None and doc and span:
+        if doc and span:
             seeded = {r["key"] for r in figure_rows}
             with db() as conn:
                 figs = conn.execute(
@@ -265,18 +242,6 @@ def build_review_queue(
                 if figure_review_key(doc, int(f.get("order") or 0)) in seeded:
                     continue
                 new_figures.append(new_figure_card(doc, f))
-        # Daily new-card allowance (unscoped sessions only).
-        introduced_today = 0
-        if scope is None:
-            since = day_start_ts if day_start_ts is not None else day_start(now)
-            with db() as conn:
-                introduced_today = conn.execute(
-                    "SELECT count(*) AS n FROM concept_reviews "
-                    "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
-                    "AND (item_type IS NULL OR item_type <> 'skeleton') "
-                    "AND first_review IS NOT NULL AND extract(epoch from first_review) >= %(since)s",
-                    {"doc": doc, "since": since},
-                ).fetchone()["n"]
     except Exception as exc:  # noqa: BLE001
         return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)}
 
@@ -302,22 +267,12 @@ def build_review_queue(
         else:
             later += 1
     due.sort(key=lambda x: x.get("due") or 0)
-    if scope is None:
-        allowance = new_allowance(new_limit if new_limit is not None else NEW_PER_DAY, introduced_today)
-        served_new = new[:allowance]
-    else:
-        # Deliberate chapter study: all its new concepts, then its unseeded figures.
-        allowance = len(new)
-        served_new = new + new_figures
+    # Deliberate chapter study: all its new concepts, then its unseeded figures.
+    served_new = new + new_figures
     queue = (due + served_new)[:limit]
     return {
         "cards": queue,
-        "counts": {
-            "due": len(due),
-            "new": len(new) + len(new_figures),
-            "later": later,
-            "newAllowance": allowance if scope is None else len(served_new),
-        },
+        "counts": {"due": len(due), "new": len(new) + len(new_figures), "later": later},
     }
 
 

@@ -16,13 +16,13 @@ const GRADES: { grade: ReviewGrade; label: string; cls: string }[] = [
 ]
 
 /** Spaced-repetition recall: name → recall → reveal signal/source → self-grade (Again/Hard/Good/Easy).
- *  Keyless. `scope` = a sectionKey (review one section) or null (whole-course due queue). */
+ *  Keyless. `scope` = the chapter/section being studied (sessions are chapter-scoped). */
 export function ReviewPanel({
   scope,
   docId,
   onAnswered,
 }: {
-  scope: string | null
+  scope: string
   docId?: string
   onAnswered?: () => void
 }) {
@@ -78,7 +78,7 @@ export function ReviewPanel({
         submitFigureReviewGrade(card.docId, card.figureOrder, g, {
           caption: card.signal,
           sectionKey: card.sectionKey,
-          chapterScope: scope ?? undefined,
+          chapterScope: scope,
           page: card.page,
         }).catch(() => {})
       } else {
@@ -151,10 +151,7 @@ export function ReviewPanel({
       <div>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {counts.due} due · {Math.min(counts.new, counts.newAllowance ?? counts.new)} new
-            {counts.newAllowance != null && counts.new > counts.newAllowance && (
-              <span className="opacity-70"> ({counts.new} in backlog)</span>
-            )}
+            {counts.due} due · {counts.new} new
           </span>
           <span className="tabular-nums">
             {idx + 1} / {cards.length}

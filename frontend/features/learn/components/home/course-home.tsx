@@ -45,7 +45,6 @@ type CourseHomeProps = {
   onViewConcepts: () => void
   /** Open one concept's detail (clicked as a leaf in the course outline). */
   onOpenConcept?: (conceptKey: string) => void
-  onAsk?: () => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
   onDrill?: () => void
@@ -113,7 +112,6 @@ export function CourseHome({
   onDeepRead,
   onViewConcepts,
   onOpenConcept,
-  onAsk,
   onBackToShelf,
   continueNode,
   onDrill,
@@ -639,18 +637,6 @@ export function CourseHome({
                   Deep read
                 </Button>
               )}
-              {onAsk && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1.5 px-2 text-xs"
-                  onClick={onAsk}
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  Ask this book
-                </Button>
-              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -663,15 +649,6 @@ export function CourseHome({
                 {conceptCount !== null && conceptCount > 0 && (
                   <span className="tabular-nums text-muted-foreground/70">· {conceptCount}</span>
                 )}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => onOpenSection(null, null)}
-              >
-                Study whole course
               </Button>
             </div>
           </div>

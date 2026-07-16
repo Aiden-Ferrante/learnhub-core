@@ -65,8 +65,6 @@ type CourseShelfProps = {
   onSelect: (course: Course) => void
   /** Jump straight into the reading surface at the saved position (card quick action). */
   onContinue?: (course: Course, sectionKey: string | null) => void
-  /** Open the whole-course review session (card quick action). */
-  onReview?: (course: Course) => void
   onNewCourse?: () => void
   /** Open the processing dashboard (extraction/TOC) — material management lives here now. */
   onProcess?: () => void
@@ -90,7 +88,6 @@ function CourseCard({
   courseGroupIds,
   onSelect,
   onContinue,
-  onReview,
   onToggleMembership,
   onNewGroupForCourse,
   onDelete,
@@ -105,7 +102,6 @@ function CourseCard({
   courseGroupIds: string[]
   onSelect: (course: Course) => void
   onContinue?: (course: Course, sectionKey: string | null) => void
-  onReview?: (course: Course) => void
   onToggleMembership: (courseId: string, groupId: string) => void
   onNewGroupForCourse: (courseId: string) => void
   onDelete: (course: Course) => void
@@ -211,7 +207,7 @@ function CourseCard({
       </button>
 
       {/* Quick actions — jump straight into studying without the course-home stop. */}
-      {ready && (onContinue || (onReview && dueNow > 0)) && (
+      {ready && onContinue && (
         <div className="flex gap-1.5 border-t px-3 py-2">
           {onContinue && (
             <button
@@ -221,16 +217,6 @@ function CourseCard({
             >
               <BookOpen className="h-3.5 w-3.5" />
               {continueKey ? "Continue" : "Start reading"}
-            </button>
-          )}
-          {onReview && dueNow > 0 && (
-            <button
-              type="button"
-              onClick={() => onReview(course)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-status-due/50 hover:text-status-due"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Review {dueNow}
             </button>
           )}
         </div>
@@ -246,7 +232,6 @@ export function CourseShelf({
   liveCourseId,
   onSelect,
   onContinue,
-  onReview,
   onNewCourse,
   onProcess,
 }: CourseShelfProps) {
@@ -520,7 +505,6 @@ export function CourseShelf({
                   dueNow={course.learnDocId ? (dueByDoc[course.learnDocId] ?? 0) : 0}
                   continueKey={positions[course.id] ?? null}
                   onContinue={onContinue}
-                  onReview={onReview}
                   groups={groupsState.groups}
                   courseGroupIds={groupsState.membership[course.id] ?? []}
                   onDelete={setDeleteTarget}

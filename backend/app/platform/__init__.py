@@ -8,7 +8,7 @@ the Ollama client (llm) and the Pydantic schemas for structured LLM output
 
 from app.platform.db import db, set_request_db_name
 from app.platform.jobs import JobCancelled, KINDS, cancel_build, enqueue_build, ensure_worker, list_builds, queue_summary, register_runner, set_doc_resolver, set_queue_paused
-from app.platform.llm import get_chat_model, ollama_base_url, ollama_model, ollama_structured_completion
+from app.platform.llm import ollama_base_url, ollama_model, ollama_structured_completion
 from app.platform.llm_schemas import Augment, AuthoredSet, ConceptResult, ConceptVerdict, GuidedScript, Orient, ReadingGuide, Skeleton
 
 __all__ = [
@@ -26,7 +26,6 @@ __all__ = [
     "db",
     "enqueue_build",
     "ensure_worker",
-    "get_chat_model",
     "list_builds",
     "ollama_base_url",
     "ollama_model",

@@ -25,7 +25,6 @@ function ChapterInner({ params }: { params: Params }) {
 
   const drawerParam = search.get("drawer")
   const initialDrawer = DRAWERS.includes(drawerParam as Drawer) ? (drawerParam as Drawer) : undefined
-  const reviewWholeCourse = search.get("all") === "1"
 
   const handleScopeChange = useCallback(
     (sectionKey: string) => {
@@ -51,7 +50,6 @@ function ChapterInner({ params }: { params: Params }) {
         onBack={() => router.push(`/courses/${courseId}`)}
         onScopeChange={handleScopeChange}
         initialDrawer={initialDrawer}
-        reviewWholeCourse={reviewWholeCourse}
       />
     </main>
   )

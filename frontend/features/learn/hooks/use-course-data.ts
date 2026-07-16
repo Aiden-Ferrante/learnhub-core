@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { fetchTocTree, findNodeBySectionKey, type LearnTreeNode } from "@/features/learn/api/outline"
 import { fetchMastery, type MasteryResponse } from "@/features/learn/api/progress"
-import { fetchReviewQueue } from "@/features/learn/api/review"
+import { fetchStudyDebt } from "@/features/learn/api/progress"
 import {
   fetchReadingProgress,
   saveReadingPosition,
@@ -69,8 +69,8 @@ export function useCourseData(courseId: string) {
 
   const loadDue = useCallback(async (doc: string) => {
     try {
-      const data = await fetchReviewQueue(doc, null, 1)
-      setReviewDue(data.counts?.due ?? 0)
+      const debt = await fetchStudyDebt()
+      setReviewDue(debt.courses?.find((c) => c.doc === doc)?.dueNow ?? 0)
     } catch {
       setReviewDue(0)
     }

@@ -103,9 +103,10 @@ def concept_mastery(doc: str) -> Any:
 
 
 @mcp.tool()
-def due_reviews(doc: str, limit: int = 20) -> Any:
-    """The spaced-repetition queue: which concepts are due now, plus due/new/later counts."""
-    return _req("GET", "/api/review/queue", params={"doc": doc, "limit": limit})
+def due_reviews(doc: str, scope: str, limit: int = 20) -> Any:
+    """The spaced-repetition queue for one chapter/section `scope` (e.g. 'toc:2'): which
+    concepts are due now, plus due/new/later counts. Studying is chapter-scoped."""
+    return _req("GET", "/api/review/queue", params={"doc": doc, "scope": scope, "limit": limit})
 
 
 @mcp.tool()
@@ -139,7 +140,7 @@ def get_section(doc: str, section_key: str) -> Any:
 def search_text(doc: str, query: str, limit: int = 8, full: bool = False) -> Any:
     """KEYWORD search — find where a literal term is discussed (e.g. "quantization"). Returns the
     best-matching passages with section, heading, page, score and a snippet. For meaning-based
-    search use semantic_search; to get an answer use ask_textbook. Set `full=True` for full markdown."""
+    search use semantic_search. Set `full=True` for full markdown."""
     params: dict[str, Any] = {"doc": doc, "q": query, "limit": limit}
     if full:
         params["full"] = "true"
@@ -155,16 +156,8 @@ def semantic_search(doc: str, query: str, k: int = 8) -> Any:
 
 
 @mcp.tool()
-def ask_textbook(doc: str, question: str, k: int = 6) -> Any:
-    """Ask a question and get a grounded, cited answer drawn ONLY from the book's content (keyless
-    retrieval + Ollama). Returns {answer, citations:[{n,heading,page}]}. Needs the book indexed
-    (index_book(doc)). `k` = how many passages to ground the answer in."""
-    return _req("POST", "/api/ask", params={"doc": doc}, json={"q": question, "k": k})
-
-
-@mcp.tool()
 def index_book(doc: str) -> Any:
-    """Embed a book's content for semantic_search / ask_textbook (one-time, ~seconds; idempotent —
+    """Embed a book’s content for semantic_search (one-time, ~seconds; idempotent —
     re-run after adding chapters). Returns {total, indexed}."""
     return _req("POST", "/api/search/index", params={"doc": doc})
 

@@ -1,11 +1,11 @@
-"""Semantic search + grounded-answer endpoints (the keyless RAG replacement)."""
+"""Semantic search endpoints (keyless local embeddings + pgvector)."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.search import ask, ensure_index, index_status, semantic_search
+from app.search import ensure_index, index_status, semantic_search
 
 router = APIRouter()
 
@@ -38,20 +38,5 @@ def api_semantic_search(
     """Natural-language search over the content layer (cosine over MiniLM embeddings)."""
     try:
         return JSONResponse(semantic_search(q, doc, k))
-    except Exception as exc:  # noqa: BLE001
-        return JSONResponse({"error": str(exc)}, status_code=503)
-
-
-@router.post("/api/ask")
-def api_ask(doc: str | None = Query(None), body: dict = Body(...)) -> JSONResponse:
-    """Ask a question; get a grounded, cited answer from the retrieved passages."""
-    b = body or {}
-    q = str(b.get("q") or b.get("query") or "").strip()
-    if not q:
-        return JSONResponse({"error": "q (question) required"}, status_code=400)
-    k = int(b.get("k") or 6)
-    model = b.get("model")
-    try:
-        return JSONResponse(ask(q, doc, k=k, model=model))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

@@ -31,10 +31,7 @@ export type ReviewCard = {
 
 export type ReviewQueueResponse = {
   cards: ReviewCard[]
-  /** `new` is the full untouched backlog; `newAllowance` (unscoped sessions only) is how many
-   *  of them today's session will actually serve — the daily intake cap minus what was
-   *  already introduced since midnight. */
-  counts: { due: number; new: number; later: number; newAllowance?: number }
+  counts: { due: number; new: number; later: number }
   error?: string
 }
 
@@ -49,18 +46,15 @@ export type ReviewGradeResponse = {
 // Recall grades: 1=Again, 2=Hard, 3=Good, 4=Easy.
 export type ReviewGrade = 1 | 2 | 3 | 4
 
-// Due + new concepts to review. `scope` = a sectionKey (one section) or null (whole course).
+// Due + new concepts to review for one chapter/section scope (studying is chapter-scoped).
 // `docId` must be the learnDocId (concepts/reviews are keyed by it).
 export async function fetchReviewQueue(
-  docId?: string,
-  scope?: string | null,
+  docId: string | undefined,
+  scope: string,
   limit = 40,
 ): Promise<ReviewQueueResponse> {
-  const params = new URLSearchParams({ limit: String(limit) })
+  const params = new URLSearchParams({ scope, limit: String(limit) })
   if (docId) params.set('doc', docId)
-  if (scope) params.set('scope', scope)
-  // The learner's midnight, so the daily new-card allowance follows their timezone.
-  params.set('dayStart', String(new Date().setHours(0, 0, 0, 0) / 1000))
   const res = await fetch(`/api/learn/review/queue?${params}`, { cache: 'no-store' })
   return parseJsonResponse<ReviewQueueResponse>(res)
 }

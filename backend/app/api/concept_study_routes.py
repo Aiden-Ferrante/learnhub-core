@@ -21,13 +21,11 @@ router = APIRouter()
 @router.get("/api/review/queue")
 def api_review_queue(
     doc: str | None = Query(None),
-    scope: str | None = Query(None),
+    scope: str = Query(..., min_length=1),
     limit: int = Query(40, ge=1, le=200),
-    new_limit: int | None = Query(None, alias="newLimit", ge=0, le=200),
-    day_start_ts: float | None = Query(None, alias="dayStart"),
 ) -> JSONResponse:
-    """Concepts to review now: due cards (earliest first) then new (unseen) cards."""
-    return JSONResponse(build_review_queue(doc, scope, limit, new_limit, day_start_ts))
+    """Concepts to review now for one chapter/section scope (studying is chapter-scoped)."""
+    return JSONResponse(build_review_queue(doc, scope, limit))
 
 
 @router.post("/api/review/grade")
