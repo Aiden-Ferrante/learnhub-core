@@ -11,7 +11,6 @@ const SUBPAGE_LABELS: Record<string, string> = {
   concepts: "Concepts",
   drill: "Drill",
   dump: "Free recall",
-  ask: "Ask",
   read: "Book",
 }
 
