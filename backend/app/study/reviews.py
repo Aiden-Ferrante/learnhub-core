@@ -64,7 +64,8 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
         "heading, children, figure_order) "
         "VALUES (%(key)s,%(doc_id)s,%(section_key)s, to_timestamp(%(due)s), %(ease)s,%(interval)s,"
         "%(reps)s,%(lapses)s,%(state)s,%(stab)s,%(diff)s,%(step)s,%(lg)s, to_timestamp(%(lr)s), "
-        "CASE WHEN %(fr)s IS NULL THEN NULL ELSE to_timestamp(%(fr)s) END, %(it)s,%(cs)s,%(cap)s,%(pg)s,%(ord)s,"
+        # to_timestamp(NULL) is NULL; the explicit cast lets server-side binding type a None param.
+        "to_timestamp(%(fr)s::float8), %(it)s,%(cs)s,%(cap)s,%(pg)s,%(ord)s,"
         "%(hd)s,%(ch)s,%(fo)s) "
         "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
         "due=EXCLUDED.due, ease=EXCLUDED.ease, interval=EXCLUDED.interval, reps=EXCLUDED.reps, "

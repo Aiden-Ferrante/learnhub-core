@@ -16,6 +16,7 @@ import {
   type WorkingSession,
 } from "@/features/learn/api/planner"
 import { coverHue } from "@/features/learn/lib/cover"
+import { cleanCourseTitle } from "@/lib/course-title"
 import { cn } from "@/lib/utils"
 
 /** The /study planner: one cross-course surface for "when does what I studied come due"
@@ -63,7 +64,9 @@ function CourseChips({ courses, onOpen }: { courses: CalendarCourse[]; onOpen: (
             className="group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-muted/60"
           >
             <span className="h-2 w-2 shrink-0 rounded-full" style={courseDot(c.title)} />
-            <span className="min-w-0 flex-1 truncate group-hover:underline">{c.title}</span>
+            <span className="min-w-0 flex-1 truncate group-hover:underline">
+              {cleanCourseTitle(c.title).title}
+            </span>
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
               {Object.entries(c.byType)
                 .map(([t, n]) => `${n} ${TYPE_LABELS[t] || t}`)
@@ -171,7 +174,7 @@ function SessionRow({ session }: { session: WorkingSession }) {
         {duration}
         {session.courses.length > 0 && (
           <span className="block truncate text-xs text-muted-foreground">
-            {session.courses.map((c) => c.title).join(", ")}
+            {session.courses.map((c) => cleanCourseTitle(c.title).title).join(", ")}
           </span>
         )}
       </span>
@@ -262,6 +265,7 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
                         weekday: "long",
                         month: "long",
                         day: "numeric",
+                        timeZone: "UTC", // days are bucketed in UTC — keep the label on the same clock
                       })}
                       {" · "}
                       {selectedDay.total} due
