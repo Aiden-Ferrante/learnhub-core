@@ -1036,7 +1036,7 @@ export function DeepChapter({
                     {currentBuild?.phase === "extract" && currentBuild.total
                       ? ` · extracting ${currentBuild.done}/${currentBuild.total}`
                       : currentBuild?.phase === "deep"
-                        ? " · deep layer"
+                        ? " · guided layer"
                         : "…"}
                   </DropdownMenuItem>
                 ) : queuedBuild ? (
@@ -1074,7 +1074,7 @@ export function DeepChapter({
                 ) : b?.status === "queued" ? (
                   <Clock className="h-3 w-3 text-muted-foreground" />
                 ) : r && r.concepts > 0 && r.briefing ? (
-                  <span className="h-2 w-2 rounded-full bg-brand" title="Deep — ready" />
+                  <span className="h-2 w-2 rounded-full bg-brand" title="Guided reading — ready" />
                 ) : r && r.concepts > 0 ? (
                   <span className="h-2 w-2 rounded-full border border-brand bg-brand/30" title="Partially built" />
                 ) : (

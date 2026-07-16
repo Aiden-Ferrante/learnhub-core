@@ -1,9 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, GraduationCap, Sparkles } from "lucide-react"
+import { ChevronLeft, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ConceptCard, prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { prettyScope } from "@/features/learn/components/concepts/concept-card"
+import { ConceptTree } from "@/features/learn/components/concepts/concept-tree"
+import type { LearnTreeNode } from "@/features/learn/api/outline"
 import { ConceptDetail } from "@/features/learn/components/concepts/concept-detail"
 import { fetchDocumentConcepts, type ConceptLesson } from "@/features/learn/api/concepts"
 import { fetchDocumentMarkdown } from "@/features/learn/api/content"
@@ -12,6 +14,8 @@ import type { Course } from "@/features/learn/lib/courses"
 
 type ConceptsViewProps = {
   course: Course
+  /** The course outline tree (toc-tree) — the concept tree reuses its skeleton. */
+  tree: LearnTreeNode[]
   onBack: () => void
   /** Open straight onto this concept's detail (e.g. a concept clicked in the syllabus tree). */
   initialConceptKey?: string | null
@@ -19,7 +23,7 @@ type ConceptsViewProps = {
 
 type Mode = "list" | "detail"
 
-export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsViewProps) {
+export function ConceptsView({ course, tree, onBack, initialConceptKey }: ConceptsViewProps) {
   const [concepts, setConcepts] = useState<ConceptLesson[]>([])
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [mastery, setMastery] = useState<Record<string, ConceptMastery>>({})
@@ -65,24 +69,17 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
     }
   }, [course.learnDocId, loadMastery])
 
-  const groups = useMemo(() => {
-    const out: { sectionKey: string; items: { c: ConceptLesson; idx: number }[] }[] = []
-    concepts.forEach((c, idx) => {
-      const sk = c.sectionKey || ""
-      const last = out[out.length - 1]
-      if (last && last.sectionKey === sk) last.items.push({ c, idx })
-      else out.push({ sectionKey: sk, items: [{ c, idx }] })
-    })
-    return out
-  }, [concepts])
-
   // "What can I learn next": concepts you haven't mastered yet (gate "ready").
   const ready = useMemo(
     () => concepts.filter((c) => c.conceptKey && mastery[c.conceptKey]?.gate === "ready").slice(0, 10),
     [concepts, mastery],
   )
 
-  const sectionLabel = (sk: string) => titles[sk] || `§${prettyScope(sk)}`
+  const lessonsByKey = useMemo(() => {
+    const out: Record<string, ConceptLesson> = {}
+    for (const c of concepts) if (c.conceptKey) out[c.conceptKey] = c
+    return out
+  }, [concepts])
   const masteryFor = (c: ConceptLesson) => (c.conceptKey ? mastery[c.conceptKey] : undefined)
   const openConcept = (c: ConceptLesson) => {
     setSelected(c)
@@ -163,29 +160,14 @@ export function ConceptsView({ course, onBack, initialConceptKey }: ConceptsView
         </div>
       )}
 
-      <div className="flex flex-col gap-5">
-        {groups.map((g) => (
-          <section key={g.sectionKey} className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {sectionLabel(g.sectionKey)}
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {g.items.map(({ c, idx }) => {
-                const sm = masteryFor(c)
-                return (
-                  <ConceptCard
-                    key={idx}
-                    concept={c}
-                    mastery={sm?.mastery}
-                    attempts={sm?.attempts}
-                    onOpen={() => openConcept(c)}
-                  />
-                )
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
+      {!loading && !error && concepts.length > 0 && (
+        <ConceptTree
+          tree={tree}
+          lessonsByKey={lessonsByKey}
+          mastery={mastery}
+          onOpenConcept={openConcept}
+        />
+      )}
     </div>
   )
 }

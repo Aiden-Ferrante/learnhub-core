@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
  *  need a voice/source choice — that stays in the Listen drawer). */
 const COLUMNS: { key: string; label: string; kind: BuildKind | null; hint: string }[] = [
   { key: "concepts", label: "Concepts", kind: "build", hint: "Extract this chapter's concepts (+ deep overlay)" },
-  { key: "deep", label: "Deep", kind: "build", hint: "Briefing + per-concept deep explanations" },
+  { key: "deep", label: "Guided", kind: "build", hint: "Guided-reading briefing (assembled from skeleton + concepts)" },
   { key: "quizzes", label: "Quizzes", kind: "quizzes", hint: "Author application questions" },
   { key: "skeleton", label: "Skeleton", kind: "skeleton", hint: "Chapter essences (the memory scaffold)" },
   { key: "orient", label: "Orient", kind: "orient", hint: "Objectives + watch-fors" },

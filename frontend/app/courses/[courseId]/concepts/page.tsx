@@ -20,6 +20,7 @@ function ConceptsInner({ params }: { params: Params }) {
     <main className="mx-auto w-full px-4 pb-3 pt-3">
       <ConceptsView
         course={data.course}
+        tree={data.tree}
         onBack={() => router.push(`/courses/${courseId}`)}
         initialConceptKey={search.get("concept")}
       />

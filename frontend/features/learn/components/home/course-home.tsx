@@ -277,7 +277,7 @@ export function CourseHome({
                   size="sm"
                   className="h-8 gap-1.5 px-3 text-xs"
                   onClick={onDeepRead}
-                  title={plan?.resume?.nextStage ? `Next up: ${plan.resume.nextStage.label}` : "Read on the deep chapter surface"}
+                  title={plan?.resume?.nextStage ? `Next up: ${plan.resume.nextStage.label}` : "Read on the guided reading surface"}
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                   {plan?.resume
@@ -634,7 +634,7 @@ export function CourseHome({
                   onClick={onDeepRead}
                 >
                   <GraduationCap className="h-3.5 w-3.5" />
-                  Deep read
+                  Guided reading
                 </Button>
               )}
               <Button
