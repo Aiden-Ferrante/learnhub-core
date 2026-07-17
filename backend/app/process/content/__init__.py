@@ -26,6 +26,7 @@ from app.process.content.documents import (
     list_documents,
     mark_document_status,
     resolve_doc_id,
+    structure_id,
 )
 from app.process.content.elements import fetch_elements, figure_path
 from app.process.content.find import keyword_search
@@ -62,4 +63,5 @@ __all__ = [
     "resolve_doc_id",
     "scope_blocks",
     "scope_section_keys",
+    "structure_id",
 ]
