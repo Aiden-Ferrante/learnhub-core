@@ -45,8 +45,14 @@ export async function GET() {
 }
 
 /**
- * PUT /api/documents — replace the full document list (mirrors the old
- * localStorage semantics: the client owns the list, empty array clears it).
+ * PUT /api/documents — save the client's document list (UI state + order).
+ *
+ * The client no longer OWNS the table: a stale client list (e.g. a browser that
+ * predates a document uploaded in another tab) must not delete a real course. So
+ * the prune only removes cards that DON'T back a converted book — orphan
+ * placeholders (upload started, never converted) and client-only drafts. A real
+ * course is removed by deleting its document (DELETE /api/document drops the
+ * raw_documents row), after which its now-orphan card is pruned normally.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -80,8 +86,16 @@ export async function PUT(req: NextRequest) {
             jsonb(d.metadata), ts(d.extractedDate), ts(d.lastUpdated),
           ])
         }
+        // Prune only cards NOT in the client list AND not backing a converted book —
+        // a stale client list can never delete a real course (see the doc comment).
         const keys = records.map((r) => r.d.id)
-        await c.query('DELETE FROM app_documents WHERE NOT (key = ANY($1::text[]))', [keys])
+        await c.query(
+          `DELETE FROM app_documents
+             WHERE NOT (key = ANY($1::text[]))
+               AND (learn_doc_id IS NULL
+                    OR learn_doc_id NOT IN (SELECT key FROM raw_documents WHERE status = 'ready'))`,
+          [keys],
+        )
         await c.query('COMMIT')
       } catch (e) {
         await c.query('ROLLBACK')
