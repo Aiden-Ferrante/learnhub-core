@@ -1,72 +1,18 @@
 #!/bin/bash
-# Stop script for Learn Hub project
+# Stop Learn Hub — every service EXCEPT ollama. Ollama is a shared LLM other apps
+# depend on and is managed independently (Mission Control's `ollama` service).
+# Use `rm -sf` (stop+remove) rather than `down`: `down` removes the compose
+# network, which would detach the still-running ollama container.
+set -euo pipefail
 
-# Check which Docker Compose version is available
-DOCKER_COMPOSE_CMD=""
-if docker compose version &> /dev/null; then
-  DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
-  DOCKER_COMPOSE_CMD="docker-compose"
-else
-  echo "Error: Neither 'docker compose' nor 'docker-compose' is available"
-  exit 1
-fi
-
-# Parse command line arguments
-USE_VECTOR_SEARCH=false
-
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --vector-search)
-      USE_VECTOR_SEARCH=true
-      shift
-      ;;
-    --help|-h)
-      echo "Usage: ./stop.sh [OPTIONS]"
-      echo ""
-      echo "Options:"
-      echo "  --vector-search   Include vector search services"
-      echo "  --help, -h        Show this help message"
-      echo ""
-      echo "Note: Use the same flags you used with ./start.sh"
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Run './stop.sh --help' for usage information"
-      exit 1
-      ;;
-  esac
-done
-
-# Select compose file (paths relative to this script, not caller cwd)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-COMPOSE_DIR="$SCRIPT_DIR/deploy/compose"
-PROFILES=""
+COMPOSE_FILE="$SCRIPT_DIR/deploy/compose/docker-compose.yml"
 
-COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
-
-CMD="$DOCKER_COMPOSE_CMD -f $COMPOSE_FILE"
-
-if [ "$USE_VECTOR_SEARCH" = true ]; then
-  PROFILES="--profile vector-search"
-fi
-
-echo "Stopping Learn Hub services (leaving the shared Ollama running)..."
-cd "$SCRIPT_DIR"
-# Stop every service EXCEPT ollama. Ollama is a shared LLM other apps depend on
-# and is managed independently (Mission Control's `ollama` service), so tearing
-# down the whole stack here would needlessly kill it. Use `rm -sf` (stop+remove)
-# rather than `down`: `down` removes the compose network, which would detach the
-# still-running ollama container.
-SERVICES="$(eval "$CMD $PROFILES config --services" 2>/dev/null | grep -vx ollama | tr '\n' ' ')"
-if [ -n "${SERVICES// /}" ]; then
-  eval "$CMD $PROFILES rm -sf $SERVICES"
-else
-  echo "  (no non-ollama services found; nothing to stop)"
-fi
+echo "Stopping Learn Hub services (leaving the shared Ollama running)…"
+SERVICES="$(docker compose -f "$COMPOSE_FILE" config --services | grep -vx ollama | tr '\n' ' ')"
+docker compose -f "$COMPOSE_FILE" rm -sf $SERVICES
 
 echo ""
-echo "All Learn Hub services stopped; Ollama left running for other apps."
-echo "To start again, run: ./start.sh"
-echo "To stop Ollama too: docker compose -f $COMPOSE_FILE stop ollama"
+echo "Stopped; Ollama left running for other apps."
+echo "Start again: ./start.sh"
+echo "Stop Ollama too: docker compose -f $COMPOSE_FILE stop ollama"
