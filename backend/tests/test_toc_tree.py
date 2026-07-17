@@ -75,3 +75,21 @@ def test_apply_section_titles_sets_heading_on_sections_only():
     apply_section_titles(forest, {"toc:1": "Introduction"})
     assert forest[0].title == "Introduction"
     assert forest[0].children[0].title is None
+
+
+def test_drop_orphan_parts_keeps_numbered_childless_chapters():
+    """PoSD ch. 11 "Design it Twice" regression: a numbered chapter with no subsections,
+    followed by a child-bearing chapter, must NOT be dropped as an orphan Part — while a
+    slug-keyed childless "Part" container before a chaptered node still is."""
+    from app.process.content.toc_tree import TreeNode, _drop_orphan_parts
+
+    ch10 = TreeNode(id="toc:10", label="10", children=[TreeNode(id="toc:10.1", label="10.1")])
+    ch11 = TreeNode(id="toc:11", label="11")                      # childless, numbered
+    ch12 = TreeNode(id="toc:12", label="12", children=[TreeNode(id="toc:12.1", label="12.1")])
+    part = TreeNode(id="toc:part-ii", label="Part II")            # childless, slug "Part"
+
+    kept = _drop_orphan_parts([ch10, ch11, ch12])
+    assert [n.id for n in kept] == ["toc:10", "toc:11", "toc:12"]
+
+    kept = _drop_orphan_parts([part, ch12])
+    assert [n.id for n in kept] == ["toc:12"]

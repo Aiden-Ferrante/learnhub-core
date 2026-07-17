@@ -266,13 +266,18 @@ def _drop_front_back_matter(nodes: list[TreeNode]) -> list[TreeNode]:
 def _drop_orphan_parts(nodes: list[TreeNode]) -> list[TreeNode]:
     """Drop childless top-level "Part" containers that some PDFs (e.g. the CV book) bookmark at
     the SAME depth as the chapters they should hold — leaving the flat, globally-numbered chapter
-    list instead of Part/chapter siblings with colliding numbers. A childless top-level node that
-    is immediately followed by a child-bearing (chaptered) node is such an orphan Part. Strict
-    no-op for well-nested books (Parts there have children) and for chapterless books."""
+    list instead of Part/chapter siblings with colliding numbers. A childless top-level node
+    immediately followed by a child-bearing (chaptered) node is such an orphan Part — UNLESS it
+    is itself a numbered chapter (``toc:N``): a real chapter may legitimately have no
+    subsections (PoSD's ch. 11 "Design it Twice"), and "Part I/II" bookmarks never parse to
+    numeric keys (roman numerals → slug keys). Strict no-op for well-nested books (Parts there
+    have children) and for chapterless books."""
     return [
         n
         for i, n in enumerate(nodes)
-        if n.children or not (i + 1 < len(nodes) and nodes[i + 1].children)
+        if n.children
+        or TOC_NUMERIC.match(n.id or "")
+        or not (i + 1 < len(nodes) and nodes[i + 1].children)
     ]
 
 
