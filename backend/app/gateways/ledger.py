@@ -276,14 +276,16 @@ def queue_summary() -> dict[str, Any]:
         try:
             with db() as conn:
                 doc_row = conn.execute(
-                    "SELECT title, outline FROM documents WHERE key = %(d)s",
+                    "SELECT title FROM raw_documents WHERE key = %(d)s",
                     {"d": running["docId"]},
                 ).fetchone() or {}
+                ch = conn.execute(
+                    "SELECT title FROM raw_structure WHERE doc_id = %(d)s AND section_key = %(sc)s",
+                    {"d": running["docId"], "sc": running.get("scope")},
+                ).fetchone()
             running["docTitle"] = doc_row.get("title")
-            for e in doc_row.get("outline") or []:
-                if e.get("sectionKey") == running["scope"]:
-                    running["chapterTitle"] = e.get("title")
-                    break
+            if ch:
+                running["chapterTitle"] = ch.get("title")
         except Exception:  # noqa: BLE001 — titles are cosmetic
             pass
     return {

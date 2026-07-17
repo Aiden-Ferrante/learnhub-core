@@ -241,15 +241,18 @@ def match_renamed_concepts(
 def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
     # Re-extraction must be idempotent: clear this section's existing concepts first, else
     # concepts the new run no longer produces (renamed/dropped) linger.
+    from app.process.content import structure_id
+
     rows = []
     for idx, c in enumerate(sc.concepts):
         rows.append(
             {
                 "key": concept_key(sc.doc_id, sc.section_key, c.name),
                 "doc_id": sc.doc_id,
+                # A concept anchors to its section's structure node; the FK is nullable so a
+                # concept in a non-bookmarked block (no structure node) still stores.
+                "structure_id": structure_id(sc.doc_id, sc.section_key),
                 "section_key": sc.section_key,
-                "page_start": sc.page_start,
-                "page_end": sc.page_end,
                 "name": c.name,
                 "kind": c.kind,
                 "signal": c.signal,
@@ -264,7 +267,7 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
         # and therefore key — changed, onto its best-matching successor. A re-extraction
         # that improves names must not punish past study time (docs/concept-identity.md).
         old = conn.execute(
-            "SELECT key, name FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
+            "SELECT key, name FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
             {"d": sc.doc_id, "s": sc.section_key},
         ).fetchall()
         old_keys = {o["key"] for o in old}
@@ -293,16 +296,17 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
                         {"n": new_key, "o": old_key},
                     )
         conn.execute(
-            "DELETE FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
+            "DELETE FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
             {"d": sc.doc_id, "s": sc.section_key},
         )
         if rows:
             conn.cursor().executemany(
-                'INSERT INTO concepts (key, doc_id, section_key, page_start, page_end, name, kind, '
-                'signal, source, "order", created_at) VALUES (%(key)s,%(doc_id)s,%(section_key)s,'
-                '%(page_start)s,%(page_end)s,%(name)s,%(kind)s,%(signal)s,%(source)s,%(order)s, now()) '
-                "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, section_key=EXCLUDED.section_key, "
-                "page_start=EXCLUDED.page_start, page_end=EXCLUDED.page_end, name=EXCLUDED.name, "
+                'INSERT INTO ext_concepts (key, doc_id, structure_id, section_key, name, kind, '
+                'signal, source, "order", created_at) VALUES (%(key)s,%(doc_id)s,'
+                '(SELECT id FROM raw_structure WHERE id = %(structure_id)s),%(section_key)s,'
+                '%(name)s,%(kind)s,%(signal)s,%(source)s,%(order)s, now()) '
+                "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, structure_id=EXCLUDED.structure_id, "
+                "section_key=EXCLUDED.section_key, name=EXCLUDED.name, "
                 "kind=EXCLUDED.kind, signal=EXCLUDED.signal, source=EXCLUDED.source, "
                 '"order"=EXCLUDED."order", created_at=EXCLUDED.created_at',
                 rows,

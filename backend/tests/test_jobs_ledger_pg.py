@@ -22,9 +22,17 @@ SCOPE = "toc:pgtest-jobs"
 def clean_jobs():
     def _wipe():
         with db() as conn:
-            conn.execute("DELETE FROM chapter_builds WHERE doc_id = %(d)s", {"d": DOC})
+            # chapter_builds.doc_id FKs raw_documents, so the parent stub must exist first
+            # (removing it cascades the jobs away).
+            conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": DOC})
 
     _wipe()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO raw_documents (key, status) VALUES (%(d)s, 'ready') "
+            "ON CONFLICT (key) DO NOTHING",
+            {"d": DOC},
+        )
     yield
     _wipe()
 

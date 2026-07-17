@@ -281,7 +281,7 @@ def _concept_passage(concept: dict[str, Any]) -> str:
     try:
         with db() as conn:
             rows = conn.execute(
-                "SELECT markdown FROM section_content WHERE section_key = %(sk)s "
+                "SELECT markdown FROM raw_content WHERE section_key = %(sk)s "
                 'AND (%(doc)s::text IS NULL OR doc_id = %(doc)s) ORDER BY "order" ASC',
                 {"sk": sk, "doc": concept.get("docId")},
             ).fetchall()
@@ -312,7 +312,7 @@ def author_scope_sync(doc: str | None, section_keys: list[str], limit: int = 100
     with db() as conn:
         rows = conn.execute(
             'SELECT key, name, signal, source, doc_id AS "docId", section_key AS "sectionKey" '
-            "FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "FROM ext_concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
             "AND section_key = ANY(%(ks)s::text[]) AND signal IS NOT NULL "
             "AND (quiz_questions IS NULL OR jsonb_array_length(quiz_questions) = 0) LIMIT %(lim)s",
             {"doc": doc, "ks": section_keys, "lim": limit},
@@ -324,7 +324,7 @@ def author_scope_sync(doc: str | None, section_keys: list[str], limit: int = 100
     with db() as conn:
         for sk in {r.get("sectionKey") for r in rows}:
             srows = conn.execute(
-                "SELECT name FROM concepts WHERE section_key = %(sk)s", {"sk": sk}
+                "SELECT name FROM ext_concepts WHERE section_key = %(sk)s", {"sk": sk}
             ).fetchall()
             sibs[sk] = [r["name"] for r in srows if r.get("name")]
     authored = 0
@@ -336,7 +336,7 @@ def author_scope_sync(doc: str | None, section_keys: list[str], limit: int = 100
         if qs:
             with db() as conn:
                 conn.execute(
-                    "UPDATE concepts SET quiz_questions = %(q)s WHERE key = %(k)s",
+                    "UPDATE ext_concepts SET quiz_questions = %(q)s WHERE key = %(k)s",
                     {"q": Json(qs), "k": r["key"]},
                 )
             authored += 1
@@ -377,12 +377,12 @@ def scope_question_status(doc: str | None, section_keys: set[str] | None) -> dic
     keys = sorted(section_keys)
     with db() as conn:
         total = conn.execute(
-            "SELECT count(*) AS n FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "SELECT count(*) AS n FROM ext_concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
             "AND section_key = ANY(%(ks)s::text[]) AND signal IS NOT NULL",
             {"doc": doc, "ks": keys},
         ).fetchone()["n"]
         authored = conn.execute(
-            "SELECT count(*) AS n FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
+            "SELECT count(*) AS n FROM ext_concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
             "AND section_key = ANY(%(ks)s::text[]) AND quiz_questions IS NOT NULL "
             "AND jsonb_array_length(quiz_questions) > 0",
             {"doc": doc, "ks": keys},

@@ -12,12 +12,14 @@ document exists.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 from pathlib import Path
 from typing import Any
 
 from app.process.ingestion import PdfConvertError, convert_pdf_bytes
+from app.process.content import create_stub, mark_document_status
 from app.conductor.lifecycle import on_converted
 
 __all__ = [
@@ -32,10 +34,15 @@ def _pdf_path(doc_id: str) -> Path:
 
 
 def prepare_upload(data: bytes, filename: str) -> dict[str, Any]:
-    """Mint a document id, stash the uploaded PDF on the shared volume, and return the
-    ``docId`` + ``pdfPath`` for a ``convert`` job to pick up. The bytes live on disk (not in
-    memory or the ledger row) so the conversion survives an app restart."""
+    """Mint a document id, insert its stub identity row (status='converting') so the convert
+    job and any content FK against it, stash the PDF on the shared volume, and return the
+    ``docId`` + ``pdfPath``. Stub-before-enqueue is what the FKs require; it also makes a
+    re-upload detectable mid-conversion. The bytes live on disk (not in memory or the ledger
+    row) so the conversion survives an app restart."""
     doc_id = str(uuid.uuid4())
+    source_hash = hashlib.sha256(data).hexdigest()
+    title = filename.rsplit(".", 1)[0] if filename else "document"
+    create_stub(doc_id, title, source_hash)
     path = _pdf_path(doc_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
@@ -56,6 +63,7 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
         result = convert_pdf_bytes(data, filename, doc_id=doc_id)
     except PdfConvertError as e:
         ctx.patch({"statusCode": e.status_code})
+        mark_document_status(doc_id, "error", e.status_code)
         return {"error": str(e)}
     ctx.patch({
         "result": {

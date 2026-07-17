@@ -94,7 +94,7 @@ def author_guides_sync(doc: str | None, scope: str | None, on_progress=None) -> 
     with db() as conn:
         existing = {
             r["key"] for r in conn.execute(
-                "SELECT key FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+                "SELECT key FROM ext_guides WHERE doc_id = %(d)s", {"d": doc}
             ).fetchall()
         }
     authored = 0
@@ -105,10 +105,10 @@ def author_guides_sync(doc: str | None, scope: str | None, on_progress=None) -> 
             if g:
                 with db() as conn:
                     conn.execute(
-                        "INSERT INTO reading_guides (key, doc_id, section_key, focus, checks, created_at) "
-                        "VALUES (%(k)s,%(d)s,%(sk)s,%(focus)s,%(checks)s, now()) "
-                        "ON CONFLICT (key) DO UPDATE SET focus=EXCLUDED.focus, checks=EXCLUDED.checks",
-                        {"k": k, "d": doc, "sk": b["sectionKey"],
+                        "INSERT INTO ext_guides (key, doc_id, structure_id, section_key, focus, checks, created_at) "
+                        "VALUES (%(k)s,%(d)s,(SELECT id FROM raw_structure WHERE id = %(sid)s),%(sk)s,%(focus)s,%(checks)s, now()) "
+                        "ON CONFLICT (key) DO UPDATE SET structure_id=EXCLUDED.structure_id, focus=EXCLUDED.focus, checks=EXCLUDED.checks",
+                        {"k": k, "d": doc, "sid": f"{doc}::{b['sectionKey']}", "sk": b["sectionKey"],
                          "focus": g.get("focus"), "checks": Json(g.get("checks"))},
                     )
                 authored += 1
@@ -134,7 +134,7 @@ def guide_status(doc: str | None, scope: str | None) -> dict[str, Any]:
     with db() as conn:
         existing = {
             r["key"] for r in conn.execute(
-                "SELECT key FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+                "SELECT key FROM ext_guides WHERE doc_id = %(d)s", {"d": doc}
             ).fetchall()
         }
     authored = sum(1 for b in blocks if _key(doc, b["sectionKey"]) in existing)
@@ -173,7 +173,7 @@ def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
             depth_by = {s["sectionKey"]: s.get("depth", 0) for s in secs}
             with db() as conn:
                 skel = conn.execute(
-                    "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                    "SELECT sections FROM ext_skeleton WHERE key = %(k)s",
                     {"k": _skel_key(doc, scope)},
                 ).fetchone()
             if skel:
@@ -187,7 +187,7 @@ def fetch_reading_guide(doc: str | None, scope: str | None) -> dict[str, Any]:
         with db() as conn:
             guides = {
                 r["key"]: r for r in conn.execute(
-                    "SELECT key, focus, checks FROM reading_guides WHERE doc_id = %(d)s", {"d": doc}
+                    "SELECT key, focus, checks FROM ext_guides WHERE doc_id = %(d)s", {"d": doc}
                 ).fetchall()
             }
         sections = []

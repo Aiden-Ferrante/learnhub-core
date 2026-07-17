@@ -54,7 +54,7 @@ def _sample_concepts(doc_id: str, section_keys: list[str] | None, n: int) -> lis
     with db() as conn:
         return conn.execute(
             'SELECT key, name, kind, signal, source, section_key AS "sectionKey" '
-            "FROM concepts WHERE doc_id = %(d)s "
+            "FROM ext_concepts WHERE doc_id = %(d)s "
             "AND (%(ks)s::text[] IS NULL OR section_key = ANY(%(ks)s::text[])) "
             "ORDER BY md5(key) LIMIT %(n)s",
             {"d": doc_id, "ks": section_keys, "n": n},

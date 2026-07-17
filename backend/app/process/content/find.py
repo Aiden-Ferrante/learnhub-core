@@ -35,7 +35,7 @@ def keyword_search(doc_id: str | None, query: str, limit: int = 8, full: bool = 
         blocks = conn.execute(
             'SELECT section_key AS "sectionKey", heading, markdown, '
             'page_start AS "pageStart", page_end AS "pageEnd" '
-            "FROM section_content WHERE markdown IS NOT NULL "
+            "FROM raw_content WHERE markdown IS NOT NULL "
             "AND (%(d)s::text IS NULL OR doc_id = %(d)s)",
             {"d": doc_id},
         ).fetchall()

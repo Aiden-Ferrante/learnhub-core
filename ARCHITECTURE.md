@@ -40,8 +40,8 @@ The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 |---|---|
 | `gateways/` | The connections to programs outside this process: Postgres pool + X-User-Db schema tenancy (`db.py`), Ollama client (`llm.py`, `llm_schemas.py`), and the persistent jobs ledger stored in Postgres (`ledger.py` — rows only, no worker; the doc resolver is injected) |
 | `process/ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
-| `process/content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`) |
-| `process/extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), assembled chapter briefing (`deep_chapter.py`), skeleton, reading guides |
+| `process/content/` | The book itself, in the `raw_` tables: identity/stub + status (`documents.py`), the TOC as a self-referencing tree + the markdown blocks + figures (`store.py` writes `raw_structure`/`raw_content`/`raw_elements`), markdown→section splitting (`sections.py`), page-range assignment (`pages.py`), the canonical bookmark outline (`outline.py`), figure reads (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`), keyword search (`find.py`) |
+| `process/extraction/` | LLM generation passes, into the `ext_` tables: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), the derived chapter briefing over the `ext_briefing` **view** (`guided_reading.py`), skeleton + orient (`skeleton.py`), reading guides (`reading_guide.py`) — each row anchored to a `raw_structure` node by a nullable FK |
 | `supplemental/study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, FSRS (`srs.py`) |
 | `supplemental/media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
 | `conductor/` | Decides what runs, and wires it (the job rows live in `gateways/ledger`): the one queue worker + runner registry + `JobCtx` (`worker.py`), phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state + auto-chain `converted → extract` (`lifecycle.py`), and the composition root that registers every job-kind runner and starts the worker (`registry.py`) |
@@ -49,6 +49,29 @@ The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 
 `app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, and
 `conductor/registry.install()` (job-runner wiring).
+
+## Database schema — sections, one owner each
+
+Integrity lives in the database, not in application convention. Tables are grouped by
+**name prefix**, each section owned by the package above:
+
+| Prefix | Owner | Tables |
+|---|---|---|
+| `raw_` | `process/` | `raw_documents` (identity + status), `raw_structure` (the TOC as a self-referencing tree; `id = doc_id::section_key`), `raw_content` (markdown blocks), `raw_elements` (figures/tables) |
+| `ext_` | `process/extraction` | `ext_concepts`, `ext_orient`, `ext_skeleton`, `ext_guides` — plus `ext_briefing`, a **view** derived from orient + skeleton (aggregators are views, never stored tables) |
+| `study_`-ish | `supplemental/study` | `concept_reviews`, `study_events`, `chapter_progress` (unchanged this pass — no doc FK yet) |
+| operational | `gateways/ledger` + `conductor` | `chapter_builds` (job ledger), `learn_meta` (queue flag) |
+| deferred | frontend | `app_documents`, `user_settings` (the course card + UI state — the user layer) |
+
+Rules the schema enforces: every child of a document carries a NOT NULL `doc_id` FK with
+`ON DELETE CASCADE`; `structure_id` is a nullable FK to a `raw_structure` node (content
+and concepts are finer-grained than the TOC, so a row may anchor to no node). A stub
+`raw_documents` row is created at upload (`status='converting'`), so a job or content row
+always has a parent — which is why the stub is inserted **before** the convert job
+enqueues. Deleting a document is one `DELETE FROM raw_documents`; the cascade removes its
+whole `raw_`/`ext_` graph + its jobs (the un-FK'd study tables are pruned explicitly until
+the study layer is re-anchored). Pages are metadata on the structure/content rows — there
+is no page-content table; the raw PDF is served from disk for a page view.
 
 ## The document lifecycle
 
@@ -66,7 +89,7 @@ single easiest way to get an empty result from a query that "should" work.
 
 | Name | Where it lives | Used for |
 |---|---|---|
-| **learn-doc-key** | `documents.key` (PK). Every backend table references it as `doc_id` — `concepts`, `section_content`, `elements`, `concept_reviews`, `chapter_*`, … | The canonical id in the backend. Every content/study/enrichment row is keyed by it. |
+| **learn-doc-key** | `raw_documents.key` (PK). Every backend table references it as `doc_id` (a NOT NULL FK for the `raw_`/`ext_` tables) — `raw_structure`, `raw_content`, `ext_concepts`, `concept_reviews`, `chapter_*`, … | The canonical id in the backend. Every content/study/enrichment row is keyed by it. |
 | **app-document-id** | `app_documents.key` = `app_documents.id` (same value) | The frontend's id for a course card and the id in the URL `/courses/<id>`. Backend content code never sees it. |
 
 The bridge is one column: **`app_documents.learn_doc_id → documents.key`**. The frontend

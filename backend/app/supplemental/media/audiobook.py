@@ -153,7 +153,7 @@ def _scope_segments_concepts(doc_id: str, scope: str | None) -> list[str]:
         return []
     with db() as conn:
         rows = conn.execute(
-            "SELECT name, signal FROM concepts "
+            "SELECT name, signal FROM ext_concepts "
             "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
             'ORDER BY section_key, "order"',
             {"d": doc_id, "ks": keys},
@@ -196,7 +196,7 @@ def _spoken(s: object) -> str:
 def _concepts_for_section(doc_id: str, section_key: str) -> list[dict]:
     with db() as conn:
         return conn.execute(
-            'SELECT name, signal FROM concepts WHERE doc_id = %(d)s AND section_key = %(s)s '
+            'SELECT name, signal FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s '
             'ORDER BY "order"',
             {"d": doc_id, "s": section_key},
         ).fetchall()

@@ -108,7 +108,7 @@ def fetch_section_titles(doc_id: str | None = None) -> dict[str, str]:
 
     with db() as conn:
         rows = conn.execute(
-            'SELECT section_key AS key, heading, "order" FROM section_content '
+            'SELECT section_key AS key, heading, "order" FROM raw_content '
             "WHERE doc_id = %(doc)s AND heading IS NOT NULL AND heading <> '' ORDER BY \"order\"",
             {"doc": doc_id},
         ).fetchall()
@@ -143,12 +143,10 @@ def fetch_section_titles(doc_id: str | None = None) -> dict[str, str]:
 
 
 def fetch_outline_titles(doc_id: str) -> dict[str, str]:
-    """sectionKey -> clean bookmark title from ``documents.outline`` (empty when absent)."""
-    with db() as conn:
-        row = conn.execute(
-            "SELECT outline FROM documents WHERE key = %(doc)s", {"doc": doc_id}
-        ).fetchone()
-    outline = row["outline"] if row and isinstance(row["outline"], list) else []
+    """sectionKey -> clean bookmark title from the structure tree (empty when absent)."""
+    from app.process.content.documents import fetch_structure_entries
+
+    outline = fetch_structure_entries(doc_id)
     out: dict[str, str] = {}
     for e in outline:
         key = (e.get("sectionKey") or "").strip()
@@ -182,7 +180,7 @@ def _concept_counts_by_section(doc_id: str) -> dict[str, int]:
     try:
         with db() as conn:
             rows = conn.execute(
-                "SELECT section_key AS sk, count(*) AS n FROM concepts "
+                "SELECT section_key AS sk, count(*) AS n FROM ext_concepts "
                 "WHERE doc_id = %(d)s GROUP BY section_key",
                 {"d": doc_id},
             ).fetchall()
@@ -206,7 +204,7 @@ def _concepts_by_section(doc_id: str) -> dict[str, list[dict[str, Any]]]:
     try:
         with db() as conn:
             rows = conn.execute(
-                "SELECT section_key AS sk, key, name, kind FROM concepts "
+                "SELECT section_key AS sk, key, name, kind FROM ext_concepts "
                 'WHERE doc_id = %(d)s ORDER BY section_key, "order"',
                 {"d": doc_id},
             ).fetchall()

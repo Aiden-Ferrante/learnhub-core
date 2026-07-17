@@ -45,7 +45,7 @@ def _pool(doc: str | None, scope: str | None) -> tuple[list[dict[str, Any]], lis
     with db() as conn:
         rows = conn.execute(
             'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
-            'quiz_questions AS "quizQuestions" FROM concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s',
+            'quiz_questions AS "quizQuestions" FROM ext_concepts WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s',
             {"doc": doc},
         ).fetchall()
     keys = scope_section_keys(doc, scope)

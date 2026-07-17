@@ -326,7 +326,7 @@ def _section_concept_ids(section_key: str, doc: str | None) -> set[str]:
     try:
         with db() as conn:
             rows = conn.execute(
-                "SELECT key FROM concepts WHERE section_key = %(s)s "
+                "SELECT key FROM ext_concepts WHERE section_key = %(s)s "
                 "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
                 {"s": section_key, "doc": doc},
             ).fetchall()
@@ -448,7 +448,7 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
     try:
         with db() as conn:
             concepts = conn.execute(
-                'SELECT key, name, section_key AS "sectionKey" FROM concepts '
+                'SELECT key, name, section_key AS "sectionKey" FROM ext_concepts '
                 "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
                 {"doc": doc},
             ).fetchall()

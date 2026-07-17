@@ -1,31 +1,25 @@
 """Deep Chapter — the assembled reading-first chapter surface.
 
-One non-destructive, idempotent artifact: ``deep_chapter_briefing`` — a chapter
-briefing ASSEMBLED from the already-cached artifacts (orient objectives/watch-fors
-+ skeleton essences + key concepts), cached per (doc, scope).
+The chapter briefing is DERIVED, never stored: the ``ext_briefing`` view aggregates the
+already-cached parts (orient objectives/watch-fors + skeleton essences) per (doc, scope),
+and ``build_briefing`` layers on the concept preview (which needs the Python scope
+resolver). Nothing is written — the briefing can never drift from its parts.
 
 Per-concept "deep explanations" were retired (2026-07-15): they were a second,
-UNGROUNDED explanation competing with the grounded ``signal``; the concept record
-now has one explanation of record. The GET assembler never calls the LLM — it
-serves whatever is cached (and assembles+caches the briefing the moment its
-orient/skeleton parts exist), so opening a chapter is always fast.
+UNGROUNDED explanation competing with the grounded ``signal``; the concept record now
+has one explanation of record. The assembler never calls the LLM — it reads caches only,
+so opening a chapter is always fast.
 """
 
 from __future__ import annotations
 
-import hashlib
 import time
 from typing import Any
 
 from app.process.content import resolve_doc_id
 from app.process.content import fetch_section_content
-from psycopg.types.json import Json
 
 from app.gateways import db
-
-
-def briefing_key(doc_id: str, scope: str | None) -> str:
-    return hashlib.sha256(f"{doc_id}|{scope or 'ALL'}".encode()).hexdigest()[:16]
 
 
 # --------------------------------------------------------------------------- #
@@ -33,26 +27,24 @@ def briefing_key(doc_id: str, scope: str | None) -> str:
 # --------------------------------------------------------------------------- #
 
 def build_briefing(doc_id: str, scope: str | None) -> dict | None:
-    """Assemble the chapter briefing from the cached orient/skeleton/concepts.
-
-    Reads caches only — never calls the LLM — so opening a chapter never waits
-    on a model. Returns None when nothing is cached yet.
+    """Assemble the chapter briefing — DERIVED, never stored. The relational part
+    (objectives + watch-fors + section essences) comes from the ``ext_briefing`` view
+    over orient + skeleton; the concept preview needs the Python scope resolver, so it is
+    layered on here. Reads caches only — never calls the LLM — so opening a chapter never
+    waits on a model. Returns None when nothing is cached yet.
     """
-    from app.process.extraction.skeleton import _attach_depths, chapter_cache_key as skel_key
+    from app.process.extraction.skeleton import _attach_depths
 
     with db() as conn:
-        orient = conn.execute(
-            'SELECT objectives, watch_for AS "watchFor" FROM chapter_orient WHERE key = %(k)s',
-            {"k": skel_key(doc_id, scope)},
+        row = conn.execute(
+            'SELECT objectives, watch_for AS "watchFor", sections FROM ext_briefing '
+            "WHERE doc_id = %(d)s AND scope IS NOT DISTINCT FROM %(sc)s",
+            {"d": doc_id, "sc": scope},
         ).fetchone() or {}
-        cached = conn.execute(
-            "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
-            {"k": skel_key(doc_id, scope)},
-        ).fetchone() or {}
-    sections = _attach_depths(doc_id, cached.get("sections") or [])
 
-    objectives = orient.get("objectives") or []
-    watch_for = orient.get("watchFor") or []
+    objectives = row.get("objectives") or []
+    watch_for = row.get("watchFor") or []
+    sections = _attach_depths(doc_id, row.get("sections") or [])
     if not (objectives or watch_for or sections):
         return None
 
@@ -68,7 +60,7 @@ def build_briefing(doc_id: str, scope: str | None) -> dict | None:
             for c in rows[:10]
         ]
 
-    briefing = {
+    return {
         "docId": doc_id,
         "scope": scope,
         "objectives": objectives,
@@ -78,18 +70,6 @@ def build_briefing(doc_id: str, scope: str | None) -> dict | None:
         "conceptCount": concept_count,
         "createdAt": int(time.time()),
     }
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO deep_chapter_briefing (key, doc_id, scope, objectives, watch_for, sections, "
-            "key_concepts, concept_count, created_at) VALUES "
-            "(%(k)s,%(d)s,%(sc)s,%(obj)s,%(wf)s,%(sec)s,%(kc)s,%(cc)s, now()) "
-            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
-            "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, sections=EXCLUDED.sections, "
-            "key_concepts=EXCLUDED.key_concepts, concept_count=EXCLUDED.concept_count, created_at=EXCLUDED.created_at",
-            {"k": briefing_key(doc_id, scope), "d": doc_id, "sc": scope, "obj": Json(objectives),
-             "wf": Json(watch_for), "sec": Json(sections), "kc": Json(key_concepts), "cc": concept_count},
-        )
-    return briefing
 
 
 # --------------------------------------------------------------------------- #
@@ -97,11 +77,13 @@ def build_briefing(doc_id: str, scope: str | None) -> dict | None:
 # --------------------------------------------------------------------------- #
 
 def deep_status(doc_id: str, scope: str | None) -> dict[str, Any]:
-    """Readiness of the reading surface for a scope: briefing presence.
+    """Readiness of the reading surface for a scope: whether the briefing's parts (orient /
+    skeleton) are cached — the ext_briefing view has a row exactly when they are.
     ``running`` is kept for wire-compat; nothing backfills out-of-band anymore."""
     with db() as conn:
         has_briefing = conn.execute(
-            "SELECT 1 FROM deep_chapter_briefing WHERE key = %(k)s", {"k": briefing_key(doc_id, scope)}
+            "SELECT 1 FROM ext_briefing WHERE doc_id = %(d)s AND scope IS NOT DISTINCT FROM %(sc)s",
+            {"d": doc_id, "sc": scope},
         ).fetchone() is not None
     return {"running": False, "briefing": has_briefing}
 
@@ -127,15 +109,7 @@ def fetch_guided_reading(doc_id: str | None, scope: str) -> dict[str, Any]:
         sec = fetch_section_concepts(scope, doc_id)
         concepts = sec.get("concepts", [])
 
-        with db() as conn:
-            briefing = conn.execute(
-                'SELECT doc_id AS "docId", scope, objectives, watch_for AS "watchFor", sections, '
-                'key_concepts AS "keyConcepts", concept_count AS "conceptCount" '
-                "FROM deep_chapter_briefing WHERE key = %(k)s",
-                {"k": briefing_key(doc_id, scope)},
-            ).fetchone()
-        if not briefing:
-            briefing = build_briefing(doc_id, scope)
+        briefing = build_briefing(doc_id, scope)
 
         return {
             "docId": doc_id,

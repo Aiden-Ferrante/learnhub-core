@@ -329,13 +329,13 @@ def _chapter_snapshot(doc_id: str, scope: str) -> tuple[str | None, list[dict[st
     children: list[dict[str, str]] = []
     with db() as conn:
         row = conn.execute(
-            "SELECT heading FROM section_content WHERE doc_id = %(d)s AND section_key = %(s)s LIMIT 1",
+            "SELECT heading FROM raw_content WHERE doc_id = %(d)s AND section_key = %(s)s LIMIT 1",
             {"d": doc_id, "s": scope},
         ).fetchone()
         if row and row.get("heading"):
             heading = str(row["heading"]).strip() or None
         skel = conn.execute(
-            "SELECT sections FROM chapter_skeletons WHERE doc_id = %(d)s AND scope = %(s)s LIMIT 1",
+            "SELECT sections FROM ext_skeleton WHERE doc_id = %(d)s AND scope = %(s)s LIMIT 1",
             {"d": doc_id, "s": scope},
         ).fetchone()
     if skel and skel.get("sections"):
@@ -347,7 +347,7 @@ def _chapter_snapshot(doc_id: str, scope: str) -> tuple[str | None, list[dict[st
         if span:
             with db() as conn:
                 concepts = conn.execute(
-                    'SELECT name, signal, section_key AS "sectionKey" FROM concepts '
+                    'SELECT name, signal, section_key AS "sectionKey" FROM ext_concepts '
                     'WHERE doc_id = %(d)s ORDER BY "order"',
                     {"d": doc_id},
                 ).fetchall()
@@ -434,9 +434,10 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
         span = scope_section_keys(doc, scope)
         with db() as conn:
             concepts = conn.execute(
-                'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
-                'doc_id AS "docId", page_start AS "pageStart", page_end AS "pageEnd" '
-                'FROM concepts WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) ORDER BY "order"',
+                'SELECT c.key, c.name, c.kind, c.signal, c.source, c.section_key AS "sectionKey", '
+                'c.doc_id AS "docId", s.page_start AS "pageStart", s.page_end AS "pageEnd" '
+                'FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id '
+                'WHERE (%(doc)s::text IS NULL OR c.doc_id = %(doc)s) ORDER BY c."order"',
                 {"doc": doc},
             ).fetchall()
             reviews: dict[str, dict[str, Any]] = {}
@@ -470,7 +471,7 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
             seeded = {r["key"] for r in figure_rows}
             with db() as conn:
                 figs = conn.execute(
-                    'SELECT "order", page, caption, section_key AS "sectionKey" FROM elements '
+                    'SELECT "order", page, caption, section_key AS "sectionKey" FROM raw_elements '
                     "WHERE doc_id = %(d)s AND type = 'figure' AND caption IS NOT NULL AND caption <> '' "
                     'ORDER BY "order"',
                     {"d": doc},
@@ -527,7 +528,7 @@ def grade_review(body: dict, concept_key: str, grade: int, now: float) -> tuple[
         with db() as conn:
             concept = conn.execute(
                 'SELECT doc_id AS "docId", section_key AS "sectionKey", name, signal '
-                "FROM concepts WHERE key = %(k)s",
+                "FROM ext_concepts WHERE key = %(k)s",
                 {"k": concept_key},
             ).fetchone()
             if not concept:

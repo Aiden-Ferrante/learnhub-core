@@ -36,7 +36,7 @@ def _doc_pool(doc_id: str) -> list[dict]:
     with db() as conn:
         return conn.execute(
             'SELECT key, name, kind, signal, source, section_key AS "sectionKey", '
-            'quiz_questions AS "quizQuestions" FROM concepts WHERE doc_id = %(d)s',
+            'quiz_questions AS "quizQuestions" FROM ext_concepts WHERE doc_id = %(d)s',
             {"d": doc_id},
         ).fetchall()
 

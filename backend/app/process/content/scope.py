@@ -94,14 +94,9 @@ def _scope_keys_from_outline(doc_id: str, scope: str) -> set[str] | None:
     works when a numbered chapter (``toc:2``) contains slug sub-sections (``toc:modeling``) that
     aren't numeric descendants of the chapter. Returns None if ``scope`` isn't an outline entry
     (caller falls back to the reading-order span)."""
-    try:
-        with db() as conn:
-            row = conn.execute(
-                "SELECT outline FROM documents WHERE key = %(doc)s", {"doc": doc_id}
-            ).fetchone()
-    except Exception:  # noqa: BLE001
-        return None
-    outline = row["outline"] if row else None
+    from app.process.content.documents import fetch_structure_entries
+
+    outline = fetch_structure_entries(doc_id)
     if not outline:
         return None
     idx = next((i for i, e in enumerate(outline) if e.get("sectionKey") == scope), None)
@@ -121,7 +116,7 @@ def _fetch_scope_rows(doc_id: str) -> list[dict]:
     with db() as conn:
         return conn.execute(
             'SELECT section_key AS "sectionKey", "order", heading, level '
-            "FROM section_content WHERE doc_id = %(d)s ORDER BY \"order\"",
+            "FROM raw_content WHERE doc_id = %(d)s ORDER BY \"order\"",
             {"d": doc_id},
         ).fetchall()
 
@@ -194,7 +189,7 @@ def load_section_blocks(
         rows = conn.execute(
             'SELECT section_key AS "sectionKey", "order", heading, level, markdown, '
             'page_start AS "pageStart", page_end AS "pageEnd" '
-            'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+            'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
             {"d": doc_id},
         ).fetchall()
     if scope:

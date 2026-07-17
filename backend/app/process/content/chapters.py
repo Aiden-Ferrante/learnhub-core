@@ -34,7 +34,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
         with db() as conn:
             rows = conn.execute(
                 'SELECT section_key AS "sectionKey", "order", heading, level '
-                'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+                'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
                 {"d": doc_id},
             ).fetchall()
         def has_content(key: str) -> bool:
@@ -145,7 +145,7 @@ def fetch_chapter(doc_id: str | None, ref: str, max_chars: int = 0) -> dict[str,
         blocks = conn.execute(
             'SELECT markdown, section_key AS "sectionKey", heading, '
             'page_start AS "pageStart", page_end AS "pageEnd" '
-            "FROM section_content WHERE doc_id = %(d)s AND page_start IS NOT NULL "
+            "FROM raw_content WHERE doc_id = %(d)s AND page_start IS NOT NULL "
             'AND page_start >= %(s)s AND page_start < %(e)s ORDER BY page_start ASC, "order" ASC',
             {"d": resolved_doc, "s": start, "e": end},
         ).fetchall()

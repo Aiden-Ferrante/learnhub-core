@@ -135,7 +135,7 @@ def _figures_by_section(doc_id: str, section_keys: set[str]) -> dict[str, list[d
         return out
     with db() as conn:
         rows = conn.execute(
-            'SELECT section_key AS "sectionKey", "order", page, caption FROM elements '
+            'SELECT section_key AS "sectionKey", "order", page, caption FROM raw_elements '
             "WHERE doc_id = %(d)s AND type = 'figure' AND section_key = ANY(%(ks)s) "
             "AND caption IS NOT NULL AND caption <> '' ORDER BY \"order\"",
             {"d": doc_id, "ks": list(section_keys)},
@@ -169,7 +169,7 @@ def fetch_elements(
             'SELECT "order", type, page, bbox, bbox_origin AS "bboxOrigin", '
             'section_key AS "sectionKey", caption, image_ref AS "imageRef", latex, '
             'table_markdown AS "tableMarkdown", table_data AS "tableData", code, language '
-            "FROM elements WHERE doc_id = %(d)s"
+            "FROM raw_elements WHERE doc_id = %(d)s"
         )
         binds: dict = {"d": doc_id}
         if el_type:

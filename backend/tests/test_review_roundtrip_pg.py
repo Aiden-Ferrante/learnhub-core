@@ -39,7 +39,7 @@ def _seed_concept_and_review(now: float) -> str:
     key = "pgtest-concept-1"
     with db() as conn:
         conn.execute(
-            'INSERT INTO concepts (key, doc_id, section_key, name, kind, signal, "order") '
+            'INSERT INTO ext_concepts (key, doc_id, section_key, name, kind, signal, "order") '
             "VALUES (%(k)s,%(d)s,%(s)s,'Test concept','definition','The signal.',1) "
             "ON CONFLICT (key) DO NOTHING",
             {"k": key, "d": DOC, "s": SCOPE},
@@ -76,10 +76,17 @@ def clean_pgtest_rows():
     def _wipe() -> None:
         with db() as conn:
             conn.execute("DELETE FROM concept_reviews WHERE doc_id = %(d)s", {"d": DOC})
-            conn.execute("DELETE FROM concepts WHERE doc_id = %(d)s", {"d": DOC})
             conn.execute("DELETE FROM study_events WHERE doc = %(d)s", {"d": DOC})
+            # ext_concepts.doc_id FKs raw_documents; dropping the stub cascades the concepts.
+            conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": DOC})
 
     _wipe()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO raw_documents (key, status) VALUES (%(d)s, 'ready') "
+            "ON CONFLICT (key) DO NOTHING",
+            {"d": DOC},
+        )
     yield
     _wipe()
 

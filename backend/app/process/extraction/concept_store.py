@@ -17,7 +17,7 @@ def concept_count(doc_id: str, section_keys: list[str]) -> int:
         return 0
     with db() as conn:
         return conn.execute(
-            "SELECT count(*) AS n FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+            "SELECT count(*) AS n FROM ext_concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
             {"d": doc_id, "ks": section_keys},
         ).fetchone()["n"]
 
@@ -28,7 +28,7 @@ def _concept_reading_ranks(doc_id: str, rows: list[dict]) -> dict[str, int]:
     sec_order: dict[str, int] = {}
     with db() as conn:
         srows = conn.execute(
-            'SELECT section_key AS k, "order" AS o FROM section_content WHERE doc_id = %(d)s',
+            'SELECT section_key AS k, "order" AS o FROM raw_content WHERE doc_id = %(d)s',
             {"d": doc_id},
         ).fetchall()
     for r in srows:
@@ -66,7 +66,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
             with db() as conn:
                 blocks = conn.execute(
                     'SELECT section_key AS "sectionKey", "order", heading, level '
-                    'FROM section_content WHERE doc_id = %(d)s ORDER BY "order"',
+                    'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
                     {"d": doc_id},
                 ).fetchall()
             if blocks:
@@ -92,9 +92,10 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
 
         with db() as conn:
             rows = conn.execute(
-                'SELECT key AS "conceptKey", name, kind, signal, source, '
-                'section_key AS "sectionKey", "order", page_start AS "pageStart", page_end AS "pageEnd" '
-                "FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
+                'SELECT c.key AS "conceptKey", c.name, c.kind, c.signal, c.source, '
+                'c.section_key AS "sectionKey", c."order", s.page_start AS "pageStart", s.page_end AS "pageEnd" '
+                "FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id "
+                "WHERE c.doc_id = %(d)s AND c.section_key = ANY(%(ks)s::text[])",
                 {"d": doc_id, "ks": scope_keys},
             ).fetchall()
         # Reading order across the span: by section position, then within-section order.
@@ -118,7 +119,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
 
             with db() as conn:
                 skel = conn.execute(
-                    "SELECT sections FROM chapter_skeletons WHERE key = %(k)s",
+                    "SELECT sections FROM ext_skeleton WHERE key = %(k)s",
                     {"k": _skel_key(doc_id, section_key)},
                 ).fetchone()
             if skel and skel.get("sections"):
@@ -151,9 +152,10 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
             return {"docId": None, "concepts": []}
         with db() as conn:
             rows = conn.execute(
-                'SELECT key, name, kind, signal, source, '
-                'section_key AS "sectionKey", page_start AS "pageStart", page_end AS "pageEnd", "order" '
-                "FROM concepts WHERE doc_id = %(d)s",
+                'SELECT c.key, c.name, c.kind, c.signal, c.source, '
+                'c.section_key AS "sectionKey", s.page_start AS "pageStart", s.page_end AS "pageEnd", c."order" '
+                "FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id "
+                "WHERE c.doc_id = %(d)s",
                 {"d": doc_id},
             ).fetchall()
         if not rows:
@@ -205,7 +207,7 @@ def update_concept(key: str, patch: dict) -> dict:
         params[f] = v
     with db() as conn:
         row = conn.execute(
-            f"UPDATE concepts SET {', '.join(sets)} WHERE key = %(key)s RETURNING key", params
+            f"UPDATE ext_concepts SET {', '.join(sets)} WHERE key = %(key)s RETURNING key", params
         ).fetchone()
     if row is None:
         return {"error": f"concept {key} not found", "status": 404}
@@ -216,10 +218,10 @@ def delete_concept(key: str) -> dict:
     """Remove a concept row (curation). Returns {deleted, concept} | {error, status}.
     Review history is the study domain's to clean — see study.delete_concept_reviews."""
     with db() as conn:
-        row = conn.execute("SELECT name FROM concepts WHERE key = %(k)s", {"k": key}).fetchone()
+        row = conn.execute("SELECT name FROM ext_concepts WHERE key = %(k)s", {"k": key}).fetchone()
         if row is None:
             return {"error": f"concept {key} not found", "status": 404}
-        conn.execute("DELETE FROM concepts WHERE key = %(k)s", {"k": key})
+        conn.execute("DELETE FROM ext_concepts WHERE key = %(k)s", {"k": key})
     return {"deleted": key, "concept": row.get("name")}
 
 
@@ -230,7 +232,7 @@ def set_concept_questions(key: str, questions: list | None) -> dict:
 
     with db() as conn:
         row = conn.execute(
-            "UPDATE concepts SET quiz_questions = %(q)s WHERE key = %(k)s RETURNING key",
+            "UPDATE ext_concepts SET quiz_questions = %(q)s WHERE key = %(k)s RETURNING key",
             {"q": Json(questions) if questions else None, "k": key},
         ).fetchone()
     if row is None:
@@ -244,7 +246,7 @@ def concept_counts_by_doc() -> dict[str, int]:
         return {
             r["docId"]: r["n"]
             for r in conn.execute(
-                'SELECT doc_id AS "docId", count(*) AS n FROM concepts GROUP BY doc_id'
+                'SELECT doc_id AS "docId", count(*) AS n FROM ext_concepts GROUP BY doc_id'
             ).fetchall()
         }
 
@@ -255,6 +257,6 @@ def section_question_flags(doc_id: str) -> list[dict]:
         return conn.execute(
             'SELECT section_key AS "sectionKey", '
             "COALESCE(jsonb_array_length(quiz_questions), 0) > 0 AS \"hasQuestions\" "
-            "FROM concepts WHERE doc_id = %(d)s",
+            "FROM ext_concepts WHERE doc_id = %(d)s",
             {"d": doc_id},
         ).fetchall()

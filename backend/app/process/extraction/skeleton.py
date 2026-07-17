@@ -48,9 +48,9 @@ def _attach_depths(doc_id: str, sections: list[dict]) -> list[dict]:
         return sections
     depth_by_title: dict[str, int] = {}
     try:
-        with db() as conn:
-            row = conn.execute("SELECT outline FROM documents WHERE key = %(d)s", {"d": doc_id}).fetchone()
-        for e in ((row["outline"] if row else None) or []):
+        from app.process.content import fetch_structure_entries
+
+        for e in fetch_structure_entries(doc_id):
             t, d = _norm_heading(e.get("title")), e.get("listDepth")
             if t and d is not None and t not in depth_by_title:
                 depth_by_title[t] = d
@@ -74,7 +74,7 @@ def _attach_depths(doc_id: str, sections: list[dict]) -> list[dict]:
         try:
             with db() as conn:
                 lrows = conn.execute(
-                    'SELECT section_key AS sk, level AS lvl FROM section_content '
+                    'SELECT section_key AS sk, level AS lvl FROM raw_content '
                     "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
                     {"d": doc_id, "ks": keys},
                 ).fetchall()
@@ -122,7 +122,7 @@ def _concepts_by_section(doc_id: str, section_keys: list[str]) -> dict[str, list
         return out
     with db() as conn:
         rows = conn.execute(
-            'SELECT section_key AS sk, name FROM concepts '
+            'SELECT section_key AS sk, name FROM ext_concepts '
             'WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) ORDER BY "order"',
             {"d": doc_id, "ks": section_keys},
         ).fetchall()
@@ -172,12 +172,12 @@ def refresh_skeleton(doc_id: str, scope: str | None) -> dict:
         return {"sections": 0, "error": "no sections in this scope"}
     with db() as conn:
         conn.execute(
-            "INSERT INTO chapter_skeletons (key, doc_id, scope, sections, prompt_version, created_at) "
-            "VALUES (%(k)s,%(d)s,%(sc)s,%(sections)s,%(pv)s, now()) "
-            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
-            "sections=EXCLUDED.sections, prompt_version=EXCLUDED.prompt_version, created_at=EXCLUDED.created_at",
-            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sc": scope, "sections": Json(sections),
-             "pv": SKELETON_PROMPT_VERSION},
+            "INSERT INTO ext_skeleton (key, doc_id, structure_id, scope, sections, prompt_version, created_at) "
+            "VALUES (%(k)s,%(d)s,(SELECT id FROM raw_structure WHERE id = %(sid)s),%(sc)s,%(sections)s,%(pv)s, now()) "
+            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, structure_id=EXCLUDED.structure_id, "
+            "scope=EXCLUDED.scope, sections=EXCLUDED.sections, prompt_version=EXCLUDED.prompt_version, created_at=EXCLUDED.created_at",
+            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sid": f"{doc_id}::{scope}" if scope else None,
+             "sc": scope, "sections": Json(sections), "pv": SKELETON_PROMPT_VERSION},
         )
     return {"sections": len(sections)}
 
@@ -208,7 +208,7 @@ def fetch_skeleton(doc_id: str | None = None, scope: str | None = None, regenera
                 return {"docId": doc_id, "scope": scope, "sections": [], "error": receipt["error"]}
         with db() as conn:
             existing = conn.execute(
-                "SELECT sections, prompt_version FROM chapter_skeletons WHERE key = %(k)s",
+                "SELECT sections, prompt_version FROM ext_skeleton WHERE key = %(k)s",
                 {"k": chapter_cache_key(doc_id, scope)},
             ).fetchone()
         if existing and existing.get("sections"):
@@ -250,7 +250,7 @@ def generate_orient(doc_id: str, scope: str | None, model: str | None = None) ->
     keys = [s.section_key for s in sections]
     with db() as conn:
         rows = conn.execute(
-            "SELECT name, signal FROM concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+            "SELECT name, signal FROM ext_concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
             'ORDER BY section_key, "order"',
             {"d": doc_id, "ks": keys},
         ).fetchall()
@@ -277,12 +277,12 @@ def refresh_orient(doc_id: str, scope: str | None) -> dict:
         return {"objectives": 0, "error": "no sections in this scope"}
     with db() as conn:
         conn.execute(
-            "INSERT INTO chapter_orient (key, doc_id, scope, objectives, watch_for, created_at) "
-            "VALUES (%(k)s,%(d)s,%(sc)s,%(obj)s,%(wf)s, now()) "
-            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, scope=EXCLUDED.scope, "
-            "objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, created_at=EXCLUDED.created_at",
-            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sc": scope,
-             "obj": Json(data.get("objectives")), "wf": Json(data.get("watchFor"))},
+            "INSERT INTO ext_orient (key, doc_id, structure_id, scope, objectives, watch_for, created_at) "
+            "VALUES (%(k)s,%(d)s,(SELECT id FROM raw_structure WHERE id = %(sid)s),%(sc)s,%(obj)s,%(wf)s, now()) "
+            "ON CONFLICT (key) DO UPDATE SET doc_id=EXCLUDED.doc_id, structure_id=EXCLUDED.structure_id, "
+            "scope=EXCLUDED.scope, objectives=EXCLUDED.objectives, watch_for=EXCLUDED.watch_for, created_at=EXCLUDED.created_at",
+            {"k": chapter_cache_key(doc_id, scope), "d": doc_id, "sid": f"{doc_id}::{scope}" if scope else None,
+             "sc": scope, "obj": Json(data.get("objectives")), "wf": Json(data.get("watchFor"))},
         )
     return {"objectives": len(data.get("objectives") or []), "watchFor": len(data.get("watchFor") or [])}
 
@@ -300,7 +300,7 @@ def fetch_orient(doc_id: str | None = None, scope: str | None = None, regenerate
                 return {"docId": doc_id, "scope": scope, "objectives": [], "watchFor": [], "error": receipt["error"]}
         with db() as conn:
             existing = conn.execute(
-                'SELECT objectives, watch_for AS "watchFor" FROM chapter_orient WHERE key = %(k)s',
+                'SELECT objectives, watch_for AS "watchFor" FROM ext_orient WHERE key = %(k)s',
                 {"k": chapter_cache_key(doc_id, scope)},
             ).fetchone()
         if existing and (existing.get("objectives") or existing.get("watchFor")):

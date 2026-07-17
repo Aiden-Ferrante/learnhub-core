@@ -97,7 +97,7 @@ def fetch_sessions(doc: str | None = None, days: int = 90) -> dict[str, Any]:
             ).fetchall()
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM documents").fetchall()
+                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
             }
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
         return {"sessions": [], "summary": {}, "error": str(exc)}

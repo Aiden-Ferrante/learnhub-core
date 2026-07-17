@@ -41,7 +41,7 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
         with db() as conn:
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM documents").fetchall()
+                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
             }
             rows = conn.execute(
                 'SELECT doc_id AS "docId", item_type AS "itemType", '
@@ -88,7 +88,7 @@ def build_study_debt(days: int = 7) -> dict[str, Any]:
         with db() as conn:
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM documents").fetchall()
+                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
             }
             rows = conn.execute(
                 "SELECT doc_id AS d, "
