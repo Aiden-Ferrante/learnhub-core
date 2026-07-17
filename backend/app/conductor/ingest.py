@@ -71,7 +71,11 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
             "outputFilename": result.output_filename,
             "pageCount": result.page_count,
             "docId": result.doc_id,
-        }
+        },
+        # The TOC controller's verdict — which route the book's structure took and why.
+        # Schemaless jsonb payload fields: diagnosable from the ledger, no schema change.
+        "tocRoute": result.toc_route,
+        "tocDecisions": result.toc_decisions or [],
     })
     # Lifecycle auto-chain: converted → extract, so an upload yields a studyable document
     # without a manual build. Enrichment stays on-demand. (No-op when LEARN_AUTOCHAIN=0.)

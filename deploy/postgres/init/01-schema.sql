@@ -48,6 +48,8 @@ CREATE TABLE raw_documents (
   source_hash     text,
   status          text NOT NULL DEFAULT 'ready',   -- converting | ready | error
   status_code     int,                             -- http status of a convert failure
+  toc_route       text,                            -- TOC controller verdict: bookmarks |
+                                                   -- bookmarks-pagematched | none
   page_count      int,
   section_count   int,
   element_count   int,

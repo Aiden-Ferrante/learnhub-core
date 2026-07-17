@@ -1,0 +1,6033 @@
+{
+ "page_count": 210,
+ "blocks": [
+  {
+   "section_key": "toc:a-philosophy-of-software-design",
+   "heading": "A Philosophy of Software Design",
+   "level": 1,
+   "number_key": null,
+   "order": 0,
+   "page_start": 2,
+   "page_end": 2
+  },
+  {
+   "section_key": "toc:john-ousterhout-stanford-university",
+   "heading": "John Ousterhout Stanford University",
+   "level": 3,
+   "number_key": null,
+   "order": 1,
+   "page_start": 2,
+   "page_end": 4
+  },
+  {
+   "section_key": "toc:contents",
+   "heading": "Contents",
+   "level": 1,
+   "number_key": null,
+   "order": 2,
+   "page_start": 4,
+   "page_end": 10
+  },
+  {
+   "section_key": "toc:preface",
+   "heading": "Preface",
+   "level": 1,
+   "number_key": null,
+   "order": 3,
+   "page_start": 10,
+   "page_end": 14
+  },
+  {
+   "section_key": "toc:chapter-1-introduction",
+   "heading": "Chapter 1 Introduction",
+   "level": 1,
+   "number_key": null,
+   "order": 4,
+   "page_start": 14,
+   "page_end": 14
+  },
+  {
+   "section_key": "toc:it-s-all-about-complexity",
+   "heading": "(It\u2019s All About Complexity)",
+   "level": 3,
+   "number_key": null,
+   "order": 5,
+   "page_start": 14,
+   "page_end": 17
+  },
+  {
+   "section_key": "toc:1.1",
+   "heading": "1.1 How to use this book",
+   "level": 3,
+   "number_key": "1.1",
+   "order": 6,
+   "page_start": 17,
+   "page_end": 19
+  },
+  {
+   "section_key": "toc:chapter-2-the-nature-of-complexity",
+   "heading": "Chapter 2 The Nature of Complexity",
+   "level": 1,
+   "number_key": null,
+   "order": 7,
+   "page_start": 19,
+   "page_end": 19
+  },
+  {
+   "section_key": "toc:2.1",
+   "heading": "2.1 Complexity de\ufffdned",
+   "level": 3,
+   "number_key": "2.1",
+   "order": 8,
+   "page_start": 19,
+   "page_end": 21
+  },
+  {
+   "section_key": "toc:2.2",
+   "heading": "2.2 Symptoms of complexity",
+   "level": 3,
+   "number_key": "2.2",
+   "order": 9,
+   "page_start": 21,
+   "page_end": 23
+  },
+  {
+   "section_key": "toc:2.3",
+   "heading": "2.3 Causes of complexity",
+   "level": 3,
+   "number_key": "2.3",
+   "order": 10,
+   "page_start": 23,
+   "page_end": 25
+  },
+  {
+   "section_key": "toc:2.4",
+   "heading": "2.4 Complexity is incremental",
+   "level": 3,
+   "number_key": "2.4",
+   "order": 11,
+   "page_start": 25,
+   "page_end": 26
+  },
+  {
+   "section_key": "toc:2.5",
+   "heading": "2.5 Conclusion",
+   "level": 3,
+   "number_key": "2.5",
+   "order": 12,
+   "page_start": 26,
+   "page_end": 27
+  },
+  {
+   "section_key": "toc:chapter-3-working-code-isn-t-enough",
+   "heading": "Chapter 3 Working Code Isn\u2019t Enough",
+   "level": 1,
+   "number_key": null,
+   "order": 13,
+   "page_start": 27,
+   "page_end": 27
+  },
+  {
+   "section_key": "toc:strategic-vs-tactical-programming",
+   "heading": "(Strategic vs. Tactical Programming)",
+   "level": 3,
+   "number_key": null,
+   "order": 14,
+   "page_start": 27,
+   "page_end": 27
+  },
+  {
+   "section_key": "toc:3.1",
+   "heading": "3.1 Tactical programming",
+   "level": 3,
+   "number_key": "3.1",
+   "order": 15,
+   "page_start": 27,
+   "page_end": 28
+  },
+  {
+   "section_key": "toc:3.2",
+   "heading": "3.2 Strategic programming",
+   "level": 3,
+   "number_key": "3.2",
+   "order": 16,
+   "page_start": 28,
+   "page_end": 29
+  },
+  {
+   "section_key": "toc:3.3",
+   "heading": "3.3 How much to invest?",
+   "level": 3,
+   "number_key": "3.3",
+   "order": 17,
+   "page_start": 29,
+   "page_end": 31
+  },
+  {
+   "section_key": "toc:3.4",
+   "heading": "3.4 Startups and investment",
+   "level": 3,
+   "number_key": "3.4",
+   "order": 18,
+   "page_start": 31,
+   "page_end": 33
+  },
+  {
+   "section_key": "toc:3.5",
+   "heading": "3.5 Conclusion",
+   "level": 3,
+   "number_key": "3.5",
+   "order": 19,
+   "page_start": 33,
+   "page_end": 34
+  },
+  {
+   "section_key": "toc:chapter-4-modules-should-be-deep",
+   "heading": "Chapter 4 Modules Should Be Deep",
+   "level": 1,
+   "number_key": null,
+   "order": 20,
+   "page_start": 34,
+   "page_end": 34
+  },
+  {
+   "section_key": "toc:4.1",
+   "heading": "4.1 Modular design",
+   "level": 3,
+   "number_key": "4.1",
+   "order": 21,
+   "page_start": 34,
+   "page_end": 36
+  },
+  {
+   "section_key": "toc:4.2",
+   "heading": "4.2 What\u2019s in an interface?",
+   "level": 3,
+   "number_key": "4.2",
+   "order": 22,
+   "page_start": 36,
+   "page_end": 36
+  },
+  {
+   "section_key": "toc:4.3",
+   "heading": "4.3 Abstractions",
+   "level": 3,
+   "number_key": "4.3",
+   "order": 23,
+   "page_start": 36,
+   "page_end": 38
+  },
+  {
+   "section_key": "toc:4.4",
+   "heading": "4.4 Deep modules",
+   "level": 3,
+   "number_key": "4.4",
+   "order": 24,
+   "page_start": 38,
+   "page_end": 40
+  },
+  {
+   "section_key": "toc:4.5",
+   "heading": "4.5 Shallow modules",
+   "level": 3,
+   "number_key": "4.5",
+   "order": 25,
+   "page_start": 40,
+   "page_end": 41
+  },
+  {
+   "section_key": "toc:red-flag-shallow-module",
+   "heading": "Red Flag: Shallow Module",
+   "level": 3,
+   "number_key": null,
+   "order": 26,
+   "page_start": 41,
+   "page_end": 41
+  },
+  {
+   "section_key": "toc:4.6",
+   "heading": "4.6 Classitis",
+   "level": 3,
+   "number_key": "4.6",
+   "order": 27,
+   "page_start": 41,
+   "page_end": 42
+  },
+  {
+   "section_key": "toc:4.7",
+   "heading": "4.7 Examples: Java and Unix I/O",
+   "level": 3,
+   "number_key": "4.7",
+   "order": 28,
+   "page_start": 42,
+   "page_end": 43
+  },
+  {
+   "section_key": "toc:4.8",
+   "heading": "4.8 Conclusion",
+   "level": 3,
+   "number_key": "4.8",
+   "order": 29,
+   "page_start": 43,
+   "page_end": 44
+  },
+  {
+   "section_key": "toc:chapter-5-information-hiding-and-leakage",
+   "heading": "Chapter 5 Information Hiding (and Leakage)",
+   "level": 1,
+   "number_key": null,
+   "order": 30,
+   "page_start": 44,
+   "page_end": 44
+  },
+  {
+   "section_key": "toc:5.1",
+   "heading": "5.1 Information hiding",
+   "level": 3,
+   "number_key": "5.1",
+   "order": 31,
+   "page_start": 44,
+   "page_end": 45
+  },
+  {
+   "section_key": "toc:5.2",
+   "heading": "5.2 Information leakage",
+   "level": 3,
+   "number_key": "5.2",
+   "order": 32,
+   "page_start": 45,
+   "page_end": 46
+  },
+  {
+   "section_key": "toc:5.3",
+   "heading": "5.3 Temporal decomposition",
+   "level": 3,
+   "number_key": "5.3",
+   "order": 33,
+   "page_start": 46,
+   "page_end": 47
+  },
+  {
+   "section_key": "toc:red-flag-information-leakage",
+   "heading": "Red Flag: Information Leakage",
+   "level": 3,
+   "number_key": null,
+   "order": 34,
+   "page_start": 47,
+   "page_end": 47
+  },
+  {
+   "section_key": "toc:5.4",
+   "heading": "5.4 Example: HTTP server",
+   "level": 3,
+   "number_key": "5.4",
+   "order": 35,
+   "page_start": 47,
+   "page_end": 48
+  },
+  {
+   "section_key": "toc:red-flag-temporal-decomposition",
+   "heading": "Red Flag: Temporal Decomposition",
+   "level": 3,
+   "number_key": null,
+   "order": 36,
+   "page_start": 48,
+   "page_end": 48
+  },
+  {
+   "section_key": "toc:5.5",
+   "heading": "5.5 Example: too many classes",
+   "level": 3,
+   "number_key": "5.5",
+   "order": 37,
+   "page_start": 48,
+   "page_end": 49
+  },
+  {
+   "section_key": "toc:5.6",
+   "heading": "5.6 Example: HTTP parameter handling",
+   "level": 3,
+   "number_key": "5.6",
+   "order": 38,
+   "page_start": 49,
+   "page_end": 51
+  },
+  {
+   "section_key": "toc:5.7",
+   "heading": "5.7 Example: defaults in HTTP responses",
+   "level": 3,
+   "number_key": "5.7",
+   "order": 39,
+   "page_start": 51,
+   "page_end": 52
+  },
+  {
+   "section_key": "toc:red-flag-overexposure",
+   "heading": "Red Flag: Overexposure",
+   "level": 3,
+   "number_key": null,
+   "order": 40,
+   "page_start": 52,
+   "page_end": 52
+  },
+  {
+   "section_key": "toc:5.8",
+   "heading": "5.8 Information hiding within a class",
+   "level": 3,
+   "number_key": "5.8",
+   "order": 41,
+   "page_start": 52,
+   "page_end": 52
+  },
+  {
+   "section_key": "toc:5.9",
+   "heading": "5.9 Taking it too far",
+   "level": 3,
+   "number_key": "5.9",
+   "order": 42,
+   "page_start": 52,
+   "page_end": 53
+  },
+  {
+   "section_key": "toc:5.10",
+   "heading": "5.10 Conclusion",
+   "level": 3,
+   "number_key": "5.10",
+   "order": 43,
+   "page_start": 53,
+   "page_end": 54
+  },
+  {
+   "section_key": "toc:chapter-6-general-purpose-modules-are-deeper",
+   "heading": "Chapter 6 General-Purpose Modules are Deeper",
+   "level": 1,
+   "number_key": null,
+   "order": 44,
+   "page_start": 54,
+   "page_end": 54
+  },
+  {
+   "section_key": "toc:6.1",
+   "heading": "6.1 Make classes somewhat general- purpose",
+   "level": 3,
+   "number_key": "6.1",
+   "order": 45,
+   "page_start": 54,
+   "page_end": 56
+  },
+  {
+   "section_key": "toc:6.2",
+   "heading": "6.2 Example: storing text for an editor",
+   "level": 3,
+   "number_key": "6.2",
+   "order": 46,
+   "page_start": 56,
+   "page_end": 57
+  },
+  {
+   "section_key": "toc:6.3",
+   "heading": "6.3 A more general-purpose API",
+   "level": 3,
+   "number_key": "6.3",
+   "order": 47,
+   "page_start": 57,
+   "page_end": 58
+  },
+  {
+   "section_key": "toc:6.4",
+   "heading": "6.4 Generality leads to better information hiding",
+   "level": 3,
+   "number_key": "6.4",
+   "order": 48,
+   "page_start": 58,
+   "page_end": 59
+  },
+  {
+   "section_key": "toc:6.5",
+   "heading": "6.5 Questions to ask yourself",
+   "level": 3,
+   "number_key": "6.5",
+   "order": 49,
+   "page_start": 59,
+   "page_end": 60
+  },
+  {
+   "section_key": "toc:6.6",
+   "heading": "6.6 Push specialization upwards (and downwards!)",
+   "level": 3,
+   "number_key": "6.6",
+   "order": 50,
+   "page_start": 60,
+   "page_end": 61
+  },
+  {
+   "section_key": "toc:6.7",
+   "heading": "6.7 Example: editor undo mechanism",
+   "level": 3,
+   "number_key": "6.7",
+   "order": 51,
+   "page_start": 61,
+   "page_end": 64
+  },
+  {
+   "section_key": "toc:6.8",
+   "heading": "6.8 Eliminate special cases in code",
+   "level": 3,
+   "number_key": "6.8",
+   "order": 52,
+   "page_start": 64,
+   "page_end": 65
+  },
+  {
+   "section_key": "toc:6.9",
+   "heading": "6.9 Conclusion",
+   "level": 3,
+   "number_key": "6.9",
+   "order": 53,
+   "page_start": 65,
+   "page_end": 66
+  },
+  {
+   "section_key": "toc:chapter-7-di-erent-layer-di-erent-abstraction",
+   "heading": "Chapter 7 Di\ufffderent Layer, Di\ufffderent Abstraction",
+   "level": 1,
+   "number_key": null,
+   "order": 54,
+   "page_start": 66,
+   "page_end": 67
+  },
+  {
+   "section_key": "toc:7.1",
+   "heading": "7.1 Pass-through methods",
+   "level": 3,
+   "number_key": "7.1",
+   "order": 55,
+   "page_start": 67,
+   "page_end": 67
+  },
+  {
+   "section_key": "toc:red-flag-pass-through-method",
+   "heading": "Red Flag: Pass-Through Method",
+   "level": 3,
+   "number_key": null,
+   "order": 56,
+   "page_start": 67,
+   "page_end": 69
+  },
+  {
+   "section_key": "toc:7.2",
+   "heading": "7.2 When is interface duplication OK?",
+   "level": 3,
+   "number_key": "7.2",
+   "order": 57,
+   "page_start": 69,
+   "page_end": 70
+  },
+  {
+   "section_key": "toc:7.3",
+   "heading": "7.3 Decorators",
+   "level": 3,
+   "number_key": "7.3",
+   "order": 58,
+   "page_start": 70,
+   "page_end": 71
+  },
+  {
+   "section_key": "toc:7.4",
+   "heading": "7.4 Interface versus implementation",
+   "level": 3,
+   "number_key": "7.4",
+   "order": 59,
+   "page_start": 71,
+   "page_end": 72
+  },
+  {
+   "section_key": "toc:7.5",
+   "heading": "7.5 Pass-through variables",
+   "level": 3,
+   "number_key": "7.5",
+   "order": 60,
+   "page_start": 72,
+   "page_end": 75
+  },
+  {
+   "section_key": "toc:7.6",
+   "heading": "7.6 Conclusion",
+   "level": 3,
+   "number_key": "7.6",
+   "order": 61,
+   "page_start": 75,
+   "page_end": 77
+  },
+  {
+   "section_key": "toc:chapter-8-pull-complexity-downwards",
+   "heading": "Chapter 8 Pull Complexity Downwards",
+   "level": 1,
+   "number_key": null,
+   "order": 62,
+   "page_start": 77,
+   "page_end": 77
+  },
+  {
+   "section_key": "toc:8.1",
+   "heading": "8.1 Example: editor text class",
+   "level": 3,
+   "number_key": "8.1",
+   "order": 63,
+   "page_start": 77,
+   "page_end": 78
+  },
+  {
+   "section_key": "toc:p",
+   "heading": "p",
+   "level": 3,
+   "number_key": null,
+   "order": 64,
+   "page_start": 78,
+   "page_end": 78
+  },
+  {
+   "section_key": "toc:8.2",
+   "heading": "8.2 Example: con\ufffdguration parameters",
+   "level": 3,
+   "number_key": "8.2",
+   "order": 65,
+   "page_start": 78,
+   "page_end": 79
+  },
+  {
+   "section_key": "toc:8.3",
+   "heading": "8.3 Taking it too far",
+   "level": 3,
+   "number_key": "8.3",
+   "order": 66,
+   "page_start": 79,
+   "page_end": 80
+  },
+  {
+   "section_key": "toc:8.4",
+   "heading": "8.4 Conclusion",
+   "level": 3,
+   "number_key": "8.4",
+   "order": 67,
+   "page_start": 80,
+   "page_end": 81
+  },
+  {
+   "section_key": "toc:chapter-9-better-together-or-better-apart",
+   "heading": "Chapter 9 Better Together Or Better Apart?",
+   "level": 1,
+   "number_key": null,
+   "order": 68,
+   "page_start": 81,
+   "page_end": 83
+  },
+  {
+   "section_key": "toc:9.1",
+   "heading": "9.1 Bring together if information is shared",
+   "level": 3,
+   "number_key": "9.1",
+   "order": 69,
+   "page_start": 83,
+   "page_end": 83
+  },
+  {
+   "section_key": "toc:9.2",
+   "heading": "9.2 Bring together if it will simplify the interface",
+   "level": 3,
+   "number_key": "9.2",
+   "order": 70,
+   "page_start": 83,
+   "page_end": 84
+  },
+  {
+   "section_key": "toc:9.3",
+   "heading": "9.3 Bring together to eliminate duplication",
+   "level": 3,
+   "number_key": "9.3",
+   "order": 71,
+   "page_start": 84,
+   "page_end": 84
+  },
+  {
+   "section_key": "toc:9.4",
+   "heading": "9.4 Separate general-purpose and special- purpose code",
+   "level": 3,
+   "number_key": "9.4",
+   "order": 72,
+   "page_start": 84,
+   "page_end": 85
+  },
+  {
+   "section_key": "toc:red-flag-repetition",
+   "heading": "Red Flag: Repetition",
+   "level": 3,
+   "number_key": null,
+   "order": 73,
+   "page_start": 85,
+   "page_end": 87
+  },
+  {
+   "section_key": "toc:9.5",
+   "heading": "9.5 Example: insertion cursor and selection",
+   "level": 3,
+   "number_key": "9.5",
+   "order": 74,
+   "page_start": 87,
+   "page_end": 88
+  },
+  {
+   "section_key": "toc:red-flag-special-general-mixture",
+   "heading": "Red Flag: Special-General Mixture",
+   "level": 3,
+   "number_key": null,
+   "order": 75,
+   "page_start": 88,
+   "page_end": 89
+  },
+  {
+   "section_key": "toc:9.6",
+   "heading": "9.6 Example: separate class for logging",
+   "level": 3,
+   "number_key": "9.6",
+   "order": 76,
+   "page_start": 89,
+   "page_end": 90
+  },
+  {
+   "section_key": "toc:9.7",
+   "heading": "9.7 Splitting and joining methods",
+   "level": 3,
+   "number_key": "9.7",
+   "order": 77,
+   "page_start": 90,
+   "page_end": 93
+  },
+  {
+   "section_key": "toc:red-flag-conjoined-methods",
+   "heading": "Red Flag: Conjoined Methods",
+   "level": 3,
+   "number_key": null,
+   "order": 78,
+   "page_start": 93,
+   "page_end": 93
+  },
+  {
+   "section_key": "toc:9.8",
+   "heading": "9.8 A di\ufffderent opinion: Clean Code",
+   "level": 3,
+   "number_key": "9.8",
+   "order": 79,
+   "page_start": 93,
+   "page_end": 94
+  },
+  {
+   "section_key": "toc:9.9",
+   "heading": "9.9 Conclusion",
+   "level": 3,
+   "number_key": "9.9",
+   "order": 80,
+   "page_start": 94,
+   "page_end": 95
+  },
+  {
+   "section_key": "toc:chapter-10-de-ne-errors-out-of-existence",
+   "heading": "Chapter 10 De\ufffdne Errors Out Of Existence",
+   "level": 1,
+   "number_key": null,
+   "order": 81,
+   "page_start": 95,
+   "page_end": 95
+  },
+  {
+   "section_key": "toc:10.1",
+   "heading": "10.1 Why exceptions add complexity",
+   "level": 3,
+   "number_key": "10.1",
+   "order": 82,
+   "page_start": 95,
+   "page_end": 98
+  },
+  {
+   "section_key": "toc:10.2",
+   "heading": "10.2 Too many exceptions",
+   "level": 3,
+   "number_key": "10.2",
+   "order": 83,
+   "page_start": 98,
+   "page_end": 99
+  },
+  {
+   "section_key": "toc:10.3",
+   "heading": "10.3 De\ufffdne errors out of existence",
+   "level": 3,
+   "number_key": "10.3",
+   "order": 84,
+   "page_start": 99,
+   "page_end": 100
+  },
+  {
+   "section_key": "toc:10.4",
+   "heading": "10.4 Example: \ufffdle deletion in Windows",
+   "level": 3,
+   "number_key": "10.4",
+   "order": 85,
+   "page_start": 100,
+   "page_end": 101
+  },
+  {
+   "section_key": "toc:10.5",
+   "heading": "10.5 Example: Java substring method",
+   "level": 3,
+   "number_key": "10.5",
+   "order": 86,
+   "page_start": 101,
+   "page_end": 102
+  },
+  {
+   "section_key": "toc:10.6",
+   "heading": "10.6 Mask exceptions",
+   "level": 3,
+   "number_key": "10.6",
+   "order": 87,
+   "page_start": 102,
+   "page_end": 103
+  },
+  {
+   "section_key": "toc:10.7",
+   "heading": "10.7 Exception aggregation",
+   "level": 3,
+   "number_key": "10.7",
+   "order": 88,
+   "page_start": 103,
+   "page_end": 107
+  },
+  {
+   "section_key": "toc:10.8",
+   "heading": "10.8 Just crash?",
+   "level": 3,
+   "number_key": "10.8",
+   "order": 89,
+   "page_start": 107,
+   "page_end": 108
+  },
+  {
+   "section_key": "toc:10.9",
+   "heading": "10.9 Taking it too far",
+   "level": 3,
+   "number_key": "10.9",
+   "order": 90,
+   "page_start": 108,
+   "page_end": 109
+  },
+  {
+   "section_key": "toc:10.10",
+   "heading": "10.10 Conclusion",
+   "level": 3,
+   "number_key": "10.10",
+   "order": 91,
+   "page_start": 109,
+   "page_end": 110
+  },
+  {
+   "section_key": "toc:chapter-11-design-it-twice",
+   "heading": "Chapter 11 Design it Twice",
+   "level": 1,
+   "number_key": null,
+   "order": 92,
+   "page_start": 110,
+   "page_end": 114
+  },
+  {
+   "section_key": "toc:chapter-12-why-write-comments-the-four-excuses",
+   "heading": "Chapter 12 Why Write Comments? The Four Excuses",
+   "level": 1,
+   "number_key": null,
+   "order": 93,
+   "page_start": 114,
+   "page_end": 115
+  },
+  {
+   "section_key": "toc:12.1",
+   "heading": "12.1 Good code is self-documenting",
+   "level": 3,
+   "number_key": "12.1",
+   "order": 94,
+   "page_start": 115,
+   "page_end": 116
+  },
+  {
+   "section_key": "toc:12.2",
+   "heading": "12.2 I don\u2019t have time to write comments",
+   "level": 3,
+   "number_key": "12.2",
+   "order": 95,
+   "page_start": 116,
+   "page_end": 117
+  },
+  {
+   "section_key": "toc:12.3",
+   "heading": "12.3 Comments get out of date and become misleading",
+   "level": 3,
+   "number_key": "12.3",
+   "order": 96,
+   "page_start": 117,
+   "page_end": 117
+  },
+  {
+   "section_key": "toc:12.4",
+   "heading": "12.4 All the comments I have seen are worthless",
+   "level": 3,
+   "number_key": "12.4",
+   "order": 97,
+   "page_start": 117,
+   "page_end": 118
+  },
+  {
+   "section_key": "toc:12.5",
+   "heading": "12.5 Bene\ufffdts of well-written comments",
+   "level": 3,
+   "number_key": "12.5",
+   "order": 98,
+   "page_start": 118,
+   "page_end": 119
+  },
+  {
+   "section_key": "toc:12.6",
+   "heading": "12.6 A di\ufffderent opinion: comments are failures",
+   "level": 3,
+   "number_key": "12.6",
+   "order": 99,
+   "page_start": 119,
+   "page_end": 121
+  },
+  {
+   "section_key": "toc:chapter-13-comments-should-describe-things-that-",
+   "heading": "Chapter 13 Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+   "level": 2,
+   "number_key": null,
+   "order": 100,
+   "page_start": 121,
+   "page_end": 122
+  },
+  {
+   "section_key": "toc:13.1",
+   "heading": "13.1 Pick conventions",
+   "level": 3,
+   "number_key": "13.1",
+   "order": 101,
+   "page_start": 122,
+   "page_end": 123
+  },
+  {
+   "section_key": "toc:13.2",
+   "heading": "13.2 Don\u2019t repeat the code",
+   "level": 3,
+   "number_key": "13.2",
+   "order": 102,
+   "page_start": 123,
+   "page_end": 124
+  },
+  {
+   "section_key": "toc:red-flag-comment-repeats-code",
+   "heading": "Red Flag: Comment Repeats Code",
+   "level": 3,
+   "number_key": null,
+   "order": 103,
+   "page_start": 124,
+   "page_end": 125
+  },
+  {
+   "section_key": "toc:13.3",
+   "heading": "13.3 Lower-level comments add precision",
+   "level": 3,
+   "number_key": "13.3",
+   "order": 104,
+   "page_start": 125,
+   "page_end": 127
+  },
+  {
+   "section_key": "toc:13.4",
+   "heading": "13.4 Higher-level comments enhance intuition",
+   "level": 3,
+   "number_key": "13.4",
+   "order": 105,
+   "page_start": 127,
+   "page_end": 129
+  },
+  {
+   "section_key": "toc:13.5",
+   "heading": "13.5 Interface documentation",
+   "level": 3,
+   "number_key": "13.5",
+   "order": 106,
+   "page_start": 129,
+   "page_end": 135
+  },
+  {
+   "section_key": "toc:red-flag-implementation-documentation-contaminat",
+   "heading": "Red Flag: Implementation Documentation Contaminates Interface",
+   "level": 3,
+   "number_key": null,
+   "order": 107,
+   "page_start": 135,
+   "page_end": 136
+  },
+  {
+   "section_key": "toc:13.6",
+   "heading": "13.6 Implementation comments: what and why, not how",
+   "level": 3,
+   "number_key": "13.6",
+   "order": 108,
+   "page_start": 136,
+   "page_end": 137
+  },
+  {
+   "section_key": "toc:13.7",
+   "heading": "13.7 Cross-module design decisions",
+   "level": 3,
+   "number_key": "13.7",
+   "order": 109,
+   "page_start": 137,
+   "page_end": 140
+  },
+  {
+   "section_key": "toc:13.8",
+   "heading": "13.8 Conclusion",
+   "level": 3,
+   "number_key": "13.8",
+   "order": 110,
+   "page_start": 140,
+   "page_end": 140
+  },
+  {
+   "section_key": "toc:13.9",
+   "heading": "13.9 Answers to questions from Section 13.5",
+   "level": 3,
+   "number_key": "13.9",
+   "order": 111,
+   "page_start": 140,
+   "page_end": 142
+  },
+  {
+   "section_key": "toc:chapter-14-choosing-names",
+   "heading": "Chapter 14 Choosing Names",
+   "level": 1,
+   "number_key": null,
+   "order": 112,
+   "page_start": 142,
+   "page_end": 142
+  },
+  {
+   "section_key": "toc:14.1",
+   "heading": "14.1 Example: bad names cause bugs",
+   "level": 3,
+   "number_key": "14.1",
+   "order": 113,
+   "page_start": 142,
+   "page_end": 143
+  },
+  {
+   "section_key": "toc:14.2",
+   "heading": "14.2 Create an image",
+   "level": 3,
+   "number_key": "14.2",
+   "order": 114,
+   "page_start": 143,
+   "page_end": 144
+  },
+  {
+   "section_key": "toc:14.3",
+   "heading": "14.3 Names should be precise",
+   "level": 3,
+   "number_key": "14.3",
+   "order": 115,
+   "page_start": 144,
+   "page_end": 144
+  },
+  {
+   "section_key": "toc:red-flag-vague-name",
+   "heading": "Red Flag: Vague Name",
+   "level": 3,
+   "number_key": null,
+   "order": 116,
+   "page_start": 144,
+   "page_end": 147
+  },
+  {
+   "section_key": "toc:red-flag-hard-to-pick-name",
+   "heading": "Red Flag: Hard to Pick Name",
+   "level": 3,
+   "number_key": null,
+   "order": 117,
+   "page_start": 147,
+   "page_end": 147
+  },
+  {
+   "section_key": "toc:14.4",
+   "heading": "14.4 Use names consistently",
+   "level": 3,
+   "number_key": "14.4",
+   "order": 118,
+   "page_start": 147,
+   "page_end": 148
+  },
+  {
+   "section_key": "toc:14.5",
+   "heading": "14.5 Avoid extra words",
+   "level": 3,
+   "number_key": "14.5",
+   "order": 119,
+   "page_start": 148,
+   "page_end": 149
+  },
+  {
+   "section_key": "toc:14.6",
+   "heading": "14.6 A di\ufffderent opinion: Go style guide",
+   "level": 3,
+   "number_key": "14.6",
+   "order": 120,
+   "page_start": 149,
+   "page_end": 150
+  },
+  {
+   "section_key": "toc:14.7",
+   "heading": "14.7 Conclusion",
+   "level": 3,
+   "number_key": "14.7",
+   "order": 121,
+   "page_start": 150,
+   "page_end": 152
+  },
+  {
+   "section_key": "toc:chapter-15-write-the-comments-first",
+   "heading": "Chapter 15 Write The Comments First",
+   "level": 1,
+   "number_key": null,
+   "order": 122,
+   "page_start": 152,
+   "page_end": 152
+  },
+  {
+   "section_key": "toc:use-comments-as-part-of-the-design-process",
+   "heading": "(Use Comments As Part Of The Design Process)",
+   "level": 3,
+   "number_key": null,
+   "order": 123,
+   "page_start": 152,
+   "page_end": 152
+  },
+  {
+   "section_key": "toc:15.1",
+   "heading": "15.1 Delayed comments are bad comments",
+   "level": 3,
+   "number_key": "15.1",
+   "order": 124,
+   "page_start": 152,
+   "page_end": 153
+  },
+  {
+   "section_key": "toc:15.2",
+   "heading": "15.2 Write the comments \ufffdrst",
+   "level": 3,
+   "number_key": "15.2",
+   "order": 125,
+   "page_start": 153,
+   "page_end": 154
+  },
+  {
+   "section_key": "toc:15.3",
+   "heading": "15.3 Comments are a design tool",
+   "level": 3,
+   "number_key": "15.3",
+   "order": 126,
+   "page_start": 154,
+   "page_end": 155
+  },
+  {
+   "section_key": "toc:red-flag-hard-to-describe",
+   "heading": "Red Flag: Hard to Describe",
+   "level": 3,
+   "number_key": null,
+   "order": 127,
+   "page_start": 155,
+   "page_end": 155
+  },
+  {
+   "section_key": "toc:15.4",
+   "heading": "15.4 Early comments are fun comments",
+   "level": 3,
+   "number_key": "15.4",
+   "order": 128,
+   "page_start": 155,
+   "page_end": 156
+  },
+  {
+   "section_key": "toc:15.5",
+   "heading": "15.5 Are early comments expensive?",
+   "level": 3,
+   "number_key": "15.5",
+   "order": 129,
+   "page_start": 156,
+   "page_end": 156
+  },
+  {
+   "section_key": "toc:15.6",
+   "heading": "15.6 Conclusion",
+   "level": 3,
+   "number_key": "15.6",
+   "order": 130,
+   "page_start": 156,
+   "page_end": 157
+  },
+  {
+   "section_key": "toc:chapter-16-modifying-existing-code",
+   "heading": "Chapter 16 Modifying Existing Code",
+   "level": 1,
+   "number_key": null,
+   "order": 131,
+   "page_start": 157,
+   "page_end": 157
+  },
+  {
+   "section_key": "toc:16.1",
+   "heading": "16.1 Stay strategic",
+   "level": 3,
+   "number_key": "16.1",
+   "order": 132,
+   "page_start": 157,
+   "page_end": 159
+  },
+  {
+   "section_key": "toc:16.2",
+   "heading": "16.2 Maintaining comments: keep the comments near the code",
+   "level": 3,
+   "number_key": "16.2",
+   "order": 133,
+   "page_start": 159,
+   "page_end": 160
+  },
+  {
+   "section_key": "toc:16.3",
+   "heading": "16.3 Comments belong in the code, not the commit log",
+   "level": 3,
+   "number_key": "16.3",
+   "order": 134,
+   "page_start": 160,
+   "page_end": 161
+  },
+  {
+   "section_key": "toc:16.4",
+   "heading": "16.4 Maintaining comments: avoid duplication",
+   "level": 3,
+   "number_key": "16.4",
+   "order": 135,
+   "page_start": 161,
+   "page_end": 162
+  },
+  {
+   "section_key": "toc:16.5",
+   "heading": "16.5 Maintaining comments: check the di\ufffds",
+   "level": 3,
+   "number_key": "16.5",
+   "order": 136,
+   "page_start": 162,
+   "page_end": 162
+  },
+  {
+   "section_key": "toc:16.6",
+   "heading": "16.6 Higher-level comments are easier to maintain",
+   "level": 3,
+   "number_key": "16.6",
+   "order": 137,
+   "page_start": 162,
+   "page_end": 164
+  },
+  {
+   "section_key": "toc:chapter-17-consistency",
+   "heading": "Chapter 17 Consistency",
+   "level": 1,
+   "number_key": null,
+   "order": 138,
+   "page_start": 164,
+   "page_end": 164
+  },
+  {
+   "section_key": "toc:17.1",
+   "heading": "17.1 Examples of consistency",
+   "level": 3,
+   "number_key": "17.1",
+   "order": 139,
+   "page_start": 164,
+   "page_end": 165
+  },
+  {
+   "section_key": "toc:17.2",
+   "heading": "17.2 Ensuring consistency",
+   "level": 3,
+   "number_key": "17.2",
+   "order": 140,
+   "page_start": 165,
+   "page_end": 167
+  },
+  {
+   "section_key": "toc:17.3",
+   "heading": "17.3 Taking it too far",
+   "level": 3,
+   "number_key": "17.3",
+   "order": 141,
+   "page_start": 167,
+   "page_end": 167
+  },
+  {
+   "section_key": "toc:17.4",
+   "heading": "17.4 Conclusion",
+   "level": 3,
+   "number_key": "17.4",
+   "order": 142,
+   "page_start": 167,
+   "page_end": 169
+  },
+  {
+   "section_key": "toc:chapter-18-code-should-be-obvious",
+   "heading": "Chapter 18 Code Should be Obvious",
+   "level": 1,
+   "number_key": null,
+   "order": 143,
+   "page_start": 169,
+   "page_end": 169
+  },
+  {
+   "section_key": "toc:18.1",
+   "heading": "18.1 Things that make code more obvious",
+   "level": 3,
+   "number_key": "18.1",
+   "order": 144,
+   "page_start": 169,
+   "page_end": 172
+  },
+  {
+   "section_key": "toc:18.2",
+   "heading": "18.2 Things that make code less obvious",
+   "level": 3,
+   "number_key": "18.2",
+   "order": 145,
+   "page_start": 172,
+   "page_end": 173
+  },
+  {
+   "section_key": "toc:red-flag-nonobvious-code",
+   "heading": "Red Flag: Nonobvious Code",
+   "level": 3,
+   "number_key": null,
+   "order": 146,
+   "page_start": 173,
+   "page_end": 174
+  },
+  {
+   "section_key": "toc:18.3",
+   "heading": "18.3 Conclusion",
+   "level": 3,
+   "number_key": "18.3",
+   "order": 147,
+   "page_start": 174,
+   "page_end": 176
+  },
+  {
+   "section_key": "toc:chapter-19-software-trends",
+   "heading": "Chapter 19 Software Trends",
+   "level": 1,
+   "number_key": null,
+   "order": 148,
+   "page_start": 176,
+   "page_end": 176
+  },
+  {
+   "section_key": "toc:19.1",
+   "heading": "19.1 Object-oriented programming and inheritance",
+   "level": 3,
+   "number_key": "19.1",
+   "order": 149,
+   "page_start": 176,
+   "page_end": 178
+  },
+  {
+   "section_key": "toc:19.2",
+   "heading": "19.2 Agile development",
+   "level": 3,
+   "number_key": "19.2",
+   "order": 150,
+   "page_start": 178,
+   "page_end": 179
+  },
+  {
+   "section_key": "toc:19.3",
+   "heading": "19.3 Unit tests",
+   "level": 3,
+   "number_key": "19.3",
+   "order": 151,
+   "page_start": 179,
+   "page_end": 180
+  },
+  {
+   "section_key": "toc:19.4",
+   "heading": "19.4 Test-driven development",
+   "level": 3,
+   "number_key": "19.4",
+   "order": 152,
+   "page_start": 180,
+   "page_end": 181
+  },
+  {
+   "section_key": "toc:19.5",
+   "heading": "19.5 Design patterns",
+   "level": 3,
+   "number_key": "19.5",
+   "order": 153,
+   "page_start": 181,
+   "page_end": 182
+  },
+  {
+   "section_key": "toc:19.6",
+   "heading": "19.6 Getters and setters",
+   "level": 3,
+   "number_key": "19.6",
+   "order": 154,
+   "page_start": 182,
+   "page_end": 182
+  },
+  {
+   "section_key": "toc:19.7",
+   "heading": "19.7 Conclusion",
+   "level": 3,
+   "number_key": "19.7",
+   "order": 155,
+   "page_start": 182,
+   "page_end": 183
+  },
+  {
+   "section_key": "toc:chapter-20-designing-for-performance",
+   "heading": "Chapter 20 Designing for Performance",
+   "level": 1,
+   "number_key": null,
+   "order": 156,
+   "page_start": 183,
+   "page_end": 183
+  },
+  {
+   "section_key": "toc:20.1",
+   "heading": "20.1 How to think about performance",
+   "level": 3,
+   "number_key": "20.1",
+   "order": 157,
+   "page_start": 183,
+   "page_end": 185
+  },
+  {
+   "section_key": "toc:20.2",
+   "heading": "20.2 Measure before (and after) modifying",
+   "level": 3,
+   "number_key": "20.2",
+   "order": 158,
+   "page_start": 185,
+   "page_end": 186
+  },
+  {
+   "section_key": "toc:20.3",
+   "heading": "20.3 Design around the critical path",
+   "level": 3,
+   "number_key": "20.3",
+   "order": 159,
+   "page_start": 186,
+   "page_end": 188
+  },
+  {
+   "section_key": "toc:20.4",
+   "heading": "20.4 An example: RAMCloud Bu\ufffders",
+   "level": 3,
+   "number_key": "20.4",
+   "order": 160,
+   "page_start": 188,
+   "page_end": 193
+  },
+  {
+   "section_key": "toc:20.5",
+   "heading": "20.5 Conclusion",
+   "level": 3,
+   "number_key": "20.5",
+   "order": 161,
+   "page_start": 193,
+   "page_end": 194
+  },
+  {
+   "section_key": "toc:chapter-21-decide-what-matters",
+   "heading": "Chapter 21 Decide What Matters",
+   "level": 1,
+   "number_key": null,
+   "order": 162,
+   "page_start": 194,
+   "page_end": 194
+  },
+  {
+   "section_key": "toc:21.1",
+   "heading": "21.1 How to decide what matters?",
+   "level": 3,
+   "number_key": "21.1",
+   "order": 163,
+   "page_start": 194,
+   "page_end": 195
+  },
+  {
+   "section_key": "toc:21.2",
+   "heading": "21.2 Minimize what matters",
+   "level": 3,
+   "number_key": "21.2",
+   "order": 164,
+   "page_start": 195,
+   "page_end": 196
+  },
+  {
+   "section_key": "toc:21.3",
+   "heading": "21.3 How to emphasize things that matter",
+   "level": 3,
+   "number_key": "21.3",
+   "order": 165,
+   "page_start": 196,
+   "page_end": 196
+  },
+  {
+   "section_key": "toc:21.4",
+   "heading": "21.4 Mistakes",
+   "level": 3,
+   "number_key": "21.4",
+   "order": 166,
+   "page_start": 196,
+   "page_end": 197
+  },
+  {
+   "section_key": "toc:21.5",
+   "heading": "21.5 Thinking more broadly",
+   "level": 3,
+   "number_key": "21.5",
+   "order": 167,
+   "page_start": 197,
+   "page_end": 198
+  },
+  {
+   "section_key": "toc:chapter-22-conclusion",
+   "heading": "Chapter 22 Conclusion",
+   "level": 1,
+   "number_key": null,
+   "order": 168,
+   "page_start": 198,
+   "page_end": 200
+  },
+  {
+   "section_key": "toc:index",
+   "heading": "Index",
+   "level": 1,
+   "number_key": null,
+   "order": 169,
+   "page_start": 200,
+   "page_end": 206
+  },
+  {
+   "section_key": "toc:summary-of-design-principles",
+   "heading": "Summary of Design Principles",
+   "level": 1,
+   "number_key": null,
+   "order": 170,
+   "page_start": 206,
+   "page_end": 207
+  },
+  {
+   "section_key": "toc:summary-of-red-flags",
+   "heading": "Summary of Red Flags",
+   "level": 1,
+   "number_key": null,
+   "order": 171,
+   "page_start": 207,
+   "page_end": 209
+  },
+  {
+   "section_key": "toc:about-the-author",
+   "heading": "About the Author",
+   "level": 1,
+   "number_key": null,
+   "order": 172,
+   "page_start": 209,
+   "page_end": 210
+  }
+ ],
+ "variants": {
+  "bookmarks": {
+   "raw_outline": [
+    {
+     "level": 1,
+     "title": "Title Page",
+     "page": 2
+    },
+    {
+     "level": 1,
+     "title": "Copyright",
+     "page": 3
+    },
+    {
+     "level": 1,
+     "title": "Contents",
+     "page": 4
+    },
+    {
+     "level": 1,
+     "title": "Preface",
+     "page": 10
+    },
+    {
+     "level": 1,
+     "title": "1: Introduction",
+     "page": 14
+    },
+    {
+     "level": 2,
+     "title": "1.1 How to use this book",
+     "page": 17
+    },
+    {
+     "level": 1,
+     "title": "2: The Nature of Complexity",
+     "page": 19
+    },
+    {
+     "level": 2,
+     "title": "2.1 Complexity defined",
+     "page": 19
+    },
+    {
+     "level": 2,
+     "title": "2.2 Symptoms of complexity",
+     "page": 21
+    },
+    {
+     "level": 2,
+     "title": "2.3 Causes of complexity",
+     "page": 23
+    },
+    {
+     "level": 2,
+     "title": "2.4 Complexity is incremental",
+     "page": 25
+    },
+    {
+     "level": 2,
+     "title": "2.5 Conclusion",
+     "page": 26
+    },
+    {
+     "level": 1,
+     "title": "3: Working Code Isn\u2019t Enough",
+     "page": 27
+    },
+    {
+     "level": 2,
+     "title": "3.1 Tactical programming",
+     "page": 27
+    },
+    {
+     "level": 2,
+     "title": "3.2 Strategic programming",
+     "page": 28
+    },
+    {
+     "level": 2,
+     "title": "3.3 How much to invest?",
+     "page": 29
+    },
+    {
+     "level": 2,
+     "title": "3.4 Startups and investment",
+     "page": 31
+    },
+    {
+     "level": 2,
+     "title": "3.5 Conclusion",
+     "page": 33
+    },
+    {
+     "level": 1,
+     "title": "4: Modules Should Be Deep",
+     "page": 34
+    },
+    {
+     "level": 2,
+     "title": "4.1 Modular design",
+     "page": 34
+    },
+    {
+     "level": 2,
+     "title": "4.2 What\u2019s in an interface?",
+     "page": 36
+    },
+    {
+     "level": 2,
+     "title": "4.3 Abstractions",
+     "page": 36
+    },
+    {
+     "level": 2,
+     "title": "4.4 Deep modules",
+     "page": 38
+    },
+    {
+     "level": 2,
+     "title": "4.5 Shallow modules",
+     "page": 40
+    },
+    {
+     "level": 2,
+     "title": "4.6 Classitis",
+     "page": 41
+    },
+    {
+     "level": 2,
+     "title": "4.7 Examples: Java and Unix I/O",
+     "page": 42
+    },
+    {
+     "level": 2,
+     "title": "4.8 Conclusion",
+     "page": 43
+    },
+    {
+     "level": 1,
+     "title": "5: Information Hiding (and Leakage)",
+     "page": 44
+    },
+    {
+     "level": 2,
+     "title": "5.1 Information hiding",
+     "page": 44
+    },
+    {
+     "level": 2,
+     "title": "5.2 Information leakage",
+     "page": 45
+    },
+    {
+     "level": 2,
+     "title": "5.3 Temporal decomposition",
+     "page": 46
+    },
+    {
+     "level": 2,
+     "title": "5.4 Example: HTTP server",
+     "page": 47
+    },
+    {
+     "level": 2,
+     "title": "5.5 Example: too many classes",
+     "page": 48
+    },
+    {
+     "level": 2,
+     "title": "5.6 Example: HTTP parameter handling",
+     "page": 49
+    },
+    {
+     "level": 2,
+     "title": "5.7 Example: defaults in HTTP responses",
+     "page": 51
+    },
+    {
+     "level": 2,
+     "title": "5.8 Information hiding within a class",
+     "page": 52
+    },
+    {
+     "level": 2,
+     "title": "5.9 Taking it too far",
+     "page": 52
+    },
+    {
+     "level": 2,
+     "title": "5.10: Conclusion",
+     "page": 53
+    },
+    {
+     "level": 1,
+     "title": "6: General-Purpose Modules are Deeper",
+     "page": 54
+    },
+    {
+     "level": 2,
+     "title": "6.1 Make classes somewhat general-purpose",
+     "page": 54
+    },
+    {
+     "level": 2,
+     "title": "6.2 Example: storing text for an editor",
+     "page": 56
+    },
+    {
+     "level": 2,
+     "title": "6.3 A more general-purpose API",
+     "page": 57
+    },
+    {
+     "level": 2,
+     "title": "6.4 Generality leads to better information hiding",
+     "page": 58
+    },
+    {
+     "level": 2,
+     "title": "6.5 Questions to ask yourself",
+     "page": 59
+    },
+    {
+     "level": 2,
+     "title": "6.6 Push specialization upwards (and downwards!)",
+     "page": 60
+    },
+    {
+     "level": 2,
+     "title": "6.7 Example: editor undo mechanism",
+     "page": 61
+    },
+    {
+     "level": 2,
+     "title": "6.8 Eliminate special cases in code",
+     "page": 64
+    },
+    {
+     "level": 2,
+     "title": "6.9 Conclusion",
+     "page": 65
+    },
+    {
+     "level": 1,
+     "title": "7: Different Layer, Different Abstraction",
+     "page": 66
+    },
+    {
+     "level": 2,
+     "title": "7.1 Pass-through methods",
+     "page": 67
+    },
+    {
+     "level": 2,
+     "title": "7.2 When is interface duplication OK?",
+     "page": 69
+    },
+    {
+     "level": 2,
+     "title": "7.3 Decorators",
+     "page": 70
+    },
+    {
+     "level": 2,
+     "title": "7.4 Interface versus implementation",
+     "page": 71
+    },
+    {
+     "level": 2,
+     "title": "7.5 Pass-through variables",
+     "page": 72
+    },
+    {
+     "level": 2,
+     "title": "7.6 Conclusion",
+     "page": 75
+    },
+    {
+     "level": 1,
+     "title": "8: Pull Complexity Downwards",
+     "page": 77
+    },
+    {
+     "level": 2,
+     "title": "8.1 Example: editor text class",
+     "page": 77
+    },
+    {
+     "level": 2,
+     "title": "8.2 Example: configuration parameters",
+     "page": 78
+    },
+    {
+     "level": 2,
+     "title": "8.3 Taking it too far",
+     "page": 79
+    },
+    {
+     "level": 2,
+     "title": "8.4 Conclusion",
+     "page": 80
+    },
+    {
+     "level": 1,
+     "title": "9: Better Together Or Better Apart?",
+     "page": 81
+    },
+    {
+     "level": 2,
+     "title": "9.1 Bring together if information is shared",
+     "page": 83
+    },
+    {
+     "level": 2,
+     "title": "9.2 Bring together if it will simplify the interface",
+     "page": 83
+    },
+    {
+     "level": 2,
+     "title": "9.3 Bring together to eliminate duplication",
+     "page": 84
+    },
+    {
+     "level": 2,
+     "title": "9.4 Separate general-purpose and special-purpose code",
+     "page": 84
+    },
+    {
+     "level": 2,
+     "title": "9.5 Example: insertion cursor and selection",
+     "page": 87
+    },
+    {
+     "level": 2,
+     "title": "9.6 Example: separate class for logging",
+     "page": 89
+    },
+    {
+     "level": 2,
+     "title": "9.7 Splitting and joining methods",
+     "page": 90
+    },
+    {
+     "level": 2,
+     "title": "9.8 A different opinion: Clean Code",
+     "page": 93
+    },
+    {
+     "level": 2,
+     "title": "9.9 Conclusion",
+     "page": 94
+    },
+    {
+     "level": 1,
+     "title": "10: Define Errors Out Of Existence",
+     "page": 95
+    },
+    {
+     "level": 2,
+     "title": "10.1 Why exceptions add complexity",
+     "page": 95
+    },
+    {
+     "level": 2,
+     "title": "10.2 Too many exceptions",
+     "page": 98
+    },
+    {
+     "level": 2,
+     "title": "10.3 Define errors out of existence",
+     "page": 99
+    },
+    {
+     "level": 2,
+     "title": "10.4 Example: file deletion in Windows",
+     "page": 100
+    },
+    {
+     "level": 2,
+     "title": "10.5 Example: Java substring method",
+     "page": 101
+    },
+    {
+     "level": 2,
+     "title": "10.6 Mask exceptions",
+     "page": 102
+    },
+    {
+     "level": 2,
+     "title": "10.7 Exception aggregation",
+     "page": 103
+    },
+    {
+     "level": 2,
+     "title": "10.8 Just crash?",
+     "page": 107
+    },
+    {
+     "level": 2,
+     "title": "10.9 Taking it too far",
+     "page": 108
+    },
+    {
+     "level": 2,
+     "title": "10.10 Conclusion",
+     "page": 109
+    },
+    {
+     "level": 1,
+     "title": "11: Design it Twice",
+     "page": 110
+    },
+    {
+     "level": 1,
+     "title": "12: Why Write Comments? The Four Excuses",
+     "page": 114
+    },
+    {
+     "level": 2,
+     "title": "12.1 Good code is self-documenting",
+     "page": 115
+    },
+    {
+     "level": 2,
+     "title": "12.2 I don\u2019t have time to write comments",
+     "page": 116
+    },
+    {
+     "level": 2,
+     "title": "12.3 Comments get out of date and become misleading",
+     "page": 117
+    },
+    {
+     "level": 2,
+     "title": "12.4 All the comments I have seen are worthless",
+     "page": 117
+    },
+    {
+     "level": 2,
+     "title": "12.5 Benefits of well-written comments",
+     "page": 118
+    },
+    {
+     "level": 2,
+     "title": "12.6 A different opinion: comments are failures",
+     "page": 119
+    },
+    {
+     "level": 1,
+     "title": "13: Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+     "page": 121
+    },
+    {
+     "level": 2,
+     "title": "13.1 Pick conventions",
+     "page": 122
+    },
+    {
+     "level": 2,
+     "title": "13.2 Don\u2019t repeat the code",
+     "page": 123
+    },
+    {
+     "level": 2,
+     "title": "13.3 Lower-level comments add precision",
+     "page": 125
+    },
+    {
+     "level": 2,
+     "title": "13.4 Higher-level comments enhance intuition",
+     "page": 127
+    },
+    {
+     "level": 2,
+     "title": "13.5 Interface documentation",
+     "page": 129
+    },
+    {
+     "level": 2,
+     "title": "13.6 Implementation comments: what and why, not how",
+     "page": 136
+    },
+    {
+     "level": 2,
+     "title": "13.7 Cross-module design decisions",
+     "page": 137
+    },
+    {
+     "level": 2,
+     "title": "13.8 Conclusion",
+     "page": 140
+    },
+    {
+     "level": 2,
+     "title": "13.9 Answers to questions from Section 13.5",
+     "page": 140
+    },
+    {
+     "level": 1,
+     "title": "14: Choosing Names",
+     "page": 142
+    },
+    {
+     "level": 2,
+     "title": "14.1 Example: bad names cause bugs",
+     "page": 142
+    },
+    {
+     "level": 2,
+     "title": "14.2 Create an image",
+     "page": 143
+    },
+    {
+     "level": 2,
+     "title": "14.3 Names should be precise",
+     "page": 144
+    },
+    {
+     "level": 2,
+     "title": "14.4 Use names consistently",
+     "page": 147
+    },
+    {
+     "level": 2,
+     "title": "14.5 Avoid extra words",
+     "page": 148
+    },
+    {
+     "level": 2,
+     "title": "14.6 A different opinion: Go style guide",
+     "page": 149
+    },
+    {
+     "level": 2,
+     "title": "14.7 Conclusion",
+     "page": 150
+    },
+    {
+     "level": 1,
+     "title": "15: Write The Comments First",
+     "page": 152
+    },
+    {
+     "level": 2,
+     "title": "15.1 Delayed comments are bad comments",
+     "page": 152
+    },
+    {
+     "level": 2,
+     "title": "15.2 Write the comments first",
+     "page": 153
+    },
+    {
+     "level": 2,
+     "title": "15.3 Comments are a design tool",
+     "page": 154
+    },
+    {
+     "level": 2,
+     "title": "15.4 Early comments are fun comments",
+     "page": 155
+    },
+    {
+     "level": 2,
+     "title": "15.5 Are early comments expensive?",
+     "page": 156
+    },
+    {
+     "level": 2,
+     "title": "15.6 Conclusion",
+     "page": 156
+    },
+    {
+     "level": 1,
+     "title": "16: Modifying Existing Code",
+     "page": 157
+    },
+    {
+     "level": 2,
+     "title": "16.1 Stay strategic",
+     "page": 157
+    },
+    {
+     "level": 2,
+     "title": "16.2 Maintaining comments: keep the comments near the code",
+     "page": 159
+    },
+    {
+     "level": 2,
+     "title": "16.3 Comments belong in the code, not the commit log",
+     "page": 160
+    },
+    {
+     "level": 2,
+     "title": "16.4 Maintaining comments: avoid duplication",
+     "page": 161
+    },
+    {
+     "level": 2,
+     "title": "16.5 Maintaining comments: check the diffs",
+     "page": 162
+    },
+    {
+     "level": 2,
+     "title": "16.6 Higher-level comments are easier to maintain",
+     "page": 162
+    },
+    {
+     "level": 1,
+     "title": "17: Consistency",
+     "page": 164
+    },
+    {
+     "level": 2,
+     "title": "17.1 Examples of consistency",
+     "page": 164
+    },
+    {
+     "level": 2,
+     "title": "17.2 Ensuring consistency",
+     "page": 165
+    },
+    {
+     "level": 2,
+     "title": "17.3 Taking it too far",
+     "page": 167
+    },
+    {
+     "level": 2,
+     "title": "17.4 Conclusion",
+     "page": 167
+    },
+    {
+     "level": 1,
+     "title": "18: Code Should be Obvious",
+     "page": 169
+    },
+    {
+     "level": 2,
+     "title": "18.1 Things that make code more obvious",
+     "page": 169
+    },
+    {
+     "level": 2,
+     "title": "18.2 Things that make code less obvious",
+     "page": 172
+    },
+    {
+     "level": 2,
+     "title": "18.3 Conclusion",
+     "page": 174
+    },
+    {
+     "level": 1,
+     "title": "19: Software Trends",
+     "page": 176
+    },
+    {
+     "level": 2,
+     "title": "19.1 Object-oriented programming and inheritance",
+     "page": 176
+    },
+    {
+     "level": 2,
+     "title": "19.2 Agile development",
+     "page": 178
+    },
+    {
+     "level": 2,
+     "title": "19.3 Unit tests",
+     "page": 179
+    },
+    {
+     "level": 2,
+     "title": "19.4 Test-driven development",
+     "page": 180
+    },
+    {
+     "level": 2,
+     "title": "19.5 Design patterns",
+     "page": 181
+    },
+    {
+     "level": 2,
+     "title": "19.6 Getters and setters",
+     "page": 182
+    },
+    {
+     "level": 2,
+     "title": "19.7 Conclusion",
+     "page": 182
+    },
+    {
+     "level": 1,
+     "title": "20: Designing for Performance",
+     "page": 183
+    },
+    {
+     "level": 2,
+     "title": "20.1 How to think about performance",
+     "page": 183
+    },
+    {
+     "level": 2,
+     "title": "20.2 Measure before (and after) modifying",
+     "page": 185
+    },
+    {
+     "level": 2,
+     "title": "20.3 Design around the critical path",
+     "page": 186
+    },
+    {
+     "level": 2,
+     "title": "20.4 An example: RAMCloud Buffers",
+     "page": 188
+    },
+    {
+     "level": 2,
+     "title": "20.5 Conclusion",
+     "page": 193
+    },
+    {
+     "level": 1,
+     "title": "21: Decide What Matters",
+     "page": 194
+    },
+    {
+     "level": 2,
+     "title": "21.1 How to decide what matters?",
+     "page": 194
+    },
+    {
+     "level": 2,
+     "title": "21.2 Minimize what matters",
+     "page": 195
+    },
+    {
+     "level": 2,
+     "title": "21.3 How to emphasize things that matter",
+     "page": 196
+    },
+    {
+     "level": 2,
+     "title": "21.4 Mistakes",
+     "page": 196
+    },
+    {
+     "level": 2,
+     "title": "21.5 Thinking more broadly",
+     "page": 197
+    },
+    {
+     "level": 1,
+     "title": "22: Conclusion",
+     "page": 198
+    },
+    {
+     "level": 1,
+     "title": "Index",
+     "page": 200
+    },
+    {
+     "level": 1,
+     "title": "Summary of Design Principles",
+     "page": 206
+    },
+    {
+     "level": 1,
+     "title": "Summary of Red Flags",
+     "page": 207
+    },
+    {
+     "level": 1,
+     "title": "About the Author",
+     "page": 209
+    },
+    {
+     "level": 1,
+     "title": "Back Cover",
+     "page": 210
+    }
+   ],
+   "expected": {
+    "outline_entries": [
+     {
+      "numberKey": null,
+      "title": "Title Page",
+      "sectionKey": "toc:title-page",
+      "listDepth": 0,
+      "page": 2
+     },
+     {
+      "numberKey": null,
+      "title": "Copyright",
+      "sectionKey": "toc:copyright",
+      "listDepth": 0,
+      "page": 3
+     },
+     {
+      "numberKey": null,
+      "title": "Contents",
+      "sectionKey": "toc:contents",
+      "listDepth": 0,
+      "page": 4
+     },
+     {
+      "numberKey": null,
+      "title": "Preface",
+      "sectionKey": "toc:preface",
+      "listDepth": 0,
+      "page": 10
+     },
+     {
+      "numberKey": "1",
+      "title": "Introduction",
+      "sectionKey": "toc:1",
+      "listDepth": 0,
+      "page": 14
+     },
+     {
+      "numberKey": "1.1",
+      "title": "How to use this book",
+      "sectionKey": "toc:1.1",
+      "listDepth": 1,
+      "page": 17
+     },
+     {
+      "numberKey": "2",
+      "title": "The Nature of Complexity",
+      "sectionKey": "toc:2",
+      "listDepth": 0,
+      "page": 19
+     },
+     {
+      "numberKey": "2.1",
+      "title": "Complexity defined",
+      "sectionKey": "toc:2.1",
+      "listDepth": 1,
+      "page": 19
+     },
+     {
+      "numberKey": "2.2",
+      "title": "Symptoms of complexity",
+      "sectionKey": "toc:2.2",
+      "listDepth": 1,
+      "page": 21
+     },
+     {
+      "numberKey": "2.3",
+      "title": "Causes of complexity",
+      "sectionKey": "toc:2.3",
+      "listDepth": 1,
+      "page": 23
+     },
+     {
+      "numberKey": "2.4",
+      "title": "Complexity is incremental",
+      "sectionKey": "toc:2.4",
+      "listDepth": 1,
+      "page": 25
+     },
+     {
+      "numberKey": "2.5",
+      "title": "Conclusion",
+      "sectionKey": "toc:2.5",
+      "listDepth": 1,
+      "page": 26
+     },
+     {
+      "numberKey": "3",
+      "title": "Working Code Isn\u2019t Enough",
+      "sectionKey": "toc:3",
+      "listDepth": 0,
+      "page": 27
+     },
+     {
+      "numberKey": "3.1",
+      "title": "Tactical programming",
+      "sectionKey": "toc:3.1",
+      "listDepth": 1,
+      "page": 27
+     },
+     {
+      "numberKey": "3.2",
+      "title": "Strategic programming",
+      "sectionKey": "toc:3.2",
+      "listDepth": 1,
+      "page": 28
+     },
+     {
+      "numberKey": "3.3",
+      "title": "How much to invest?",
+      "sectionKey": "toc:3.3",
+      "listDepth": 1,
+      "page": 29
+     },
+     {
+      "numberKey": "3.4",
+      "title": "Startups and investment",
+      "sectionKey": "toc:3.4",
+      "listDepth": 1,
+      "page": 31
+     },
+     {
+      "numberKey": "3.5",
+      "title": "Conclusion",
+      "sectionKey": "toc:3.5",
+      "listDepth": 1,
+      "page": 33
+     },
+     {
+      "numberKey": "4",
+      "title": "Modules Should Be Deep",
+      "sectionKey": "toc:4",
+      "listDepth": 0,
+      "page": 34
+     },
+     {
+      "numberKey": "4.1",
+      "title": "Modular design",
+      "sectionKey": "toc:4.1",
+      "listDepth": 1,
+      "page": 34
+     },
+     {
+      "numberKey": "4.2",
+      "title": "What\u2019s in an interface?",
+      "sectionKey": "toc:4.2",
+      "listDepth": 1,
+      "page": 36
+     },
+     {
+      "numberKey": "4.3",
+      "title": "Abstractions",
+      "sectionKey": "toc:4.3",
+      "listDepth": 1,
+      "page": 36
+     },
+     {
+      "numberKey": "4.4",
+      "title": "Deep modules",
+      "sectionKey": "toc:4.4",
+      "listDepth": 1,
+      "page": 38
+     },
+     {
+      "numberKey": "4.5",
+      "title": "Shallow modules",
+      "sectionKey": "toc:4.5",
+      "listDepth": 1,
+      "page": 40
+     },
+     {
+      "numberKey": "4.6",
+      "title": "Classitis",
+      "sectionKey": "toc:4.6",
+      "listDepth": 1,
+      "page": 41
+     },
+     {
+      "numberKey": "4.7",
+      "title": "Examples: Java and Unix I/O",
+      "sectionKey": "toc:4.7",
+      "listDepth": 1,
+      "page": 42
+     },
+     {
+      "numberKey": "4.8",
+      "title": "Conclusion",
+      "sectionKey": "toc:4.8",
+      "listDepth": 1,
+      "page": 43
+     },
+     {
+      "numberKey": "5",
+      "title": "Information Hiding (and Leakage)",
+      "sectionKey": "toc:5",
+      "listDepth": 0,
+      "page": 44
+     },
+     {
+      "numberKey": "5.1",
+      "title": "Information hiding",
+      "sectionKey": "toc:5.1",
+      "listDepth": 1,
+      "page": 44
+     },
+     {
+      "numberKey": "5.2",
+      "title": "Information leakage",
+      "sectionKey": "toc:5.2",
+      "listDepth": 1,
+      "page": 45
+     },
+     {
+      "numberKey": "5.3",
+      "title": "Temporal decomposition",
+      "sectionKey": "toc:5.3",
+      "listDepth": 1,
+      "page": 46
+     },
+     {
+      "numberKey": "5.4",
+      "title": "Example: HTTP server",
+      "sectionKey": "toc:5.4",
+      "listDepth": 1,
+      "page": 47
+     },
+     {
+      "numberKey": "5.5",
+      "title": "Example: too many classes",
+      "sectionKey": "toc:5.5",
+      "listDepth": 1,
+      "page": 48
+     },
+     {
+      "numberKey": "5.6",
+      "title": "Example: HTTP parameter handling",
+      "sectionKey": "toc:5.6",
+      "listDepth": 1,
+      "page": 49
+     },
+     {
+      "numberKey": "5.7",
+      "title": "Example: defaults in HTTP responses",
+      "sectionKey": "toc:5.7",
+      "listDepth": 1,
+      "page": 51
+     },
+     {
+      "numberKey": "5.8",
+      "title": "Information hiding within a class",
+      "sectionKey": "toc:5.8",
+      "listDepth": 1,
+      "page": 52
+     },
+     {
+      "numberKey": "5.9",
+      "title": "Taking it too far",
+      "sectionKey": "toc:5.9",
+      "listDepth": 1,
+      "page": 52
+     },
+     {
+      "numberKey": "5.10",
+      "title": "Conclusion",
+      "sectionKey": "toc:5.10",
+      "listDepth": 1,
+      "page": 53
+     },
+     {
+      "numberKey": "6",
+      "title": "General-Purpose Modules are Deeper",
+      "sectionKey": "toc:6",
+      "listDepth": 0,
+      "page": 54
+     },
+     {
+      "numberKey": "6.1",
+      "title": "Make classes somewhat general-purpose",
+      "sectionKey": "toc:6.1",
+      "listDepth": 1,
+      "page": 54
+     },
+     {
+      "numberKey": "6.2",
+      "title": "Example: storing text for an editor",
+      "sectionKey": "toc:6.2",
+      "listDepth": 1,
+      "page": 56
+     },
+     {
+      "numberKey": "6.3",
+      "title": "A more general-purpose API",
+      "sectionKey": "toc:6.3",
+      "listDepth": 1,
+      "page": 57
+     },
+     {
+      "numberKey": "6.4",
+      "title": "Generality leads to better information hiding",
+      "sectionKey": "toc:6.4",
+      "listDepth": 1,
+      "page": 58
+     },
+     {
+      "numberKey": "6.5",
+      "title": "Questions to ask yourself",
+      "sectionKey": "toc:6.5",
+      "listDepth": 1,
+      "page": 59
+     },
+     {
+      "numberKey": "6.6",
+      "title": "Push specialization upwards (and downwards!)",
+      "sectionKey": "toc:6.6",
+      "listDepth": 1,
+      "page": 60
+     },
+     {
+      "numberKey": "6.7",
+      "title": "Example: editor undo mechanism",
+      "sectionKey": "toc:6.7",
+      "listDepth": 1,
+      "page": 61
+     },
+     {
+      "numberKey": "6.8",
+      "title": "Eliminate special cases in code",
+      "sectionKey": "toc:6.8",
+      "listDepth": 1,
+      "page": 64
+     },
+     {
+      "numberKey": "6.9",
+      "title": "Conclusion",
+      "sectionKey": "toc:6.9",
+      "listDepth": 1,
+      "page": 65
+     },
+     {
+      "numberKey": "7",
+      "title": "Different Layer, Different Abstraction",
+      "sectionKey": "toc:7",
+      "listDepth": 0,
+      "page": 66
+     },
+     {
+      "numberKey": "7.1",
+      "title": "Pass-through methods",
+      "sectionKey": "toc:7.1",
+      "listDepth": 1,
+      "page": 67
+     },
+     {
+      "numberKey": "7.2",
+      "title": "When is interface duplication OK?",
+      "sectionKey": "toc:7.2",
+      "listDepth": 1,
+      "page": 69
+     },
+     {
+      "numberKey": "7.3",
+      "title": "Decorators",
+      "sectionKey": "toc:7.3",
+      "listDepth": 1,
+      "page": 70
+     },
+     {
+      "numberKey": "7.4",
+      "title": "Interface versus implementation",
+      "sectionKey": "toc:7.4",
+      "listDepth": 1,
+      "page": 71
+     },
+     {
+      "numberKey": "7.5",
+      "title": "Pass-through variables",
+      "sectionKey": "toc:7.5",
+      "listDepth": 1,
+      "page": 72
+     },
+     {
+      "numberKey": "7.6",
+      "title": "Conclusion",
+      "sectionKey": "toc:7.6",
+      "listDepth": 1,
+      "page": 75
+     },
+     {
+      "numberKey": "8",
+      "title": "Pull Complexity Downwards",
+      "sectionKey": "toc:8",
+      "listDepth": 0,
+      "page": 77
+     },
+     {
+      "numberKey": "8.1",
+      "title": "Example: editor text class",
+      "sectionKey": "toc:8.1",
+      "listDepth": 1,
+      "page": 77
+     },
+     {
+      "numberKey": "8.2",
+      "title": "Example: configuration parameters",
+      "sectionKey": "toc:8.2",
+      "listDepth": 1,
+      "page": 78
+     },
+     {
+      "numberKey": "8.3",
+      "title": "Taking it too far",
+      "sectionKey": "toc:8.3",
+      "listDepth": 1,
+      "page": 79
+     },
+     {
+      "numberKey": "8.4",
+      "title": "Conclusion",
+      "sectionKey": "toc:8.4",
+      "listDepth": 1,
+      "page": 80
+     },
+     {
+      "numberKey": "9",
+      "title": "Better Together Or Better Apart?",
+      "sectionKey": "toc:9",
+      "listDepth": 0,
+      "page": 81
+     },
+     {
+      "numberKey": "9.1",
+      "title": "Bring together if information is shared",
+      "sectionKey": "toc:9.1",
+      "listDepth": 1,
+      "page": 83
+     },
+     {
+      "numberKey": "9.2",
+      "title": "Bring together if it will simplify the interface",
+      "sectionKey": "toc:9.2",
+      "listDepth": 1,
+      "page": 83
+     },
+     {
+      "numberKey": "9.3",
+      "title": "Bring together to eliminate duplication",
+      "sectionKey": "toc:9.3",
+      "listDepth": 1,
+      "page": 84
+     },
+     {
+      "numberKey": "9.4",
+      "title": "Separate general-purpose and special-purpose code",
+      "sectionKey": "toc:9.4",
+      "listDepth": 1,
+      "page": 84
+     },
+     {
+      "numberKey": "9.5",
+      "title": "Example: insertion cursor and selection",
+      "sectionKey": "toc:9.5",
+      "listDepth": 1,
+      "page": 87
+     },
+     {
+      "numberKey": "9.6",
+      "title": "Example: separate class for logging",
+      "sectionKey": "toc:9.6",
+      "listDepth": 1,
+      "page": 89
+     },
+     {
+      "numberKey": "9.7",
+      "title": "Splitting and joining methods",
+      "sectionKey": "toc:9.7",
+      "listDepth": 1,
+      "page": 90
+     },
+     {
+      "numberKey": "9.8",
+      "title": "A different opinion: Clean Code",
+      "sectionKey": "toc:9.8",
+      "listDepth": 1,
+      "page": 93
+     },
+     {
+      "numberKey": "9.9",
+      "title": "Conclusion",
+      "sectionKey": "toc:9.9",
+      "listDepth": 1,
+      "page": 94
+     },
+     {
+      "numberKey": "10",
+      "title": "Define Errors Out Of Existence",
+      "sectionKey": "toc:10",
+      "listDepth": 0,
+      "page": 95
+     },
+     {
+      "numberKey": "10.1",
+      "title": "Why exceptions add complexity",
+      "sectionKey": "toc:10.1",
+      "listDepth": 1,
+      "page": 95
+     },
+     {
+      "numberKey": "10.2",
+      "title": "Too many exceptions",
+      "sectionKey": "toc:10.2",
+      "listDepth": 1,
+      "page": 98
+     },
+     {
+      "numberKey": "10.3",
+      "title": "Define errors out of existence",
+      "sectionKey": "toc:10.3",
+      "listDepth": 1,
+      "page": 99
+     },
+     {
+      "numberKey": "10.4",
+      "title": "Example: file deletion in Windows",
+      "sectionKey": "toc:10.4",
+      "listDepth": 1,
+      "page": 100
+     },
+     {
+      "numberKey": "10.5",
+      "title": "Example: Java substring method",
+      "sectionKey": "toc:10.5",
+      "listDepth": 1,
+      "page": 101
+     },
+     {
+      "numberKey": "10.6",
+      "title": "Mask exceptions",
+      "sectionKey": "toc:10.6",
+      "listDepth": 1,
+      "page": 102
+     },
+     {
+      "numberKey": "10.7",
+      "title": "Exception aggregation",
+      "sectionKey": "toc:10.7",
+      "listDepth": 1,
+      "page": 103
+     },
+     {
+      "numberKey": "10.8",
+      "title": "Just crash?",
+      "sectionKey": "toc:10.8",
+      "listDepth": 1,
+      "page": 107
+     },
+     {
+      "numberKey": "10.9",
+      "title": "Taking it too far",
+      "sectionKey": "toc:10.9",
+      "listDepth": 1,
+      "page": 108
+     },
+     {
+      "numberKey": "10.10",
+      "title": "Conclusion",
+      "sectionKey": "toc:10.10",
+      "listDepth": 1,
+      "page": 109
+     },
+     {
+      "numberKey": "11",
+      "title": "Design it Twice",
+      "sectionKey": "toc:11",
+      "listDepth": 0,
+      "page": 110
+     },
+     {
+      "numberKey": "12",
+      "title": "Why Write Comments? The Four Excuses",
+      "sectionKey": "toc:12",
+      "listDepth": 0,
+      "page": 114
+     },
+     {
+      "numberKey": "12.1",
+      "title": "Good code is self-documenting",
+      "sectionKey": "toc:12.1",
+      "listDepth": 1,
+      "page": 115
+     },
+     {
+      "numberKey": "12.2",
+      "title": "I don\u2019t have time to write comments",
+      "sectionKey": "toc:12.2",
+      "listDepth": 1,
+      "page": 116
+     },
+     {
+      "numberKey": "12.3",
+      "title": "Comments get out of date and become misleading",
+      "sectionKey": "toc:12.3",
+      "listDepth": 1,
+      "page": 117
+     },
+     {
+      "numberKey": "12.4",
+      "title": "All the comments I have seen are worthless",
+      "sectionKey": "toc:12.4",
+      "listDepth": 1,
+      "page": 117
+     },
+     {
+      "numberKey": "12.5",
+      "title": "Benefits of well-written comments",
+      "sectionKey": "toc:12.5",
+      "listDepth": 1,
+      "page": 118
+     },
+     {
+      "numberKey": "12.6",
+      "title": "A different opinion: comments are failures",
+      "sectionKey": "toc:12.6",
+      "listDepth": 1,
+      "page": 119
+     },
+     {
+      "numberKey": "13",
+      "title": "Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+      "sectionKey": "toc:13",
+      "listDepth": 0,
+      "page": 121
+     },
+     {
+      "numberKey": "13.1",
+      "title": "Pick conventions",
+      "sectionKey": "toc:13.1",
+      "listDepth": 1,
+      "page": 122
+     },
+     {
+      "numberKey": "13.2",
+      "title": "Don\u2019t repeat the code",
+      "sectionKey": "toc:13.2",
+      "listDepth": 1,
+      "page": 123
+     },
+     {
+      "numberKey": "13.3",
+      "title": "Lower-level comments add precision",
+      "sectionKey": "toc:13.3",
+      "listDepth": 1,
+      "page": 125
+     },
+     {
+      "numberKey": "13.4",
+      "title": "Higher-level comments enhance intuition",
+      "sectionKey": "toc:13.4",
+      "listDepth": 1,
+      "page": 127
+     },
+     {
+      "numberKey": "13.5",
+      "title": "Interface documentation",
+      "sectionKey": "toc:13.5",
+      "listDepth": 1,
+      "page": 129
+     },
+     {
+      "numberKey": "13.6",
+      "title": "Implementation comments: what and why, not how",
+      "sectionKey": "toc:13.6",
+      "listDepth": 1,
+      "page": 136
+     },
+     {
+      "numberKey": "13.7",
+      "title": "Cross-module design decisions",
+      "sectionKey": "toc:13.7",
+      "listDepth": 1,
+      "page": 137
+     },
+     {
+      "numberKey": "13.8",
+      "title": "Conclusion",
+      "sectionKey": "toc:13.8",
+      "listDepth": 1,
+      "page": 140
+     },
+     {
+      "numberKey": "13.9",
+      "title": "Answers to questions from Section 13.5",
+      "sectionKey": "toc:13.9",
+      "listDepth": 1,
+      "page": 140
+     },
+     {
+      "numberKey": "14",
+      "title": "Choosing Names",
+      "sectionKey": "toc:14",
+      "listDepth": 0,
+      "page": 142
+     },
+     {
+      "numberKey": "14.1",
+      "title": "Example: bad names cause bugs",
+      "sectionKey": "toc:14.1",
+      "listDepth": 1,
+      "page": 142
+     },
+     {
+      "numberKey": "14.2",
+      "title": "Create an image",
+      "sectionKey": "toc:14.2",
+      "listDepth": 1,
+      "page": 143
+     },
+     {
+      "numberKey": "14.3",
+      "title": "Names should be precise",
+      "sectionKey": "toc:14.3",
+      "listDepth": 1,
+      "page": 144
+     },
+     {
+      "numberKey": "14.4",
+      "title": "Use names consistently",
+      "sectionKey": "toc:14.4",
+      "listDepth": 1,
+      "page": 147
+     },
+     {
+      "numberKey": "14.5",
+      "title": "Avoid extra words",
+      "sectionKey": "toc:14.5",
+      "listDepth": 1,
+      "page": 148
+     },
+     {
+      "numberKey": "14.6",
+      "title": "A different opinion: Go style guide",
+      "sectionKey": "toc:14.6",
+      "listDepth": 1,
+      "page": 149
+     },
+     {
+      "numberKey": "14.7",
+      "title": "Conclusion",
+      "sectionKey": "toc:14.7",
+      "listDepth": 1,
+      "page": 150
+     },
+     {
+      "numberKey": "15",
+      "title": "Write The Comments First",
+      "sectionKey": "toc:15",
+      "listDepth": 0,
+      "page": 152
+     },
+     {
+      "numberKey": "15.1",
+      "title": "Delayed comments are bad comments",
+      "sectionKey": "toc:15.1",
+      "listDepth": 1,
+      "page": 152
+     },
+     {
+      "numberKey": "15.2",
+      "title": "Write the comments first",
+      "sectionKey": "toc:15.2",
+      "listDepth": 1,
+      "page": 153
+     },
+     {
+      "numberKey": "15.3",
+      "title": "Comments are a design tool",
+      "sectionKey": "toc:15.3",
+      "listDepth": 1,
+      "page": 154
+     },
+     {
+      "numberKey": "15.4",
+      "title": "Early comments are fun comments",
+      "sectionKey": "toc:15.4",
+      "listDepth": 1,
+      "page": 155
+     },
+     {
+      "numberKey": "15.5",
+      "title": "Are early comments expensive?",
+      "sectionKey": "toc:15.5",
+      "listDepth": 1,
+      "page": 156
+     },
+     {
+      "numberKey": "15.6",
+      "title": "Conclusion",
+      "sectionKey": "toc:15.6",
+      "listDepth": 1,
+      "page": 156
+     },
+     {
+      "numberKey": "16",
+      "title": "Modifying Existing Code",
+      "sectionKey": "toc:16",
+      "listDepth": 0,
+      "page": 157
+     },
+     {
+      "numberKey": "16.1",
+      "title": "Stay strategic",
+      "sectionKey": "toc:16.1",
+      "listDepth": 1,
+      "page": 157
+     },
+     {
+      "numberKey": "16.2",
+      "title": "Maintaining comments: keep the comments near the code",
+      "sectionKey": "toc:16.2",
+      "listDepth": 1,
+      "page": 159
+     },
+     {
+      "numberKey": "16.3",
+      "title": "Comments belong in the code, not the commit log",
+      "sectionKey": "toc:16.3",
+      "listDepth": 1,
+      "page": 160
+     },
+     {
+      "numberKey": "16.4",
+      "title": "Maintaining comments: avoid duplication",
+      "sectionKey": "toc:16.4",
+      "listDepth": 1,
+      "page": 161
+     },
+     {
+      "numberKey": "16.5",
+      "title": "Maintaining comments: check the diffs",
+      "sectionKey": "toc:16.5",
+      "listDepth": 1,
+      "page": 162
+     },
+     {
+      "numberKey": "16.6",
+      "title": "Higher-level comments are easier to maintain",
+      "sectionKey": "toc:16.6",
+      "listDepth": 1,
+      "page": 162
+     },
+     {
+      "numberKey": "17",
+      "title": "Consistency",
+      "sectionKey": "toc:17",
+      "listDepth": 0,
+      "page": 164
+     },
+     {
+      "numberKey": "17.1",
+      "title": "Examples of consistency",
+      "sectionKey": "toc:17.1",
+      "listDepth": 1,
+      "page": 164
+     },
+     {
+      "numberKey": "17.2",
+      "title": "Ensuring consistency",
+      "sectionKey": "toc:17.2",
+      "listDepth": 1,
+      "page": 165
+     },
+     {
+      "numberKey": "17.3",
+      "title": "Taking it too far",
+      "sectionKey": "toc:17.3",
+      "listDepth": 1,
+      "page": 167
+     },
+     {
+      "numberKey": "17.4",
+      "title": "Conclusion",
+      "sectionKey": "toc:17.4",
+      "listDepth": 1,
+      "page": 167
+     },
+     {
+      "numberKey": "18",
+      "title": "Code Should be Obvious",
+      "sectionKey": "toc:18",
+      "listDepth": 0,
+      "page": 169
+     },
+     {
+      "numberKey": "18.1",
+      "title": "Things that make code more obvious",
+      "sectionKey": "toc:18.1",
+      "listDepth": 1,
+      "page": 169
+     },
+     {
+      "numberKey": "18.2",
+      "title": "Things that make code less obvious",
+      "sectionKey": "toc:18.2",
+      "listDepth": 1,
+      "page": 172
+     },
+     {
+      "numberKey": "18.3",
+      "title": "Conclusion",
+      "sectionKey": "toc:18.3",
+      "listDepth": 1,
+      "page": 174
+     },
+     {
+      "numberKey": "19",
+      "title": "Software Trends",
+      "sectionKey": "toc:19",
+      "listDepth": 0,
+      "page": 176
+     },
+     {
+      "numberKey": "19.1",
+      "title": "Object-oriented programming and inheritance",
+      "sectionKey": "toc:19.1",
+      "listDepth": 1,
+      "page": 176
+     },
+     {
+      "numberKey": "19.2",
+      "title": "Agile development",
+      "sectionKey": "toc:19.2",
+      "listDepth": 1,
+      "page": 178
+     },
+     {
+      "numberKey": "19.3",
+      "title": "Unit tests",
+      "sectionKey": "toc:19.3",
+      "listDepth": 1,
+      "page": 179
+     },
+     {
+      "numberKey": "19.4",
+      "title": "Test-driven development",
+      "sectionKey": "toc:19.4",
+      "listDepth": 1,
+      "page": 180
+     },
+     {
+      "numberKey": "19.5",
+      "title": "Design patterns",
+      "sectionKey": "toc:19.5",
+      "listDepth": 1,
+      "page": 181
+     },
+     {
+      "numberKey": "19.6",
+      "title": "Getters and setters",
+      "sectionKey": "toc:19.6",
+      "listDepth": 1,
+      "page": 182
+     },
+     {
+      "numberKey": "19.7",
+      "title": "Conclusion",
+      "sectionKey": "toc:19.7",
+      "listDepth": 1,
+      "page": 182
+     },
+     {
+      "numberKey": "20",
+      "title": "Designing for Performance",
+      "sectionKey": "toc:20",
+      "listDepth": 0,
+      "page": 183
+     },
+     {
+      "numberKey": "20.1",
+      "title": "How to think about performance",
+      "sectionKey": "toc:20.1",
+      "listDepth": 1,
+      "page": 183
+     },
+     {
+      "numberKey": "20.2",
+      "title": "Measure before (and after) modifying",
+      "sectionKey": "toc:20.2",
+      "listDepth": 1,
+      "page": 185
+     },
+     {
+      "numberKey": "20.3",
+      "title": "Design around the critical path",
+      "sectionKey": "toc:20.3",
+      "listDepth": 1,
+      "page": 186
+     },
+     {
+      "numberKey": "20.4",
+      "title": "An example: RAMCloud Buffers",
+      "sectionKey": "toc:20.4",
+      "listDepth": 1,
+      "page": 188
+     },
+     {
+      "numberKey": "20.5",
+      "title": "Conclusion",
+      "sectionKey": "toc:20.5",
+      "listDepth": 1,
+      "page": 193
+     },
+     {
+      "numberKey": "21",
+      "title": "Decide What Matters",
+      "sectionKey": "toc:21",
+      "listDepth": 0,
+      "page": 194
+     },
+     {
+      "numberKey": "21.1",
+      "title": "How to decide what matters?",
+      "sectionKey": "toc:21.1",
+      "listDepth": 1,
+      "page": 194
+     },
+     {
+      "numberKey": "21.2",
+      "title": "Minimize what matters",
+      "sectionKey": "toc:21.2",
+      "listDepth": 1,
+      "page": 195
+     },
+     {
+      "numberKey": "21.3",
+      "title": "How to emphasize things that matter",
+      "sectionKey": "toc:21.3",
+      "listDepth": 1,
+      "page": 196
+     },
+     {
+      "numberKey": "21.4",
+      "title": "Mistakes",
+      "sectionKey": "toc:21.4",
+      "listDepth": 1,
+      "page": 196
+     },
+     {
+      "numberKey": "21.5",
+      "title": "Thinking more broadly",
+      "sectionKey": "toc:21.5",
+      "listDepth": 1,
+      "page": 197
+     },
+     {
+      "numberKey": "22",
+      "title": "Conclusion",
+      "sectionKey": "toc:22",
+      "listDepth": 0,
+      "page": 198
+     },
+     {
+      "numberKey": null,
+      "title": "Index",
+      "sectionKey": "toc:index",
+      "listDepth": 0,
+      "page": 200
+     },
+     {
+      "numberKey": null,
+      "title": "Summary of Design Principles",
+      "sectionKey": "toc:summary-of-design-principles",
+      "listDepth": 0,
+      "page": 206
+     },
+     {
+      "numberKey": null,
+      "title": "Summary of Red Flags",
+      "sectionKey": "toc:summary-of-red-flags",
+      "listDepth": 0,
+      "page": 207
+     },
+     {
+      "numberKey": null,
+      "title": "About the Author",
+      "sectionKey": "toc:about-the-author",
+      "listDepth": 0,
+      "page": 209
+     },
+     {
+      "numberKey": null,
+      "title": "Back Cover",
+      "sectionKey": "toc:back-cover",
+      "listDepth": 0,
+      "page": 210
+     }
+    ],
+    "block_map": {
+     "2": "toc:contents",
+     "3": "toc:preface",
+     "4": "toc:1",
+     "5": "toc:1",
+     "6": "toc:1.1",
+     "7": "toc:2",
+     "8": "toc:2.1",
+     "9": "toc:2.2",
+     "10": "toc:2.3",
+     "11": "toc:2.4",
+     "12": "toc:2.5",
+     "13": "toc:3",
+     "14": "toc:3",
+     "15": "toc:3.1",
+     "16": "toc:3.2",
+     "17": "toc:3.3",
+     "18": "toc:3.4",
+     "19": "toc:3.5",
+     "20": "toc:4",
+     "21": "toc:4.1",
+     "22": "toc:4.2",
+     "23": "toc:4.3",
+     "24": "toc:4.4",
+     "25": "toc:4.5",
+     "26": "toc:4.5",
+     "27": "toc:4.6",
+     "28": "toc:4.7",
+     "29": "toc:4.8",
+     "30": "toc:5",
+     "31": "toc:5.1",
+     "32": "toc:5.2",
+     "33": "toc:5.3",
+     "34": "toc:5.3",
+     "35": "toc:5.4",
+     "36": "toc:5.4",
+     "37": "toc:5.5",
+     "38": "toc:5.6",
+     "39": "toc:5.7",
+     "40": "toc:5.7",
+     "41": "toc:5.8",
+     "42": "toc:5.9",
+     "43": "toc:5.10",
+     "44": "toc:6",
+     "45": "toc:6.1",
+     "46": "toc:6.2",
+     "47": "toc:6.3",
+     "48": "toc:6.4",
+     "49": "toc:6.5",
+     "50": "toc:6.6",
+     "51": "toc:6.7",
+     "52": "toc:6.8",
+     "53": "toc:6.9",
+     "54": "toc:7",
+     "55": "toc:7.1",
+     "56": "toc:7.1",
+     "57": "toc:7.2",
+     "58": "toc:7.3",
+     "59": "toc:7.4",
+     "60": "toc:7.5",
+     "61": "toc:7.6",
+     "62": "toc:8",
+     "63": "toc:8.1",
+     "64": "toc:8.1",
+     "65": "toc:8.2",
+     "66": "toc:8.3",
+     "67": "toc:8.4",
+     "68": "toc:9",
+     "69": "toc:9.1",
+     "70": "toc:9.2",
+     "71": "toc:9.3",
+     "72": "toc:9.4",
+     "73": "toc:9.4",
+     "74": "toc:9.5",
+     "75": "toc:9.5",
+     "76": "toc:9.6",
+     "77": "toc:9.7",
+     "78": "toc:9.7",
+     "79": "toc:9.8",
+     "80": "toc:9.9",
+     "81": "toc:10",
+     "82": "toc:10.1",
+     "83": "toc:10.2",
+     "84": "toc:10.3",
+     "85": "toc:10.4",
+     "86": "toc:10.5",
+     "87": "toc:10.6",
+     "88": "toc:10.7",
+     "89": "toc:10.8",
+     "90": "toc:10.9",
+     "91": "toc:10.10",
+     "92": "toc:11",
+     "93": "toc:12",
+     "94": "toc:12.1",
+     "95": "toc:12.2",
+     "96": "toc:12.3",
+     "97": "toc:12.4",
+     "98": "toc:12.5",
+     "99": "toc:12.6",
+     "100": "toc:13",
+     "101": "toc:13.1",
+     "102": "toc:13.2",
+     "103": "toc:13.2",
+     "104": "toc:13.3",
+     "105": "toc:13.4",
+     "106": "toc:13.5",
+     "107": "toc:13.5",
+     "108": "toc:13.6",
+     "109": "toc:13.7",
+     "110": "toc:13.8",
+     "111": "toc:13.9",
+     "112": "toc:14",
+     "113": "toc:14.1",
+     "114": "toc:14.2",
+     "115": "toc:14.3",
+     "116": "toc:14.3",
+     "117": "toc:14.3",
+     "118": "toc:14.4",
+     "119": "toc:14.5",
+     "120": "toc:14.6",
+     "121": "toc:14.7",
+     "122": "toc:15",
+     "123": "toc:15",
+     "124": "toc:15.1",
+     "125": "toc:15.2",
+     "126": "toc:15.3",
+     "127": "toc:15.3",
+     "128": "toc:15.4",
+     "129": "toc:15.5",
+     "130": "toc:15.6",
+     "131": "toc:16",
+     "132": "toc:16.1",
+     "133": "toc:16.2",
+     "134": "toc:16.3",
+     "135": "toc:16.4",
+     "136": "toc:16.5",
+     "137": "toc:16.6",
+     "138": "toc:17",
+     "139": "toc:17.1",
+     "140": "toc:17.2",
+     "141": "toc:17.3",
+     "142": "toc:17.4",
+     "143": "toc:18",
+     "144": "toc:18.1",
+     "145": "toc:18.2",
+     "146": "toc:18.2",
+     "147": "toc:18.3",
+     "148": "toc:19",
+     "149": "toc:19.1",
+     "150": "toc:19.2",
+     "151": "toc:19.3",
+     "152": "toc:19.4",
+     "153": "toc:19.5",
+     "154": "toc:19.6",
+     "155": "toc:19.7",
+     "156": "toc:20",
+     "157": "toc:20.1",
+     "158": "toc:20.2",
+     "159": "toc:20.3",
+     "160": "toc:20.4",
+     "161": "toc:20.5",
+     "162": "toc:21",
+     "163": "toc:21.1",
+     "164": "toc:21.2",
+     "165": "toc:21.3",
+     "166": "toc:21.4",
+     "167": "toc:21.5",
+     "168": "toc:22",
+     "169": "toc:index",
+     "170": "toc:summary-of-design-principles",
+     "171": "toc:summary-of-red-flags",
+     "172": "toc:about-the-author"
+    },
+    "final_keys": {
+     "0": "toc:a-philosophy-of-software-design",
+     "1": "toc:john-ousterhout-stanford-university",
+     "2": "toc:contents",
+     "3": "toc:preface",
+     "4": "toc:1",
+     "5": "toc:1",
+     "6": "toc:1.1",
+     "7": "toc:2",
+     "8": "toc:2.1",
+     "9": "toc:2.2",
+     "10": "toc:2.3",
+     "11": "toc:2.4",
+     "12": "toc:2.5",
+     "13": "toc:3",
+     "14": "toc:3",
+     "15": "toc:3.1",
+     "16": "toc:3.2",
+     "17": "toc:3.3",
+     "18": "toc:3.4",
+     "19": "toc:3.5",
+     "20": "toc:4",
+     "21": "toc:4.1",
+     "22": "toc:4.2",
+     "23": "toc:4.3",
+     "24": "toc:4.4",
+     "25": "toc:4.5",
+     "26": "toc:4.5",
+     "27": "toc:4.6",
+     "28": "toc:4.7",
+     "29": "toc:4.8",
+     "30": "toc:5",
+     "31": "toc:5.1",
+     "32": "toc:5.2",
+     "33": "toc:5.3",
+     "34": "toc:5.3",
+     "35": "toc:5.4",
+     "36": "toc:5.4",
+     "37": "toc:5.5",
+     "38": "toc:5.6",
+     "39": "toc:5.7",
+     "40": "toc:5.7",
+     "41": "toc:5.8",
+     "42": "toc:5.9",
+     "43": "toc:5.10",
+     "44": "toc:6",
+     "45": "toc:6.1",
+     "46": "toc:6.2",
+     "47": "toc:6.3",
+     "48": "toc:6.4",
+     "49": "toc:6.5",
+     "50": "toc:6.6",
+     "51": "toc:6.7",
+     "52": "toc:6.8",
+     "53": "toc:6.9",
+     "54": "toc:7",
+     "55": "toc:7.1",
+     "56": "toc:7.1",
+     "57": "toc:7.2",
+     "58": "toc:7.3",
+     "59": "toc:7.4",
+     "60": "toc:7.5",
+     "61": "toc:7.6",
+     "62": "toc:8",
+     "63": "toc:8.1",
+     "64": "toc:8.1",
+     "65": "toc:8.2",
+     "66": "toc:8.3",
+     "67": "toc:8.4",
+     "68": "toc:9",
+     "69": "toc:9.1",
+     "70": "toc:9.2",
+     "71": "toc:9.3",
+     "72": "toc:9.4",
+     "73": "toc:9.4",
+     "74": "toc:9.5",
+     "75": "toc:9.5",
+     "76": "toc:9.6",
+     "77": "toc:9.7",
+     "78": "toc:9.7",
+     "79": "toc:9.8",
+     "80": "toc:9.9",
+     "81": "toc:10",
+     "82": "toc:10.1",
+     "83": "toc:10.2",
+     "84": "toc:10.3",
+     "85": "toc:10.4",
+     "86": "toc:10.5",
+     "87": "toc:10.6",
+     "88": "toc:10.7",
+     "89": "toc:10.8",
+     "90": "toc:10.9",
+     "91": "toc:10.10",
+     "92": "toc:11",
+     "93": "toc:12",
+     "94": "toc:12.1",
+     "95": "toc:12.2",
+     "96": "toc:12.3",
+     "97": "toc:12.4",
+     "98": "toc:12.5",
+     "99": "toc:12.6",
+     "100": "toc:13",
+     "101": "toc:13.1",
+     "102": "toc:13.2",
+     "103": "toc:13.2",
+     "104": "toc:13.3",
+     "105": "toc:13.4",
+     "106": "toc:13.5",
+     "107": "toc:13.5",
+     "108": "toc:13.6",
+     "109": "toc:13.7",
+     "110": "toc:13.8",
+     "111": "toc:13.9",
+     "112": "toc:14",
+     "113": "toc:14.1",
+     "114": "toc:14.2",
+     "115": "toc:14.3",
+     "116": "toc:14.3",
+     "117": "toc:14.3",
+     "118": "toc:14.4",
+     "119": "toc:14.5",
+     "120": "toc:14.6",
+     "121": "toc:14.7",
+     "122": "toc:15",
+     "123": "toc:15",
+     "124": "toc:15.1",
+     "125": "toc:15.2",
+     "126": "toc:15.3",
+     "127": "toc:15.3",
+     "128": "toc:15.4",
+     "129": "toc:15.5",
+     "130": "toc:15.6",
+     "131": "toc:16",
+     "132": "toc:16.1",
+     "133": "toc:16.2",
+     "134": "toc:16.3",
+     "135": "toc:16.4",
+     "136": "toc:16.5",
+     "137": "toc:16.6",
+     "138": "toc:17",
+     "139": "toc:17.1",
+     "140": "toc:17.2",
+     "141": "toc:17.3",
+     "142": "toc:17.4",
+     "143": "toc:18",
+     "144": "toc:18.1",
+     "145": "toc:18.2",
+     "146": "toc:18.2",
+     "147": "toc:18.3",
+     "148": "toc:19",
+     "149": "toc:19.1",
+     "150": "toc:19.2",
+     "151": "toc:19.3",
+     "152": "toc:19.4",
+     "153": "toc:19.5",
+     "154": "toc:19.6",
+     "155": "toc:19.7",
+     "156": "toc:20",
+     "157": "toc:20.1",
+     "158": "toc:20.2",
+     "159": "toc:20.3",
+     "160": "toc:20.4",
+     "161": "toc:20.5",
+     "162": "toc:21",
+     "163": "toc:21.1",
+     "164": "toc:21.2",
+     "165": "toc:21.3",
+     "166": "toc:21.4",
+     "167": "toc:21.5",
+     "168": "toc:22",
+     "169": "toc:index",
+     "170": "toc:summary-of-design-principles",
+     "171": "toc:summary-of-red-flags",
+     "172": "toc:about-the-author"
+    },
+    "route_hint": "bookmarks"
+   }
+  },
+  "absent": {
+   "raw_outline": [],
+   "expected": {
+    "outline_entries": [],
+    "block_map": {},
+    "final_keys": {
+     "0": "toc:a-philosophy-of-software-design",
+     "1": "toc:john-ousterhout-stanford-university",
+     "2": "toc:contents",
+     "3": "toc:preface",
+     "4": "toc:chapter-1-introduction",
+     "5": "toc:it-s-all-about-complexity",
+     "6": "toc:1.1",
+     "7": "toc:chapter-2-the-nature-of-complexity",
+     "8": "toc:2.1",
+     "9": "toc:2.2",
+     "10": "toc:2.3",
+     "11": "toc:2.4",
+     "12": "toc:2.5",
+     "13": "toc:chapter-3-working-code-isn-t-enough",
+     "14": "toc:strategic-vs-tactical-programming",
+     "15": "toc:3.1",
+     "16": "toc:3.2",
+     "17": "toc:3.3",
+     "18": "toc:3.4",
+     "19": "toc:3.5",
+     "20": "toc:chapter-4-modules-should-be-deep",
+     "21": "toc:4.1",
+     "22": "toc:4.2",
+     "23": "toc:4.3",
+     "24": "toc:4.4",
+     "25": "toc:4.5",
+     "26": "toc:red-flag-shallow-module",
+     "27": "toc:4.6",
+     "28": "toc:4.7",
+     "29": "toc:4.8",
+     "30": "toc:chapter-5-information-hiding-and-leakage",
+     "31": "toc:5.1",
+     "32": "toc:5.2",
+     "33": "toc:5.3",
+     "34": "toc:red-flag-information-leakage",
+     "35": "toc:5.4",
+     "36": "toc:red-flag-temporal-decomposition",
+     "37": "toc:5.5",
+     "38": "toc:5.6",
+     "39": "toc:5.7",
+     "40": "toc:red-flag-overexposure",
+     "41": "toc:5.8",
+     "42": "toc:5.9",
+     "43": "toc:5.10",
+     "44": "toc:chapter-6-general-purpose-modules-are-deeper",
+     "45": "toc:6.1",
+     "46": "toc:6.2",
+     "47": "toc:6.3",
+     "48": "toc:6.4",
+     "49": "toc:6.5",
+     "50": "toc:6.6",
+     "51": "toc:6.7",
+     "52": "toc:6.8",
+     "53": "toc:6.9",
+     "54": "toc:chapter-7-di-erent-layer-di-erent-abstraction",
+     "55": "toc:7.1",
+     "56": "toc:red-flag-pass-through-method",
+     "57": "toc:7.2",
+     "58": "toc:7.3",
+     "59": "toc:7.4",
+     "60": "toc:7.5",
+     "61": "toc:7.6",
+     "62": "toc:chapter-8-pull-complexity-downwards",
+     "63": "toc:8.1",
+     "64": "toc:p",
+     "65": "toc:8.2",
+     "66": "toc:8.3",
+     "67": "toc:8.4",
+     "68": "toc:chapter-9-better-together-or-better-apart",
+     "69": "toc:9.1",
+     "70": "toc:9.2",
+     "71": "toc:9.3",
+     "72": "toc:9.4",
+     "73": "toc:red-flag-repetition",
+     "74": "toc:9.5",
+     "75": "toc:red-flag-special-general-mixture",
+     "76": "toc:9.6",
+     "77": "toc:9.7",
+     "78": "toc:red-flag-conjoined-methods",
+     "79": "toc:9.8",
+     "80": "toc:9.9",
+     "81": "toc:chapter-10-de-ne-errors-out-of-existence",
+     "82": "toc:10.1",
+     "83": "toc:10.2",
+     "84": "toc:10.3",
+     "85": "toc:10.4",
+     "86": "toc:10.5",
+     "87": "toc:10.6",
+     "88": "toc:10.7",
+     "89": "toc:10.8",
+     "90": "toc:10.9",
+     "91": "toc:10.10",
+     "92": "toc:chapter-11-design-it-twice",
+     "93": "toc:chapter-12-why-write-comments-the-four-excuses",
+     "94": "toc:12.1",
+     "95": "toc:12.2",
+     "96": "toc:12.3",
+     "97": "toc:12.4",
+     "98": "toc:12.5",
+     "99": "toc:12.6",
+     "100": "toc:chapter-13-comments-should-describe-things-that-",
+     "101": "toc:13.1",
+     "102": "toc:13.2",
+     "103": "toc:red-flag-comment-repeats-code",
+     "104": "toc:13.3",
+     "105": "toc:13.4",
+     "106": "toc:13.5",
+     "107": "toc:red-flag-implementation-documentation-contaminat",
+     "108": "toc:13.6",
+     "109": "toc:13.7",
+     "110": "toc:13.8",
+     "111": "toc:13.9",
+     "112": "toc:chapter-14-choosing-names",
+     "113": "toc:14.1",
+     "114": "toc:14.2",
+     "115": "toc:14.3",
+     "116": "toc:red-flag-vague-name",
+     "117": "toc:red-flag-hard-to-pick-name",
+     "118": "toc:14.4",
+     "119": "toc:14.5",
+     "120": "toc:14.6",
+     "121": "toc:14.7",
+     "122": "toc:chapter-15-write-the-comments-first",
+     "123": "toc:use-comments-as-part-of-the-design-process",
+     "124": "toc:15.1",
+     "125": "toc:15.2",
+     "126": "toc:15.3",
+     "127": "toc:red-flag-hard-to-describe",
+     "128": "toc:15.4",
+     "129": "toc:15.5",
+     "130": "toc:15.6",
+     "131": "toc:chapter-16-modifying-existing-code",
+     "132": "toc:16.1",
+     "133": "toc:16.2",
+     "134": "toc:16.3",
+     "135": "toc:16.4",
+     "136": "toc:16.5",
+     "137": "toc:16.6",
+     "138": "toc:chapter-17-consistency",
+     "139": "toc:17.1",
+     "140": "toc:17.2",
+     "141": "toc:17.3",
+     "142": "toc:17.4",
+     "143": "toc:chapter-18-code-should-be-obvious",
+     "144": "toc:18.1",
+     "145": "toc:18.2",
+     "146": "toc:red-flag-nonobvious-code",
+     "147": "toc:18.3",
+     "148": "toc:chapter-19-software-trends",
+     "149": "toc:19.1",
+     "150": "toc:19.2",
+     "151": "toc:19.3",
+     "152": "toc:19.4",
+     "153": "toc:19.5",
+     "154": "toc:19.6",
+     "155": "toc:19.7",
+     "156": "toc:chapter-20-designing-for-performance",
+     "157": "toc:20.1",
+     "158": "toc:20.2",
+     "159": "toc:20.3",
+     "160": "toc:20.4",
+     "161": "toc:20.5",
+     "162": "toc:chapter-21-decide-what-matters",
+     "163": "toc:21.1",
+     "164": "toc:21.2",
+     "165": "toc:21.3",
+     "166": "toc:21.4",
+     "167": "toc:21.5",
+     "168": "toc:chapter-22-conclusion",
+     "169": "toc:index",
+     "170": "toc:summary-of-design-principles",
+     "171": "toc:summary-of-red-flags",
+     "172": "toc:about-the-author"
+    },
+    "route_hint": "pagematched-or-none"
+   }
+  },
+  "pagematched": {
+   "raw_outline": [
+    {
+     "level": 1,
+     "title": "Zq0 xylophone",
+     "page": 2
+    },
+    {
+     "level": 1,
+     "title": "Zq1 xylophone",
+     "page": 3
+    },
+    {
+     "level": 1,
+     "title": "Zq2 xylophone",
+     "page": 4
+    },
+    {
+     "level": 1,
+     "title": "Zq3 xylophone",
+     "page": 10
+    },
+    {
+     "level": 1,
+     "title": "Zq4 xylophone",
+     "page": 14
+    },
+    {
+     "level": 2,
+     "title": "Zq5 xylophone",
+     "page": 17
+    },
+    {
+     "level": 1,
+     "title": "Zq6 xylophone",
+     "page": 19
+    },
+    {
+     "level": 2,
+     "title": "Zq7 xylophone",
+     "page": 19
+    },
+    {
+     "level": 2,
+     "title": "Zq8 xylophone",
+     "page": 21
+    },
+    {
+     "level": 2,
+     "title": "Zq9 xylophone",
+     "page": 23
+    },
+    {
+     "level": 2,
+     "title": "Zq10 xylophone",
+     "page": 25
+    },
+    {
+     "level": 2,
+     "title": "Zq11 xylophone",
+     "page": 26
+    },
+    {
+     "level": 1,
+     "title": "Zq12 xylophone",
+     "page": 27
+    },
+    {
+     "level": 2,
+     "title": "Zq13 xylophone",
+     "page": 27
+    },
+    {
+     "level": 2,
+     "title": "Zq14 xylophone",
+     "page": 28
+    },
+    {
+     "level": 2,
+     "title": "Zq15 xylophone",
+     "page": 29
+    },
+    {
+     "level": 2,
+     "title": "Zq16 xylophone",
+     "page": 31
+    },
+    {
+     "level": 2,
+     "title": "Zq17 xylophone",
+     "page": 33
+    },
+    {
+     "level": 1,
+     "title": "Zq18 xylophone",
+     "page": 34
+    },
+    {
+     "level": 2,
+     "title": "Zq19 xylophone",
+     "page": 34
+    },
+    {
+     "level": 2,
+     "title": "Zq20 xylophone",
+     "page": 36
+    },
+    {
+     "level": 2,
+     "title": "Zq21 xylophone",
+     "page": 36
+    },
+    {
+     "level": 2,
+     "title": "Zq22 xylophone",
+     "page": 38
+    },
+    {
+     "level": 2,
+     "title": "Zq23 xylophone",
+     "page": 40
+    },
+    {
+     "level": 2,
+     "title": "Zq24 xylophone",
+     "page": 41
+    },
+    {
+     "level": 2,
+     "title": "Zq25 xylophone",
+     "page": 42
+    },
+    {
+     "level": 2,
+     "title": "Zq26 xylophone",
+     "page": 43
+    },
+    {
+     "level": 1,
+     "title": "Zq27 xylophone",
+     "page": 44
+    },
+    {
+     "level": 2,
+     "title": "Zq28 xylophone",
+     "page": 44
+    },
+    {
+     "level": 2,
+     "title": "Zq29 xylophone",
+     "page": 45
+    },
+    {
+     "level": 2,
+     "title": "Zq30 xylophone",
+     "page": 46
+    },
+    {
+     "level": 2,
+     "title": "Zq31 xylophone",
+     "page": 47
+    },
+    {
+     "level": 2,
+     "title": "Zq32 xylophone",
+     "page": 48
+    },
+    {
+     "level": 2,
+     "title": "Zq33 xylophone",
+     "page": 49
+    },
+    {
+     "level": 2,
+     "title": "Zq34 xylophone",
+     "page": 51
+    },
+    {
+     "level": 2,
+     "title": "Zq35 xylophone",
+     "page": 52
+    },
+    {
+     "level": 2,
+     "title": "Zq36 xylophone",
+     "page": 52
+    },
+    {
+     "level": 2,
+     "title": "Zq37 xylophone",
+     "page": 53
+    },
+    {
+     "level": 1,
+     "title": "Zq38 xylophone",
+     "page": 54
+    },
+    {
+     "level": 2,
+     "title": "Zq39 xylophone",
+     "page": 54
+    },
+    {
+     "level": 2,
+     "title": "Zq40 xylophone",
+     "page": 56
+    },
+    {
+     "level": 2,
+     "title": "Zq41 xylophone",
+     "page": 57
+    },
+    {
+     "level": 2,
+     "title": "Zq42 xylophone",
+     "page": 58
+    },
+    {
+     "level": 2,
+     "title": "Zq43 xylophone",
+     "page": 59
+    },
+    {
+     "level": 2,
+     "title": "Zq44 xylophone",
+     "page": 60
+    },
+    {
+     "level": 2,
+     "title": "Zq45 xylophone",
+     "page": 61
+    },
+    {
+     "level": 2,
+     "title": "Zq46 xylophone",
+     "page": 64
+    },
+    {
+     "level": 2,
+     "title": "Zq47 xylophone",
+     "page": 65
+    },
+    {
+     "level": 1,
+     "title": "Zq48 xylophone",
+     "page": 66
+    },
+    {
+     "level": 2,
+     "title": "Zq49 xylophone",
+     "page": 67
+    },
+    {
+     "level": 2,
+     "title": "Zq50 xylophone",
+     "page": 69
+    },
+    {
+     "level": 2,
+     "title": "Zq51 xylophone",
+     "page": 70
+    },
+    {
+     "level": 2,
+     "title": "Zq52 xylophone",
+     "page": 71
+    },
+    {
+     "level": 2,
+     "title": "Zq53 xylophone",
+     "page": 72
+    },
+    {
+     "level": 2,
+     "title": "Zq54 xylophone",
+     "page": 75
+    },
+    {
+     "level": 1,
+     "title": "Zq55 xylophone",
+     "page": 77
+    },
+    {
+     "level": 2,
+     "title": "Zq56 xylophone",
+     "page": 77
+    },
+    {
+     "level": 2,
+     "title": "Zq57 xylophone",
+     "page": 78
+    },
+    {
+     "level": 2,
+     "title": "Zq58 xylophone",
+     "page": 79
+    },
+    {
+     "level": 2,
+     "title": "Zq59 xylophone",
+     "page": 80
+    },
+    {
+     "level": 1,
+     "title": "Zq60 xylophone",
+     "page": 81
+    },
+    {
+     "level": 2,
+     "title": "Zq61 xylophone",
+     "page": 83
+    },
+    {
+     "level": 2,
+     "title": "Zq62 xylophone",
+     "page": 83
+    },
+    {
+     "level": 2,
+     "title": "Zq63 xylophone",
+     "page": 84
+    },
+    {
+     "level": 2,
+     "title": "Zq64 xylophone",
+     "page": 84
+    },
+    {
+     "level": 2,
+     "title": "Zq65 xylophone",
+     "page": 87
+    },
+    {
+     "level": 2,
+     "title": "Zq66 xylophone",
+     "page": 89
+    },
+    {
+     "level": 2,
+     "title": "Zq67 xylophone",
+     "page": 90
+    },
+    {
+     "level": 2,
+     "title": "Zq68 xylophone",
+     "page": 93
+    },
+    {
+     "level": 2,
+     "title": "Zq69 xylophone",
+     "page": 94
+    },
+    {
+     "level": 1,
+     "title": "Zq70 xylophone",
+     "page": 95
+    },
+    {
+     "level": 2,
+     "title": "Zq71 xylophone",
+     "page": 95
+    },
+    {
+     "level": 2,
+     "title": "Zq72 xylophone",
+     "page": 98
+    },
+    {
+     "level": 2,
+     "title": "Zq73 xylophone",
+     "page": 99
+    },
+    {
+     "level": 2,
+     "title": "Zq74 xylophone",
+     "page": 100
+    },
+    {
+     "level": 2,
+     "title": "Zq75 xylophone",
+     "page": 101
+    },
+    {
+     "level": 2,
+     "title": "Zq76 xylophone",
+     "page": 102
+    },
+    {
+     "level": 2,
+     "title": "Zq77 xylophone",
+     "page": 103
+    },
+    {
+     "level": 2,
+     "title": "Zq78 xylophone",
+     "page": 107
+    },
+    {
+     "level": 2,
+     "title": "Zq79 xylophone",
+     "page": 108
+    },
+    {
+     "level": 2,
+     "title": "Zq80 xylophone",
+     "page": 109
+    },
+    {
+     "level": 1,
+     "title": "Zq81 xylophone",
+     "page": 110
+    },
+    {
+     "level": 1,
+     "title": "Zq82 xylophone",
+     "page": 114
+    },
+    {
+     "level": 2,
+     "title": "Zq83 xylophone",
+     "page": 115
+    },
+    {
+     "level": 2,
+     "title": "Zq84 xylophone",
+     "page": 116
+    },
+    {
+     "level": 2,
+     "title": "Zq85 xylophone",
+     "page": 117
+    },
+    {
+     "level": 2,
+     "title": "Zq86 xylophone",
+     "page": 117
+    },
+    {
+     "level": 2,
+     "title": "Zq87 xylophone",
+     "page": 118
+    },
+    {
+     "level": 2,
+     "title": "Zq88 xylophone",
+     "page": 119
+    },
+    {
+     "level": 1,
+     "title": "Zq89 xylophone",
+     "page": 121
+    },
+    {
+     "level": 2,
+     "title": "Zq90 xylophone",
+     "page": 122
+    },
+    {
+     "level": 2,
+     "title": "Zq91 xylophone",
+     "page": 123
+    },
+    {
+     "level": 2,
+     "title": "Zq92 xylophone",
+     "page": 125
+    },
+    {
+     "level": 2,
+     "title": "Zq93 xylophone",
+     "page": 127
+    },
+    {
+     "level": 2,
+     "title": "Zq94 xylophone",
+     "page": 129
+    },
+    {
+     "level": 2,
+     "title": "Zq95 xylophone",
+     "page": 136
+    },
+    {
+     "level": 2,
+     "title": "Zq96 xylophone",
+     "page": 137
+    },
+    {
+     "level": 2,
+     "title": "Zq97 xylophone",
+     "page": 140
+    },
+    {
+     "level": 2,
+     "title": "Zq98 xylophone",
+     "page": 140
+    },
+    {
+     "level": 1,
+     "title": "Zq99 xylophone",
+     "page": 142
+    },
+    {
+     "level": 2,
+     "title": "Zq100 xylophone",
+     "page": 142
+    },
+    {
+     "level": 2,
+     "title": "Zq101 xylophone",
+     "page": 143
+    },
+    {
+     "level": 2,
+     "title": "Zq102 xylophone",
+     "page": 144
+    },
+    {
+     "level": 2,
+     "title": "Zq103 xylophone",
+     "page": 147
+    },
+    {
+     "level": 2,
+     "title": "Zq104 xylophone",
+     "page": 148
+    },
+    {
+     "level": 2,
+     "title": "Zq105 xylophone",
+     "page": 149
+    },
+    {
+     "level": 2,
+     "title": "Zq106 xylophone",
+     "page": 150
+    },
+    {
+     "level": 1,
+     "title": "Zq107 xylophone",
+     "page": 152
+    },
+    {
+     "level": 2,
+     "title": "Zq108 xylophone",
+     "page": 152
+    },
+    {
+     "level": 2,
+     "title": "Zq109 xylophone",
+     "page": 153
+    },
+    {
+     "level": 2,
+     "title": "Zq110 xylophone",
+     "page": 154
+    },
+    {
+     "level": 2,
+     "title": "Zq111 xylophone",
+     "page": 155
+    },
+    {
+     "level": 2,
+     "title": "Zq112 xylophone",
+     "page": 156
+    },
+    {
+     "level": 2,
+     "title": "Zq113 xylophone",
+     "page": 156
+    },
+    {
+     "level": 1,
+     "title": "Zq114 xylophone",
+     "page": 157
+    },
+    {
+     "level": 2,
+     "title": "Zq115 xylophone",
+     "page": 157
+    },
+    {
+     "level": 2,
+     "title": "Zq116 xylophone",
+     "page": 159
+    },
+    {
+     "level": 2,
+     "title": "Zq117 xylophone",
+     "page": 160
+    },
+    {
+     "level": 2,
+     "title": "Zq118 xylophone",
+     "page": 161
+    },
+    {
+     "level": 2,
+     "title": "Zq119 xylophone",
+     "page": 162
+    },
+    {
+     "level": 2,
+     "title": "Zq120 xylophone",
+     "page": 162
+    },
+    {
+     "level": 1,
+     "title": "Zq121 xylophone",
+     "page": 164
+    },
+    {
+     "level": 2,
+     "title": "Zq122 xylophone",
+     "page": 164
+    },
+    {
+     "level": 2,
+     "title": "Zq123 xylophone",
+     "page": 165
+    },
+    {
+     "level": 2,
+     "title": "Zq124 xylophone",
+     "page": 167
+    },
+    {
+     "level": 2,
+     "title": "Zq125 xylophone",
+     "page": 167
+    },
+    {
+     "level": 1,
+     "title": "Zq126 xylophone",
+     "page": 169
+    },
+    {
+     "level": 2,
+     "title": "Zq127 xylophone",
+     "page": 169
+    },
+    {
+     "level": 2,
+     "title": "Zq128 xylophone",
+     "page": 172
+    },
+    {
+     "level": 2,
+     "title": "Zq129 xylophone",
+     "page": 174
+    },
+    {
+     "level": 1,
+     "title": "Zq130 xylophone",
+     "page": 176
+    },
+    {
+     "level": 2,
+     "title": "Zq131 xylophone",
+     "page": 176
+    },
+    {
+     "level": 2,
+     "title": "Zq132 xylophone",
+     "page": 178
+    },
+    {
+     "level": 2,
+     "title": "Zq133 xylophone",
+     "page": 179
+    },
+    {
+     "level": 2,
+     "title": "Zq134 xylophone",
+     "page": 180
+    },
+    {
+     "level": 2,
+     "title": "Zq135 xylophone",
+     "page": 181
+    },
+    {
+     "level": 2,
+     "title": "Zq136 xylophone",
+     "page": 182
+    },
+    {
+     "level": 2,
+     "title": "Zq137 xylophone",
+     "page": 182
+    },
+    {
+     "level": 1,
+     "title": "Zq138 xylophone",
+     "page": 183
+    },
+    {
+     "level": 2,
+     "title": "Zq139 xylophone",
+     "page": 183
+    },
+    {
+     "level": 2,
+     "title": "Zq140 xylophone",
+     "page": 185
+    },
+    {
+     "level": 2,
+     "title": "Zq141 xylophone",
+     "page": 186
+    },
+    {
+     "level": 2,
+     "title": "Zq142 xylophone",
+     "page": 188
+    },
+    {
+     "level": 2,
+     "title": "Zq143 xylophone",
+     "page": 193
+    },
+    {
+     "level": 1,
+     "title": "Zq144 xylophone",
+     "page": 194
+    },
+    {
+     "level": 2,
+     "title": "Zq145 xylophone",
+     "page": 194
+    },
+    {
+     "level": 2,
+     "title": "Zq146 xylophone",
+     "page": 195
+    },
+    {
+     "level": 2,
+     "title": "Zq147 xylophone",
+     "page": 196
+    },
+    {
+     "level": 2,
+     "title": "Zq148 xylophone",
+     "page": 196
+    },
+    {
+     "level": 2,
+     "title": "Zq149 xylophone",
+     "page": 197
+    },
+    {
+     "level": 1,
+     "title": "Zq150 xylophone",
+     "page": 198
+    },
+    {
+     "level": 1,
+     "title": "Zq151 xylophone",
+     "page": 200
+    },
+    {
+     "level": 1,
+     "title": "Zq152 xylophone",
+     "page": 206
+    },
+    {
+     "level": 1,
+     "title": "Zq153 xylophone",
+     "page": 207
+    },
+    {
+     "level": 1,
+     "title": "Zq154 xylophone",
+     "page": 209
+    },
+    {
+     "level": 1,
+     "title": "Zq155 xylophone",
+     "page": 210
+    }
+   ],
+   "expected": {
+    "outline_entries": [
+     {
+      "numberKey": null,
+      "title": "Zq0 xylophone",
+      "sectionKey": "toc:john-ousterhout-stanford-university",
+      "listDepth": 0,
+      "page": 2
+     },
+     {
+      "numberKey": null,
+      "title": "Zq1 xylophone",
+      "sectionKey": "toc:john-ousterhout-stanford-university",
+      "listDepth": 0,
+      "page": 3
+     },
+     {
+      "numberKey": null,
+      "title": "Zq2 xylophone",
+      "sectionKey": "toc:contents",
+      "listDepth": 0,
+      "page": 4
+     },
+     {
+      "numberKey": null,
+      "title": "Zq3 xylophone",
+      "sectionKey": "toc:preface",
+      "listDepth": 0,
+      "page": 10
+     },
+     {
+      "numberKey": null,
+      "title": "Zq4 xylophone",
+      "sectionKey": "toc:it-s-all-about-complexity",
+      "listDepth": 0,
+      "page": 14
+     },
+     {
+      "numberKey": null,
+      "title": "Zq5 xylophone",
+      "sectionKey": "toc:1.1",
+      "listDepth": 1,
+      "page": 17
+     },
+     {
+      "numberKey": null,
+      "title": "Zq6 xylophone",
+      "sectionKey": "toc:2.1",
+      "listDepth": 0,
+      "page": 19
+     },
+     {
+      "numberKey": null,
+      "title": "Zq7 xylophone",
+      "sectionKey": "toc:2.1",
+      "listDepth": 1,
+      "page": 19
+     },
+     {
+      "numberKey": null,
+      "title": "Zq8 xylophone",
+      "sectionKey": "toc:2.2",
+      "listDepth": 1,
+      "page": 21
+     },
+     {
+      "numberKey": null,
+      "title": "Zq9 xylophone",
+      "sectionKey": "toc:2.3",
+      "listDepth": 1,
+      "page": 23
+     },
+     {
+      "numberKey": null,
+      "title": "Zq10 xylophone",
+      "sectionKey": "toc:2.4",
+      "listDepth": 1,
+      "page": 25
+     },
+     {
+      "numberKey": null,
+      "title": "Zq11 xylophone",
+      "sectionKey": "toc:2.5",
+      "listDepth": 1,
+      "page": 26
+     },
+     {
+      "numberKey": null,
+      "title": "Zq12 xylophone",
+      "sectionKey": "toc:3.1",
+      "listDepth": 0,
+      "page": 27
+     },
+     {
+      "numberKey": null,
+      "title": "Zq13 xylophone",
+      "sectionKey": "toc:3.1",
+      "listDepth": 1,
+      "page": 27
+     },
+     {
+      "numberKey": null,
+      "title": "Zq14 xylophone",
+      "sectionKey": "toc:3.2",
+      "listDepth": 1,
+      "page": 28
+     },
+     {
+      "numberKey": null,
+      "title": "Zq15 xylophone",
+      "sectionKey": "toc:3.3",
+      "listDepth": 1,
+      "page": 29
+     },
+     {
+      "numberKey": null,
+      "title": "Zq16 xylophone",
+      "sectionKey": "toc:3.4",
+      "listDepth": 1,
+      "page": 31
+     },
+     {
+      "numberKey": null,
+      "title": "Zq17 xylophone",
+      "sectionKey": "toc:3.5",
+      "listDepth": 1,
+      "page": 33
+     },
+     {
+      "numberKey": null,
+      "title": "Zq18 xylophone",
+      "sectionKey": "toc:4.1",
+      "listDepth": 0,
+      "page": 34
+     },
+     {
+      "numberKey": null,
+      "title": "Zq19 xylophone",
+      "sectionKey": "toc:4.1",
+      "listDepth": 1,
+      "page": 34
+     },
+     {
+      "numberKey": null,
+      "title": "Zq20 xylophone",
+      "sectionKey": "toc:4.3",
+      "listDepth": 1,
+      "page": 36
+     },
+     {
+      "numberKey": null,
+      "title": "Zq21 xylophone",
+      "sectionKey": "toc:4.3",
+      "listDepth": 1,
+      "page": 36
+     },
+     {
+      "numberKey": null,
+      "title": "Zq22 xylophone",
+      "sectionKey": "toc:4.4",
+      "listDepth": 1,
+      "page": 38
+     },
+     {
+      "numberKey": null,
+      "title": "Zq23 xylophone",
+      "sectionKey": "toc:4.5",
+      "listDepth": 1,
+      "page": 40
+     },
+     {
+      "numberKey": null,
+      "title": "Zq24 xylophone",
+      "sectionKey": "toc:4.6",
+      "listDepth": 1,
+      "page": 41
+     },
+     {
+      "numberKey": null,
+      "title": "Zq25 xylophone",
+      "sectionKey": "toc:4.7",
+      "listDepth": 1,
+      "page": 42
+     },
+     {
+      "numberKey": null,
+      "title": "Zq26 xylophone",
+      "sectionKey": "toc:4.8",
+      "listDepth": 1,
+      "page": 43
+     },
+     {
+      "numberKey": null,
+      "title": "Zq27 xylophone",
+      "sectionKey": "toc:5.1",
+      "listDepth": 0,
+      "page": 44
+     },
+     {
+      "numberKey": null,
+      "title": "Zq28 xylophone",
+      "sectionKey": "toc:5.1",
+      "listDepth": 1,
+      "page": 44
+     },
+     {
+      "numberKey": null,
+      "title": "Zq29 xylophone",
+      "sectionKey": "toc:5.2",
+      "listDepth": 1,
+      "page": 45
+     },
+     {
+      "numberKey": null,
+      "title": "Zq30 xylophone",
+      "sectionKey": "toc:5.3",
+      "listDepth": 1,
+      "page": 46
+     },
+     {
+      "numberKey": null,
+      "title": "Zq31 xylophone",
+      "sectionKey": "toc:5.4",
+      "listDepth": 1,
+      "page": 47
+     },
+     {
+      "numberKey": null,
+      "title": "Zq32 xylophone",
+      "sectionKey": "toc:5.5",
+      "listDepth": 1,
+      "page": 48
+     },
+     {
+      "numberKey": null,
+      "title": "Zq33 xylophone",
+      "sectionKey": "toc:5.6",
+      "listDepth": 1,
+      "page": 49
+     },
+     {
+      "numberKey": null,
+      "title": "Zq34 xylophone",
+      "sectionKey": "toc:5.7",
+      "listDepth": 1,
+      "page": 51
+     },
+     {
+      "numberKey": null,
+      "title": "Zq35 xylophone",
+      "sectionKey": "toc:5.9",
+      "listDepth": 1,
+      "page": 52
+     },
+     {
+      "numberKey": null,
+      "title": "Zq36 xylophone",
+      "sectionKey": "toc:5.9",
+      "listDepth": 1,
+      "page": 52
+     },
+     {
+      "numberKey": null,
+      "title": "Zq37 xylophone",
+      "sectionKey": "toc:5.10",
+      "listDepth": 1,
+      "page": 53
+     },
+     {
+      "numberKey": null,
+      "title": "Zq38 xylophone",
+      "sectionKey": "toc:6.1",
+      "listDepth": 0,
+      "page": 54
+     },
+     {
+      "numberKey": null,
+      "title": "Zq39 xylophone",
+      "sectionKey": "toc:6.1",
+      "listDepth": 1,
+      "page": 54
+     },
+     {
+      "numberKey": null,
+      "title": "Zq40 xylophone",
+      "sectionKey": "toc:6.2",
+      "listDepth": 1,
+      "page": 56
+     },
+     {
+      "numberKey": null,
+      "title": "Zq41 xylophone",
+      "sectionKey": "toc:6.3",
+      "listDepth": 1,
+      "page": 57
+     },
+     {
+      "numberKey": null,
+      "title": "Zq42 xylophone",
+      "sectionKey": "toc:6.4",
+      "listDepth": 1,
+      "page": 58
+     },
+     {
+      "numberKey": null,
+      "title": "Zq43 xylophone",
+      "sectionKey": "toc:6.5",
+      "listDepth": 1,
+      "page": 59
+     },
+     {
+      "numberKey": null,
+      "title": "Zq44 xylophone",
+      "sectionKey": "toc:6.6",
+      "listDepth": 1,
+      "page": 60
+     },
+     {
+      "numberKey": null,
+      "title": "Zq45 xylophone",
+      "sectionKey": "toc:6.7",
+      "listDepth": 1,
+      "page": 61
+     },
+     {
+      "numberKey": null,
+      "title": "Zq46 xylophone",
+      "sectionKey": "toc:6.8",
+      "listDepth": 1,
+      "page": 64
+     },
+     {
+      "numberKey": null,
+      "title": "Zq47 xylophone",
+      "sectionKey": "toc:6.9",
+      "listDepth": 1,
+      "page": 65
+     },
+     {
+      "numberKey": null,
+      "title": "Zq48 xylophone",
+      "sectionKey": "toc:chapter-7-di-erent-layer-di-erent-abstraction",
+      "listDepth": 0,
+      "page": 66
+     },
+     {
+      "numberKey": null,
+      "title": "Zq49 xylophone",
+      "sectionKey": "toc:red-flag-pass-through-method",
+      "listDepth": 1,
+      "page": 67
+     },
+     {
+      "numberKey": null,
+      "title": "Zq50 xylophone",
+      "sectionKey": "toc:7.2",
+      "listDepth": 1,
+      "page": 69
+     },
+     {
+      "numberKey": null,
+      "title": "Zq51 xylophone",
+      "sectionKey": "toc:7.3",
+      "listDepth": 1,
+      "page": 70
+     },
+     {
+      "numberKey": null,
+      "title": "Zq52 xylophone",
+      "sectionKey": "toc:7.4",
+      "listDepth": 1,
+      "page": 71
+     },
+     {
+      "numberKey": null,
+      "title": "Zq53 xylophone",
+      "sectionKey": "toc:7.5",
+      "listDepth": 1,
+      "page": 72
+     },
+     {
+      "numberKey": null,
+      "title": "Zq54 xylophone",
+      "sectionKey": "toc:7.6",
+      "listDepth": 1,
+      "page": 75
+     },
+     {
+      "numberKey": null,
+      "title": "Zq55 xylophone",
+      "sectionKey": "toc:8.1",
+      "listDepth": 0,
+      "page": 77
+     },
+     {
+      "numberKey": null,
+      "title": "Zq56 xylophone",
+      "sectionKey": "toc:8.1",
+      "listDepth": 1,
+      "page": 77
+     },
+     {
+      "numberKey": null,
+      "title": "Zq57 xylophone",
+      "sectionKey": "toc:8.2",
+      "listDepth": 1,
+      "page": 78
+     },
+     {
+      "numberKey": null,
+      "title": "Zq58 xylophone",
+      "sectionKey": "toc:8.3",
+      "listDepth": 1,
+      "page": 79
+     },
+     {
+      "numberKey": null,
+      "title": "Zq59 xylophone",
+      "sectionKey": "toc:8.4",
+      "listDepth": 1,
+      "page": 80
+     },
+     {
+      "numberKey": null,
+      "title": "Zq60 xylophone",
+      "sectionKey": "toc:chapter-9-better-together-or-better-apart",
+      "listDepth": 0,
+      "page": 81
+     },
+     {
+      "numberKey": null,
+      "title": "Zq61 xylophone",
+      "sectionKey": "toc:9.2",
+      "listDepth": 1,
+      "page": 83
+     },
+     {
+      "numberKey": null,
+      "title": "Zq62 xylophone",
+      "sectionKey": "toc:9.2",
+      "listDepth": 1,
+      "page": 83
+     },
+     {
+      "numberKey": null,
+      "title": "Zq63 xylophone",
+      "sectionKey": "toc:9.4",
+      "listDepth": 1,
+      "page": 84
+     },
+     {
+      "numberKey": null,
+      "title": "Zq64 xylophone",
+      "sectionKey": "toc:9.4",
+      "listDepth": 1,
+      "page": 84
+     },
+     {
+      "numberKey": null,
+      "title": "Zq65 xylophone",
+      "sectionKey": "toc:9.5",
+      "listDepth": 1,
+      "page": 87
+     },
+     {
+      "numberKey": null,
+      "title": "Zq66 xylophone",
+      "sectionKey": "toc:9.6",
+      "listDepth": 1,
+      "page": 89
+     },
+     {
+      "numberKey": null,
+      "title": "Zq67 xylophone",
+      "sectionKey": "toc:9.7",
+      "listDepth": 1,
+      "page": 90
+     },
+     {
+      "numberKey": null,
+      "title": "Zq68 xylophone",
+      "sectionKey": "toc:9.8",
+      "listDepth": 1,
+      "page": 93
+     },
+     {
+      "numberKey": null,
+      "title": "Zq69 xylophone",
+      "sectionKey": "toc:9.9",
+      "listDepth": 1,
+      "page": 94
+     },
+     {
+      "numberKey": null,
+      "title": "Zq70 xylophone",
+      "sectionKey": "toc:10.1",
+      "listDepth": 0,
+      "page": 95
+     },
+     {
+      "numberKey": null,
+      "title": "Zq71 xylophone",
+      "sectionKey": "toc:10.1",
+      "listDepth": 1,
+      "page": 95
+     },
+     {
+      "numberKey": null,
+      "title": "Zq72 xylophone",
+      "sectionKey": "toc:10.2",
+      "listDepth": 1,
+      "page": 98
+     },
+     {
+      "numberKey": null,
+      "title": "Zq73 xylophone",
+      "sectionKey": "toc:10.3",
+      "listDepth": 1,
+      "page": 99
+     },
+     {
+      "numberKey": null,
+      "title": "Zq74 xylophone",
+      "sectionKey": "toc:10.4",
+      "listDepth": 1,
+      "page": 100
+     },
+     {
+      "numberKey": null,
+      "title": "Zq75 xylophone",
+      "sectionKey": "toc:10.5",
+      "listDepth": 1,
+      "page": 101
+     },
+     {
+      "numberKey": null,
+      "title": "Zq76 xylophone",
+      "sectionKey": "toc:10.6",
+      "listDepth": 1,
+      "page": 102
+     },
+     {
+      "numberKey": null,
+      "title": "Zq77 xylophone",
+      "sectionKey": "toc:10.7",
+      "listDepth": 1,
+      "page": 103
+     },
+     {
+      "numberKey": null,
+      "title": "Zq78 xylophone",
+      "sectionKey": "toc:10.8",
+      "listDepth": 1,
+      "page": 107
+     },
+     {
+      "numberKey": null,
+      "title": "Zq79 xylophone",
+      "sectionKey": "toc:10.9",
+      "listDepth": 1,
+      "page": 108
+     },
+     {
+      "numberKey": null,
+      "title": "Zq80 xylophone",
+      "sectionKey": "toc:10.10",
+      "listDepth": 1,
+      "page": 109
+     },
+     {
+      "numberKey": null,
+      "title": "Zq81 xylophone",
+      "sectionKey": "toc:chapter-11-design-it-twice",
+      "listDepth": 0,
+      "page": 110
+     },
+     {
+      "numberKey": null,
+      "title": "Zq82 xylophone",
+      "sectionKey": "toc:chapter-12-why-write-comments-the-four-excuses",
+      "listDepth": 0,
+      "page": 114
+     },
+     {
+      "numberKey": null,
+      "title": "Zq83 xylophone",
+      "sectionKey": "toc:12.1",
+      "listDepth": 1,
+      "page": 115
+     },
+     {
+      "numberKey": null,
+      "title": "Zq84 xylophone",
+      "sectionKey": "toc:12.2",
+      "listDepth": 1,
+      "page": 116
+     },
+     {
+      "numberKey": null,
+      "title": "Zq85 xylophone",
+      "sectionKey": "toc:12.4",
+      "listDepth": 1,
+      "page": 117
+     },
+     {
+      "numberKey": null,
+      "title": "Zq86 xylophone",
+      "sectionKey": "toc:12.4",
+      "listDepth": 1,
+      "page": 117
+     },
+     {
+      "numberKey": null,
+      "title": "Zq87 xylophone",
+      "sectionKey": "toc:12.5",
+      "listDepth": 1,
+      "page": 118
+     },
+     {
+      "numberKey": null,
+      "title": "Zq88 xylophone",
+      "sectionKey": "toc:12.6",
+      "listDepth": 1,
+      "page": 119
+     },
+     {
+      "numberKey": null,
+      "title": "Zq89 xylophone",
+      "sectionKey": "toc:chapter-13-comments-should-describe-things-that-",
+      "listDepth": 0,
+      "page": 121
+     },
+     {
+      "numberKey": null,
+      "title": "Zq90 xylophone",
+      "sectionKey": "toc:13.1",
+      "listDepth": 1,
+      "page": 122
+     },
+     {
+      "numberKey": null,
+      "title": "Zq91 xylophone",
+      "sectionKey": "toc:13.2",
+      "listDepth": 1,
+      "page": 123
+     },
+     {
+      "numberKey": null,
+      "title": "Zq92 xylophone",
+      "sectionKey": "toc:13.3",
+      "listDepth": 1,
+      "page": 125
+     },
+     {
+      "numberKey": null,
+      "title": "Zq93 xylophone",
+      "sectionKey": "toc:13.4",
+      "listDepth": 1,
+      "page": 127
+     },
+     {
+      "numberKey": null,
+      "title": "Zq94 xylophone",
+      "sectionKey": "toc:13.5",
+      "listDepth": 1,
+      "page": 129
+     },
+     {
+      "numberKey": null,
+      "title": "Zq95 xylophone",
+      "sectionKey": "toc:13.6",
+      "listDepth": 1,
+      "page": 136
+     },
+     {
+      "numberKey": null,
+      "title": "Zq96 xylophone",
+      "sectionKey": "toc:13.7",
+      "listDepth": 1,
+      "page": 137
+     },
+     {
+      "numberKey": null,
+      "title": "Zq97 xylophone",
+      "sectionKey": "toc:13.9",
+      "listDepth": 1,
+      "page": 140
+     },
+     {
+      "numberKey": null,
+      "title": "Zq98 xylophone",
+      "sectionKey": "toc:13.9",
+      "listDepth": 1,
+      "page": 140
+     },
+     {
+      "numberKey": null,
+      "title": "Zq99 xylophone",
+      "sectionKey": "toc:14.1",
+      "listDepth": 0,
+      "page": 142
+     },
+     {
+      "numberKey": null,
+      "title": "Zq100 xylophone",
+      "sectionKey": "toc:14.1",
+      "listDepth": 1,
+      "page": 142
+     },
+     {
+      "numberKey": null,
+      "title": "Zq101 xylophone",
+      "sectionKey": "toc:14.2",
+      "listDepth": 1,
+      "page": 143
+     },
+     {
+      "numberKey": null,
+      "title": "Zq102 xylophone",
+      "sectionKey": "toc:red-flag-vague-name",
+      "listDepth": 1,
+      "page": 144
+     },
+     {
+      "numberKey": null,
+      "title": "Zq103 xylophone",
+      "sectionKey": "toc:14.4",
+      "listDepth": 1,
+      "page": 147
+     },
+     {
+      "numberKey": null,
+      "title": "Zq104 xylophone",
+      "sectionKey": "toc:14.5",
+      "listDepth": 1,
+      "page": 148
+     },
+     {
+      "numberKey": null,
+      "title": "Zq105 xylophone",
+      "sectionKey": "toc:14.6",
+      "listDepth": 1,
+      "page": 149
+     },
+     {
+      "numberKey": null,
+      "title": "Zq106 xylophone",
+      "sectionKey": "toc:14.7",
+      "listDepth": 1,
+      "page": 150
+     },
+     {
+      "numberKey": null,
+      "title": "Zq107 xylophone",
+      "sectionKey": "toc:15.1",
+      "listDepth": 0,
+      "page": 152
+     },
+     {
+      "numberKey": null,
+      "title": "Zq108 xylophone",
+      "sectionKey": "toc:15.1",
+      "listDepth": 1,
+      "page": 152
+     },
+     {
+      "numberKey": null,
+      "title": "Zq109 xylophone",
+      "sectionKey": "toc:15.2",
+      "listDepth": 1,
+      "page": 153
+     },
+     {
+      "numberKey": null,
+      "title": "Zq110 xylophone",
+      "sectionKey": "toc:15.3",
+      "listDepth": 1,
+      "page": 154
+     },
+     {
+      "numberKey": null,
+      "title": "Zq111 xylophone",
+      "sectionKey": "toc:15.4",
+      "listDepth": 1,
+      "page": 155
+     },
+     {
+      "numberKey": null,
+      "title": "Zq112 xylophone",
+      "sectionKey": "toc:15.6",
+      "listDepth": 1,
+      "page": 156
+     },
+     {
+      "numberKey": null,
+      "title": "Zq113 xylophone",
+      "sectionKey": "toc:15.6",
+      "listDepth": 1,
+      "page": 156
+     },
+     {
+      "numberKey": null,
+      "title": "Zq114 xylophone",
+      "sectionKey": "toc:16.1",
+      "listDepth": 0,
+      "page": 157
+     },
+     {
+      "numberKey": null,
+      "title": "Zq115 xylophone",
+      "sectionKey": "toc:16.1",
+      "listDepth": 1,
+      "page": 157
+     },
+     {
+      "numberKey": null,
+      "title": "Zq116 xylophone",
+      "sectionKey": "toc:16.2",
+      "listDepth": 1,
+      "page": 159
+     },
+     {
+      "numberKey": null,
+      "title": "Zq117 xylophone",
+      "sectionKey": "toc:16.3",
+      "listDepth": 1,
+      "page": 160
+     },
+     {
+      "numberKey": null,
+      "title": "Zq118 xylophone",
+      "sectionKey": "toc:16.4",
+      "listDepth": 1,
+      "page": 161
+     },
+     {
+      "numberKey": null,
+      "title": "Zq119 xylophone",
+      "sectionKey": "toc:16.6",
+      "listDepth": 1,
+      "page": 162
+     },
+     {
+      "numberKey": null,
+      "title": "Zq120 xylophone",
+      "sectionKey": "toc:16.6",
+      "listDepth": 1,
+      "page": 162
+     },
+     {
+      "numberKey": null,
+      "title": "Zq121 xylophone",
+      "sectionKey": "toc:17.1",
+      "listDepth": 0,
+      "page": 164
+     },
+     {
+      "numberKey": null,
+      "title": "Zq122 xylophone",
+      "sectionKey": "toc:17.1",
+      "listDepth": 1,
+      "page": 164
+     },
+     {
+      "numberKey": null,
+      "title": "Zq123 xylophone",
+      "sectionKey": "toc:17.2",
+      "listDepth": 1,
+      "page": 165
+     },
+     {
+      "numberKey": null,
+      "title": "Zq124 xylophone",
+      "sectionKey": "toc:17.4",
+      "listDepth": 1,
+      "page": 167
+     },
+     {
+      "numberKey": null,
+      "title": "Zq125 xylophone",
+      "sectionKey": "toc:17.4",
+      "listDepth": 1,
+      "page": 167
+     },
+     {
+      "numberKey": null,
+      "title": "Zq126 xylophone",
+      "sectionKey": "toc:18.1",
+      "listDepth": 0,
+      "page": 169
+     },
+     {
+      "numberKey": null,
+      "title": "Zq127 xylophone",
+      "sectionKey": "toc:18.1",
+      "listDepth": 1,
+      "page": 169
+     },
+     {
+      "numberKey": null,
+      "title": "Zq128 xylophone",
+      "sectionKey": "toc:18.2",
+      "listDepth": 1,
+      "page": 172
+     },
+     {
+      "numberKey": null,
+      "title": "Zq129 xylophone",
+      "sectionKey": "toc:18.3",
+      "listDepth": 1,
+      "page": 174
+     },
+     {
+      "numberKey": null,
+      "title": "Zq130 xylophone",
+      "sectionKey": "toc:19.1",
+      "listDepth": 0,
+      "page": 176
+     },
+     {
+      "numberKey": null,
+      "title": "Zq131 xylophone",
+      "sectionKey": "toc:19.1",
+      "listDepth": 1,
+      "page": 176
+     },
+     {
+      "numberKey": null,
+      "title": "Zq132 xylophone",
+      "sectionKey": "toc:19.2",
+      "listDepth": 1,
+      "page": 178
+     },
+     {
+      "numberKey": null,
+      "title": "Zq133 xylophone",
+      "sectionKey": "toc:19.3",
+      "listDepth": 1,
+      "page": 179
+     },
+     {
+      "numberKey": null,
+      "title": "Zq134 xylophone",
+      "sectionKey": "toc:19.4",
+      "listDepth": 1,
+      "page": 180
+     },
+     {
+      "numberKey": null,
+      "title": "Zq135 xylophone",
+      "sectionKey": "toc:19.5",
+      "listDepth": 1,
+      "page": 181
+     },
+     {
+      "numberKey": null,
+      "title": "Zq136 xylophone",
+      "sectionKey": "toc:19.7",
+      "listDepth": 1,
+      "page": 182
+     },
+     {
+      "numberKey": null,
+      "title": "Zq137 xylophone",
+      "sectionKey": "toc:19.7",
+      "listDepth": 1,
+      "page": 182
+     },
+     {
+      "numberKey": null,
+      "title": "Zq138 xylophone",
+      "sectionKey": "toc:20.1",
+      "listDepth": 0,
+      "page": 183
+     },
+     {
+      "numberKey": null,
+      "title": "Zq139 xylophone",
+      "sectionKey": "toc:20.1",
+      "listDepth": 1,
+      "page": 183
+     },
+     {
+      "numberKey": null,
+      "title": "Zq140 xylophone",
+      "sectionKey": "toc:20.2",
+      "listDepth": 1,
+      "page": 185
+     },
+     {
+      "numberKey": null,
+      "title": "Zq141 xylophone",
+      "sectionKey": "toc:20.3",
+      "listDepth": 1,
+      "page": 186
+     },
+     {
+      "numberKey": null,
+      "title": "Zq142 xylophone",
+      "sectionKey": "toc:20.4",
+      "listDepth": 1,
+      "page": 188
+     },
+     {
+      "numberKey": null,
+      "title": "Zq143 xylophone",
+      "sectionKey": "toc:20.5",
+      "listDepth": 1,
+      "page": 193
+     },
+     {
+      "numberKey": null,
+      "title": "Zq144 xylophone",
+      "sectionKey": "toc:21.1",
+      "listDepth": 0,
+      "page": 194
+     },
+     {
+      "numberKey": null,
+      "title": "Zq145 xylophone",
+      "sectionKey": "toc:21.1",
+      "listDepth": 1,
+      "page": 194
+     },
+     {
+      "numberKey": null,
+      "title": "Zq146 xylophone",
+      "sectionKey": "toc:21.2",
+      "listDepth": 1,
+      "page": 195
+     },
+     {
+      "numberKey": null,
+      "title": "Zq147 xylophone",
+      "sectionKey": "toc:21.4",
+      "listDepth": 1,
+      "page": 196
+     },
+     {
+      "numberKey": null,
+      "title": "Zq148 xylophone",
+      "sectionKey": "toc:21.4",
+      "listDepth": 1,
+      "page": 196
+     },
+     {
+      "numberKey": null,
+      "title": "Zq149 xylophone",
+      "sectionKey": "toc:21.5",
+      "listDepth": 1,
+      "page": 197
+     },
+     {
+      "numberKey": null,
+      "title": "Zq150 xylophone",
+      "sectionKey": "toc:chapter-22-conclusion",
+      "listDepth": 0,
+      "page": 198
+     },
+     {
+      "numberKey": null,
+      "title": "Zq151 xylophone",
+      "sectionKey": "toc:index",
+      "listDepth": 0,
+      "page": 200
+     },
+     {
+      "numberKey": null,
+      "title": "Zq152 xylophone",
+      "sectionKey": "toc:summary-of-design-principles",
+      "listDepth": 0,
+      "page": 206
+     },
+     {
+      "numberKey": null,
+      "title": "Zq153 xylophone",
+      "sectionKey": "toc:summary-of-red-flags",
+      "listDepth": 0,
+      "page": 207
+     },
+     {
+      "numberKey": null,
+      "title": "Zq154 xylophone",
+      "sectionKey": "toc:about-the-author",
+      "listDepth": 0,
+      "page": 209
+     },
+     {
+      "numberKey": null,
+      "title": "Zq155 xylophone",
+      "sectionKey": "toc:about-the-author",
+      "listDepth": 0,
+      "page": 210
+     }
+    ],
+    "block_map": {},
+    "final_keys": {
+     "0": "toc:a-philosophy-of-software-design",
+     "1": "toc:john-ousterhout-stanford-university",
+     "2": "toc:contents",
+     "3": "toc:preface",
+     "4": "toc:chapter-1-introduction",
+     "5": "toc:it-s-all-about-complexity",
+     "6": "toc:1.1",
+     "7": "toc:chapter-2-the-nature-of-complexity",
+     "8": "toc:2.1",
+     "9": "toc:2.2",
+     "10": "toc:2.3",
+     "11": "toc:2.4",
+     "12": "toc:2.5",
+     "13": "toc:chapter-3-working-code-isn-t-enough",
+     "14": "toc:strategic-vs-tactical-programming",
+     "15": "toc:3.1",
+     "16": "toc:3.2",
+     "17": "toc:3.3",
+     "18": "toc:3.4",
+     "19": "toc:3.5",
+     "20": "toc:chapter-4-modules-should-be-deep",
+     "21": "toc:4.1",
+     "22": "toc:4.2",
+     "23": "toc:4.3",
+     "24": "toc:4.4",
+     "25": "toc:4.5",
+     "26": "toc:red-flag-shallow-module",
+     "27": "toc:4.6",
+     "28": "toc:4.7",
+     "29": "toc:4.8",
+     "30": "toc:chapter-5-information-hiding-and-leakage",
+     "31": "toc:5.1",
+     "32": "toc:5.2",
+     "33": "toc:5.3",
+     "34": "toc:red-flag-information-leakage",
+     "35": "toc:5.4",
+     "36": "toc:red-flag-temporal-decomposition",
+     "37": "toc:5.5",
+     "38": "toc:5.6",
+     "39": "toc:5.7",
+     "40": "toc:red-flag-overexposure",
+     "41": "toc:5.8",
+     "42": "toc:5.9",
+     "43": "toc:5.10",
+     "44": "toc:chapter-6-general-purpose-modules-are-deeper",
+     "45": "toc:6.1",
+     "46": "toc:6.2",
+     "47": "toc:6.3",
+     "48": "toc:6.4",
+     "49": "toc:6.5",
+     "50": "toc:6.6",
+     "51": "toc:6.7",
+     "52": "toc:6.8",
+     "53": "toc:6.9",
+     "54": "toc:chapter-7-di-erent-layer-di-erent-abstraction",
+     "55": "toc:7.1",
+     "56": "toc:red-flag-pass-through-method",
+     "57": "toc:7.2",
+     "58": "toc:7.3",
+     "59": "toc:7.4",
+     "60": "toc:7.5",
+     "61": "toc:7.6",
+     "62": "toc:chapter-8-pull-complexity-downwards",
+     "63": "toc:8.1",
+     "64": "toc:p",
+     "65": "toc:8.2",
+     "66": "toc:8.3",
+     "67": "toc:8.4",
+     "68": "toc:chapter-9-better-together-or-better-apart",
+     "69": "toc:9.1",
+     "70": "toc:9.2",
+     "71": "toc:9.3",
+     "72": "toc:9.4",
+     "73": "toc:red-flag-repetition",
+     "74": "toc:9.5",
+     "75": "toc:red-flag-special-general-mixture",
+     "76": "toc:9.6",
+     "77": "toc:9.7",
+     "78": "toc:red-flag-conjoined-methods",
+     "79": "toc:9.8",
+     "80": "toc:9.9",
+     "81": "toc:chapter-10-de-ne-errors-out-of-existence",
+     "82": "toc:10.1",
+     "83": "toc:10.2",
+     "84": "toc:10.3",
+     "85": "toc:10.4",
+     "86": "toc:10.5",
+     "87": "toc:10.6",
+     "88": "toc:10.7",
+     "89": "toc:10.8",
+     "90": "toc:10.9",
+     "91": "toc:10.10",
+     "92": "toc:chapter-11-design-it-twice",
+     "93": "toc:chapter-12-why-write-comments-the-four-excuses",
+     "94": "toc:12.1",
+     "95": "toc:12.2",
+     "96": "toc:12.3",
+     "97": "toc:12.4",
+     "98": "toc:12.5",
+     "99": "toc:12.6",
+     "100": "toc:chapter-13-comments-should-describe-things-that-",
+     "101": "toc:13.1",
+     "102": "toc:13.2",
+     "103": "toc:red-flag-comment-repeats-code",
+     "104": "toc:13.3",
+     "105": "toc:13.4",
+     "106": "toc:13.5",
+     "107": "toc:red-flag-implementation-documentation-contaminat",
+     "108": "toc:13.6",
+     "109": "toc:13.7",
+     "110": "toc:13.8",
+     "111": "toc:13.9",
+     "112": "toc:chapter-14-choosing-names",
+     "113": "toc:14.1",
+     "114": "toc:14.2",
+     "115": "toc:14.3",
+     "116": "toc:red-flag-vague-name",
+     "117": "toc:red-flag-hard-to-pick-name",
+     "118": "toc:14.4",
+     "119": "toc:14.5",
+     "120": "toc:14.6",
+     "121": "toc:14.7",
+     "122": "toc:chapter-15-write-the-comments-first",
+     "123": "toc:use-comments-as-part-of-the-design-process",
+     "124": "toc:15.1",
+     "125": "toc:15.2",
+     "126": "toc:15.3",
+     "127": "toc:red-flag-hard-to-describe",
+     "128": "toc:15.4",
+     "129": "toc:15.5",
+     "130": "toc:15.6",
+     "131": "toc:chapter-16-modifying-existing-code",
+     "132": "toc:16.1",
+     "133": "toc:16.2",
+     "134": "toc:16.3",
+     "135": "toc:16.4",
+     "136": "toc:16.5",
+     "137": "toc:16.6",
+     "138": "toc:chapter-17-consistency",
+     "139": "toc:17.1",
+     "140": "toc:17.2",
+     "141": "toc:17.3",
+     "142": "toc:17.4",
+     "143": "toc:chapter-18-code-should-be-obvious",
+     "144": "toc:18.1",
+     "145": "toc:18.2",
+     "146": "toc:red-flag-nonobvious-code",
+     "147": "toc:18.3",
+     "148": "toc:chapter-19-software-trends",
+     "149": "toc:19.1",
+     "150": "toc:19.2",
+     "151": "toc:19.3",
+     "152": "toc:19.4",
+     "153": "toc:19.5",
+     "154": "toc:19.6",
+     "155": "toc:19.7",
+     "156": "toc:chapter-20-designing-for-performance",
+     "157": "toc:20.1",
+     "158": "toc:20.2",
+     "159": "toc:20.3",
+     "160": "toc:20.4",
+     "161": "toc:20.5",
+     "162": "toc:chapter-21-decide-what-matters",
+     "163": "toc:21.1",
+     "164": "toc:21.2",
+     "165": "toc:21.3",
+     "166": "toc:21.4",
+     "167": "toc:21.5",
+     "168": "toc:chapter-22-conclusion",
+     "169": "toc:index",
+     "170": "toc:summary-of-design-principles",
+     "171": "toc:summary-of-red-flags",
+     "172": "toc:about-the-author"
+    },
+    "route_hint": "pagematched-or-none"
+   }
+  }
+ }
+}

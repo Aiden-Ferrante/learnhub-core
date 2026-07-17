@@ -25,12 +25,8 @@ from app.process.content.elements import (
     _swap_image_placeholders,
     figure_markdown,
 )
-from app.process.content.outline import (
-    assign_blocks_to_outline,
-    build_outline_from_bookmarks,
-    normalize_outline,
-)
 from app.process.content.pages import section_page_ranges
+from app.process.content.toc_controller import resolve_toc
 from app.process.content.scope import scope_blocks
 from app.process.content.sections import split_markdown_sections
 from app.gateways import db
@@ -85,9 +81,11 @@ def persist_document(
     outline: list[dict] | None = None,
     elements: list[dict] | None = None,
     source_hash: str | None = None,
-) -> str:
+) -> dict:
     """Persist a converted document into raw_structure + raw_content + raw_elements, and flip
-    its raw_documents stub to ``ready`` with final counts.
+    its raw_documents stub to ``ready`` with final counts. Returns
+    ``{docId, tocRoute, tocDecisions}`` so the convert job can put the TOC controller's
+    verdict on its ledger row.
 
     Raises on failure — a document that didn't persist must fail the convert job loudly
     (the ledger records the error) rather than report "done" with nothing in the database.
@@ -112,26 +110,17 @@ def persist_document(
         for b in blocks:
             b.page_start, b.page_end = ranges.get(b.order, (None, None))
 
-    # Unified keyspace: one canonical TOC (unique nested keys from the bookmarks) shared by
-    # the reader and concepts. Re-key each content block onto the canonical section that
-    # contains its page, so the syllabus tree, reader, and numbering line up by construction.
-    # Falls back to the legacy page-matched outline when there's no page data to align on.
-    canonical = build_outline_from_bookmarks(outline)
-    bmap = (
-        assign_blocks_to_outline(
-            canonical, [(b.order, b.heading, b.page_start) for b in blocks]
-        )
-        if canonical
-        else {}
-    )
-    if bmap:
-        outline_entries = canonical
-        for b in blocks:
-            ck = bmap.get(b.order)
-            if ck:
-                b.section_key = ck
-    else:
-        outline_entries = normalize_outline(outline, blocks)
+    # Unified keyspace: one canonical TOC (unique nested keys) shared by the reader and
+    # concepts. The TOC controller picks the route (bookmarks / pagematched / none) and
+    # logs why — its decisions land on the convert job's ledger row.
+    toc = resolve_toc(outline, blocks, page_count)
+    outline_entries = toc.outline_entries
+    # block_map is an OVERLAY: only re-key blocks the reconcile matched; the rest keep
+    # their splitter-assigned keys.
+    for b in blocks:
+        ck = toc.block_map.get(b.order)
+        if ck:
+            b.section_key = ck
 
     has_page_provenance = any(b.page_start is not None for b in blocks)
     struct_rows = _structure_rows(doc_id, outline_entries, page_count)
@@ -149,18 +138,20 @@ def persist_document(
         conn.execute(
             """
             INSERT INTO raw_documents (key, title, source_filename, page_count, char_count,
-                section_count, element_count, has_page_provenance, source_hash, status, last_updated)
-            VALUES (%(key)s,%(title)s,%(sf)s,%(pc)s,%(cc)s,%(sec)s,%(ec)s,%(hpp)s,%(sh)s,'ready', now())
+                section_count, element_count, has_page_provenance, source_hash, toc_route,
+                status, last_updated)
+            VALUES (%(key)s,%(title)s,%(sf)s,%(pc)s,%(cc)s,%(sec)s,%(ec)s,%(hpp)s,%(sh)s,
+                %(tr)s,'ready', now())
             ON CONFLICT (key) DO UPDATE SET
                 title=EXCLUDED.title, source_filename=EXCLUDED.source_filename,
                 page_count=EXCLUDED.page_count, char_count=EXCLUDED.char_count,
                 section_count=EXCLUDED.section_count, element_count=EXCLUDED.element_count,
                 has_page_provenance=EXCLUDED.has_page_provenance, source_hash=EXCLUDED.source_hash,
-                status='ready', last_updated=now()
+                toc_route=EXCLUDED.toc_route, status='ready', last_updated=now()
             """,
             {"key": doc_id, "title": title, "sf": source_filename, "pc": page_count,
              "cc": len(markdown), "sec": len(blocks), "ec": len(elements),
-             "hpp": has_page_provenance, "sh": source_hash},
+             "hpp": has_page_provenance, "sh": source_hash, "tr": toc.route},
         )
 
         # Structure first — content/element FKs point at it. Delete children before the tree
@@ -205,7 +196,7 @@ def persist_document(
                   "table_data": Json(e["tableData"]) if e.get("tableData") is not None else None,
                   "code": e.get("code"), "language": e.get("language")} for e in element_rows],
             )
-    return doc_id
+    return {"docId": doc_id, "tocRoute": toc.route, "tocDecisions": toc.decisions}
 
 
 def fetch_outline(doc_id: str | None = None) -> dict:

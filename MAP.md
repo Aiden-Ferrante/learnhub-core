@@ -158,6 +158,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`math_markdown.py`](backend/app/process/content/math_markdown.py) | LaTeX/KaTeX math rendering |
 | [`toc_tree.py`](backend/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
 | [`find.py`](backend/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
+| [`toc_controller.py`](backend/app/process/content/toc_controller.py) | Staged TOC routing loop (bookmarks / pagematched / none) + decision log (pure) |
 
 ### process/extraction/ — LLM generation passes
 

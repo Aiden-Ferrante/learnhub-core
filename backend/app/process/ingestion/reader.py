@@ -360,7 +360,9 @@ def extract_pages(data: bytes) -> list[PageText]:
 def extract_pdf_outline(data: bytes) -> list[dict]:
     """The PDF's embedded outline / bookmarks — the author's real Table of Contents — via
     PyMuPDF. Returns ``[{level, title, page}]`` (1-based page, level>=1) in reading order, or
-    ``[]`` when the PDF has no bookmarks (scanned/stripped PDFs fall back to TOC-page parsing)."""
+    ``[]`` when the PDF has no bookmarks. There is NO fallback parsing here: an empty list
+    routes the TOC controller (content/toc_controller.py) to ``none`` — its derive
+    strategies are stubs until implemented, and the decision log says so loudly."""
     try:
         doc = fitz.open(stream=data, filetype="pdf")
         try:

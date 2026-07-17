@@ -38,12 +38,15 @@ def source_hash_of(data: bytes) -> str:
 @dataclass
 class ConvertResult:
     """What the convert job patches onto its ledger row. The converted markdown itself
-    is NOT here — it lives in ``documents`` (the status route re-reads it from there)."""
+    is NOT here — it lives in ``raw_content`` (the status route re-reads it from there).
+    ``toc_route``/``toc_decisions`` carry the TOC controller's verdict up to the ledger."""
 
     source_filename: str
     output_filename: str
     page_count: int
     doc_id: str
+    toc_route: str = ""
+    toc_decisions: list[str] | None = None
 
 
 def _normalize_markdown(text: str, engine: str) -> str:
@@ -127,7 +130,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) 
 
     output_filename = _output_name(filename or "document.pdf")
     doc_id = doc_id or str(uuid.uuid4())
-    persist_document(
+    persisted = persist_document(
         doc_id=doc_id,
         title=Path(filename or "document.pdf").stem,
         source_filename=filename or "document.pdf",
@@ -145,4 +148,6 @@ def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) 
         output_filename=output_filename,
         page_count=page_count,
         doc_id=doc_id,
+        toc_route=persisted.get("tocRoute", ""),
+        toc_decisions=persisted.get("tocDecisions"),
     )
