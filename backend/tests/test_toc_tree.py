@@ -77,19 +77,14 @@ def test_apply_section_titles_sets_heading_on_sections_only():
     assert forest[0].children[0].title is None
 
 
-def test_drop_orphan_parts_keeps_numbered_childless_chapters():
-    """PoSD ch. 11 "Design it Twice" regression: a numbered chapter with no subsections,
-    followed by a child-bearing chapter, must NOT be dropped as an orphan Part — while a
-    slug-keyed childless "Part" container before a chaptered node still is."""
-    from app.process.content.toc_tree import TreeNode, _drop_orphan_parts
+def test_drop_hidden_entries_filters_by_stored_flag_only():
+    """Read time never re-decides: entries flagged by the convert-time curate stage are
+    dropped; unflagged (incl. legacy rows without the field) pass through."""
+    from app.process.content.toc_tree import _drop_hidden_entries
 
-    ch10 = TreeNode(id="toc:10", label="10", children=[TreeNode(id="toc:10.1", label="10.1")])
-    ch11 = TreeNode(id="toc:11", label="11")                      # childless, numbered
-    ch12 = TreeNode(id="toc:12", label="12", children=[TreeNode(id="toc:12.1", label="12.1")])
-    part = TreeNode(id="toc:part-ii", label="Part II")            # childless, slug "Part"
-
-    kept = _drop_orphan_parts([ch10, ch11, ch12])
-    assert [n.id for n in kept] == ["toc:10", "toc:11", "toc:12"]
-
-    kept = _drop_orphan_parts([part, ch12])
-    assert [n.id for n in kept] == ["toc:12"]
+    outline = [
+        {"sectionKey": "toc:title-page", "listDepth": 0, "hiddenReason": "front-back-matter"},
+        {"sectionKey": "toc:1", "listDepth": 0, "hiddenReason": None},
+        {"sectionKey": "toc:1.1", "listDepth": 1},  # legacy row, no field
+    ]
+    assert [e["sectionKey"] for e in _drop_hidden_entries(outline)] == ["toc:1", "toc:1.1"]

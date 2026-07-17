@@ -127,6 +127,10 @@ class TocResolution:
     outline_entries: list[dict]         # canonical entries store.py persists
     block_map: dict[int, str]           # block order -> sectionKey (OVERLAY; may be empty)
     decisions: list[str] = field(default_factory=list)  # one line per stage
+    # sectionKey -> reason for nodes hidden from the SYLLABUS view (front/back matter,
+    # orphan Part containers). Stored per node (raw_structure.hidden_reason) so read-time
+    # tree assembly filters by flag — the heuristics run once, here, logged.
+    hidden: dict[str, str] = field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------- #
@@ -141,6 +145,74 @@ _STRATEGY_ROUTES = {
     "from-contents-pages": ROUTE_DERIVED_CONTENTS,
     "from-llm": ROUTE_DERIVED_LLM,
 }
+
+
+# --------------------------------------------------------------------------- #
+# stage: curate — which nodes the SYLLABUS should hide (the reader always shows
+# the whole book). Moved from toc_tree.py's silent read-time filters so the
+# verdicts are logged here and stored per node; read time filters by flag only.
+# --------------------------------------------------------------------------- #
+
+HIDE_FRONT_BACK = "front-back-matter"
+HIDE_ORPHAN_PART = "orphan-part"
+
+# Top-level front/back matter to hide so the syllabus reads like the printed Table of
+# Contents (these are in the PDF bookmarks but not study content). Matched
+# case-insensitively, exact or by prefix, against the entry title.
+_FRONT_BACK_EXACT = {
+    "cover", "copyright", "title page", "half title", "dedication", "colophon",
+    "table of contents", "brief table of contents", "contents", "index",
+    "about the author", "about the authors", "acknowledgments", "acknowledgements",
+    "notation", "list of figures", "list of tables", "revision history",
+    "preface", "foreword", "epilogue", "contributors", "other books you may enjoy",
+    "bibliography", "glossary", "references",
+}
+_FRONT_BACK_PREFIX = ("praise for", "revision history for", "about the author")
+_TOC_NUMERIC_KEY = re.compile(r"^toc:\d+(?:\.\d+)*$")
+
+
+def _is_front_back_title(title: str) -> bool:
+    t = re.sub(r"\s+", " ", (title or "")).strip().lower()
+    return t in _FRONT_BACK_EXACT or any(t.startswith(p) for p in _FRONT_BACK_PREFIX)
+
+
+def curate_outline(entries: list[dict]) -> dict[str, str]:
+    """sectionKey -> hide reason, over the flat canonical entries.
+
+    Front/back matter: a depth-0 entry with a boilerplate title is hidden ALONG WITH its
+    descendants (the following entries at greater depth). Orphan Parts: a childless
+    depth-0 entry immediately followed by a child-bearing sibling is a mis-bookmarked
+    "Part" container — UNLESS it has a numeric ``toc:N`` key: a real chapter may
+    legitimately have no subsections (PoSD ch. 11 "Design it Twice"); "Part I/II"
+    bookmarks parse to slug keys (roman numerals carry no digits)."""
+    hidden: dict[str, str] = {}
+    tops: list[tuple[int, dict, bool]] = []  # (entry index, entry, has_children)
+    for i, e in enumerate(entries):
+        if int(e.get("listDepth") or 0) != 0:
+            continue
+        has_children = i + 1 < len(entries) and int(entries[i + 1].get("listDepth") or 0) > 0
+        tops.append((i, e, has_children))
+
+    def hide_subtree(idx: int, reason: str) -> None:
+        hidden[entries[idx]["sectionKey"]] = reason
+        for e in entries[idx + 1 :]:
+            if int(e.get("listDepth") or 0) == 0:
+                break
+            hidden[e["sectionKey"]] = reason
+
+    for idx, e, _ in tops:
+        if _is_front_back_title(e.get("title") or ""):
+            hide_subtree(idx, HIDE_FRONT_BACK)
+
+    # Orphan-part pass over the tops that SURVIVE the front/back pass, preserving the
+    # original adjacency semantics ("immediately followed by a chaptered sibling").
+    visible_tops = [(i, e, ch) for (i, e, ch) in tops if e["sectionKey"] not in hidden]
+    for pos, (idx, e, has_children) in enumerate(visible_tops):
+        if has_children or _TOC_NUMERIC_KEY.match(e.get("sectionKey") or ""):
+            continue
+        if pos + 1 < len(visible_tops) and visible_tops[pos + 1][2]:
+            hidden[e["sectionKey"]] = HIDE_ORPHAN_PART
+    return hidden
 
 
 # --------------------------------------------------------------------------- #
@@ -216,8 +288,9 @@ def resolve_toc(
     if block_map:
         route = derived_route or ROUTE_BOOKMARKS
         decisions.append(f"reconcile: {len(block_map)}/{len(blocks)} blocks matched")
+        hidden = _curate_logged(canonical, decisions)
         decisions.append(f"route: {route}")
-        return TocResolution(route, quality, canonical, block_map, decisions)
+        return TocResolution(route, quality, canonical, block_map, decisions, hidden)
 
     entries = normalize_outline(raw, blocks)
     route = derived_route or ROUTE_PAGEMATCHED
@@ -225,5 +298,24 @@ def resolve_toc(
         "reconcile: 0 blocks matched — outline page-matched onto block keys "
         f"({len(entries)} entries; blocks keep splitter keys)"
     )
+    hidden = _curate_logged(entries, decisions)
     decisions.append(f"route: {route}")
-    return TocResolution(route, quality, entries, {}, decisions)
+    return TocResolution(route, quality, entries, {}, decisions, hidden)
+
+
+def _curate_logged(entries: list[dict], decisions: list[str]) -> dict[str, str]:
+    """Run curate_outline and narrate its verdicts into the decision log."""
+    hidden = curate_outline(entries)
+    if not hidden:
+        decisions.append("curate: nothing hidden")
+        return hidden
+    by_key = {e["sectionKey"]: e for e in entries if e.get("sectionKey")}
+    for reason in (HIDE_FRONT_BACK, HIDE_ORPHAN_PART):
+        tops = [
+            k for k, r in hidden.items()
+            if r == reason and int(by_key.get(k, {}).get("listDepth") or 0) == 0
+        ]
+        if tops:
+            titles = ", ".join((by_key.get(k, {}).get("title") or k) for k in tops)
+            decisions.append(f"curate: hid {len(tops)} ({reason}): {titles}")
+    return hidden

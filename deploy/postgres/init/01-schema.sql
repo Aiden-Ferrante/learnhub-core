@@ -74,6 +74,9 @@ CREATE TABLE raw_structure (
   number_label text,                               -- '2', '2.1' (was numberKey)
   title        text,
   depth        int,                                -- 0-based (was listDepth)
+  hidden_reason text,                              -- NULL = in the syllabus; else why the
+                                                   -- curate stage hid it (front-back-matter
+                                                   -- | orphan-part) — reader shows all nodes
   "order"      int,
   page_start   int,
   page_end     int,

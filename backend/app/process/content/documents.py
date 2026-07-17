@@ -35,8 +35,8 @@ def fetch_structure_entries(doc_id: str | None) -> list[dict[str, Any]]:
         with db() as conn:
             rows = conn.execute(
                 'SELECT section_key AS "sectionKey", number_label AS "numberKey", title, '
-                'depth AS "listDepth", page_start AS page FROM raw_structure '
-                'WHERE doc_id = %(d)s ORDER BY "order"',
+                'depth AS "listDepth", page_start AS page, hidden_reason AS "hiddenReason" '
+                'FROM raw_structure WHERE doc_id = %(d)s ORDER BY "order"',
                 {"d": doc_id},
             ).fetchall()
         return [dict(r) for r in rows]

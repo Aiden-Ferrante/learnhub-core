@@ -311,3 +311,69 @@ def test_messy_routes_like_clean_and_logs_reasons():
     assert res.route in (ROUTE_BOOKMARKS, ROUTE_PAGEMATCHED)
     log = "\n".join(res.decisions)
     assert "assess: messy (" in log and "junk-titles" in log
+
+
+# --------------------------------------------------------------------------- #
+# curate — front/back matter + orphan Parts, decided at convert time, logged
+# --------------------------------------------------------------------------- #
+
+from app.process.content.toc_controller import (  # noqa: E402
+    HIDE_FRONT_BACK,
+    HIDE_ORPHAN_PART,
+    curate_outline,
+)
+
+
+def _o(sk, depth=0, title="", num=None, page=None):
+    return {"sectionKey": sk, "listDepth": depth, "title": title, "numberKey": num, "page": page}
+
+
+def test_curate_hides_front_matter_with_descendants():
+    hidden = curate_outline([
+        _o("toc:contents", 0, "Contents"),
+        _o("toc:contents-a", 1, "Part listing"),
+        _o("toc:1", 0, "Introduction"),
+        _o("toc:1.1", 1, "How to use this book"),
+        _o("toc:index", 0, "Index"),
+    ])
+    assert hidden == {
+        "toc:contents": HIDE_FRONT_BACK,
+        "toc:contents-a": HIDE_FRONT_BACK,
+        "toc:index": HIDE_FRONT_BACK,
+    }
+
+
+def test_curate_orphan_part_dropped_but_numbered_childless_chapter_kept():
+    """The PoSD ch. 11 regression, now at the curate stage: numbered childless chapters
+    survive; a slug-keyed childless "Part" before a chaptered sibling is hidden."""
+    hidden = curate_outline([
+        _o("toc:part-ii", 0, "Part II"),
+        _o("toc:10", 0, "Define Errors Out Of Existence", "10"),
+        _o("toc:10.1", 1, "Why exceptions add complexity", "10.1"),
+        _o("toc:11", 0, "Design it Twice", "11"),
+        _o("toc:12", 0, "Why Write Comments?", "12"),
+        _o("toc:12.1", 1, "Good code is self-documenting", "12.1"),
+    ])
+    assert hidden == {"toc:part-ii": HIDE_ORPHAN_PART}
+
+
+def test_curate_adjacency_ignores_already_hidden_tops():
+    # An orphan Part whose next VISIBLE sibling has children is still caught even when
+    # hidden front matter sits between them.
+    hidden = curate_outline([
+        _o("toc:part-i", 0, "Part I"),
+        _o("toc:preface", 0, "Preface"),
+        _o("toc:2", 0, "The Nature of Complexity", "2"),
+        _o("toc:2.1", 1, "Complexity defined", "2.1"),
+    ])
+    assert hidden == {"toc:part-i": HIDE_ORPHAN_PART, "toc:preface": HIDE_FRONT_BACK}
+
+
+def test_resolution_logs_curate_and_carries_hidden():
+    _, res = _resolve("bookmarks")
+    log = "\n".join(res.decisions)
+    assert "curate:" in log
+    # posd's bookmarks include Title Page / Copyright / Contents / Preface → hidden
+    assert any(r == HIDE_FRONT_BACK for r in res.hidden.values())
+    # ...but never chapter 11 (numbered childless chapter)
+    assert "toc:11" not in res.hidden

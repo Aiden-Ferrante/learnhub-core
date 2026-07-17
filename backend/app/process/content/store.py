@@ -34,7 +34,10 @@ from app.gateways import db
 DOCUMENTS = "raw_documents"
 
 
-def _structure_rows(doc_id: str, outline_entries: list[dict], page_count: int) -> list[dict]:
+def _structure_rows(
+    doc_id: str, outline_entries: list[dict], page_count: int,
+    hidden: dict[str, str] | None = None,
+) -> list[dict]:
     """Turn the flat outline entries (each ``{sectionKey, numberKey, title, listDepth, page}``)
     into raw_structure rows: a self-referencing tree (parent_id from the depth stack), a
     per-node page span (start = the entry's page, end = just before the next same-or-shallower
@@ -65,6 +68,7 @@ def _structure_rows(doc_id: str, outline_entries: list[dict], page_count: int) -
             "kind": "chapter" if depth == 0 else "section",
             "number_label": e.get("numberKey"), "title": e.get("title"),
             "depth": depth, "order": i, "page_start": page, "page_end": page_end,
+            "hidden_reason": (hidden or {}).get(sk),
         })
     return rows
 
@@ -131,7 +135,7 @@ def persist_document(
             b.section_key = ck
 
     has_page_provenance = any(b.page_start is not None for b in blocks)
-    struct_rows = _structure_rows(doc_id, outline_entries, page_count)
+    struct_rows = _structure_rows(doc_id, outline_entries, page_count, hidden=toc.hidden)
     struct_keys = {r["section_key"] for r in struct_rows}
 
     def sid(sk: str | None) -> str | None:
@@ -170,8 +174,8 @@ def persist_document(
         if struct_rows:
             conn.cursor().executemany(
                 'INSERT INTO raw_structure (id, doc_id, parent_id, section_key, kind, number_label, '
-                'title, depth, "order", page_start, page_end) VALUES (%(id)s,%(doc_id)s,%(parent_id)s,'
-                '%(section_key)s,%(kind)s,%(number_label)s,%(title)s,%(depth)s,%(order)s,%(page_start)s,%(page_end)s)',
+                'title, depth, "order", page_start, page_end, hidden_reason) VALUES (%(id)s,%(doc_id)s,%(parent_id)s,'
+                '%(section_key)s,%(kind)s,%(number_label)s,%(title)s,%(depth)s,%(order)s,%(page_start)s,%(page_end)s,%(hidden_reason)s)',
                 struct_rows,
             )
 

@@ -238,47 +238,12 @@ def _filter_to_concept_sections(nodes: list[TreeNode]) -> list[TreeNode]:
     return kept
 
 
-# Top-level front/back matter to drop so the syllabus reads like the printed Table of Contents
-# (these are in the PDF bookmarks but not study content). Matched case-insensitively, exact or
-# by prefix, against a node's title.
-_FRONT_BACK_EXACT = {
-    "cover", "copyright", "title page", "half title", "dedication", "colophon",
-    "table of contents", "brief table of contents", "contents", "index",
-    "about the author", "about the authors", "acknowledgments", "acknowledgements",
-    "notation", "list of figures", "list of tables", "revision history",
-    "preface", "foreword", "epilogue", "contributors", "other books you may enjoy",
-    "bibliography", "glossary", "references",
-}
-_FRONT_BACK_PREFIX = ("praise for", "revision history for", "about the author")
-
-
-def _is_front_back_matter(node: TreeNode) -> bool:
-    t = re.sub(r"\s+", " ", (node.title or node.label or "")).strip().lower()
-    return t in _FRONT_BACK_EXACT or any(t.startswith(p) for p in _FRONT_BACK_PREFIX)
-
-
-def _drop_front_back_matter(nodes: list[TreeNode]) -> list[TreeNode]:
-    """Show the FULL book TOC (all chapters/sections, extracted or not) but prune obvious
-    top-level front/back matter — so the course outline matches the textbook's printed contents."""
-    return [n for n in nodes if not _is_front_back_matter(n)]
-
-
-def _drop_orphan_parts(nodes: list[TreeNode]) -> list[TreeNode]:
-    """Drop childless top-level "Part" containers that some PDFs (e.g. the CV book) bookmark at
-    the SAME depth as the chapters they should hold — leaving the flat, globally-numbered chapter
-    list instead of Part/chapter siblings with colliding numbers. A childless top-level node
-    immediately followed by a child-bearing (chaptered) node is such an orphan Part — UNLESS it
-    is itself a numbered chapter (``toc:N``): a real chapter may legitimately have no
-    subsections (PoSD's ch. 11 "Design it Twice"), and "Part I/II" bookmarks never parse to
-    numeric keys (roman numerals → slug keys). Strict no-op for well-nested books (Parts there
-    have children) and for chapterless books."""
-    return [
-        n
-        for i, n in enumerate(nodes)
-        if n.children
-        or TOC_NUMERIC.match(n.id or "")
-        or not (i + 1 < len(nodes) and nodes[i + 1].children)
-    ]
+def _drop_hidden_entries(outline: list[dict]) -> list[dict]:
+    """Filter out entries the convert-time curate stage hid (front/back matter, orphan
+    Parts) — the ONLY syllabus filtering; the heuristics themselves live in
+    toc_controller.curate_outline, run once at persist, and are logged on the convert
+    job's ledger row. Entries without the flag (legacy rows) pass through."""
+    return [e for e in outline if not e.get("hiddenReason")]
 
 
 def build_tree_from_outline(outline: list[dict[str, Any]]) -> list[TreeNode]:
@@ -328,7 +293,7 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     except Exception as e:  # noqa: BLE001 — tree is best-effort; surface the error to the API
         return [], 0, str(e)
 
-    forest_nodes = build_tree_from_outline(outline)
+    forest_nodes = build_tree_from_outline(_drop_hidden_entries(outline))
     apply_section_titles(forest_nodes, titles_by_key)
 
     # Tie concepts to the tree. If the doc has NO concepts yet (e.g. just converted, not
@@ -337,11 +302,9 @@ def get_toc_tree(doc: str | None = None) -> tuple[list[dict[str, Any]], int, str
     if counts:
         _annotate_concept_counts(forest_nodes, counts)
         _attach_concepts(forest_nodes, _concepts_by_section(doc_key))
-    # The course outline IS the textbook's TOC: show the whole book (chapters & sections, whether
-    # or not concepts are extracted yet), pruning only top-level front/back matter, and dropping
-    # mis-bookmarked orphan "Part" containers so chapters read as a clean numbered list.
-    forest_nodes = _drop_orphan_parts(_drop_front_back_matter(forest_nodes))
-
+    # The course outline IS the textbook's TOC: the whole book minus what the convert-time
+    # curate stage hid (front/back matter, orphan Parts) — filtered above by stored flag,
+    # never re-decided here.
     section_count = _count_nodes(forest_nodes)
     return [n.as_dict() for n in forest_nodes], section_count, None
 
