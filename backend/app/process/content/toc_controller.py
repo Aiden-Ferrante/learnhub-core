@@ -16,13 +16,21 @@ ROUTING TABLE (v1 — every path that exists today, named; zero behavior change)
                                      REVERSE direction — outline entries re-keyed
                                      onto the blocks' own splitter keys by page;
                                      block_map is empty, blocks keep their keys
-  absent    none                     derive strategies (headings, contents-page)
-                                     are STUBS returning None → empty outline,
-                                     loud decision log. This is today's silent
-                                     no-bookmarks behavior, made explicit.
+  absent    derived-headings         toc_strategies/from_headings: font-size
+                                     clustering over the heading pages (chapter
+                                     titles are set bigger), text fallback from
+                                     numbered/markdown levels → canonicalize →
+                                     reconcile
+  absent    derived-contents-pages   toc_strategies/from_contents_pages: parse
+                                     the printed Contents page(s), fit the
+                                     printed→physical page offset
+  absent    none                     every strategy declined (each with its
+                                     reason in the log; from-llm is a stub) →
+                                     empty outline, blocks keep splitter keys.
 
 There is deliberately NO derived-llm route: conversion is a non-LLM job; LLM
-repair belongs to a future queued job kind, never a synchronous stage here.
+repair belongs to a future queued job kind, never a synchronous stage here
+(from-llm is registered as a declining stub so the log shows it).
 
 ``block_map`` semantics: an OVERLAY. Apply only where present — a block absent
 from the map keeps its splitter-assigned section_key. Never replace wholesale.
@@ -55,6 +63,9 @@ QUALITY_ABSENT = "absent"
 
 ROUTE_BOOKMARKS = "bookmarks"
 ROUTE_PAGEMATCHED = "bookmarks-pagematched"
+ROUTE_DERIVED_HEADINGS = "derived-headings"
+ROUTE_DERIVED_CONTENTS = "derived-contents-pages"
+ROUTE_DERIVED_LLM = "derived-llm"  # declared; strategy is a registered stub
 ROUTE_NONE = "none"
 
 
@@ -70,28 +81,17 @@ class TocResolution:
 
 
 # --------------------------------------------------------------------------- #
-# Derive strategies — run only when bookmarks are absent. v1: stubs that return
-# None, so the today-silent failure is loud and labeled instead of implicit.
+# Derive strategies live in toc_strategies/ (contract in its base.py): each is a
+# pure function of a TocDeriveContext returning entries in the RAW bookmark shape
+# ``[{level, title, page}]`` — so a derived outline flows through the exact same
+# canonicalize → reconcile machinery as real bookmarks — or a decline reason.
 # --------------------------------------------------------------------------- #
 
-def derive_from_headings(blocks: list[SectionBlock], page_count: int) -> list[dict] | None:
-    """Build an outline from the split blocks' own headings/levels/pages.
-    Not implemented yet — first real derive strategy to build (blocks already
-    carry heading, number_key, level, and page spans)."""
-    return None
-
-
-def derive_from_contents_page(blocks: list[SectionBlock], page_count: int) -> list[dict] | None:
-    """Parse the book's printed Table of Contents. The printed TOC lives in the
-    front-matter "Contents" BLOCK in raw_content (there is no pages table).
-    Not implemented yet."""
-    return None
-
-
-_DERIVE_STRATEGIES = (
-    ("derive-from-headings", derive_from_headings),
-    ("derive-from-contents-page", derive_from_contents_page),
-)
+_STRATEGY_ROUTES = {
+    "from-headings": ROUTE_DERIVED_HEADINGS,
+    "from-contents-pages": ROUTE_DERIVED_CONTENTS,
+    "from-llm": ROUTE_DERIVED_LLM,
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -102,12 +102,20 @@ def resolve_toc(
     raw_outline: list[dict] | None,
     blocks: list[SectionBlock],
     page_count: int,
+    *,
+    heading_pages: list[tuple[str, int]] | None = None,
+    pages: list[tuple[int, str]] | None = None,
+    pdf_bytes: bytes | None = None,
 ) -> TocResolution:
     """Resolve a document's TOC through the routing table above.
 
     Inputs are exactly what ``persist_document`` has in hand: the PDF bookmarks
-    from the reader, the page-annotated split blocks, and the page count.
+    from the reader, the page-annotated split blocks, and the page count. The
+    keyword extras feed the derive strategies' TocDeriveContext (all optional —
+    strategies decline gracefully without them).
     """
+    from app.process.content.toc_strategies import STRATEGIES, TocDeriveContext
+
     decisions: list[str] = []
 
     # stage: source — shape only. PDF-level bookmark cleanup is reader.py's job
@@ -119,17 +127,26 @@ def resolve_toc(
     quality = QUALITY_PRESENT if raw else QUALITY_ABSENT
     decisions.append(f"assess: {quality}")
 
-    # stage: derive — absent only. Every strategy is a stub; log each refusal.
+    # stage: derive — absent only. First strategy that yields an outline wins and
+    # stamps the final route; every refusal is logged with its reason.
+    derived_route: str | None = None
     if quality == QUALITY_ABSENT:
-        for name, strategy in _DERIVE_STRATEGIES:
-            derived = strategy(blocks, page_count)
-            if derived:
-                # (unreachable in v1 — kept so the loop shape is real when a
-                # strategy lands; a derived outline would flow into canonicalize)
-                decisions.append(f"derive: {name} produced {len(derived)} entries")
-                raw = derived
+        ctx = TocDeriveContext(
+            pdf_bytes=pdf_bytes,
+            blocks=blocks,
+            heading_pages=heading_pages or [],
+            pages=pages or [],
+            page_count=page_count,
+        )
+        for name, strategy in STRATEGIES:
+            out = strategy(ctx)
+            if isinstance(out, list) and out:
+                decisions.append(f"derive/{name}: {len(out)} entries")
+                raw = out
+                derived_route = _STRATEGY_ROUTES.get(name, ROUTE_NONE)
                 break
-            decisions.append(f"derive: {name} not implemented")
+            reason = out if isinstance(out, str) else "no usable outline"
+            decisions.append(f"derive/{name}: declined ({reason})")
         else:
             decisions.append("route: none — no structure; blocks keep splitter keys")
             return TocResolution(ROUTE_NONE, quality, [], {}, decisions)
@@ -146,14 +163,16 @@ def resolve_toc(
         else {}
     )
     if block_map:
+        route = derived_route or ROUTE_BOOKMARKS
         decisions.append(f"reconcile: {len(block_map)}/{len(blocks)} blocks matched")
-        decisions.append(f"route: {ROUTE_BOOKMARKS}")
-        return TocResolution(ROUTE_BOOKMARKS, quality, canonical, block_map, decisions)
+        decisions.append(f"route: {route}")
+        return TocResolution(route, quality, canonical, block_map, decisions)
 
     entries = normalize_outline(raw, blocks)
+    route = derived_route or ROUTE_PAGEMATCHED
     decisions.append(
         "reconcile: 0 blocks matched — outline page-matched onto block keys "
         f"({len(entries)} entries; blocks keep splitter keys)"
     )
-    decisions.append(f"route: {ROUTE_PAGEMATCHED}")
-    return TocResolution(ROUTE_PAGEMATCHED, quality, entries, {}, decisions)
+    decisions.append(f"route: {route}")
+    return TocResolution(route, quality, entries, {}, decisions)

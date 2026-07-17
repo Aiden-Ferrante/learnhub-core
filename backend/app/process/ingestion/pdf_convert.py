@@ -141,6 +141,7 @@ def convert_pdf_bytes(data: bytes, filename: str, *, doc_id: str | None = None) 
         outline=converted.outline,
         elements=elements,
         source_hash=source_hash_of(data),
+        pdf_bytes=data,
     )
 
     return ConvertResult(

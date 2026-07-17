@@ -81,6 +81,7 @@ def persist_document(
     outline: list[dict] | None = None,
     elements: list[dict] | None = None,
     source_hash: str | None = None,
+    pdf_bytes: bytes | None = None,
 ) -> dict:
     """Persist a converted document into raw_structure + raw_content + raw_elements, and flip
     its raw_documents stub to ``ready`` with final counts. Returns
@@ -111,9 +112,16 @@ def persist_document(
             b.page_start, b.page_end = ranges.get(b.order, (None, None))
 
     # Unified keyspace: one canonical TOC (unique nested keys) shared by the reader and
-    # concepts. The TOC controller picks the route (bookmarks / pagematched / none) and
-    # logs why — its decisions land on the convert job's ledger row.
-    toc = resolve_toc(outline, blocks, page_count)
+    # concepts. The TOC controller picks the route (bookmarks / pagematched / derived-* /
+    # none) and logs why — its decisions land on the convert job's ledger row. The
+    # extras feed the derive strategies (font pass needs the PDF bytes; contents-page
+    # parsing needs the per-page text).
+    toc = resolve_toc(
+        outline, blocks, page_count,
+        heading_pages=hp,
+        pages=[(int(pn), md) for (pn, md) in (pages or [])],
+        pdf_bytes=pdf_bytes,
+    )
     outline_entries = toc.outline_entries
     # block_map is an OVERLAY: only re-key blocks the reconcile matched; the rest keep
     # their splitter-assigned keys.
