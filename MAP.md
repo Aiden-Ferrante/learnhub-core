@@ -209,7 +209,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 |---|---|
 | [`build.py`](backend/app/conductor/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
 | [`ingest.py`](backend/app/conductor/ingest.py) | Phase 1: stash upload + `convert` job runner |
-| [`lifecycle.py`](backend/app/conductor/lifecycle.py) | Per-document state + auto-chain `converted → extract` |
+| [`lifecycle.py`](backend/app/conductor/lifecycle.py) | Per-document state; extraction is on-demand (auto-chain opt-in via LEARN_AUTOCHAIN=1) |
 | [`registry.py`](backend/app/conductor/registry.py) | Composition root — registers every job-kind runner |
 | [`worker.py`](backend/app/conductor/worker.py) | The one daemon worker: runner registry, JobCtx, drain loop over the ledger |
 
@@ -363,4 +363,4 @@ Floor first (small, everything builds on these), then trace one journey:
 1. [ARCHITECTURE.md](ARCHITECTURE.md) — the map's legend
 2. [`gateways/db.py`](backend/app/gateways/db.py) → [`gateways/llm.py`](backend/app/gateways/llm.py) → [`process/content/scope.py`](backend/app/process/content/scope.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py)
 3. Then a vertical slice — e.g. **build a chapter**: [`api/process_routes.py`](backend/app/api/process_routes.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py) → [`conductor/worker.py`](backend/app/conductor/worker.py) → [`conductor/registry.py`](backend/app/conductor/registry.py) → [`conductor/build.py`](backend/app/conductor/build.py) → [`extraction/concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
-4. Or the **document lifecycle**: an upload flows [`api/process_routes.py`](backend/app/api/process_routes.py) → [`conductor/ingest.py`](backend/app/conductor/ingest.py) (convert job) → auto-chained [`conductor/build.py`](backend/app/conductor/build.py) (extract) → studyable, tracked by [`conductor/lifecycle.py`](backend/app/conductor/lifecycle.py)
+4. Or the **document lifecycle**: an upload flows [`api/process_routes.py`](backend/app/api/process_routes.py) → [`conductor/ingest.py`](backend/app/conductor/ingest.py) (convert job) → readable; then on-demand per-chapter [`conductor/build.py`](backend/app/conductor/build.py) (extract) → studyable, tracked by [`conductor/lifecycle.py`](backend/app/conductor/lifecycle.py)

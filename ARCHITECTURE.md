@@ -44,7 +44,7 @@ The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 | `process/extraction/` | LLM generation passes, into the `ext_` tables: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), the derived chapter briefing over the `ext_briefing` **view** (`guided_reading.py`), skeleton + orient (`skeleton.py`), reading guides (`reading_guide.py`) — each row anchored to a `raw_structure` node by a nullable FK |
 | `supplemental/study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, FSRS (`srs.py`) |
 | `supplemental/media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
-| `conductor/` | Decides what runs, and wires it (the job rows live in `gateways/ledger`): the one queue worker + runner registry + `JobCtx` (`worker.py`), phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state + auto-chain `converted → extract` (`lifecycle.py`), and the composition root that registers every job-kind runner and starts the worker (`registry.py`) |
+| `conductor/` | Decides what runs, and wires it (the job rows live in `gateways/ledger`): the one queue worker + runner registry + `JobCtx` (`worker.py`), phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state (`lifecycle.py` — extraction is on-demand per chapter; whole-book auto-chain is opt-in via `LEARN_AUTOCHAIN=1`), and the composition root that registers every job-kind runner and starts the worker (`registry.py`) |
 | `api/` | The HTTP boundary — eight thin routers mirroring the groups: `content` (the book), `process` (convert/extract/build), `concept` (read+curate), `reading`, `study` (doing), `progress` (tracking), `media` (audiobook), `system`. Routers validate, call one facade, shape the envelope — no business logic |
 
 `app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, and
@@ -79,8 +79,11 @@ A document flows `uploaded → converted → extracted → studyable`, with enri
 (skeleton / guides / quizzes / audiobook) as a lazy overlay on top. All background
 work — conversion, extraction, every enrichment pass, and audiobook TTS — runs on the
 **one persistent queue** (rows in `gateways/ledger`, drained by `conductor/worker`) as a registered *kind*; there are no in-memory
-job systems. An upload auto-chains to core extraction (`LEARN_AUTOCHAIN`, default on), so a
-converted document becomes studyable without a manual build. See [MAP.md](MAP.md) § 4.
+job systems. Conversion and extraction are separate steps: converting yields the structure
+tree and the reader immediately; concept extraction runs on demand, per chapter, from the
+TOC (Process tab) — a whole-book LLM pass is hours, not seconds. `LEARN_AUTOCHAIN=1`
+re-enables the old convert→extract-everything chain for unattended bulk ingests. See
+[MAP.md](MAP.md) § 4.
 
 ## Identifiers — the two document ids
 

@@ -77,7 +77,8 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
         "tocRoute": result.toc_route,
         "tocDecisions": result.toc_decisions or [],
     })
-    # Lifecycle auto-chain: converted → extract, so an upload yields a studyable document
-    # without a manual build. Enrichment stays on-demand. (No-op when LEARN_AUTOCHAIN=0.)
+    # Lifecycle hook: by default a no-op — the book is readable once converted, and
+    # concepts are extracted on demand per chapter from the TOC. (LEARN_AUTOCHAIN=1
+    # re-enables the old convert→extract-everything chain for bulk ingests.)
     on_converted(result.doc_id or doc_id)
     return None
