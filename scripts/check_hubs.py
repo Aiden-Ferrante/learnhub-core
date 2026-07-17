@@ -7,7 +7,7 @@ This check fails (exit 1) on:
 
   1. cross-package DEEP imports  (from app.pkg.module import x — must be from app.pkg import x)
   2. cross-package UNDERSCORE imports (private names never leave a package)
-  3. UPWARD imports (violating platform <- content <- domains <- {overview,pipeline} <- api)
+  3. UPWARD imports (violating gateways <- process.content <- domains <- conductor <- api)
   4. a facade missing a real docstring, or containing logic (defs/classes)
 
 Exceptions, by design: backend/tests may deep-import (tests exercise internals);
@@ -26,21 +26,35 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "backend")
 APP = os.path.join(ROOT, "app")
 
 # Layer numbers: an import may only target a layer <= its own (same-layer domain
-# imports are allowed public-surface-only; upward imports never).
+# imports are allowed public-surface-only; upward imports never). Dotted names are
+# hubs nested inside a grouping folder (app/process/ holds the document-processing
+# stages); the group's own __init__.py is a namespace, not an import target.
 LAYERS = {
-    "platform": 0,
-    "content": 1,
-    "ingestion": 2, "extraction": 2, "study": 2, "search": 2, "media": 2,
-    "overview": 3, "pipeline": 3,
+    "gateways": 0,
+    "process.content": 1,
+    "process.ingestion": 2, "process.extraction": 2, "supplemental.study": 2, "supplemental.media": 2,
+    "conductor": 3,
     "api": 4,
 }
+# Grouping folders: docstring-only namespaces (rule 4 applies; never imported from).
+GROUPS = ["process", "supplemental"]
+
+
+def hub_of(parts: list[str]) -> str | None:
+    """The hub a dotted path (after `app.`) belongs to — longest LAYERS match wins."""
+    for n in (2, 1):
+        cand = ".".join(parts[:n])
+        if cand in LAYERS:
+            return cand
+    return None
+
 
 def check() -> list[str]:
     problems: list[str] = []
 
     # 4. facades: docstring + no logic
-    for pkg in LAYERS:
-        init = os.path.join(APP, pkg, "__init__.py")
+    for pkg in list(LAYERS) + GROUPS:
+        init = os.path.join(APP, pkg.replace(".", os.sep), "__init__.py")
         if not os.path.exists(init):
             problems.append(f"{pkg}: missing __init__.py facade")
             continue
@@ -56,7 +70,7 @@ def check() -> list[str]:
     for dirpath, dirnames, files in os.walk(APP):
         dirnames[:] = [d for d in dirnames if d != "__pycache__"]
         rel = os.path.relpath(dirpath, APP)
-        src_pkg = rel.split(os.sep)[0] if rel != "." else None  # None = app/main.py level
+        src_pkg = hub_of(rel.split(os.sep)) if rel != "." else None  # None = app/main.py level
         for f in files:
             if not f.endswith(".py"):
                 continue
@@ -68,12 +82,14 @@ def check() -> list[str]:
                     continue
                 if not node.module.startswith("app."):
                     continue
-                parts = node.module.split(".")
-                tgt = parts[1] if len(parts) > 1 else None
-                if tgt not in LAYERS:
+                parts = node.module.split(".")[1:]
+                tgt = hub_of(parts)
+                if tgt is None:
+                    if parts and parts[0] in GROUPS:
+                        problems.append(f"{short}:{node.lineno}: `app.{'.'.join(parts)}` — import a hub inside the group, not the group")
                     continue
                 cross = tgt != src_pkg
-                if cross and len(parts) > 2:
+                if cross and len(parts) > len(tgt.split(".")):
                     problems.append(f"{short}:{node.lineno}: deep import — use `from app.{tgt} import ...`")
                 if cross:
                     for a in node.names:

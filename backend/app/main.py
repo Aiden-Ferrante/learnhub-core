@@ -11,8 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api import all_routers
-from app.pipeline import install as install_job_runners
-from app.platform import set_request_db_name
+from app.conductor import install as install_job_runners
+from app.gateways import set_request_db_name
 
 app = FastAPI(title="Learn Hub", version="0.2.0")
 

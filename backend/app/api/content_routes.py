@@ -1,7 +1,9 @@
-"""Content reads: the book itself — TOC tree, outline, document, sections, elements, figures.
+"""Content routes: the book itself — courses, TOC tree, outline, chapters, sections,
+elements, figures, keyword search.
 
-Thin routers over the ``content`` domain (plus the original-PDF and figure file streams).
-Moved out of main.py so it is a pure composition root.
+Thin routers over the ``process/content`` domain (plus the original-PDF and figure
+file streams). The course list decorates content's rows with extraction's concept
+counts — api-level composition, both through facades.
 """
 
 from __future__ import annotations
@@ -9,20 +11,87 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.content import (
+from app.process.content import (
+    chapter_units,
+    delete_document,
+    fetch_chapter,
     fetch_elements,
     fetch_latest_document,
     fetch_outline,
     fetch_section_content,
     figure_path,
     get_toc_tree,
+    keyword_search,
+    list_documents,
     resolve_doc_id,
 )
+from app.process.extraction import concept_counts_by_doc
 
 router = APIRouter()
+
+
+@router.get("/api/documents")
+def api_list_documents() -> JSONResponse:
+    """List the processed courses (one per converted document). Returns the learnDocId each
+    study/concept endpoint expects as ``doc``."""
+    try:
+        rows = list_documents()
+        counts = concept_counts_by_doc()
+        for r in rows:
+            r["conceptCount"] = counts.get(r["docId"], 0)
+        return JSONResponse({"documents": rows})
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.delete("/api/document")
+def api_delete_document(doc: str = Query(...)) -> JSONResponse:
+    """Delete a course outright: document row, every learn table keyed by it, and its
+    on-disk artifacts. Irreversible."""
+    try:
+        data = delete_document(doc)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.get("/api/chapters")
+def api_chapters(doc: str | None = None) -> JSONResponse:
+    """Canonical chapter units — every chapter list in the app derives from this."""
+    data = chapter_units(doc)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
+
+
+@router.get("/api/chapter")
+def api_chapter(
+    doc: str | None = Query(None),
+    ref: str = Query(..., description="chapter number, sectionKey, or title substring"),
+    max_chars: int = Query(0, ge=0, description="optional cap on returned markdown (0 = no cap)"),
+) -> JSONResponse:
+    """Pull an ENTIRE chapter's text by number / sectionKey / title substring."""
+    try:
+        data = fetch_chapter(doc, ref, max_chars=max_chars)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.get("/api/search")
+def api_search(
+    doc: str | None = Query(None),
+    q: str = Query(..., min_length=2, description="keywords to find in the course content"),
+    limit: int = Query(8, ge=1, le=40),
+    full: bool = Query(False, description="include each match's full block markdown"),
+) -> JSONResponse:
+    """Keyword-search a course's content — locate a topic, then pull it with
+    /api/section or /api/chapter."""
+    try:
+        return JSONResponse(keyword_search(doc, q, limit=limit, full=full))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
 
 
 @router.get("/api/toc-tree")

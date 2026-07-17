@@ -1,6 +1,6 @@
 """Tests for PDF math → LaTeX markdown normalization."""
 
-from app.content.math_markdown import normalize_math_in_markdown
+from app.process.content.math_markdown import normalize_math_in_markdown
 
 
 # --- full profile (pymupdf4llm fallback): heuristic rewriting ---

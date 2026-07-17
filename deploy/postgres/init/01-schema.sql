@@ -2,7 +2,6 @@
 -- Runs once on first container init. Extensions are database-wide; tenant tables
 -- live in a per-user schema selected per request via SET search_path (X-User-Db).
 
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ── shared auth (was learnhub_auth.users) ───────────────────────────────
@@ -18,7 +17,7 @@ CREATE TABLE auth.users (
 
 -- ── default tenant schema (matches today's DB name) ─────────────────────
 CREATE SCHEMA IF NOT EXISTS learnhub;
--- include public so the pgvector `vector` type (installed in public) resolves
+-- include public so extension types/functions (installed in public) resolve
 SET search_path TO learnhub, public;
 
 CREATE TABLE documents (
@@ -53,14 +52,8 @@ CREATE INDEX ON elements (doc_id, section_key);
 CREATE TABLE concepts (
   key text PRIMARY KEY, doc_id text NOT NULL, section_key text, name text, kind text,
   signal text, source text, "order" int, page_start int, page_end int,
-  quiz_questions jsonb, embedding vector(384), created_at timestamptz);
+  quiz_questions jsonb, created_at timestamptz);
 CREATE INDEX ON concepts (doc_id, section_key);
-CREATE INDEX ON concepts USING hnsw (embedding vector_cosine_ops);
-
-CREATE TABLE content_vectors (
-  key text PRIMARY KEY, doc_id text NOT NULL, section_key text, heading text, text text,
-  page_start int, page_end int, embedding vector(384));
-CREATE INDEX ON content_vectors USING hnsw (embedding vector_cosine_ops);
 
 CREATE TABLE concept_reviews (
   key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc_id text, section_key text, due timestamptz, ease real,
@@ -91,7 +84,6 @@ CREATE TABLE chapter_skeletons   (key text PRIMARY KEY, doc_id text, scope text,
 CREATE TABLE deep_chapter_briefing (key text PRIMARY KEY, doc_id text, scope text, concept_count int,
   key_concepts jsonb, objectives jsonb, sections jsonb, watch_for jsonb, created_at timestamptz);
 CREATE TABLE reading_guides   (key text PRIMARY KEY, doc_id text, section_key text, focus text, checks jsonb, created_at timestamptz);
-CREATE TABLE section_augment  (key text PRIMARY KEY, doc_id text, section_key text, objectives jsonb, recap jsonb);
 -- Schemaless per-user settings (course groups, reading progress, prompts, …) as one blob,
 -- matching the frontend's merge-arbitrary-keys contract. The legacy typed columns are kept
 -- for provenance of the migrated row; the app reads/writes only `settings`.

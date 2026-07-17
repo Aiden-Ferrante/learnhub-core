@@ -1,6 +1,0 @@
-# torch is provided by the NGC PyTorch base image (CUDA build for aarch64/GB10).
-# Do NOT add torch/numpy here — pip would overwrite the base's CUDA torch with a
-# CPU-only wheel. sentence-transformers pulls a compatible transformers itself.
-sentence-transformers>=2.7
-flask==2.3.3
-gunicorn==23.0.0

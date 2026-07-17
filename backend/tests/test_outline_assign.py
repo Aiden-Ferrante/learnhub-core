@@ -6,7 +6,7 @@ font drops fi/ff ligature glyphs ("Complexity dened"), and the book's own conten
 pages repeat chapter titles verbatim on early pages.
 """
 
-from app.content.outline import assign_blocks_to_outline, build_outline_from_bookmarks
+from app.process.content.outline import assign_blocks_to_outline, build_outline_from_bookmarks
 
 RAW_BOOKMARKS = [
     {"level": 1, "title": "Contents", "page": 4},

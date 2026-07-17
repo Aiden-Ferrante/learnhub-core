@@ -1,6 +1,6 @@
 """Tests for pure TOC-tree assembly (no DB)."""
 
-from app.content.toc_tree import (
+from app.process.content.toc_tree import (
     _chapter_titles,
     _is_bare_chapter_number,
     apply_section_titles,

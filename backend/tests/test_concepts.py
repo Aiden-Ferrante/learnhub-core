@@ -1,6 +1,6 @@
 """Tests for concept-course extraction (pure functions, no LLM, no DB)."""
 
-from app.extraction.concepts_extract import (
+from app.process.extraction.concepts_extract import (
     concept_key,
     normalize_concept_name,
     parse_concepts_response,
@@ -60,7 +60,7 @@ def test_parse_concepts_stats_accounting():
 
 
 def test_split_markdown_chunks_lossless():
-    from app.extraction.concepts_extract import _split_markdown_chunks
+    from app.process.extraction.concepts_extract import _split_markdown_chunks
 
     md = "\n\n".join(f"para {i} " + "x" * 50 for i in range(10))
     chunks = _split_markdown_chunks(md, 120)
@@ -69,7 +69,7 @@ def test_split_markdown_chunks_lossless():
 
 
 def test_match_renamed_concepts_carries_best_unique_match():
-    from app.extraction.concepts_extract import match_renamed_concepts
+    from app.process.extraction.concepts_extract import match_renamed_concepts
 
     old = [("k1", "LLM"), ("k2", "Vector database")]
     new = [("n1", "Large language model (LLM)"), ("n2", "Vector databases"), ("n3", "Quantization")]
@@ -80,14 +80,14 @@ def test_match_renamed_concepts_carries_best_unique_match():
 
 
 def test_match_renamed_concepts_no_match_below_threshold():
-    from app.extraction.concepts_extract import match_renamed_concepts
+    from app.process.extraction.concepts_extract import match_renamed_concepts
 
     m = match_renamed_concepts([("k1", "Bayes' rule")], [("n1", "Gradient descent")])
     assert m == {}
 
 
 def test_eval_summarize_verdicts():
-    from app.extraction.eval_gate import summarize_verdicts
+    from app.process.extraction.eval_gate import summarize_verdicts
 
     concepts = [{"name": "a", "sectionKey": "toc:1"}, {"name": "b", "sectionKey": "toc:1"},
                 {"name": "c", "sectionKey": "toc:2"}]
@@ -100,12 +100,3 @@ def test_eval_summarize_verdicts():
     assert r["sampled"] == 3 and r["graded"] == 2 and r["passed"] == 1
     assert r["score"] == 0.5
     assert r["failures"][0]["name"] == "b" and r["failures"][0]["informative"] is False
-
-
-def test_sig_tokens_tokenizes_names():
-    # Regression: _sig_tokens moved into cards.py without its `re` import (NameError at
-    # runtime only on the nearest-distractor path) — calling it here keeps that caught.
-    from app.study.cards import _sig_tokens
-
-    toks = _sig_tokens("Weight update magnitude")
-    assert "weight" in toks and "update" in toks and "magnitude" in toks

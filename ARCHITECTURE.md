@@ -13,14 +13,19 @@ frontend/  Next.js 15 app (:3001) — auth, UI, and a proxy layer that forwards
            /api/learn/* to the backend with the X-User-Db tenancy header
 backend/   FastAPI service (:8010) — everything below
 mcp/       FastMCP server driving the backend over REST only (no DB access)
-deploy/    docker-compose + service images (app, learn, ollama, sentence-transformers)
-           Tools: PostgreSQL+pgvector :5432, Ollama :11434, embeddings :8000
+deploy/    docker-compose + service images (app, learn, ollama)
+           Tools: PostgreSQL :5432, Ollama :11434
 ```
 
 ## Backend packages (`backend/app/`)
 
-Dependency rule: **`platform` ← `content` ← domains ← {`overview`, `pipeline`} ← `api`** (overview and pipeline are siblings).
-Domains may import `platform`, `content`, and another domain's *public* functions;
+Dependency rule: **`gateways` ← `process/content` ← domains ← `conductor` ← `api`**.
+`process/` and `supplemental/` are grouping folders — `process/` is everything that turns
+an uploaded PDF into studyable content (`ingestion`, `content`, `extraction`);
+`supplemental/` is what the app layers on top of it (`study`, `media`). Each package
+inside a group keeps its own facade, and the layer rules apply to the packages, not the
+groups.
+Domains may import `gateways`, `process/content`, and another domain's *public* functions;
 never each other's internals, never anything above them. `api` is thin routers only.
 There are **zero import cycles** (checked by AST; keep it that way).
 
@@ -33,26 +38,24 @@ The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 
 | Package | Owns |
 |---|---|
-| `platform/` | Postgres pool + X-User-Db schema tenancy (`db.py`), Ollama client (`llm.py`, `llm_schemas.py`), the persistent jobs ledger/worker (`jobs.py` — pure mechanics, runners injected), vaultwriter seam |
-| `content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`) |
-| `ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
-| `extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), assembled chapter briefing (`deep_chapter.py`), skeleton, reading guides |
-| `study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, SM-2 (`srs.py`) |
-| `search/` | Embeddings + semantic search over content vectors |
-| `media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
-| `overview/` | Cross-domain read models: Today plan (`plan.py`), chapter readiness/coverage grids (`coverage.py`) |
-| `pipeline/` | The **conductor** over the document lifecycle: phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state + auto-chain `converted → extract` (`lifecycle.py`), and the composition root that registers every job-kind runner with `platform/jobs` (`registry.py`) |
-| `api/` | One thin router module per surface |
+| `gateways/` | The connections to programs outside this process: Postgres pool + X-User-Db schema tenancy (`db.py`), Ollama client (`llm.py`, `llm_schemas.py`), and the persistent jobs ledger stored in Postgres (`ledger.py` — rows only, no worker; the doc resolver is injected) |
+| `process/ingestion/` | PDF → markdown conversion (`reader.py`, `pdf_convert.py`) |
+| `process/content/` | The book itself: document metadata (`documents.py`), markdown→section splitting (`sections.py`), page provenance (`pages.py`), canonical TOC outline (`outline.py`), figures/tables (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), persist + reads (`store.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`) |
+| `process/extraction/` | LLM generation passes: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), assembled chapter briefing (`deep_chapter.py`), skeleton, reading guides |
+| `supplemental/study/` | Learning state: SRS reviews + grading (`reviews.py`), MCQ sessions (`quiz_session.py`), quiz generation (deterministic + LLM), mastery, drill/exam/recall, FSRS (`srs.py`) |
+| `supplemental/media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
+| `conductor/` | Decides what runs, and wires it (the job rows live in `gateways/ledger`): the one queue worker + runner registry + `JobCtx` (`worker.py`), phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state + auto-chain `converted → extract` (`lifecycle.py`), and the composition root that registers every job-kind runner and starts the worker (`registry.py`) |
+| `api/` | The HTTP boundary — eight thin routers mirroring the groups: `content` (the book), `process` (convert/extract/build), `concept` (read+curate), `reading`, `study` (doing), `progress` (tracking), `media` (audiobook), `system`. Routers validate, call one facade, shape the envelope — no business logic |
 
 `app/main.py` assembles the FastAPI app: middleware (tenancy header), routers, and
-`pipeline/registry.install()` (job-runner wiring).
+`conductor/registry.install()` (job-runner wiring).
 
-## The pipeline (document lifecycle)
+## The document lifecycle
 
 A document flows `uploaded → converted → extracted → studyable`, with enrichment
-(deep / skeleton / guides / quizzes / audiobook) as a lazy overlay on top. All background
+(skeleton / guides / quizzes / audiobook) as a lazy overlay on top. All background
 work — conversion, extraction, every enrichment pass, and audiobook TTS — runs on the
-**one persistent queue** (`platform/jobs`) as a registered *kind*; there are no in-memory
+**one persistent queue** (rows in `gateways/ledger`, drained by `conductor/worker`) as a registered *kind*; there are no in-memory
 job systems. An upload auto-chains to core extraction (`LEARN_AUTOCHAIN`, default on), so a
 converted document becomes studyable without a manual build. See [MAP.md](MAP.md) § 4.
 
@@ -63,7 +66,7 @@ single easiest way to get an empty result from a query that "should" work.
 
 | Name | Where it lives | Used for |
 |---|---|---|
-| **learn-doc-key** | `documents.key` (PK). Every backend table references it as `doc_id` — `concepts`, `section_content`, `elements`, `concept_reviews`, `chapter_*`, `content_vectors`, … | The canonical id in the backend. Every content/study/enrichment row is keyed by it. |
+| **learn-doc-key** | `documents.key` (PK). Every backend table references it as `doc_id` — `concepts`, `section_content`, `elements`, `concept_reviews`, `chapter_*`, … | The canonical id in the backend. Every content/study/enrichment row is keyed by it. |
 | **app-document-id** | `app_documents.key` = `app_documents.id` (same value) | The frontend's id for a course card and the id in the URL `/courses/<id>`. Backend content code never sees it. |
 
 The bridge is one column: **`app_documents.learn_doc_id → documents.key`**. The frontend
@@ -82,10 +85,10 @@ are external contracts; this table is the disambiguator instead.
 - New backend code goes in the domain package it belongs to; if a route handler grows
   logic, move the logic into the domain and keep the handler thin.
 - The jobs queue never imports domains — new job kinds register a runner in
-  `pipeline/registry.py` (called by `main.py` at startup).
+  `conductor/registry.py` (called by `main.py` at startup).
 - `main.py` is a composition root: the app, tenancy middleware, `/health`, and the landing
   page — nothing else. Every route lives in a router under `api/`.
-- Scope resolution (chapter → section keys) always goes through `content/scope.py`,
+- Scope resolution (chapter → section keys) always goes through `process/content/scope.py`,
   so no two surfaces can disagree about a chapter's extent.
 - Rebuild the affected image after backend/frontend changes:
   `docker compose -f deploy/compose/docker-compose.yml build learn && ... up -d learn`

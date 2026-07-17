@@ -11,7 +11,7 @@ cd backend && .venv/bin/python -m pytest -q
 
 **Integration (`@pytest.mark.integration`).** Real-Postgres round-trips. Skipped unless
 `LEARN_PG_TESTS=1` is set, so the default run stays DB-free. They connect via the normal
-`app.platform.db` pool (default DSN → `localhost:5432`), so a reachable Postgres with the
+`app.gateways.db` pool (default DSN → `localhost:5432`), so a reachable Postgres with the
 `learnhub` schema is required — the running compose stack works:
 
 ```

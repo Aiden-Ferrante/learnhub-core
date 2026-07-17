@@ -1,14 +1,25 @@
-"""Guided-reading endpoints: the scaffolded read for a chapter + its authoring status."""
+"""Reading routes: the guided-reading surface — the one-call chapter assembler plus
+per-section reading guides and their authoring status."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from app.platform import db
-from app.extraction import fetch_reading_guide, guide_status
+from app.gateways import enqueue_build
+from app.process.extraction import fetch_guided_reading, fetch_reading_guide, guide_status
 
 router = APIRouter()
+
+
+@router.get("/api/guided-reading")
+def api_guided_reading(doc: str | None = None, scope: str = "") -> JSONResponse:
+    """Everything the reading surface needs for one chapter: briefing + markdown +
+    concepts + status. Reads caches only — never calls the LLM."""
+    if not scope:
+        return JSONResponse({"error": "scope required"}, status_code=400)
+    data = fetch_guided_reading(doc, scope)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.get("/api/reading-guide")
@@ -34,14 +45,12 @@ def api_reading_guide_prepare_status(
 @router.post("/api/reading-guide/prepare")
 def api_reading_guide_prepare(body: dict = Body(default=None)) -> JSONResponse:
     """Author ALL of a chapter's guidance — enqueued on the processing ledger (visible in
-    the pipeline grid, survives restarts). Returns current status."""
+    the Process tab, survives restarts). Returns current status."""
     body = body or {}
     doc, scope = body.get("doc"), body.get("scope")
     if not scope:
         return JSONResponse({"error": "scope required"}, status_code=400)
     try:
-        from app.platform import enqueue_build
-
         enqueue_build(doc, scope, kind="guides")
         status = guide_status(doc, scope)
         status["running"] = True

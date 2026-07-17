@@ -16,8 +16,8 @@ import time
 
 import pytest
 
-from app.platform import db
-from app.study.reviews import (
+from app.gateways import db
+from app.supplemental.study.reviews import (
     build_review_queue,
     chapter_review_key,
     figure_review_key,

@@ -1,11 +1,11 @@
 """Tests for scope resolution + extraction prompt helpers (pure functions, no LLM/DB)."""
 
-from app.content.scope import (
+from app.process.content.scope import (
     SectionExtractInput,
     _blocks_in_scope,
     section_body_len,
 )
-from app.extraction.concepts_extract import build_user_prompt, normalize_entity
+from app.process.extraction.concepts_extract import build_user_prompt, normalize_entity
 
 INP = SectionExtractInput(
     doc_id="doc1",
@@ -77,7 +77,7 @@ def test_blocks_in_scope_subsection():
 def test_section_level_rule():
     # The honest level rule after the dead tree-depth branch was removed: numeric depth,
     # chapter markers = 1, other slugs = deep leaf.
-    from app.content.scope import _section_level_fn
+    from app.process.content.scope import _section_level_fn
 
     level_of = _section_level_fn("any-doc")
     assert level_of("toc:1") == 1

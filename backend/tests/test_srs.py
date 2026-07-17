@@ -1,6 +1,6 @@
 """Unit tests for the FSRS scheduler wrapper (pure, no DB)."""
 
-from app.study import srs
+from app.supplemental.study import srs
 
 NOW = 1_000_000.0
 DAY = srs.DAY

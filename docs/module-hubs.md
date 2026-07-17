@@ -13,10 +13,10 @@ and "what may I use from it?".
 
 | Question | Decision |
 |---|---|
-| What is the orchestrator? | A **public facade**: re-exports the module's public surface; internals become genuinely private. (Modules with real multi-step flows — pipeline — keep their coordinator *behind* the facade.) |
+| What is the orchestrator? | A **public facade**: re-exports the module's public surface; internals become genuinely private. (Modules with real multi-step flows — the conductor — keep their coordinator *behind* the facade.) |
 | Enforcement | **CI check, hard fail** — an AST import check in the code-map workflow. Mechanical contracts > prose. |
 | Documentation | **Facade docstring, map-fed** — `gen_map.py` extracts it into MAP.md's package sections; the existing map-staleness check covers it. |
-| Scope | **All ten packages** — platform and api included. Uniformity is what makes the rule teachable and checkable. |
+| Scope | **All packages** — gateways and api included. Uniformity is what makes the rule teachable and checkable. |
 
 ## The contract (what the CI check enforces)
 
@@ -25,22 +25,21 @@ and "what may I use from it?".
    (Inside a package, modules import each other freely — that's what "internal" means.)
 2. **Underscore names never cross a package boundary** (already adopted; now checked).
 3. **The dependency direction is unchanged and checked**:
-   `platform ← content ← domains ← {overview, pipeline} ← api` (overview and pipeline are siblings).
+   `gateways ← process/content ← domains ← conductor ← api`.
 4. **Every facade has a docstring** with three parts: what the module owns, its public surface
    (the `__all__`), what it depends on. Empty or missing docstring fails the check.
 5. **Exceptions, stated once**: `backend/tests/` may deep-import (tests exercise internals);
    `app/main.py` is the assembly point (it imports facades, incl. `app.api`'s router list);
-   `platform/jobs`' injected runner/resolver seam stays — it is *why* platform never imports up.
+   `gateways/ledger`'s injected runner/resolver seam stays — it is *why* gateways never imports up.
 
-## Facade shape (example: `app/study/__init__.py`)
+## Facade shape (example: `app/supplemental/study/__init__.py`)
 
 ```python
 """Study — the learning loop over extracted concepts.
 
 Owns: quiz/exam/drill sessions, SM-2 review scheduling (srs), mastery
 computation (coverage x accuracy x decay), and the append-only study_events
-floor. Depends on: content (scope + docs), platform (db), search (embeddings
-for distractors).
+floor. Depends on: content (scope + docs), gateways (db).
 """
 
 from app.study.mastery import compute_mastery, record_quiz_event, ...
@@ -74,7 +73,7 @@ The docstring requirement gives the folder its visible front door either way.
    the measured edge list is the spec).
 2. Repoint the 149 cross-package imports to facades (mechanical rewrite).
 3. Run `check_hubs.py --report`; fix stragglers; flip to hard fail in CI.
-4. Later moves (audit §3: admin_routes dismantle, study reshuffle, platform tidies) get
+4. Later moves (audit §3: admin_routes dismantle, study reshuffle, gateways tidies) get
    easier, not harder — call sites already face facades, so moving internals stops
    touching other packages.
 

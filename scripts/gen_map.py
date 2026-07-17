@@ -24,16 +24,15 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 MAP = ROOT / "MAP.md"
 
 # Ordered packages + the one-line blurb shown in each section heading.
+# Slash entries are hubs nested inside a grouping folder (app/process/).
 PACKAGES = [
-    ("platform", "the floor (everything depends on this)"),
-    ("content", "the book itself"),
-    ("ingestion", "PDF in"),
-    ("extraction", "LLM generation passes"),
-    ("study", "learning state"),
-    ("search", "embeddings + semantic search"),
-    ("media", "audiobooks"),
-    ("overview", "cross-domain read models"),
-    ("pipeline", "the conductor — document lifecycle + job runners"),
+    ("gateways", "connections to external programs (Postgres · Ollama) + the jobs ledger"),
+    ("process/ingestion", "PDF in"),
+    ("process/content", "the book itself"),
+    ("process/extraction", "LLM generation passes"),
+    ("supplemental/study", "learning state"),
+    ("supplemental/media", "audiobooks"),
+    ("conductor", "wires job kinds to domain runners + the auto-chain"),
     ("api", "thin routers + composition root"),
 ]
 

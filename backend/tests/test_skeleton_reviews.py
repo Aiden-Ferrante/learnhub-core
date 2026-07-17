@@ -1,6 +1,6 @@
 """Skeleton items in the review system — the pure helpers behind the walk→SRS wiring."""
 
-from app.study.reviews import (
+from app.supplemental.study.reviews import (
     SKELETON_KEY_PREFIX,
     clean_skeleton_children,
     skeleton_card,
@@ -72,7 +72,7 @@ def test_skeleton_card_shape_and_fallbacks():
 
 # ---- figure-recall items (same review envelope, image front / caption reveal) ----
 
-from app.study.reviews import (
+from app.supplemental.study.reviews import (
     FIGURE_KEY_PREFIX,
     figure_card,
     figure_review_key,
@@ -120,7 +120,7 @@ def test_new_figure_card_is_new_and_keyed_like_its_future_row():
 
 # ---- chapter-resurface items (seeded by reading; same review envelope) ----
 
-from app.study.reviews import (
+from app.supplemental.study.reviews import (
     CHAPTER_KEY_PREFIX,
     chapter_card,
     chapter_review_key,

@@ -1,6 +1,6 @@
 """Figures woven into section markdown — the pure rendering helper."""
 
-from app.content.elements import figure_markdown
+from app.process.content.elements import figure_markdown
 
 
 def test_figure_markdown_image_plus_caption():

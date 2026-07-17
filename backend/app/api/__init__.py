@@ -1,37 +1,29 @@
-"""API — thin HTTP routers over the domains.
+"""API — thin HTTP routers over the domains, one file per area of the app.
 
-Owns: one router module per surface; no business logic (routers validate, call a
-domain function, shape the JSON envelope). ``all_routers`` is what main.py mounts.
-Depends on: every domain; nothing imports api except main.py."""
+Owns: eight routers mirroring the package groups — content (the book), process
+(convert/extract/build), concepts (read + curate), reading, study (doing),
+progress (tracking), media (audiobook), system (machine strip). No business
+logic: routers validate, call a domain facade, shape the JSON envelope.
+``all_routers`` is what main.py mounts. Depends on: every domain; nothing
+imports api except main.py.
+"""
 
-from app.api.admin_routes import router as _admin_routes
-from app.api.audiobook_routes import router as _audiobook_routes
-from app.api.build_routes import router as _build_routes
-from app.api.concept_study_routes import router as _concept_study_routes
+from app.api.concept_routes import router as _concept_routes
 from app.api.content_routes import router as _content_routes
-from app.api.guided_reading_routes import router as _guided_reading_routes
-from app.api.extract_routes import router as _extract_routes
-from app.api.ingest_routes import router as _ingest_routes
-from app.api.learning_path_routes import router as _learning_path_routes
-from app.api.mastery_routes import router as _mastery_routes
+from app.api.media_routes import router as _media_routes
+from app.api.process_routes import router as _process_routes
+from app.api.progress_routes import router as _progress_routes
 from app.api.reading_routes import router as _reading_routes
-from app.api.search_routes import router as _search_routes
 from app.api.study_routes import router as _study_routes
 from app.api.system_routes import router as _system_routes
 
 all_routers = [
-    _admin_routes,
-    _audiobook_routes,
-    _build_routes,
-    _concept_study_routes,
+    _concept_routes,
     _content_routes,
-    _guided_reading_routes,
-    _extract_routes,
-    _ingest_routes,
-    _learning_path_routes,
-    _mastery_routes,
+    _media_routes,
+    _process_routes,
+    _progress_routes,
     _reading_routes,
-    _search_routes,
     _study_routes,
     _system_routes,
 ]

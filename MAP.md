@@ -3,7 +3,7 @@
 A navigable map of the codebase. Two levels:
 
 1. **System topology** — the running containers and which top-level directory each is.
-2. **Backend packages** — the domain packages + the pipeline conductor inside `backend/`, and every file in them.
+2. **Backend packages** — the domain packages + the conductor inside `backend/`, and every file in them.
 
 **How to use it:** the **tables** below each diagram are the file-level index — every file
 name is a link that opens the file. The diagrams are color-coded to match and render with
@@ -27,9 +27,8 @@ flowchart LR
   subgraph compose["docker compose network"]
     app["app · frontend<br/>:3001"]
     learn["learn · backend<br/>:8010"]
-    pg["PostgreSQL + pgvector<br/>:5432"]
+    pg["PostgreSQL<br/>:5432"]
     ollama["Ollama<br/>:11434"]
-    embed["embeddings<br/>:80"]
   end
 
   mcp["mcp server<br/>FastMCP · stdio"]
@@ -41,14 +40,13 @@ flowchart LR
   app -->|auth + user data| pg
   learn --> pg
   learn --> ollama
-  learn --> embed
 
   classDef client fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   classDef built fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef tool fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class browser,claude client;
   class app,learn,mcp built;
-  class pg,ollama,embed tool;
+  class pg,ollama tool;
   style compose fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click app "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend" "frontend/"
@@ -62,63 +60,60 @@ flowchart LR
 | learn | [`backend/`](backend) | FastAPI service — everything in section 2 below |
 | mcp | [`mcp/server.py`](mcp/server.py) | FastMCP server; drives the backend over REST only |
 | compose / tools | [`deploy/compose/`](deploy/compose) | docker-compose + service images |
-| Postgres / Ollama / embeddings | (off-the-shelf images) | database + vector search (pgvector) · local LLM · MiniLM embeddings |
+| Postgres / Ollama | (off-the-shelf images) | database · local LLM |
 
 ---
 
 ## 2. Backend packages
 
 Arrows read **"depends on"** (a package imports the one it points to). The rule — domains
-import `platform` and `content`, never each other's internals; only `api` imports domains;
+import `gateways` and `process/content`, never each other's internals; only `api` imports domains;
 zero cycles — is enforced and explained in [ARCHITECTURE.md](ARCHITECTURE.md). Diagram is
 simplified to the main edges; the file tables are complete.
 
 ```mermaid
 flowchart TD
   api["api<br/>thin routers"]
-  overview["overview<br/>plan · coverage"]
-  study["study"]
-  extraction["extraction"]
-  media["media"]
-  content["content"]
-  ingestion["ingestion"]
-  search["search"]
-  platform["platform<br/>db · llm · jobs"]
+  gateways["gateways<br/>db · llm · job ledger"]
 
-  api --> overview
+  subgraph process["process/ — PDF → studyable content"]
+    ingestion["ingestion"]
+    content["content"]
+    extraction["extraction"]
+  end
+
+  subgraph supplemental["supplemental/ — layered on top"]
+    study["study"]
+    media["media"]
+  end
+
   api --> study
   api --> extraction
   api --> media
   api --> ingestion
-  overview --> study
-  overview --> extraction
   study --> extraction
-  study --> search
   extraction --> content
-  extraction --> search
   media --> extraction
   ingestion --> content
-  content --> platform
-  search --> platform
+  content --> gateways
   study --> content
-  overview --> content
 
   classDef floor fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   classDef data fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef behavior fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
-  class platform floor;
-  class content,ingestion,search data;
-  class api,overview,study,extraction,media behavior;
+  class gateways floor;
+  class content,ingestion data;
+  class api,study,extraction,media behavior;
+  style process fill:none,stroke:#888780,stroke-dasharray:4 3;
+  style supplemental fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click api "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/api"
-  click overview "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/overview"
-  click study "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/study"
-  click extraction "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/extraction"
-  click media "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/media"
-  click content "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/content"
-  click ingestion "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/ingestion"
-  click search "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/search"
-  click platform "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/platform"
+  click study "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/supplemental/study"
+  click extraction "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/extraction"
+  click media "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/supplemental/media"
+  click content "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/content"
+  click ingestion "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/ingestion"
+  click gateways "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/gateways"
 ```
 
 Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, routers, and
@@ -126,134 +121,111 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 <!-- GEN:backend START — auto-managed by scripts/gen_map.py; edit descriptions inline, they're preserved across regens -->
 
-### platform/ — the floor (everything depends on this)
+### gateways/ — connections to external programs (Postgres · Ollama) + the jobs ledger
 
-> Platform — the floor every package stands on. — [`__init__.py`](backend/app/platform/__init__.py) is the facade: import this package, not its modules.
-
-| File | Purpose |
-|---|---|
-| [`llm.py`](backend/app/platform/llm.py) | Ollama client — free-text + structured/JSON completions |
-| [`llm_schemas.py`](backend/app/platform/llm_schemas.py) | Pydantic schemas for structured LLM output |
-| [`jobs.py`](backend/app/platform/jobs.py) | Persistent job ledger + worker; runners injected (no domain imports) |
-| [`db.py`](backend/app/platform/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
-
-### content/ — the book itself
-
-> Content — the book itself, and the one scope resolver. — [`__init__.py`](backend/app/content/__init__.py) is the facade: import this package, not its modules.
+> Gateways — the connections to programs outside this process. — [`__init__.py`](backend/app/gateways/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`documents.py`](backend/app/content/documents.py) | Document metadata lookup ("which document / what is it") |
-| [`sections.py`](backend/app/content/sections.py) | Markdown → `toc:` keyed section blocks (pure) |
-| [`pages.py`](backend/app/content/pages.py) | Page provenance math (pure) |
-| [`outline.py`](backend/app/content/outline.py) | Canonical TOC from bookmarks + block assignment (pure) |
-| [`elements.py`](backend/app/content/elements.py) | Figures/tables: save, link, read |
-| [`scope.py`](backend/app/content/scope.py) | THE scope owner: `scope_blocks` / `scope_section_keys` / `load_section_blocks` |
-| [`store.py`](backend/app/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
-| [`chapters.py`](backend/app/content/chapters.py) | Canonical chapter-unit list |
-| [`math_markdown.py`](backend/app/content/math_markdown.py) | LaTeX/KaTeX math rendering |
-| [`toc_tree.py`](backend/app/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
+| [`llm.py`](backend/app/gateways/llm.py) | Ollama client (plain httpx, native /api/chat) — schema-constrained JSON completions |
+| [`llm_schemas.py`](backend/app/gateways/llm_schemas.py) | Pydantic schemas for structured LLM output |
+| [`db.py`](backend/app/gateways/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
+| [`ledger.py`](backend/app/gateways/ledger.py) | Persistent job rows (enqueue/cancel/list/patch) — no worker; drained by conductor |
 
-### ingestion/ — PDF in
+### process/ingestion/ — PDF in
 
-> Ingestion — PDF in. — [`__init__.py`](backend/app/ingestion/__init__.py) is the facade: import this package, not its modules.
+> Ingestion — PDF in. — [`__init__.py`](backend/app/process/ingestion/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`reader.py`](backend/app/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
-| [`pdf_convert.py`](backend/app/ingestion/pdf_convert.py) | Conversion job driver |
+| [`reader.py`](backend/app/process/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
+| [`pdf_convert.py`](backend/app/process/ingestion/pdf_convert.py) | Conversion job driver |
 
-### extraction/ — LLM generation passes
+### process/content/ — the book itself
 
-> Extraction — the LLM generation passes over stored content. — [`__init__.py`](backend/app/extraction/__init__.py) is the facade: import this package, not its modules.
-
-| File | Purpose |
-|---|---|
-| [`concepts_extract.py`](backend/app/extraction/concepts_extract.py) | Concept extraction (the write side) |
-| [`concept_store.py`](backend/app/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
-| [`skeleton.py`](backend/app/extraction/skeleton.py) | Chapter skeleton essences + orientation |
-| [`reading_guide.py`](backend/app/extraction/reading_guide.py) | Per-section "what to look for" guides |
-| [`augment.py`](backend/app/extraction/augment.py) | Section learning objectives + recap |
-| [`eval_gate.py`](backend/app/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
-| [`guided_reading.py`](backend/app/extraction/guided_reading.py) | _(describe me)_ |
-
-### study/ — learning state
-
-> Study — the learning loop over extracted concepts. — [`__init__.py`](backend/app/study/__init__.py) is the facade: import this package, not its modules.
+> Content — the book itself, and the one scope resolver. — [`__init__.py`](backend/app/process/content/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`reviews.py`](backend/app/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
-| [`quiz_session.py`](backend/app/study/quiz_session.py) | MCQ build / stash answer / grade |
-| [`concept_quiz_gen.py`](backend/app/study/concept_quiz_gen.py) | Deterministic (triple-based) quiz builder |
-| [`concept_quiz_llm.py`](backend/app/study/concept_quiz_llm.py) | LLM-authored application questions + cache |
-| [`mastery.py`](backend/app/study/mastery.py) | Per-concept mastery calibration + rollups |
-| [`srs.py`](backend/app/study/srs.py) | SM-2 schedule primitive |
-| [`cards.py`](backend/app/study/cards.py) | Card quizzability + distractor selection |
-| [`drill.py`](backend/app/study/drill.py) | Drill on weak concepts |
-| [`exam.py`](backend/app/study/exam.py) | Exam mode (multi-question scoring) |
-| [`recall.py`](backend/app/study/recall.py) | Recall vs. recognition check |
-| [`sessions.py`](backend/app/study/sessions.py) | _(describe me)_ |
-| [`calendar.py`](backend/app/study/calendar.py) | _(describe me)_ |
+| [`documents.py`](backend/app/process/content/documents.py) | Document metadata lookup ("which document / what is it") |
+| [`sections.py`](backend/app/process/content/sections.py) | Markdown → `toc:` keyed section blocks (pure) |
+| [`pages.py`](backend/app/process/content/pages.py) | Page provenance math (pure) |
+| [`outline.py`](backend/app/process/content/outline.py) | Canonical TOC from bookmarks + block assignment (pure) |
+| [`elements.py`](backend/app/process/content/elements.py) | Figures/tables: save, link, read |
+| [`scope.py`](backend/app/process/content/scope.py) | THE scope owner: `scope_blocks` / `scope_section_keys` / `load_section_blocks` |
+| [`store.py`](backend/app/process/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
+| [`chapters.py`](backend/app/process/content/chapters.py) | Canonical chapter-unit list |
+| [`math_markdown.py`](backend/app/process/content/math_markdown.py) | LaTeX/KaTeX math rendering |
+| [`toc_tree.py`](backend/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
+| [`find.py`](backend/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
 
-### search/ — embeddings + semantic search
+### process/extraction/ — LLM generation passes
 
-> Search — embeddings + retrieval over the content layer. — [`__init__.py`](backend/app/search/__init__.py) is the facade: import this package, not its modules.
-
-| File | Purpose |
-|---|---|
-| [`semantic_search.py`](backend/app/search/semantic_search.py) | Embed query → top-k content blocks + `ask` |
-| [`concept_resolve.py`](backend/app/search/concept_resolve.py) | Embedding helper for concept resolution |
-
-### media/ — audiobooks
-
-> Media — audio renditions of chapters. — [`__init__.py`](backend/app/media/__init__.py) is the facade: import this package, not its modules.
+> Extraction — the LLM generation passes over stored content. — [`__init__.py`](backend/app/process/extraction/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`audiobook.py`](backend/app/media/audiobook.py) | Checkpointed TTS job system |
-| [`tts_orpheus.py`](backend/app/media/tts_orpheus.py) | Orpheus TTS client |
+| [`concepts_extract.py`](backend/app/process/extraction/concepts_extract.py) | Concept extraction (the write side) |
+| [`concept_store.py`](backend/app/process/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
+| [`skeleton.py`](backend/app/process/extraction/skeleton.py) | Chapter skeleton essences + orientation |
+| [`reading_guide.py`](backend/app/process/extraction/reading_guide.py) | Per-section "what to look for" guides |
+| [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
+| [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | _(describe me)_ |
 
-### overview/ — cross-domain read models
+### supplemental/study/ — learning state
 
-> Overview — cross-domain read models. — [`__init__.py`](backend/app/overview/__init__.py) is the facade: import this package, not its modules.
-
-| File | Purpose |
-|---|---|
-| [`plan.py`](backend/app/overview/plan.py) | Today plan (resume point, reviews due, next chapter) |
-| [`coverage.py`](backend/app/overview/coverage.py) | Chapter × artifact-kind readiness/coverage grids |
-
-### pipeline/ — the conductor — document lifecycle + job runners
-
-> Pipeline — the conductor over the document lifecycle. — [`__init__.py`](backend/app/pipeline/__init__.py) is the facade: import this package, not its modules.
+> Study — the learning loop over extracted concepts. — [`__init__.py`](backend/app/supplemental/study/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`build.py`](backend/app/pipeline/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
-| [`ingest.py`](backend/app/pipeline/ingest.py) | Phase 1: stash upload + `convert` job runner |
-| [`lifecycle.py`](backend/app/pipeline/lifecycle.py) | Per-document state + auto-chain `converted → extract` |
-| [`registry.py`](backend/app/pipeline/registry.py) | Composition root — registers every job-kind runner |
+| [`reviews.py`](backend/app/supplemental/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
+| [`quiz_session.py`](backend/app/supplemental/study/quiz_session.py) | MCQ build / stash answer / grade |
+| [`concept_quiz_gen.py`](backend/app/supplemental/study/concept_quiz_gen.py) | Deterministic (triple-based) quiz builder |
+| [`concept_quiz_llm.py`](backend/app/supplemental/study/concept_quiz_llm.py) | LLM-authored application questions + cache |
+| [`mastery.py`](backend/app/supplemental/study/mastery.py) | Per-concept mastery calibration + rollups |
+| [`srs.py`](backend/app/supplemental/study/srs.py) | SM-2 schedule primitive |
+| [`cards.py`](backend/app/supplemental/study/cards.py) | Card quizzability + distractor selection |
+| [`drill.py`](backend/app/supplemental/study/drill.py) | Drill on weak concepts |
+| [`exam.py`](backend/app/supplemental/study/exam.py) | Exam mode (multi-question scoring) |
+| [`recall.py`](backend/app/supplemental/study/recall.py) | Recall vs. recognition check |
+| [`sessions.py`](backend/app/supplemental/study/sessions.py) | _(describe me)_ |
+| [`calendar.py`](backend/app/supplemental/study/calendar.py) | _(describe me)_ |
+
+### supplemental/media/ — audiobooks
+
+> Media — audio renditions of chapters. — [`__init__.py`](backend/app/supplemental/media/__init__.py) is the facade: import this package, not its modules.
+
+| File | Purpose |
+|---|---|
+| [`audiobook.py`](backend/app/supplemental/media/audiobook.py) | Checkpointed TTS job system |
+| [`tts_orpheus.py`](backend/app/supplemental/media/tts_orpheus.py) | Orpheus TTS client |
+
+### conductor/ — wires job kinds to domain runners + the auto-chain
+
+> Conductor — decides what runs, and wires it. — [`__init__.py`](backend/app/conductor/__init__.py) is the facade: import this package, not its modules.
+
+| File | Purpose |
+|---|---|
+| [`build.py`](backend/app/conductor/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
+| [`ingest.py`](backend/app/conductor/ingest.py) | Phase 1: stash upload + `convert` job runner |
+| [`lifecycle.py`](backend/app/conductor/lifecycle.py) | Per-document state + auto-chain `converted → extract` |
+| [`registry.py`](backend/app/conductor/registry.py) | Composition root — registers every job-kind runner |
+| [`worker.py`](backend/app/conductor/worker.py) | The one daemon worker: runner registry, JobCtx, drain loop over the ledger |
 
 ### api/ — thin routers + composition root
 
-> API — thin HTTP routers over the domains. — [`__init__.py`](backend/app/api/__init__.py) is the facade: import this package, not its modules.
+> API — thin HTTP routers over the domains, one file per area of the app. — [`__init__.py`](backend/app/api/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`concept_study_routes.py`](backend/app/api/concept_study_routes.py) | Review queue, grading, quiz endpoints |
-| [`admin_routes.py`](backend/app/api/admin_routes.py) | Curation / CRUD |
-| [`build_routes.py`](backend/app/api/build_routes.py) | Job queue + coverage/readiness endpoints |
-| [`extract_routes.py`](backend/app/api/extract_routes.py) | Extraction start/status + concept reads |
-| [`audiobook_routes.py`](backend/app/api/audiobook_routes.py) | Audiobook generation/status |
-| [`ingest_routes.py`](backend/app/api/ingest_routes.py) | PDF upload → conversion |
-| [`learning_path_routes.py`](backend/app/api/learning_path_routes.py) | Learning-path (drill/exam/recall) |
 | [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + guided-reading reads |
-| [`search_routes.py`](backend/app/api/search_routes.py) | Text + semantic search |
-| [`study_routes.py`](backend/app/api/study_routes.py) | Quiz/drill/exam session state |
+| [`study_routes.py`](backend/app/api/study_routes.py) | Doing study: chapter path (orient/skeleton/progress), reviews, quizzes, exams, drills, recall |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
-| [`content_routes.py`](backend/app/api/content_routes.py) | _(describe me)_ |
-| [`mastery_routes.py`](backend/app/api/mastery_routes.py) | _(describe me)_ |
-| [`guided_reading_routes.py`](backend/app/api/guided_reading_routes.py) | _(describe me)_ |
+| [`content_routes.py`](backend/app/api/content_routes.py) | The book: courses list/delete, outline, chapters, sections, elements, figures, keyword search |
+| [`concept_routes.py`](backend/app/api/concept_routes.py) | Concept layer: reads + curation (edit / delete / replace quiz questions) |
+| [`media_routes.py`](backend/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
+| [`process_routes.py`](backend/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
+| [`progress_routes.py`](backend/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
 
 <!-- GEN:backend END -->
 
@@ -261,40 +233,41 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ## 3. Frontend (inside the `app` container)
 
-The frontend is feature-partitioned the way the backend is domain-partitioned: each
-feature under `features/` owns its screens, components, hooks, client helpers, and API
-client (see [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md)). Everything ultimately
+The frontend is surface-partitioned: each screen you can stand on is a package under
+`surfaces/`, gated by its `index.ts` hub, layered **kit ← gateways ← surfaces ← app**
+(see [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md)). Everything ultimately
 reaches the backend through the **proxy layer**: a component calls `/api/learn/*`, a thin
 route handler forwards it via
-[`lib/server/learn-proxy.ts`](frontend/lib/server/learn-proxy.ts), which stamps the
-`X-User-Db` tenancy header. Auth and the per-user document list are the paths that talk to
-Postgres directly — every server-only module lives in [`lib/server/`](frontend/lib/server).
+[`gateways/server/learn-proxy.ts`](frontend/src/gateways/server/learn-proxy.ts), which stamps
+the `X-User-Db` tenancy header. Auth and the per-user document list are the paths that talk
+to Postgres directly — every server-only module lives in
+[`gateways/server/`](frontend/src/gateways/server).
 
 ```mermaid
 flowchart TD
   browser["browser"]
 
   subgraph client["client · runs in the browser"]
-    pages["app/ — pages<br/>router · login · reader"]
-    components["features/<br/>learn · documents · process"]
-    state["components/<br/>layout chrome · ui primitives"]
-    libc["features/learn/api/*<br/>typed client, one module per domain"]
+    pages["app/ — pages<br/>courses · study · process · upload"]
+    surfaces["surfaces/<br/>library · reading · concepts · studying · processing"]
+    kit["kit/<br/>ui primitives · patterns · layout · hooks"]
+    apiclient["gateways/api/*<br/>typed client, one module per domain"]
   end
 
   subgraph server["server · Next.js runtime"]
     apiroutes["app/api/learn/*<br/>~40 route handlers"]
-    proxy["lib/server/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
-    authlib["lib/server/ — auth · dbs · pg<br/>NextAuth · pg"]
+    proxy["gateways/server/learn-proxy.ts<br/>+ user-db (X-User-Db)"]
+    authlib["gateways/server/ — auth · dbs · pg<br/>NextAuth · pg"]
   end
 
   backend["learn backend<br/>:8010"]
-  pgdb["PostgreSQL + pgvector<br/>:5432"]
+  pgdb["PostgreSQL<br/>:5432"]
 
   browser --> pages
-  pages --> components
-  components --> state
-  components --> libc
-  libc --> apiroutes
+  pages --> surfaces
+  surfaces --> kit
+  surfaces --> apiclient
+  apiclient --> apiroutes
   apiroutes --> proxy
   proxy --> backend
   authlib --> pgdb
@@ -303,67 +276,64 @@ flowchart TD
   classDef code fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef svc fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class browser ext;
-  class pages,components,state,libc,apiroutes,proxy,authlib code;
+  class pages,surfaces,kit,apiclient,apiroutes,proxy,authlib code;
   class backend,pgdb svc;
   style client fill:none,stroke:#888780,stroke-dasharray:4 3;
   style server fill:none,stroke:#888780,stroke-dasharray:4 3;
 
-  click pages "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app"
-  click components "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/features"
-  click state "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/components"
-  click libc "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/features/learn/api"
-  click apiroutes "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/app/api/learn"
-  click proxy "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/lib/server/learn-proxy.ts"
-  click authlib "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/lib/server"
+  click pages "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/app"
+  click surfaces "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/surfaces"
+  click kit "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/kit"
+  click apiclient "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/gateways/api"
+  click apiroutes "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/app/api/learn"
+  click proxy "https://github.com/Aiden-Ferrante/learnhub/blob/main/frontend/src/gateways/server/learn-proxy.ts"
+  click authlib "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend/src/gateways/server"
 ```
 
 | Layer | Location | What it is |
 |---|---|---|
-| pages | [`app/`](frontend/app) | Route entry points: the `#learn`/`#process` router, `login/`, `reader/` |
-| features | [`features/`](frontend/features) | `learn/` (study surfaces: home · reader · concepts · study), `documents/` (upload + table), `process/` (pipeline dashboard) — each owns its components, hooks, lib, api |
-| API client | [`features/learn/api/`](frontend/features/learn/api) | Typed fetchers, one module per domain (outline, content, concepts, progress, review, quiz, reading, chapter, audiobook, search, pipeline) |
-| chrome | [`components/`](frontend/components) | `layout/` (header, theme, user menu) + `ui/` (shadcn primitives) |
-| server-only | [`lib/server/`](frontend/lib/server) | Everything that must never reach the client bundle (table below) |
-| proxy routes | [`app/api/learn/`](frontend/app/api/learn) | ~40 thin handlers → backend (one per backend endpoint) |
+| pages | [`app/`](frontend/src/app) | Thin route entry points (+ `_chrome/` nav shell); each mounts a surface hub |
+| surfaces | [`surfaces/`](frontend/src/surfaces) | `library/` (shelf + course home) · `reading/` (readers + guided-reading) · `concepts/` · `studying/` (quiz/drill/exam/review/planner) · `processing/` (upload + build console) — each hub-gated |
+| API client | [`gateways/api/`](frontend/src/gateways/api) | Typed fetchers, one module per domain (outline, content, concepts, progress, review, quiz, chapter, audiobook, planner, pipeline, system) + `toc.ts` outline helpers |
+| kit | [`kit/`](frontend/src/kit) | `ui/` (shadcn) · `patterns/` (stat-tile, status-pill…) · `layout/` (brand, theme) · `hooks/` · `lib/` |
+| server-only | [`gateways/server/`](frontend/src/gateways/server) | Everything that must never reach the client bundle (table below) |
+| proxy routes | [`app/api/learn/`](frontend/src/app/api/learn) | ~40 thin handlers → backend (one per backend endpoint) |
 
-Key `lib/server/` seams:
+Key `gateways/server/` seams:
 
 | File | Purpose |
 |---|---|
-| [`learn-proxy.ts`](frontend/lib/server/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
-| [`learn-upstream.ts`](frontend/lib/server/learn-upstream.ts) | Where the learn backend lives (`LEARN_SERVICE_URL`) |
-| [`user-db.ts`](frontend/lib/server/user-db.ts) | Resolves the session's per-user schema name (tenancy) |
-| [`auth.ts`](frontend/lib/server/auth.ts) + [`auth-db.ts`](frontend/lib/server/auth-db.ts) + [`pg.ts`](frontend/lib/server/pg.ts) | NextAuth setup + Postgres user/auth reads (schema-per-tenant pool) |
-| [`features/learn/lib/`](frontend/features/learn/lib) (client side) | `courses.ts` · `learn-path.ts` · `read-along.ts` — course listing · chapter stage rail · audiobook/text sync |
+| [`learn-proxy.ts`](frontend/src/gateways/server/learn-proxy.ts) | The one door to the backend — GET/POST/DELETE + `X-User-Db` header |
+| [`learn-upstream.ts`](frontend/src/gateways/server/learn-upstream.ts) | Where the learn backend lives (`LEARN_SERVICE_URL`) |
+| [`user-db.ts`](frontend/src/gateways/server/user-db.ts) | Resolves the session's per-user schema name (tenancy) |
+| [`auth.ts`](frontend/src/gateways/server/auth.ts) + [`auth-db.ts`](frontend/src/gateways/server/auth-db.ts) + [`pg.ts`](frontend/src/gateways/server/pg.ts) | NextAuth setup + Postgres user/auth reads (schema-per-tenant pool) |
 
 ---
 
 ## 4. Inside the extraction package
 
-Extraction is the app's core feature, so here is the folder one level deeper. The pipeline
-itself is only two files (teal): [`concepts_extract.py`](backend/app/extraction/concepts_extract.py)
+Extraction is the app's core feature, so here is the folder one level deeper. The extraction flow
+itself is only two files (teal): [`concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
 builds the prompt, calls the LLM and writes concepts (section loading + scope resolution
-come from `content/scope.py`, the shared owner), and [`concept_store.py`](backend/app/extraction/concept_store.py)
-is the read side. The **pipeline conductor** ([`pipeline/build.py`](backend/app/pipeline/build.py))
+come from `process/content/scope.py`, the shared owner), and [`concept_store.py`](backend/app/process/extraction/concept_store.py)
+is the read side. The **conductor** ([`conductor/build.py`](backend/app/conductor/build.py))
 runs these as queue jobs (`extract`; `build` is a compat alias). Four other LLM *generation passes*
 (coral) live in the folder and are triggered independently — `guided_reading` assembles
 the reading briefing from cached artifacts (its per-concept explanations were retired).
 Two dependencies live outside the folder: `concepts_extract` calls
-`platform/llm.py` for the model, and the pipeline runners are dispatched by
-`platform/jobs.py` (the one queue).
+`gateways/llm.py` for the model, and the conductor’s runners are dispatched by
+`gateways/ledger.py` (the one queue).
 
 ```mermaid
 flowchart TD
-  build["pipeline/build.py<br/>extract runner + eval gate"]
+  build["conductor/build.py<br/>extract runner + eval gate"]
   concepts["concepts_extract.py<br/>LLM → concepts"]
   store["concept_store.py<br/>read concepts"]
   deep["guided_reading.py<br/>assembled briefing"]
   skeleton["skeleton.py<br/>chapter essences"]
   guide["reading_guide.py<br/>section guides"]
-  augment["augment.py<br/>objectives + recap"]
 
   build --> concepts
-  build --> deep
   concepts -->|concepts| store
 
   classDef trig fill:#EEEDFE,stroke:#534AB7,color:#26215C;
@@ -371,15 +341,14 @@ flowchart TD
   classDef pass fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
   class build trig;
   class concepts,store core;
-  class deep,skeleton,guide,augment pass;
+  class deep,skeleton,guide pass;
 
-  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/pipeline/build.py"
-  click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concepts_extract.py"
-  click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/concept_store.py"
-  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/guided_reading.py"
-  click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/skeleton.py"
-  click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/reading_guide.py"
-  click augment "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/extraction/augment.py"
+  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/conductor/build.py"
+  click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/concepts_extract.py"
+  click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/concept_store.py"
+  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/guided_reading.py"
+  click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/skeleton.py"
+  click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/reading_guide.py"
 ```
 
 Color key: purple = conductor · teal = extraction core · coral = generation passes.
@@ -391,6 +360,6 @@ Color key: purple = conductor · teal = extraction core · coral = generation pa
 Floor first (small, everything builds on these), then trace one journey:
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md) — the map's legend
-2. [`platform/db.py`](backend/app/platform/db.py) → [`platform/llm.py`](backend/app/platform/llm.py) → [`content/scope.py`](backend/app/content/scope.py) → [`platform/jobs.py`](backend/app/platform/jobs.py)
-3. Then a vertical slice — e.g. **build a chapter**: [`api/build_routes.py`](backend/app/api/build_routes.py) → [`platform/jobs.py`](backend/app/platform/jobs.py) → [`pipeline/registry.py`](backend/app/pipeline/registry.py) → [`pipeline/build.py`](backend/app/pipeline/build.py) → [`extraction/concepts_extract.py`](backend/app/extraction/concepts_extract.py)
-4. Or the **document lifecycle**: an upload flows [`api/ingest_routes.py`](backend/app/api/ingest_routes.py) → [`pipeline/ingest.py`](backend/app/pipeline/ingest.py) (convert job) → auto-chained [`pipeline/build.py`](backend/app/pipeline/build.py) (extract) → studyable, tracked by [`pipeline/lifecycle.py`](backend/app/pipeline/lifecycle.py)
+2. [`gateways/db.py`](backend/app/gateways/db.py) → [`gateways/llm.py`](backend/app/gateways/llm.py) → [`process/content/scope.py`](backend/app/process/content/scope.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py)
+3. Then a vertical slice — e.g. **build a chapter**: [`api/process_routes.py`](backend/app/api/process_routes.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py) → [`conductor/worker.py`](backend/app/conductor/worker.py) → [`conductor/registry.py`](backend/app/conductor/registry.py) → [`conductor/build.py`](backend/app/conductor/build.py) → [`extraction/concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
+4. Or the **document lifecycle**: an upload flows [`api/process_routes.py`](backend/app/api/process_routes.py) → [`conductor/ingest.py`](backend/app/conductor/ingest.py) (convert job) → auto-chained [`conductor/build.py`](backend/app/conductor/build.py) (extract) → studyable, tracked by [`conductor/lifecycle.py`](backend/app/conductor/lifecycle.py)

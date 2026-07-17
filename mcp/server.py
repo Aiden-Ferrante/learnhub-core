@@ -139,27 +139,12 @@ def get_section(doc: str, section_key: str) -> Any:
 @mcp.tool()
 def search_text(doc: str, query: str, limit: int = 8, full: bool = False) -> Any:
     """KEYWORD search — find where a literal term is discussed (e.g. "quantization"). Returns the
-    best-matching passages with section, heading, page, score and a snippet. For meaning-based
-    search use semantic_search. Set `full=True` for full markdown."""
+    best-matching passages with section, heading, page, score and a snippet. Set `full=True` for
+    full markdown."""
     params: dict[str, Any] = {"doc": doc, "q": query, "limit": limit}
     if full:
         params["full"] = "true"
     return _req("GET", "/api/search", params=params)
-
-
-@mcp.tool()
-def semantic_search(doc: str, query: str, k: int = 8) -> Any:
-    """MEANING-based search over the book (MiniLM embeddings) — finds relevant passages even when
-    the wording differs (e.g. "making models smaller" finds quantization). Returns ranked passages
-    with section/heading/page/score/snippet. Run index_book(doc) once first if results are empty."""
-    return _req("GET", "/api/semantic-search", params={"doc": doc, "q": query, "k": k})
-
-
-@mcp.tool()
-def index_book(doc: str) -> Any:
-    """Embed a book’s content for semantic_search (one-time, ~seconds; idempotent —
-    re-run after adding chapters). Returns {total, indexed}."""
-    return _req("POST", "/api/search/index", params={"doc": doc})
 
 
 # ── Processing (writes to the course) ───────────────────────────────────────────────────────

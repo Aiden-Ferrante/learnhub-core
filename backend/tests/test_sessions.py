@@ -1,6 +1,6 @@
 """Unit tests for working-session clustering (pure, no DB)."""
 
-from app.study.sessions import GAP_SECONDS, cluster_events
+from app.supplemental.study.sessions import GAP_SECONDS, cluster_events
 
 T0 = 1_000_000.0
 MIN = 60.0

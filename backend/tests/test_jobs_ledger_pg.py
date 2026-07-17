@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.platform import db
-from app.platform.jobs import enqueue_build, list_builds
+from app.gateways import db
+from app.gateways.ledger import enqueue_build, list_builds
 
 pytestmark = pytest.mark.integration
 

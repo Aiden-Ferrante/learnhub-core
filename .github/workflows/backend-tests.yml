@@ -30,7 +30,7 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     env:
-      # Matches the default DSN in app/platform/db.py — the seeded service is the test DB.
+      # Matches the default DSN in app/gateways/db.py — the seeded service is the test DB.
       POSTGRES_DSN: host=localhost port=5432 user=learnhub password=learnhub_local dbname=learnhub
     steps:
       - uses: actions/checkout@v4

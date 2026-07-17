@@ -1,8 +1,7 @@
-# Learn Hub Docker Compose — Postgres + pgvector + Ollama
+# Learn Hub Docker Compose — Postgres + Ollama
 #
-# One datastore: Postgres (with pgvector) replaced ArangoDB and Qdrant. Services:
-#   app (Next.js UI) · learn (FastAPI study engine) · postgres · ollama ·
-#   sentence-transformers (embeddings)
+# One datastore: Postgres (replaced ArangoDB and Qdrant). Services:
+#   app (Next.js UI) · learn (FastAPI study engine) · postgres · ollama
 #
 # Usage:
 #   docker compose up -d
@@ -15,7 +14,7 @@ services:
     ports:
       - '3001:3000'
     environment:
-      # Postgres + pgvector is the one datastore (auth + per-user data via schema tenancy).
+      # Postgres is the one datastore (auth + per-user data via schema tenancy).
       - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
       # Auth.js (login sessions)
       - AUTH_SECRET=${AUTH_SECRET:?set in compose/.env}
@@ -23,10 +22,6 @@ services:
       # Ollama configuration
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=nemotron-3-nano:30b
-      # Embeddings configuration
-      - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
-      - MODEL_NAME=all-MiniLM-L6-v2
-      - EMBEDDINGS_API_URL=http://sentence-transformers:80
       # Other settings
       - NODE_TLS_REJECT_UNAUTHORIZED=0
       - NODE_OPTIONS=--max-http-header-size=80000
@@ -35,7 +30,7 @@ services:
       - REQUEST_TIMEOUT=1800000
       - LEARN_SERVICE_URL=http://learn:8000
     volumes:
-      - learnhub_shared:/shared
+      - learnhub_core_shared:/shared
     networks:
       - default
     depends_on:
@@ -54,7 +49,7 @@ services:
     ports:
       - '127.0.0.1:8010:8000'
     environment:
-      # Postgres + pgvector is the one datastore (ArangoDB + Qdrant retired).
+      # Postgres is the one datastore (ArangoDB + Qdrant retired).
       - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
       - SHARED_DIR=/shared
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -72,7 +67,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
-      - learnhub_shared:/shared
+      - learnhub_core_shared:/shared
     networks:
       - default
     depends_on:
@@ -89,9 +84,9 @@ services:
               count: all
               capabilities: [gpu]
 
-  # PostgreSQL + pgvector — the one datastore (replaced ArangoDB + Qdrant).
+  # PostgreSQL — the one datastore (replaced ArangoDB + Qdrant).
   postgres:
-    image: pgvector/pgvector:pg16
+    image: postgres:16
     ports:
       - '127.0.0.1:5432:5432'
     environment:
@@ -99,7 +94,7 @@ services:
       - POSTGRES_USER=learnhub
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set in compose/.env}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_core_data:/var/lib/postgresql/data
       - ../postgres/init:/docker-entrypoint-initdb.d:ro
     networks:
       - default
@@ -160,32 +155,10 @@ services:
       retries: 3
       start_period: 60s
 
-  # Embeddings service (MiniLM 384-d) — feeds pgvector semantic search + concept dedup.
-  sentence-transformers:
-    build:
-      context: ../services/sentence-transformers
-      dockerfile: Dockerfile
-    ports:
-      - '127.0.0.1:8000:80'
-    environment:
-      - MODEL_NAME=all-MiniLM-L6-v2
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    networks:
-      - default
-    restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
 volumes:
   ollama_data:
-  learnhub_shared:
-  postgres_data:
+  learnhub_core_shared:
+  postgres_core_data:
 
 networks:
   default:
