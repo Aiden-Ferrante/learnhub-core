@@ -41,19 +41,58 @@ function ExtractButton({
   scope,
   state,
   onExtract,
+  prominent,
 }: {
   scope: string
   state: ExtractState | undefined
   onExtract: (scope: string) => void
+  /** Unbuilt CHAPTERS get a visible, labeled Build button (extraction is on-demand —
+   *  this is the syllabus's build trigger); sections keep the subtle hover icon. */
+  prominent?: boolean
 }) {
   const title =
     state === "running"
-      ? "Extracting this chapter's knowledge… (runs in the background)"
+      ? "Building this chapter's concepts… (runs in the background)"
       : state === "done"
-        ? "Extracted — click to re-run"
+        ? "Built — click to re-run"
         : state === "error"
-          ? "Extraction failed — click to retry"
-          : "Extract this chapter's concepts (background, ~15 min for a chapter)"
+          ? "Build failed — click to retry"
+          : "Build this chapter's concepts (background, a few minutes per chapter)"
+  if (prominent) {
+    return (
+      <button
+        type="button"
+        title={title}
+        aria-label={title}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (state !== "running") onExtract(scope)
+        }}
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+          state === "running"
+            ? "border-brand/40 text-brand"
+            : state === "error"
+              ? "border-destructive/50 text-destructive hover:bg-destructive/10"
+              : "border-border text-muted-foreground hover:border-brand/50 hover:text-brand",
+        )}
+      >
+        {state === "running" ? (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin" /> Building…
+          </>
+        ) : state === "error" ? (
+          <>
+            <TriangleAlert className="h-3 w-3" /> Retry
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-3 w-3" /> Build
+          </>
+        )}
+      </button>
+    )
+  }
   return (
     <button
       type="button"
@@ -217,6 +256,7 @@ function TreeRow({
             scope={node.sectionKey}
             state={extractState?.[node.sectionKey]}
             onExtract={onExtract}
+            prominent={isChapter && (node.conceptCount ?? 0) === 0}
           />
         ) : null}
       </div>
