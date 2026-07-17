@@ -4,18 +4,21 @@ One entry point (``resolve_toc``) walks named stages and returns which route the
 book took plus a human-readable decision log (persisted on the convert job's
 ledger row), so any book's TOC weirdness is diagnosable without a debugger.
 
-ROUTING TABLE (v1 — every path that exists today, named; zero behavior change):
+ROUTING TABLE (every path that exists today, named):
 
-  quality   route                    path
-  -------   ---------------------    ----------------------------------------------
-  present   bookmarks                canonicalize (build_outline_from_bookmarks)
-                                     → reconcile (assign_blocks_to_outline matched
-                                     ≥1 block; block_map OVERLAYS splitter keys)
-  present   bookmarks-pagematched    reconcile matched 0 blocks (or canonicalize
-                                     produced nothing) → normalize_outline: the
-                                     REVERSE direction — outline entries re-keyed
-                                     onto the blocks' own splitter keys by page;
-                                     block_map is empty, blocks keep their keys
+  quality      route                    path
+  ----------   ---------------------    -------------------------------------------
+  clean|messy  bookmarks                canonicalize (build_outline_from_bookmarks)
+                                        → reconcile (assign_blocks_to_outline
+                                        matched ≥1 block; block_map OVERLAYS
+                                        splitter keys). `messy` routes like `clean`
+                                        — repair hooks are future work; the failing
+                                        signals are named in the decision log.
+  clean|messy  bookmarks-pagematched    reconcile matched 0 blocks (or canonicalize
+                                        produced nothing) → normalize_outline: the
+                                        REVERSE direction — outline entries re-keyed
+                                        onto the blocks' own splitter keys by page;
+                                        block_map is empty, blocks keep their keys
   absent    derived-headings         toc_strategies/from_headings: font-size
                                      clustering over the heading pages (chapter
                                      titles are set bigger), text fallback from
@@ -41,6 +44,7 @@ page-annotated (persist_document assigns page_start/page_end before calling).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from app.process.content.outline import (
@@ -50,16 +54,61 @@ from app.process.content.outline import (
 )
 from app.process.content.sections import SectionBlock
 
-# -- assess signals (v1 scoring is deliberately dumb: present|absent only). The
-# clean/messy science gets these named slots when it lands: -------------------
-# TODO_SIGNAL_ENTRY_RATIO: bookmark count vs page count (a 500-page book with 3
-#   bookmarks is not a real TOC).
-# TODO_SIGNAL_MONOTONIC_PAGES: bookmark pages should be non-decreasing.
-# TODO_SIGNAL_JUNK_TITLE_RATIO: URLs/ISBNs/bare numbers as titles.
-# TODO_SIGNAL_DEPTH_DISTRIBUTION: all-depth-1 outlines for nested books are messy.
+# -- assess signals — how bookmark quality is scored. A failing signal marks the
+# outline `messy` (and names itself in the decision log); `messy` still routes
+# like `clean` — repair hooks are future work, the label is the diagnosis. -----
 
-QUALITY_PRESENT = "present"
+# ENTRY_RATIO: too few bookmarks for the book's size — a 500-page book with 3
+# bookmarks is not a real TOC. Required entries = max(floor, pages/divisor); a
+# 20-chapter/400-page chapters-only outline still passes.
+SIGNAL_ENTRY_FLOOR = 3
+SIGNAL_ENTRY_PAGES_PER_ENTRY = 50
+
+# MONOTONIC_PAGES: bookmark pages should be non-decreasing in reading order; more
+# than this fraction of adjacent pairs going backwards is disorder, not a stray.
+SIGNAL_MAX_NONMONOTONIC_FRAC = 0.02
+
+# JUNK_TITLE_RATIO: URLs / ISBNs / long digit runs / bare numbers as titles.
+SIGNAL_MAX_JUNK_TITLE_FRAC = 0.30
+_SIGNAL_JUNK_TITLE = re.compile(r"(https?://|www\.|isbn|\b\d{9,}\b)", re.IGNORECASE)
+_SIGNAL_BARE_NUMBER = re.compile(r"^\d+(?:\.\d+)*\s*[.:)]?$")
+
+# DEPTH_DISTRIBUTION: a long, completely flat outline (every entry level 1) for a
+# book this size means the nesting was lost. Short flat outlines (chapters-only
+# books) are legitimate.
+SIGNAL_FLAT_SUSPECT_MIN_ENTRIES = 30
+
+QUALITY_CLEAN = "clean"
+QUALITY_MESSY = "messy"
 QUALITY_ABSENT = "absent"
+
+
+def assess_bookmarks(raw: list[dict], page_count: int) -> tuple[str, list[str]]:
+    """Score the raw bookmarks → (quality, reasons). Empty → absent. Any failing
+    signal → messy, with each failure named for the decision log; else clean."""
+    if not raw:
+        return QUALITY_ABSENT, []
+    reasons: list[str] = []
+
+    required = max(SIGNAL_ENTRY_FLOOR, (page_count or 0) // SIGNAL_ENTRY_PAGES_PER_ENTRY)
+    if len(raw) < required:
+        reasons.append(f"entry-ratio: {len(raw)} entries for {page_count} pages (need {required})")
+
+    pages = [int(e["page"]) for e in raw if e.get("page")]
+    if len(pages) >= 2:
+        backwards = sum(1 for a, b in zip(pages, pages[1:]) if b < a)
+        if backwards / (len(pages) - 1) > SIGNAL_MAX_NONMONOTONIC_FRAC:
+            reasons.append(f"monotonic-pages: {backwards}/{len(pages) - 1} adjacent pairs go backwards")
+
+    titles = [str(e.get("title") or "").strip() for e in raw]
+    junk = sum(1 for t in titles if not t or _SIGNAL_JUNK_TITLE.search(t) or _SIGNAL_BARE_NUMBER.match(t))
+    if junk / len(titles) > SIGNAL_MAX_JUNK_TITLE_FRAC:
+        reasons.append(f"junk-titles: {junk}/{len(titles)} titles are noise")
+
+    if len(raw) >= SIGNAL_FLAT_SUSPECT_MIN_ENTRIES and all(int(e.get("level") or 1) <= 1 for e in raw):
+        reasons.append(f"depth-distribution: {len(raw)} entries, all level 1 (nesting lost?)")
+
+    return (QUALITY_MESSY if reasons else QUALITY_CLEAN), reasons
 
 ROUTE_BOOKMARKS = "bookmarks"
 ROUTE_PAGEMATCHED = "bookmarks-pagematched"
@@ -123,9 +172,11 @@ def resolve_toc(
     raw = raw_outline or []
     decisions.append(f"source: {len(raw)} bookmark entries, {len(blocks)} content blocks")
 
-    # stage: assess — v1 emits only what it actually knows.
-    quality = QUALITY_PRESENT if raw else QUALITY_ABSENT
-    decisions.append(f"assess: {quality}")
+    # stage: assess — scored: clean | messy (each failing signal named) | absent.
+    # `messy` routes like `clean` for now: repair hooks are future work, the
+    # label + reasons on the ledger are the diagnosis.
+    quality, why = assess_bookmarks(raw, page_count)
+    decisions.append(f"assess: {quality}" + (f" ({'; '.join(why)})" if why else ""))
 
     # stage: derive — absent only. First strategy that yields an outline wins and
     # stamps the final route; every refusal is logged with its reason.

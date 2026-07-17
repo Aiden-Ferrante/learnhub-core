@@ -18,7 +18,7 @@ import pytest
 from app.process.content.sections import SectionBlock
 from app.process.content.toc_controller import (
     QUALITY_ABSENT,
-    QUALITY_PRESENT,
+    QUALITY_CLEAN,
     ROUTE_BOOKMARKS,
     ROUTE_DERIVED_CONTENTS,
     ROUTE_DERIVED_HEADINGS,
@@ -65,8 +65,8 @@ def _final_keys(blocks: list[SectionBlock], block_map: dict[int, str]) -> dict[s
 @pytest.mark.parametrize(
     "variant, route, quality",
     [
-        ("bookmarks", ROUTE_BOOKMARKS, QUALITY_PRESENT),
-        ("pagematched", ROUTE_PAGEMATCHED, QUALITY_PRESENT),
+        ("bookmarks", ROUTE_BOOKMARKS, QUALITY_CLEAN),
+        ("pagematched", ROUTE_PAGEMATCHED, QUALITY_CLEAN),
         # absent no longer routes to none: derive_from_headings is implemented and
         # this fixture's blocks carry usable headings — the intended new behavior.
         ("absent", ROUTE_DERIVED_HEADINGS, QUALITY_ABSENT),
@@ -242,3 +242,72 @@ def test_fixture_has_unmatched_blocks():
     assert unmatched, "fixture must contain unmatched blocks to lock overlay semantics"
     for b in unmatched:
         assert expected["final_keys"][str(b.order)] == b.section_key
+
+
+# --------------------------------------------------------------------------- #
+# assess signals — clean | messy scoring (messy still routes like clean)
+# --------------------------------------------------------------------------- #
+
+from app.process.content.toc_controller import (  # noqa: E402
+    QUALITY_MESSY,
+    assess_bookmarks,
+)
+
+
+def _entries(n, *, level=1, start_page=1, step=10, title=None):
+    return [
+        {"level": level, "title": title or f"Chapter {i + 1}", "page": start_page + i * step}
+        for i in range(n)
+    ]
+
+
+def test_assess_real_fixture_bookmarks_are_clean():
+    quality, reasons = assess_bookmarks(
+        _FIXTURE["variants"]["bookmarks"]["raw_outline"], _FIXTURE["page_count"]
+    )
+    assert quality == QUALITY_CLEAN and reasons == []
+
+
+def test_assess_entry_ratio_sparse_toc_is_messy():
+    quality, reasons = assess_bookmarks(_entries(3, step=150), page_count=500)
+    assert quality == QUALITY_MESSY
+    assert any(r.startswith("entry-ratio") for r in reasons)
+
+
+def test_assess_nonmonotonic_pages_is_messy():
+    entries = _entries(10)
+    entries[3]["page"], entries[7]["page"] = 90, 2  # two hard regressions
+    quality, reasons = assess_bookmarks(entries, page_count=100)
+    assert quality == QUALITY_MESSY
+    assert any(r.startswith("monotonic-pages") for r in reasons)
+
+
+def test_assess_junk_titles_is_messy():
+    entries = _entries(10)
+    for i in range(4):  # 40% junk > 30% threshold
+        entries[i]["title"] = "https://example.com/x" if i % 2 else "9781732102217"
+    quality, reasons = assess_bookmarks(entries, page_count=100)
+    assert quality == QUALITY_MESSY
+    assert any(r.startswith("junk-titles") for r in reasons)
+
+
+def test_assess_long_flat_outline_is_messy_but_short_flat_is_clean():
+    messy_q, messy_r = assess_bookmarks(_entries(35, step=5), page_count=200)
+    assert messy_q == QUALITY_MESSY
+    assert any(r.startswith("depth-distribution") for r in messy_r)
+    clean_q, _ = assess_bookmarks(_entries(12, step=15), page_count=200)
+    assert clean_q == QUALITY_CLEAN
+
+
+def test_messy_routes_like_clean_and_logs_reasons():
+    """A messy outline still takes the bookmarks path — the label is the diagnosis."""
+    raw = _FIXTURE["variants"]["bookmarks"]["raw_outline"]
+    mangled = [
+        {**e, "title": ("9781732102217" if i % 2 == 0 else e["title"])}
+        for i, e in enumerate(raw)
+    ]  # ~50% junk titles → messy, but structure/pages intact
+    res = resolve_toc(mangled, _blocks(), _FIXTURE["page_count"])
+    assert res.quality == QUALITY_MESSY
+    assert res.route in (ROUTE_BOOKMARKS, ROUTE_PAGEMATCHED)
+    log = "\n".join(res.decisions)
+    assert "assess: messy (" in log and "junk-titles" in log
