@@ -182,7 +182,7 @@ export function DocumentsTable() {
                     type="checkbox"
                     className="rounded border-border selection-accent h-4 w-4"
                     checked={isSelected(doc.id)}
-                    onChange={(e) => handleItemClick(doc, e)}
+                    onChange={() => handleItemClick(doc)}
                   />
                 </td>
                  <td className="py-4" onClick={editingId === doc.id ? (e) => e.stopPropagation() : undefined}>

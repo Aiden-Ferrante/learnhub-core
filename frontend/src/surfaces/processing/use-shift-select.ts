@@ -7,10 +7,14 @@ interface UseShiftSelectOptions<T> {
   onSelectionChange?: (selectedIds: string[]) => void
 }
 
+// Callers pass both row MouseEvents and checkbox ChangeEvents; only the modifier
+// keys are read, so accept anything that carries them.
+type ModifierKeys = { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }
+
 interface UseShiftSelectReturn<T> {
   selectedItems: string[]
   setSelectedItems: (items: string[]) => void
-  handleItemClick: (item: T, event?: React.MouseEvent) => void
+  handleItemClick: (item: T, event?: ModifierKeys) => void
   handleSelectAll: () => void
   isSelected: (itemId: string) => boolean
   clearSelection: () => void
@@ -39,7 +43,7 @@ export function useShiftSelect<T>({
     lastClickedIndexRef.current = null
   }, [setSelectedItems])
 
-  const handleItemClick = useCallback((item: T, event?: React.MouseEvent) => {
+  const handleItemClick = useCallback((item: T, event?: ModifierKeys) => {
     if (!canSelect(item)) return
 
     const itemId = getItemId(item)

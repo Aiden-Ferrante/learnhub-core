@@ -155,6 +155,7 @@ _STRATEGY_ROUTES = {
 
 HIDE_FRONT_BACK = "front-back-matter"
 HIDE_ORPHAN_PART = "orphan-part"
+HIDE_PART = "part-container"
 
 # Top-level front/back matter to hide so the syllabus reads like the printed Table of
 # Contents (these are in the PDF bookmarks but not study content). Matched
@@ -176,7 +177,51 @@ def _is_front_back_title(title: str) -> bool:
     return t in _FRONT_BACK_EXACT or any(t.startswith(p) for p in _FRONT_BACK_PREFIX)
 
 
-def curate_outline(entries: list[dict]) -> dict[str, str]:
+# stage: parts — Part-structured books ("Part I. Foundations" containers with the
+# real chapters nested one level down) would otherwise present 3 parts as the
+# book's chapters everywhere depth 0 means "chapter" (syllabus tops, reader
+# chapter picker, chapter spans). A part container WITH children is hidden and
+# its subtree promoted one level, so chapters land at depth 0; the childless
+# mis-bookmarked variant stays curate's orphan-part rule.
+_PART_TITLE_RE = re.compile(
+    r"^\s*(?:part|unit)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+    re.IGNORECASE,
+)
+
+
+def demote_part_containers(entries: list[dict]) -> tuple[list[dict], dict[str, str], str | None]:
+    """(entries', hidden, log line). Depth-0 part-titled entries with children are
+    flagged ``part-container`` (kept in the stored structure, hidden from the
+    syllabus like curated front matter) and every entry in their subtree moves up
+    one level. Books without parts pass through untouched (same list object)."""
+    part_idx: set[int] = set()
+    for i, e in enumerate(entries):
+        if int(e.get("listDepth") or 0) != 0:
+            continue
+        has_children = i + 1 < len(entries) and int(entries[i + 1].get("listDepth") or 0) > 0
+        if has_children and _PART_TITLE_RE.match(e.get("title") or ""):
+            part_idx.add(i)
+    if not part_idx:
+        return entries, {}, None
+
+    out: list[dict] = []
+    hidden: dict[str, str] = {}
+    in_part = False
+    for i, e in enumerate(entries):
+        depth = int(e.get("listDepth") or 0)
+        if depth == 0:
+            in_part = i in part_idx
+            if in_part:
+                hidden[e["sectionKey"]] = HIDE_PART
+            out.append(e)
+        else:
+            out.append({**e, "listDepth": depth - 1} if in_part else e)
+    titles = "; ".join((entries[i].get("title") or entries[i].get("sectionKey")) for i in sorted(part_idx))
+    log = f"parts: demoted {len(part_idx)} container(s) ({titles}); nested sections promoted one level"
+    return out, hidden, log
+
+
+def curate_outline(entries: list[dict], pre_hidden: set[str] | None = None) -> dict[str, str]:
     """sectionKey -> hide reason, over the flat canonical entries.
 
     Front/back matter: a depth-0 entry with a boilerplate title is hidden ALONG WITH its
@@ -184,11 +229,13 @@ def curate_outline(entries: list[dict]) -> dict[str, str]:
     depth-0 entry immediately followed by a child-bearing sibling is a mis-bookmarked
     "Part" container — UNLESS it has a numeric ``toc:N`` key: a real chapter may
     legitimately have no subsections (PoSD ch. 11 "Design it Twice"); "Part I/II"
-    bookmarks parse to slug keys (roman numerals carry no digits)."""
+    bookmarks parse to slug keys (roman numerals carry no digits). ``pre_hidden``
+    holds keys an earlier stage already hid (demoted part containers) so they are
+    neither re-flagged nor counted as visible siblings."""
     hidden: dict[str, str] = {}
     tops: list[tuple[int, dict, bool]] = []  # (entry index, entry, has_children)
     for i, e in enumerate(entries):
-        if int(e.get("listDepth") or 0) != 0:
+        if int(e.get("listDepth") or 0) != 0 or (pre_hidden and e.get("sectionKey") in pre_hidden):
             continue
         has_children = i + 1 < len(entries) and int(entries[i + 1].get("listDepth") or 0) > 0
         tops.append((i, e, has_children))
@@ -278,6 +325,12 @@ def resolve_toc(
     canonical = build_outline_from_bookmarks(raw)
     decisions.append(f"canonicalize: {len(canonical)} canonical entries")
 
+    # stage: parts — promote chapters out of "Part N" containers (see the stage
+    # comment above demote_part_containers). No-op for part-less books.
+    canonical, part_hidden, part_log = demote_part_containers(canonical)
+    if part_log:
+        decisions.append(part_log)
+
     # stage: reconcile — map blocks onto the canonical outline; on total failure,
     # fall back to page-matching the outline onto the blocks (reverse direction).
     block_map = (
@@ -288,24 +341,29 @@ def resolve_toc(
     if block_map:
         route = derived_route or ROUTE_BOOKMARKS
         decisions.append(f"reconcile: {len(block_map)}/{len(blocks)} blocks matched")
-        hidden = _curate_logged(canonical, decisions)
+        hidden = {**_curate_logged(canonical, decisions, part_hidden), **part_hidden}
         decisions.append(f"route: {route}")
         return TocResolution(route, quality, canonical, block_map, decisions, hidden)
 
     entries = normalize_outline(raw, blocks)
+    entries, np_hidden, np_log = demote_part_containers(entries)
+    if np_log:
+        decisions.append(np_log)
     route = derived_route or ROUTE_PAGEMATCHED
     decisions.append(
         "reconcile: 0 blocks matched — outline page-matched onto block keys "
         f"({len(entries)} entries; blocks keep splitter keys)"
     )
-    hidden = _curate_logged(entries, decisions)
+    hidden = {**_curate_logged(entries, decisions, np_hidden), **np_hidden}
     decisions.append(f"route: {route}")
     return TocResolution(route, quality, entries, {}, decisions, hidden)
 
 
-def _curate_logged(entries: list[dict], decisions: list[str]) -> dict[str, str]:
+def _curate_logged(
+    entries: list[dict], decisions: list[str], pre_hidden: dict[str, str] | None = None
+) -> dict[str, str]:
     """Run curate_outline and narrate its verdicts into the decision log."""
-    hidden = curate_outline(entries)
+    hidden = curate_outline(entries, set(pre_hidden or ()))
     if not hidden:
         decisions.append("curate: nothing hidden")
         return hidden

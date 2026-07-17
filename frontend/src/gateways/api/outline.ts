@@ -25,6 +25,9 @@ export type OutlineEntry = {
   sectionKey: string
   listDepth: number
   page?: number
+  /** Set when the convert-time TOC controller hid this entry from chapter surfaces
+   *  (front/back matter, demoted Part containers); the reader sidebar still shows all. */
+  hiddenReason?: string | null
 }
 
 export async function fetchTocTree(doc?: string): Promise<TocTreeResponse> {

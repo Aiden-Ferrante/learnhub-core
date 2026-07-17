@@ -55,15 +55,16 @@ export function resolveChapterForScope(
   return { chapterKey: chapters[0]?.key ?? null, sub: scope }
 }
 
-type OutlineLike = { sectionKey: string; title: string; listDepth: number }
+type OutlineLike = { sectionKey: string; title: string; listDepth: number; hiddenReason?: string | null }
 
-/** Chapters = the top-level (listDepth 0) outline entries — the document's real chapters/parts,
- *  which the TOC tree misses for slug-keyed (unnumbered) books. */
+/** Chapters = the top-level (listDepth 0) outline entries — the document's real chapters,
+ *  which the TOC tree misses for slug-keyed (unnumbered) books. Entries the convert-time
+ *  controller hid (front/back matter, demoted Part containers) are not chapters. */
 export function chaptersFromOutline(outline: OutlineLike[]): CourseChapter[] {
   const seen = new Set<string>()
   const out: CourseChapter[] = []
   for (const e of outline || []) {
-    if (e.listDepth === 0 && e.sectionKey && !seen.has(e.sectionKey)) {
+    if (e.listDepth === 0 && e.sectionKey && !e.hiddenReason && !seen.has(e.sectionKey)) {
       seen.add(e.sectionKey)
       out.push({ key: e.sectionKey, title: e.title || e.sectionKey })
     }

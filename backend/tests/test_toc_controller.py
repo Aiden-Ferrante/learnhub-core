@@ -377,3 +377,80 @@ def test_resolution_logs_curate_and_carries_hidden():
     assert any(r == HIDE_FRONT_BACK for r in res.hidden.values())
     # ...but never chapter 11 (numbered childless chapter)
     assert "toc:11" not in res.hidden
+
+
+# --------------------------------------------------------------------------- #
+# stage: parts — Part containers demoted, chapters promoted to depth 0
+# --------------------------------------------------------------------------- #
+
+from app.process.content.toc_controller import (  # noqa: E402
+    HIDE_PART,
+    demote_part_containers,
+)
+
+
+def test_parts_demoted_and_chapters_promoted():
+    """The FoSA shape: chapters nested under 'Part N' containers move up one level;
+    the containers stay in the structure but are flagged hidden."""
+    entries, hidden, log = demote_part_containers([
+        _o("toc:preface", 0, "Preface"),
+        _o("toc:1", 0, "Introduction", "1"),
+        _o("toc:part-i-foundations", 0, "Part I. Foundations"),
+        _o("toc:2", 1, "Architectural Thinking", "2"),
+        _o("toc:2.1", 2, "Architecture Versus Design", "2.1"),
+        _o("toc:3", 1, "Modularity", "3"),
+        _o("toc:index", 0, "Index"),
+    ])
+    assert hidden == {"toc:part-i-foundations": HIDE_PART}
+    depths = {e["sectionKey"]: e["listDepth"] for e in entries}
+    assert depths["toc:2"] == 0 and depths["toc:3"] == 0  # chapters now top-level
+    assert depths["toc:2.1"] == 1  # subtree shifts as a whole
+    assert depths["toc:preface"] == 0 and depths["toc:index"] == 0  # outside parts: untouched
+    assert log.startswith("parts: demoted 1 container") and "Part I. Foundations" in log
+
+
+def test_parts_childless_part_left_to_orphan_rule_and_partless_book_untouched():
+    # A childless "Part II" is NOT demoted (no subtree to promote) — the curate
+    # orphan-part rule owns that case. A part-less book passes through as the
+    # same list object (behavior-lock safety).
+    outline = [
+        _o("toc:part-ii", 0, "Part II"),
+        _o("toc:10", 0, "Define Errors Out Of Existence", "10"),
+        _o("toc:10.1", 1, "Why exceptions add complexity", "10.1"),
+    ]
+    entries, hidden, log = demote_part_containers(outline)
+    assert entries is outline and hidden == {} and log is None
+
+
+def test_parts_title_lookalike_chapter_not_demoted():
+    # "Participation in Design" starts with 'part' but is a real chapter title.
+    entries, hidden, log = demote_part_containers([
+        _o("toc:participation-in-design", 0, "Participation in Design"),
+        _o("toc:x", 1, "A subsection"),
+    ])
+    assert hidden == {} and log is None
+
+
+def test_resolve_with_parts_promotes_chapters_and_logs_stage():
+    """End-to-end through resolve_toc: raw bookmarks with Part nesting come out with
+    chapters at depth 0, the container hidden as part-container (not re-flagged by
+    curate), and the stage narrated in the decision log."""
+    raw = [
+        {"level": 1, "title": "Preface", "page": 1},
+        {"level": 1, "title": "Part I. Foundations", "page": 2},
+        {"level": 2, "title": "1. Architectural Thinking", "page": 3},
+        {"level": 3, "title": "Architecture Versus Design", "page": 4},
+        {"level": 2, "title": "2. Modularity", "page": 6},
+        {"level": 1, "title": "Part II. Styles", "page": 8},
+        {"level": 2, "title": "3. Foundations", "page": 9},
+    ]
+    res = resolve_toc(raw, [], 400)
+    by_key = {e["sectionKey"]: e for e in res.outline_entries}
+    parts = [k for k, r in res.hidden.items() if r == HIDE_PART]
+    assert sorted(parts) == ["toc:part-i-foundations", "toc:part-ii-styles"]
+    assert by_key["toc:1"]["listDepth"] == 0 and by_key["toc:3"]["listDepth"] == 0
+    assert by_key["toc:architecture-versus-design"]["listDepth"] == 1
+    log = "\n".join(res.decisions)
+    assert "parts: demoted 2 container(s)" in log
+    # curate must not double-report the demoted containers as orphan parts
+    assert HIDE_ORPHAN_PART not in res.hidden.values()
