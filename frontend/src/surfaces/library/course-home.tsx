@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { SyllabusTree } from "@/surfaces/library/syllabus-tree"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
+import { ChapterStateStrip } from "@/surfaces/library/chapter-state-strip"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
@@ -21,7 +22,7 @@ import { countSections, displaySectionTitle, findChapterForSection, findNodeBySe
 import { SectionCard } from "@/kit/patterns/section-card"
 import { StatTile } from "@/kit/patterns/stat-tile"
 import { fetchCourseStatus, type CoursePipelineStatus } from "@/gateways/api/pipeline"
-import { type FadingSection, type MasteryResponse, type MemoryState, type SectionMemory } from "@/gateways/api/progress"
+import { type FadingSection, type MasteryResponse, type SectionMemory } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library/courses"
 
 type CourseHomeProps = {
@@ -90,64 +91,6 @@ function PracticeTile({
   )
 }
 
-const STATE_LABEL: Record<MemoryState, string> = {
-  new: "not studied",
-  solid: "solid",
-  shaky: "shaky",
-  fading: "fading",
-}
-
-const STATE_DOT: Record<MemoryState, string> = {
-  new: "bg-muted-foreground/30",
-  solid: "bg-brand",
-  shaky: "bg-amber-400",
-  fading: "bg-rose-400",
-}
-
-/** One chapter's row on the memory map: coverage bar + retention state + fading chip. */
-function MemoryRow({
-  label,
-  memory,
-  onOpen,
-}: {
-  label: string
-  memory: SectionMemory
-  onOpen: () => void
-}) {
-  const coveragePct = Math.round(memory.coverage * 100)
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-brand/5"
-    >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[memory.state]}`} aria-hidden />
-      <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-      {memory.fading > 0 && (
-        <span className="shrink-0 rounded-full bg-rose-400/15 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-rose-400">
-          {memory.fading} fading
-        </span>
-      )}
-      <span className="w-24 shrink-0">
-        <span className="block h-1.5 overflow-hidden rounded-full bg-muted">
-          <span
-            className="block h-full rounded-full bg-brand/70"
-            style={{ width: `${coveragePct}%` }}
-          />
-        </span>
-      </span>
-      <span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-        {memory.total === 0
-          ? "no concepts"
-          : memory.retention != null
-            ? `${Math.round(memory.retention * 100)}% · ${STATE_LABEL[memory.state]}`
-            : `${memory.reviewed}/${memory.total}`}
-      </span>
-    </button>
-  )
-}
-
-
 export function CourseHome({
   course,
   tree,
@@ -180,11 +123,7 @@ export function CourseHome({
     [course.learnDocId],
   )
 
-  const overall = mastery?.overall ?? null
-  const fadingSections = mastery?.fading ?? []
-  const isEmpty = !loading && !error && tree.length === 0
-
-  // The memory map's rows: the syllabus's top-level chapters + their memory summaries.
+  // The strip's squares: top-level chapters + their memory summaries.
   const chapterRows = useMemo(() => {
     if (!mastery) return []
     return tree
@@ -192,6 +131,10 @@ export function CourseHome({
       .map((n) => ({ node: n, memory: mastery.bySection[n.sectionKey!] }))
       .filter((r): r is { node: LearnTreeNode; memory: SectionMemory } => !!r.memory)
   }, [tree, mastery])
+
+  const overall = mastery?.overall ?? null
+  const fadingSections = mastery?.fading ?? []
+  const isEmpty = !loading && !error && tree.length === 0
 
   let headline: { icon: React.ReactNode; text: string }
   if (overall && overall.fading > 0) {
@@ -391,26 +334,6 @@ export function CourseHome({
         </div>
       )}
 
-      {/* The memory map — per-chapter coverage + retention, the course's state at a glance. */}
-      {!error && !isEmpty && chapterRows.length > 0 && (
-        <SectionCard
-          title="Memory map"
-          description="Per chapter: how much you've covered, and how well it's holding right now."
-          bodyClassName="p-0"
-        >
-          <div className="divide-y">
-            {chapterRows.map(({ node, memory }) => (
-              <MemoryRow
-                key={node.sectionKey}
-                label={displaySectionTitle(node.label, node.title)}
-                memory={memory}
-                onOpen={() => onOpenSection(node.sectionKey, node)}
-              />
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
       {/* Fading rail — studied sections whose retention dropped below the floor. */}
       {fadingSections.length > 0 && (
         <SectionCard title="Bring these back" bodyClassName="p-3">
@@ -435,7 +358,8 @@ export function CourseHome({
         </SectionCard>
       )}
 
-      {/* Study activity heatmap — scoped to this course (learnDocId keys the events). */}
+      {/* The book across chapters (state strip), then you across time (heatmap). */}
+      {!error && !isEmpty && <ChapterStateStrip rows={chapterRows} onOpen={onOpenSection} />}
       {!error && !isEmpty && <StudyHeatmap doc={course.learnDocId} />}
 
       {/* Course outline */}
