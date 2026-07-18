@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { SyllabusTree } from "@/surfaces/library/syllabus-tree"
+import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
@@ -433,6 +434,9 @@ export function CourseHome({
           </div>
         </SectionCard>
       )}
+
+      {/* Study activity heatmap — scoped to this course (learnDocId keys the events). */}
+      {!error && !isEmpty && <StudyHeatmap doc={course.learnDocId} />}
 
       {/* Course outline */}
       {!error && !isEmpty && (
