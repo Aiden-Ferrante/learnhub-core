@@ -122,15 +122,16 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_KEEP_ALIVE=30m
-      # KV-cache safety lives in NUM_PARALLEL=1 + the 16K context cap below (the old
-      # crash was NUM_PARALLEL=4 × a million-token context, NOT the model count).
-      # So we keep NUM_PARALLEL=1 but allow 4 resident models = 4 "slots": lets a
-      # coder + general + embed + vision model coexist warm without evict-churn.
-      # Safe on the 121GB unified pool — several small/medium weights fit in headroom,
-      # and Ollama's scheduler refuses to load a model that wouldn't fit (no OOM from
-      # slots — a too-big model just evicts an idle one or queues). Big 40GB+ weights
-      # still can't all be warm at once; use the GUI's memory readout to watch headroom.
-      - OLLAMA_NUM_PARALLEL=1
+      # NUM_PARALLEL=2 lets audiobook TTS decode two chunks per batch (~2x throughput
+      # on the bandwidth-bound GB10; single-stream Orpheus is only ~75 tok/s ≈ 0.9x
+      # real-time). The old crash was NUM_PARALLEL=4 × a MILLION-token context — with
+      # the 16K context cap below + q8_0 KV, a second slot costs only a few GB of KV
+      # per warm model, well inside headroom. MAX_LOADED_MODELS=4 keeps a coder +
+      # general + embed + vision model warm without evict-churn: safe on the 121GB
+      # unified pool — Ollama's scheduler refuses to load a model that wouldn't fit
+      # (a too-big model evicts an idle one or queues; no OOM from slots). Big 40GB+
+      # weights still can't all be warm at once; watch headroom in the GUI readout.
+      - OLLAMA_NUM_PARALLEL=2
       - OLLAMA_MAX_LOADED_MODELS=4
       # Cap the per-model context so a million-token-capable model can't size its KV cache
       # to the full window. 16K is ample for per-section extraction; raise if needed.

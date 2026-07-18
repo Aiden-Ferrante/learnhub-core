@@ -18,7 +18,7 @@ export function useNarration(chapterKey: string | null, docId: string) {
     setPlayerOpen(false)
     if (!chapterKey) return
     let alive = true
-    getAudiobookStatus(chapterKey, docId, "text")
+    getAudiobookStatus(chapterKey, docId)
       .then((st) => {
         if (alive && st.status === "done") setAudioReady(true)
       })
@@ -71,7 +71,7 @@ export function NarrationBar({
         ref={audioRef}
         controls
         preload="metadata"
-        src={audiobookFileUrl(chapterKey, docId, "text")}
+        src={audiobookFileUrl(chapterKey, docId)}
         className="h-8 min-w-0 flex-1 max-w-2xl"
         onLoadedMetadata={() => {
           const el = audioRef.current

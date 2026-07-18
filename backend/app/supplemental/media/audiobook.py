@@ -1,9 +1,7 @@
 """Audiobook generation: a chapter (or section) → a downloadable MP3 narrated by a
 local Orpheus 3B voice (via Ollama) + SNAC decode.
 
-Two sources (chosen per chapter):
-  - "text"     : the chapter's source markdown, cleaned for narration.
-  - "concepts" : the chapter's extracted concept signals (a clean audio summary).
+One source: the chapter's raw markdown, cleaned for narration.
 
 Long-running and GPU-bound, so it runs as a background job (mirrors the extraction
 job): ``POST /api/audiobook`` starts it, the client polls ``/status``, then streams /
@@ -24,10 +22,7 @@ import time
 import numpy as np
 
 from app.process.content import resolve_doc_id
-from app.gateways import db
 from app.process.content import load_section_blocks
-from app.gateways import ollama_structured_completion
-from app.gateways import GuidedScript
 from app.supplemental.media.tts_orpheus import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
 
 AUDIO_DIR = os.environ.get("AUDIOBOOK_DIR", "/shared/audiobooks")
@@ -127,10 +122,10 @@ def segment_text(text: str, max_chars: int = 280) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
-# Source text (text | concepts)
+# Narration script (raw chapter text)
 # --------------------------------------------------------------------------- #
 
-def _scope_segments_text(doc_id: str, scope: str | None) -> list[str]:
+def chapter_segments(doc_id: str, scope: str | None) -> list[str]:
     """Chapter's source markdown (per section, heading first), cleaned + segmented."""
     sections = load_section_blocks(doc_id, scope=scope)
     segs: list[str] = []
@@ -142,129 +137,6 @@ def _scope_segments_text(doc_id: str, scope: str | None) -> list[str]:
     return segs
 
 
-def _scope_section_keys(doc_id: str, scope: str | None) -> list[str]:
-    return [s.section_key for s in load_section_blocks(doc_id, scope=scope)]
-
-
-def _scope_segments_concepts(doc_id: str, scope: str | None) -> list[str]:
-    """Chapter's concept lessons as a clean audio summary, in reading order."""
-    keys = _scope_section_keys(doc_id, scope)
-    if not keys:
-        return []
-    with db() as conn:
-        rows = conn.execute(
-            "SELECT name, signal FROM ext_concepts "
-            "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
-            'ORDER BY section_key, "order"',
-            {"d": doc_id, "ks": keys},
-        ).fetchall()
-    segs: list[str] = []
-    for r in rows:
-        name = (r.get("name") or "").strip()
-        signal = clean_for_narration(r.get("signal") or "")
-        if name and signal:
-            segs.append(f"{name}.")
-            segs.extend(segment_text(signal))
-    return segs
-
-
-# --------------------------------------------------------------------------- #
-# Guided narration: read the text verbatim, wrapped in concept-grounded tutoring.
-# --------------------------------------------------------------------------- #
-
-GUIDED_SYSTEM = (
-    "You are a warm, concise tutor narrating a textbook section as AUDIO. You are given the "
-    "section's passages (numbered from 0) and its key concepts. Produce guidance that wraps "
-    "AROUND the passages — never rewrite, quote, or summarize them.\n"
-    "- intro: ONE spoken sentence orienting the listener (what this section is about, why it "
-    "matters).\n"
-    "- comments: a few SHORT tutor asides, each placed after a specific passage index, only where "
-    "genuinely helpful (connect ideas, flag what matters, relate to a key concept). Write each in "
-    "an explicit tutor voice ('Notice that…', 'The key idea here is…', 'In other words…') so a "
-    "listener clearly hears it's commentary, not the book. One sentence each; at most one per "
-    "passage; 2–4 total.\n"
-    "- takeaways: 2–4 short 'remember this' points, grounded in the concepts.\n"
-    "Spoken style only — no markdown, no symbols or equations read aloud, no passage numbers. "
-    "Ground everything in the given passages and concepts; invent nothing."
-)
-
-
-def _spoken(s: object) -> str:
-    return re.sub(r"[*_`#]", "", str(s or "")).strip()
-
-
-def _concepts_for_section(doc_id: str, section_key: str) -> list[dict]:
-    with db() as conn:
-        return conn.execute(
-            'SELECT name, signal FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s '
-            'ORDER BY "order"',
-            {"d": doc_id, "s": section_key},
-        ).fetchall()
-
-
-def _guided_script_for_section(heading: str, passages: list[str], concepts: list[dict],
-                               model: str | None = None) -> dict | None:
-    concept_lines = "\n".join(f"- {c['name']}: {c.get('signal') or ''}" for c in concepts[:12])
-    numbered = "\n".join(f"[{i}] {p}" for i, p in enumerate(passages))
-    user = (
-        f"Section: {heading}\n\n"
-        f"Key concepts:\n{concept_lines or '(none extracted)'}\n\n"
-        f"Passages:\n{numbered}"
-    )
-    messages = [
-        {"role": "system", "content": GUIDED_SYSTEM},
-        {"role": "user", "content": user},
-    ]
-    obj, _err = ollama_structured_completion(messages, GuidedScript, temperature=0.4, model=model)
-    return obj if isinstance(obj, dict) else None
-
-
-def _scope_segments_guided(doc_id: str, scope: str | None, model=None, on_progress=None) -> list[str]:
-    """Verbatim passages spliced with concept-grounded tutor scaffolding (single voice).
-    All LLM script-writing happens here, BEFORE any TTS, so the single-GPU model cache
-    swaps once (script model → Orpheus) instead of per section."""
-    sections = load_section_blocks(doc_id, scope=scope)
-    out: list[str] = []
-    for si, s in enumerate(sections):
-        if on_progress:
-            on_progress(si, len(sections), f"writing guide: {(s.heading or '')[:50]}")
-        passages = segment_text(clean_for_narration(s.markdown))
-        if not passages:
-            continue
-        head = _spoken(s.heading)
-        if head and not head.lower().startswith("toc:"):
-            out.append(f"{head}.")
-        script = _guided_script_for_section(
-            head or s.section_key, passages, _concepts_for_section(doc_id, s.section_key), model
-        )
-        comments_by: dict[int, list[str]] = {}
-        intro, takeaways = "", []
-        if script:
-            intro = _spoken(script.get("intro"))
-            for c in script.get("comments") or []:
-                note = _spoken(c.get("note"))
-                if note:
-                    comments_by.setdefault(int(c.get("after", -1)), []).append(note)
-            takeaways = [t for t in (_spoken(x) for x in script.get("takeaways") or []) if t]
-        if intro:
-            out.append(intro)
-        for i, p in enumerate(passages):
-            out.append(p)
-            for note in comments_by.get(i, []):
-                out.append(note)
-        if takeaways:
-            out.append("To sum up. " + " ".join(t.rstrip(".") + "." for t in takeaways))
-    return out
-
-
-def chapter_segments(doc_id: str, scope: str | None, source: str, on_progress=None) -> list[str]:
-    if source == "concepts":
-        return _scope_segments_concepts(doc_id, scope)
-    if source == "guided":
-        return _scope_segments_guided(doc_id, scope, on_progress=on_progress)
-    return _scope_segments_text(doc_id, scope)
-
-
 # --------------------------------------------------------------------------- #
 # Synthesis + MP3
 # --------------------------------------------------------------------------- #
@@ -273,13 +145,16 @@ def _slug(scope: str | None) -> str:
     return re.sub(r"[^a-zA-Z0-9]+", "-", scope or "whole").strip("-") or "whole"
 
 
-def audiobook_path(doc_id: str, scope: str | None, source: str) -> str:
-    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.mp3")
+# File names keep the historical "__text" suffix so already-generated narrations
+# stay playable after the source dimension was removed.
+
+def audiobook_path(doc_id: str, scope: str | None) -> str:
+    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__text.mp3")
 
 
-def timeline_path(doc_id: str, scope: str | None, source: str) -> str:
+def timeline_path(doc_id: str, scope: str | None) -> str:
     """Sidecar mapping narration chunks to playback times — the read-along data."""
-    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__{source}.timeline.json")
+    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__text.timeline.json")
 
 
 def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RATE, chars_per_sec: float = 14.0) -> list[float]:
@@ -295,8 +170,8 @@ def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RA
 _TTS_GATE = threading.Semaphore(1)
 
 
-def _work_dir(doc_id: str, scope: str | None, source: str) -> str:
-    return os.path.join(AUDIO_DIR, doc_id, f".{_slug(scope)}__{source}.work")
+def _work_dir(doc_id: str, scope: str | None) -> str:
+    return os.path.join(AUDIO_DIR, doc_id, f".{_slug(scope)}__text.work")
 
 
 def _load_manifest(work: str) -> dict | None:
@@ -331,7 +206,7 @@ def _encode_mp3(wav: np.ndarray, out_path: str) -> None:
         os.unlink(tmp_wav)
 
 
-def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
+def make_audiobook(doc_id: str | None, scope: str | None,
                    voice: str = DEFAULT_VOICE, on_progress=None) -> dict:
     """Render a chapter to an MP3. Blocking + GPU-bound — call from a worker thread.
 
@@ -346,16 +221,15 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
         voice = DEFAULT_VOICE
 
     # Resume from the checkpointed segment list when one exists — it pins the exact
-    # narration script (guided scripts are LLM-written, so recomputing would drift)
-    # and the voice, so resumed chunks match the ones already on disk.
-    work = _work_dir(doc_id, scope, source)
+    # narration script and the voice, so resumed chunks match the ones already on disk.
+    work = _work_dir(doc_id, scope)
     manifest = _load_manifest(work)
     if manifest:
         segments = manifest["segments"]
         if manifest.get("voice") in VOICES:
             voice = manifest["voice"]
     else:
-        segments = chapter_segments(doc_id, scope, source, on_progress=on_progress)
+        segments = chapter_segments(doc_id, scope)
         # Drop consecutive duplicates (e.g. a heading that the section body repeats).
         deduped: list[str] = []
         for seg in segments:
@@ -413,19 +287,18 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
         return {"docId": doc_id, "scope": scope, "error": "synthesis produced no audio"}
 
     full = np.concatenate(pieces)
-    out_path = audiobook_path(doc_id, scope, source)
+    out_path = audiobook_path(doc_id, scope)
     _encode_mp3(full, out_path)
-    tl_path = timeline_path(doc_id, scope, source)
+    tl_path = timeline_path(doc_id, scope)
     tmp_tl = f"{tl_path}.tmp"
     with open(tmp_tl, "w") as f:
-        json.dump({"exact": True, "source": source, "chunks": chunk_times}, f)
+        json.dump({"exact": True, "chunks": chunk_times}, f)
     os.replace(tmp_tl, tl_path)
     shutil.rmtree(work, ignore_errors=True)
 
     return {
         "docId": doc_id,
         "scope": scope,
-        "source": source,
         "voice": voice,
         "segments": total,
         "durationSec": round(full.size / SAMPLE_RATE, 1),
@@ -438,17 +311,17 @@ def make_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
 # Background job (on the persistent queue — the "audiobook" kind)
 # --------------------------------------------------------------------------- #
 
-def _audio_scope(scope: str | None, source: str) -> str:
-    """Queue key scope for an audiobook — carries the ``source`` dimension the queue's
-    (doc, scope, kind) keying doesn't model, so each source is its own job row."""
-    return f"{scope or ''}::{source}"
+def _audio_scope(scope: str | None) -> str:
+    """Queue key scope for an audiobook. The "::text" suffix is historical (it carried a
+    source dimension once) and is kept so job keys stay stable across the removal."""
+    return f"{scope or ''}::text"
 
 
-def _find_audiobook_job(doc_id: str, scope: str | None, source: str) -> dict | None:
+def _find_audiobook_job(doc_id: str, scope: str | None) -> dict | None:
     from app.gateways import list_builds
 
     for b in list_builds(doc_id, kind="audiobook").get("builds", []):
-        if b.get("source") == source and (b.get("realScope") or None) == (scope or None):
+        if (b.get("source") or "text") == "text" and (b.get("realScope") or None) == (scope or None):
             return b
     return None
 
@@ -458,85 +331,80 @@ def run_audiobook(job: dict, ctx) -> dict:
     queue just dispatches and records status."""
     doc_id = job["docId"]
     scope = job.get("realScope")
-    source = job.get("source") or "text"
     voice = job.get("voice") or DEFAULT_VOICE
-    summary = make_audiobook(doc_id, scope, source, voice, on_progress=ctx.progress)
+    summary = make_audiobook(doc_id, scope, voice, on_progress=ctx.progress)
     if summary.get("error"):
         return {"error": summary["error"]}
     return summary
 
 
-def start_audiobook(doc_id: str | None, scope: str | None, source: str = "text",
+def start_audiobook(doc_id: str | None, scope: str | None,
                     voice: str = DEFAULT_VOICE) -> dict:
     from app.gateways import enqueue_build
 
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "error", "error": "no document found"}
-    res = enqueue_build(doc_id, _audio_scope(scope, source), kind="audiobook",
-                        payload={"realScope": scope, "source": source, "voice": voice})
+    res = enqueue_build(doc_id, _audio_scope(scope), kind="audiobook",
+                        payload={"realScope": scope, "voice": voice})
     if res.get("error"):
         return {"status": "error", "error": res["error"]}
-    out = {"status": "running", "scope": scope, "docId": doc_id, "source": source}
+    out = {"status": "running", "scope": scope, "docId": doc_id}
     if res.get("already"):
         out["alreadyRunning"] = True
     return out
 
 
-def audiobook_status(doc_id: str | None, scope: str | None, source: str = "text") -> dict:
+def audiobook_status(doc_id: str | None, scope: str | None) -> dict:
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
-        return {"status": "idle", "scope": scope, "source": source}
+        return {"status": "idle", "scope": scope}
     # Live queue state (queued / running / error) takes precedence.
-    job = _find_audiobook_job(doc_id, scope, source)
+    job = _find_audiobook_job(doc_id, scope)
     if job and job.get("status") in ("queued", "running"):
-        out = {"status": "running", "scope": scope, "docId": doc_id, "source": source}
+        out = {"status": "running", "scope": scope, "docId": doc_id}
         if job.get("total"):
             out["progress"] = {"done": job.get("done"), "total": job.get("total"), "current": job.get("phase")}
         return out
     if job and job.get("status") == "error":
-        return {"status": "error", "scope": scope, "docId": doc_id, "source": source,
-                "error": job.get("error")}
+        return {"status": "error", "scope": scope, "docId": doc_id, "error": job.get("error")}
     # Done or no live job → the MP3 on disk is the source of truth (covers prior-run files).
-    path = audiobook_path(doc_id, scope, source)
+    path = audiobook_path(doc_id, scope)
     if os.path.exists(path):
-        return {"status": "done", "scope": scope, "docId": doc_id, "source": source,
+        return {"status": "done", "scope": scope, "docId": doc_id,
                 "summary": {"file": path, "exists": True}}
     # A checkpoint work dir without a finished file means a run died; re-starting resumes.
-    work = _work_dir(doc_id, scope, source)
+    work = _work_dir(doc_id, scope)
     manifest = _load_manifest(work)
     if manifest:
         done = sum(1 for fn in os.listdir(work)
                    if fn.endswith(".npy") and not fn.endswith(".tmp.npy"))
-        return {"status": "interrupted", "scope": scope, "docId": doc_id, "source": source,
+        return {"status": "interrupted", "scope": scope, "docId": doc_id,
                 "progress": {"done": done, "total": len(manifest["segments"]), "current": None},
                 "resume": "start this narration again to continue from the checkpoint"}
-    return {"status": "idle", "scope": scope, "docId": doc_id, "source": source}
+    return {"status": "idle", "scope": scope, "docId": doc_id}
 
 
-def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "text") -> dict:
+def audiobook_timeline(doc_id: str | None, scope: str | None) -> dict:
     """Chunk→playback-time map for read-along highlighting.
 
     Narrations generated after timelines existed have an exact sidecar. Older MP3s get an
-    ESTIMATED timeline when the narration script is deterministic (text/concepts): the same
-    segmentation is recomputed and per-chunk weights (∝ text length + gap) are returned for
-    the client to scale to the real MP3 duration. Guided scripts were LLM-written and can't
-    be reconstructed — no sidecar means no read-along there."""
+    ESTIMATED timeline: the script is deterministic, so the same segmentation is recomputed
+    and per-chunk weights (∝ text length + gap) are returned for the client to scale to the
+    real MP3 duration."""
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    tl_path = timeline_path(doc_id, scope, source)
+    tl_path = timeline_path(doc_id, scope)
     try:
         with open(tl_path) as f:
             return json.load(f)
     except (OSError, ValueError):
         pass
-    if not os.path.exists(audiobook_path(doc_id, scope, source)):
+    if not os.path.exists(audiobook_path(doc_id, scope)):
         return {"error": "no audiobook for this scope"}
-    if source == "guided":
-        return {"error": "no timeline for this narration (guided script predates timelines — regenerate)"}
     try:
-        segments = chapter_segments(doc_id, scope, source)
+        segments = chapter_segments(doc_id, scope)
         deduped: list[str] = []
         for seg in segments:  # same dedup make_audiobook applies before synthesis
             if deduped and seg.strip().lower() == deduped[-1].strip().lower():
@@ -547,7 +415,6 @@ def audiobook_timeline(doc_id: str | None, scope: str | None, source: str = "tex
         weights = estimate_weights(deduped)
         return {
             "exact": False,
-            "source": source,
             "chunks": [{"text": s, "weight": w} for s, w in zip(deduped, weights)],
         }
     except Exception as exc:  # noqa: BLE001
@@ -562,8 +429,6 @@ def list_audiobooks(doc_id: str | None) -> dict:
     items = []
     if os.path.isdir(folder):
         for fn in sorted(os.listdir(folder)):
-            if fn.endswith(".mp3"):
-                stem = fn[:-4]
-                scope_slug, _, source = stem.rpartition("__")
-                items.append({"file": fn, "scope": scope_slug, "source": source or "text"})
+            if fn.endswith("__text.mp3"):
+                items.append({"file": fn, "scope": fn[: -len("__text.mp3")]})
     return {"docId": doc_id, "audiobooks": items}

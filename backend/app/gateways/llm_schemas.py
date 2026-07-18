@@ -9,9 +9,8 @@ a plain dict so every downstream parser sees the identical keys it did before.
 Field names are intentionally kept as-is (including camelCase ``answerIndex`` / ``watchFor``)
 so no aliasing is required — ``model_dump()`` reproduces the original wire keys 1:1.
 
-The ``Literal`` enums mirror ``concepts_extract._KINDS`` and ``concept_quiz_llm._TYPES``;
-kept inline here (rather than imported) to avoid a circular import, since those modules
-consume these models.
+The ``Literal`` enums mirror ``concepts_extract._KINDS``; kept inline here (rather than
+imported) to avoid a circular import, since that module consumes these models.
 """
 
 from __future__ import annotations
@@ -36,25 +35,6 @@ class ConceptItem(BaseModel):
 
 class ConceptResult(BaseModel):
     concepts: List[ConceptItem]
-
-
-# --------------------------------------------------------------------------- #
-# concept_quiz_llm.py — AUTHOR_SCHEMA  (author + critic; mirrors _TYPES)
-# --------------------------------------------------------------------------- #
-
-QuestionType = Literal["apply", "distinguish", "why"]
-
-
-class AuthoredQuestion(BaseModel):
-    type: QuestionType
-    stem: str
-    options: List[str]
-    answerIndex: int
-    explanation: str
-
-
-class AuthoredSet(BaseModel):
-    questions: List[AuthoredQuestion]
 
 
 # --------------------------------------------------------------------------- #
@@ -91,20 +71,6 @@ class Orient(BaseModel):
     watchFor: List[str]
 
 
-# --------------------------------------------------------------------------- #
-# audiobook.py — GUIDED_SCHEMA  (comments optional: required = intro + takeaways)
-# --------------------------------------------------------------------------- #
-
-
-class GuidedComment(BaseModel):
-    after: int
-    note: str
-
-
-class GuidedScript(BaseModel):
-    intro: str
-    comments: List[GuidedComment] = Field(default_factory=list)
-    takeaways: List[str]
 
 
 # --------------------------------------------------------------------------- #

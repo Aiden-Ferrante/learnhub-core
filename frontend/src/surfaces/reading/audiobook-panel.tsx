@@ -1,19 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import {
-  Download,
-  FileText,
-  GraduationCap,
-  Headphones,
-  Loader2,
-  Play,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react"
+import { Download, Headphones, Loader2, Play, RefreshCw } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Progress } from "@/kit/ui/progress"
-import { audiobookFileUrl, fetchAudiobookTimeline, fetchAudiobookVoices, getAudiobookStatus, startAudiobook, type AudiobookSource, type AudiobookStatusResponse, type AudiobookTimeline } from "@/gateways/api/audiobook"
+import { audiobookFileUrl, fetchAudiobookTimeline, fetchAudiobookVoices, getAudiobookStatus, startAudiobook, type AudiobookStatusResponse, type AudiobookTimeline } from "@/gateways/api/audiobook"
 import {
   buildStripIndex,
   clearReadAlongHighlights,
@@ -32,21 +23,8 @@ type AudiobookPanelProps = {
   docId?: string
 }
 
-const SOURCES: { value: AudiobookSource; label: string; Icon: typeof FileText }[] = [
-  { value: "text", label: "Full text", Icon: FileText },
-  { value: "guided", label: "Guided", Icon: GraduationCap },
-  { value: "concepts", label: "Concept summary", Icon: Sparkles },
-]
-
-const SOURCE_HINT: Record<AudiobookSource, string> = {
-  text: "Reads the chapter's text aloud (equations and code are skipped).",
-  guided: "A tutor reads the text and adds orientation, notes, and key takeaways — grounded in your concepts.",
-  concepts: "Reads the extracted concept lessons — a clean audio summary.",
-}
-
 /** Generate a chapter's narration as a downloadable MP3 (local Orpheus TTS). */
 export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
-  const [source, setSource] = useState<AudiobookSource>("text")
   const [voice, setVoice] = useState("tara")
   const [voices, setVoices] = useState<string[]>(["tara"])
   const [status, setStatus] = useState<AudiobookStatusResponse | null>(null)
@@ -54,7 +32,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
   const [cacheBust, setCacheBust] = useState(0)
   const pollRef = useRef<number | null>(null)
 
-  // Playback speed (persisted) + resume position per (scope, source).
+  // Playback speed (persisted) + resume position per scope.
   const audioRef = useRef<HTMLAudioElement>(null)
   const [speed, setSpeed] = useState(1)
   useEffect(() => {
@@ -68,7 +46,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed
   }, [speed])
-  const posKey = `txt2k:audio-pos:${scope ?? ""}:${source}`
+  const posKey = `txt2k:audio-pos:${scope ?? ""}:text`
   const onAudioLoaded = () => {
     const el = audioRef.current
     if (!el) return
@@ -118,8 +96,8 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
     syncRef.current = null
     clearReadAlongHighlights()
     if (!ready) return
-    fetchAudiobookTimeline(scope, docId, source).then(setTimeline)
-  }, [ready, scope, docId, source])
+    fetchAudiobookTimeline(scope, docId).then(setTimeline)
+  }, [ready, scope, docId])
 
   // Resolve chunk times (exact, or weights scaled to the real MP3 duration) and locate each
   // chunk's span in the prose. The article lives behind this drawer in the deep chapter.
@@ -233,7 +211,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
   }, [])
 
   const poll = useCallback(async () => {
-    const st = await getAudiobookStatus(scope, docId, source)
+    const st = await getAudiobookStatus(scope, docId)
     setStatus(st)
     if (st.status === "running") {
       pollRef.current = window.setTimeout(poll, 4000)
@@ -241,14 +219,14 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
       setBusy(false)
       if (st.status === "done") setCacheBust(Date.now())
     }
-  }, [scope, docId, source])
+  }, [scope, docId])
 
-  // When scope/source changes, surface any already-generated file or resume a running job.
+  // When scope changes, surface any already-generated file or resume a running job.
   useEffect(() => {
     stopPoll()
     setBusy(false)
     setStatus(null)
-    getAudiobookStatus(scope, docId, source).then((st) => {
+    getAudiobookStatus(scope, docId).then((st) => {
       setStatus(st)
       if (st.status === "running") {
         setBusy(true)
@@ -258,11 +236,11 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
       }
     })
     return stopPoll
-  }, [scope, docId, source, poll, stopPoll])
+  }, [scope, docId, poll, stopPoll])
 
   const generate = async () => {
     setBusy(true)
-    const started = await startAudiobook(scope, docId, source, voice)
+    const started = await startAudiobook(scope, docId, voice)
     setStatus(started)
     if (started.status === "error") {
       setBusy(false)
@@ -283,8 +261,8 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
   const running = status?.status === "running" || busy
   const p = status?.progress
   const pct = p && p.total ? Math.round((100 * p.done) / p.total) : 0
-  const fileUrl = ready ? `${audiobookFileUrl(scope, docId, source)}&_=${cacheBust}` : ""
-  const downloadUrl = audiobookFileUrl(scope, docId, source, true)
+  const fileUrl = ready ? `${audiobookFileUrl(scope, docId)}&_=${cacheBust}` : ""
+  const downloadUrl = audiobookFileUrl(scope, docId, true)
   const mins = status?.summary?.durationSec ? Math.max(1, Math.round(status.summary.durationSec / 60)) : null
 
   return (
@@ -295,29 +273,9 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
         <span className="text-xs text-muted-foreground">· narrated locally by Orpheus</span>
       </div>
 
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Narrate</span>
-        <div className="inline-flex rounded-lg border border-border/60 bg-muted/30 p-0.5">
-          {SOURCES.map(({ value, label, Icon }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setSource(value)}
-              disabled={running}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
-                source === value
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">{SOURCE_HINT[source]}</p>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Reads the chapter&rsquo;s text aloud (equations and code are skipped).
+      </p>
 
       <div className="flex items-end gap-3">
         <div className="space-y-1.5">
@@ -355,11 +313,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
         <div className="space-y-1">
           <Progress value={pct} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {p?.total
-              ? `Narrating — segment ${p.done}/${p.total} (${pct}%)`
-              : source === "guided"
-                ? "Writing the guided script…"
-                : "Preparing…"}
+            {p?.total ? `Narrating — segment ${p.done}/${p.total} (${pct}%)` : "Preparing…"}
             <span className="ml-1 opacity-70">· a full chapter takes several minutes</span>
           </p>
         </div>
@@ -420,7 +374,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
               </label>
               <span>
                 {mins ? `· ${mins} min` : ""}
-                {source === "text" ? " · full text" : source === "concepts" ? " · concept summary" : ""}
+                {" · full text"}
               </span>
             </span>
             <a

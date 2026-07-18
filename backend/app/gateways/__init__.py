@@ -24,13 +24,11 @@ from app.gateways.ledger import (
     update_job,
 )
 from app.gateways.llm import ollama_base_url, ollama_model, ollama_structured_completion
-from app.gateways.llm_schemas import AuthoredSet, ConceptResult, ConceptVerdict, GuidedScript, Orient, ReadingGuide, Skeleton
+from app.gateways.llm_schemas import ConceptResult, ConceptVerdict, Orient, ReadingGuide, Skeleton
 
 __all__ = [
-    "AuthoredSet",
     "ConceptResult",
     "ConceptVerdict",
-    "GuidedScript",
     "JobCancelled",
     "KINDS",
     "Orient",
