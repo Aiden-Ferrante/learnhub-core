@@ -63,7 +63,7 @@ function ConceptRow({
           onOpen && "cursor-pointer hover:bg-muted/60",
         )}
       >
-        <ConceptMasteryDot mastery={mastery?.mastery} attempts={mastery?.attempts} className="mt-1.5" />
+        <ConceptMasteryDot state={mastery?.state} retention={mastery?.retention} className="mt-1.5" />
         <span
           className={cn(
             "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",

@@ -69,9 +69,9 @@ export function ConceptsView({ course, tree, onBack, initialConceptKey }: Concep
     }
   }, [course.learnDocId, loadMastery])
 
-  // "What can I learn next": concepts you haven't mastered yet (gate "ready").
+  // "What can I learn next": concepts not yet solid (new, shaky, or fading).
   const ready = useMemo(
-    () => concepts.filter((c) => c.conceptKey && mastery[c.conceptKey]?.gate === "ready").slice(0, 10),
+    () => concepts.filter((c) => c.conceptKey && mastery[c.conceptKey]?.state !== "solid").slice(0, 10),
     [concepts, mastery],
   )
 
@@ -105,8 +105,7 @@ export function ConceptsView({ course, tree, onBack, initialConceptKey }: Concep
         concept={selected}
         sectionTitle={titles[selected.sectionKey || ""] || prettyScope(selected.sectionKey)}
         docId={course.learnDocId}
-        mastery={sm?.mastery}
-        attempts={sm?.attempts}
+        memory={sm}
         onBack={() => {
           setMode("list")
           loadMastery()

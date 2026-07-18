@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
 import { ConceptMasteryDot } from "@/surfaces/concepts/concept-mastery-dot"
+import type { ConceptMastery } from "@/gateways/api/progress"
 import { prettyScope } from "@/surfaces/concepts/concept-card"
 import { KIND_BADGE } from "@/surfaces/concepts/kind-palette"
 import { SectionFigures } from "@/surfaces/reading"
@@ -18,8 +19,7 @@ type ConceptDetailProps = {
   onGraded?: () => void
   sectionTitle?: string
   docId?: string
-  mastery?: number
-  attempts?: number
+  memory?: ConceptMastery
 }
 
 /** A focused single-concept lesson: explanation, source passage, a reveal-on-click
@@ -30,8 +30,7 @@ export function ConceptDetail({
   onGraded,
   sectionTitle,
   docId,
-  mastery,
-  attempts,
+  memory,
 }: ConceptDetailProps) {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
   const [graded, setGraded] = useState<string | null>(null)
@@ -58,7 +57,7 @@ export function ConceptDetail({
 
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          {mastery !== undefined && <ConceptMasteryDot mastery={mastery} attempts={attempts} />}
+          {memory !== undefined && <ConceptMasteryDot state={memory.state} retention={memory.retention} />}
           <h2 className="text-xl font-semibold leading-tight">{c.name}</h2>
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
             {c.kind}

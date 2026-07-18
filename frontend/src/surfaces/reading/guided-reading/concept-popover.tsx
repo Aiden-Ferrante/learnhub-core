@@ -57,7 +57,7 @@ export function ConceptPopover({
     >
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <ConceptMasteryDot mastery={mastery?.mastery} attempts={mastery?.attempts} />
+          <ConceptMasteryDot state={mastery?.state} retention={mastery?.retention} />
           <span className="text-sm font-semibold">{concept.name}</span>
           <span
             className={cn(

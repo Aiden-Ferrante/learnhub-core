@@ -1,27 +1,31 @@
-/** Study progress rollups: mastery, activity, forecast, study debt. */
+/** Study tracking read models — the three-question split:
+ *  memory state (coverage + FSRS retention), history (activity + cadence), action (debt). */
 import { parseJsonResponse } from './http'
 
-export type SectionMastery = {
-  mastery: number
-  coverage?: number
-  accuracy?: number
-  attempts: number
-  lastSeen: number | null
-  isRollup?: boolean
+export type MemoryState = 'new' | 'solid' | 'shaky' | 'fading'
+
+/** One unit's memory summary: how much is touched (coverage) and how well it holds
+ *  right now (mean FSRS retrievability over reviewed concepts; null = nothing reviewed). */
+export type SectionMemory = {
+  total: number
+  reviewed: number
+  coverage: number
+  retention: number | null
+  state: MemoryState
+  fading: number
 }
 
-export type WeakestSection = {
+export type FadingSection = SectionMemory & {
   sectionKey: string
   label: string
   title?: string | null
-  mastery: number
 }
 
 export type MasteryResponse = {
-  bySection: Record<string, SectionMastery>
-  overall: number
-  weakest: WeakestSection[]
-  params?: { alpha: number; beta: number; tauDays: number }
+  bySection: Record<string, SectionMemory>
+  overall: SectionMemory
+  fading: FadingSection[]
+  thresholds?: { solid: number; shaky: number }
   error?: string
 }
 
@@ -33,6 +37,8 @@ export type ActivityResponse = {
   max: number
   /** Per-engagement-kind counts (review | skeleton | read | listen | …). */
   byKind?: Record<string, number>
+  /** Cadence: days with at least one graded review in the trailing window. */
+  cadence?: { reviewedDays: number; windowDays: number }
   error?: string
 }
 
@@ -46,22 +52,6 @@ export async function fetchActivity(doc?: string): Promise<ActivityResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
   const res = await fetch(`/api/learn/activity${qs}`, { cache: 'no-store' })
   return parseJsonResponse<ActivityResponse>(res)
-}
-
-// Forgetting forecast: concepts due now + falling due over the next `days`.
-export type ForecastResponse = {
-  dueNow: number
-  soon?: number
-  tracked: number
-  horizon: { date: string; count: number }[]
-  error?: string
-}
-
-export async function fetchForecast(doc?: string, days = 7): Promise<ForecastResponse> {
-  const params = new URLSearchParams({ days: String(days) })
-  if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/forecast?${params}`, { cache: 'no-store' })
-  return parseJsonResponse<ForecastResponse>(res)
 }
 
 // Record a passive engagement event (read/listen/…) so the dashboard reflects all study,
@@ -94,19 +84,21 @@ export async function fetchStudyDebt(days = 7): Promise<StudyDebt> {
 export type ConceptMastery = {
   name: string
   sectionKey: string
-  mastery: number
-  attempts: number
+  /** FSRS retrievability right now; null until first review. */
+  retention: number | null
+  state: MemoryState
   due?: number | null
-  state?: string
-  /** Study gate: mastered (≥ threshold) | ready (not yet mastered). */
-  gate?: 'mastered' | 'ready'
+  scheduleState?: string
+  attempts: number
+  accuracy?: number | null
+  lastSeen?: number | null
 }
 
 export type ConceptMasteryResponse = {
   byConcept: Record<string, ConceptMastery>
-  overall: number
-  counts?: { mastered: number; ready: number; locked: number; total: number }
-  masteredThreshold?: number
+  overall: number | null
+  counts?: { new: number; solid: number; shaky: number; fading: number; total: number }
+  thresholds?: { solid: number; shaky: number }
   error?: string
 }
 

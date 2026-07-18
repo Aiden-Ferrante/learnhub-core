@@ -97,7 +97,6 @@ export function GuidedReading({
     preparing,
     load,
     masteryByKey,
-    masteredThreshold,
     dueCount,
     refreshMastery,
   } = useGuidedReadingData(docId, chapterKey, tree)
@@ -272,7 +271,7 @@ export function GuidedReading({
     const classFor = (idx: number) => {
       const c = concepts[idx]
       const m = c?.conceptKey ? masteryByKey[c.conceptKey] : undefined
-      return cn(masteryTint(m, masteredThreshold), highlightConcepts && masteryWash(m, masteredThreshold))
+      return cn(masteryTint(m), highlightConcepts && masteryWash(m))
     }
     const annotate = (children: React.ReactNode) =>
       regex ? annotateNode(children, regex, indexByName, new Set<string>(), classFor) : children
@@ -295,7 +294,7 @@ export function GuidedReading({
         }
       />
     )
-  }, [displayMarkdown, concepts, indexByName, theme, prefs.size, prefs.measure, masteryByKey, masteredThreshold, highlightConcepts])
+  }, [displayMarkdown, concepts, indexByName, theme, prefs.size, prefs.measure, masteryByKey, highlightConcepts])
 
   // Post-render pass over the committed DOM: (1) dedupe underlines to the FIRST mention of
   // each concept in the chapter (per-paragraph marking alone is too noisy — "response time"

@@ -498,7 +498,9 @@ export function CourseShelf({
                   sections={ready && course.id === liveCourseId ? liveSections : null}
                   overallPct={
                     ready && course.id === liveCourseId && liveMastery
-                      ? Math.round(liveMastery.overall * 100)
+                      ? Math.round(
+                          (liveMastery.overall.retention ?? liveMastery.overall.coverage) * 100,
+                        )
                       : null
                   }
                   loading={ready && course.id === liveCourseId ? liveLoading : false}

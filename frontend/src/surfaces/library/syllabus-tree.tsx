@@ -18,7 +18,7 @@ import { cn } from "@/kit/lib/utils"
 import { ConceptMasteryDot } from "@/surfaces/concepts"
 import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
 import { getExtractionStatus, startExtraction } from "@/gateways/api/pipeline"
-import { type SectionMastery } from "@/gateways/api/progress"
+import { type SectionMemory } from "@/gateways/api/progress"
 
 type ExtractState = "running" | "done" | "error"
 
@@ -26,7 +26,7 @@ type SyllabusTreeProps = {
   tree: LearnTreeNode[]
   selectedScope: string | null
   onSelectScope: (scope: string | null, node: LearnTreeNode | null) => void
-  masteryBySection?: Record<string, SectionMastery>
+  masteryBySection?: Record<string, SectionMemory>
   loading?: boolean
   docId?: string | null
   /** Collapse to top-level chapters only — no drilling into sub-sections. */
@@ -147,7 +147,7 @@ function TreeRow({
   depth: number
   filter: string
   selectedScope: string | null
-  masteryBySection?: Record<string, SectionMastery>
+  masteryBySection?: Record<string, SectionMemory>
   expanded: Set<string>
   onToggleExpand: (id: string) => void
   onSelect: (node: LearnTreeNode) => void
@@ -167,7 +167,7 @@ function TreeRow({
   const isSection = node.isSection
   // Mastery % for the completion gauge next to the concept count (0% = not started).
   const sm = isSection && node.sectionKey ? masteryBySection?.[node.sectionKey] : undefined
-  const masteryPct = sm ? Math.round((sm.mastery ?? 0) * 100) : null
+  const masteryPct = sm && sm.retention != null ? Math.round(sm.retention * 100) : null
 
   const isChapter = depth === 0
   return (
@@ -201,9 +201,8 @@ function TreeRow({
         )}
         {isSection ? (
           <ConceptMasteryDot
-            mastery={node.sectionKey ? masteryBySection?.[node.sectionKey]?.mastery : undefined}
-            attempts={node.sectionKey ? masteryBySection?.[node.sectionKey]?.attempts : undefined}
-            isRollup={node.sectionKey ? masteryBySection?.[node.sectionKey]?.isRollup : undefined}
+            state={node.sectionKey ? masteryBySection?.[node.sectionKey]?.state : undefined}
+            retention={node.sectionKey ? masteryBySection?.[node.sectionKey]?.retention : undefined}
             className="mt-1"
           />
         ) : null}
@@ -238,15 +237,15 @@ function TreeRow({
           <span
             className={cn(
               "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-              masteryPct >= 80
+              masteryPct >= 90
                 ? "bg-emerald-500/10 text-emerald-500"
-                : masteryPct >= 50
+                : masteryPct >= 70
                   ? "bg-brand/10 text-brand"
                   : masteryPct > 0
                     ? "bg-amber-500/10 text-amber-500"
                     : "bg-muted text-muted-foreground",
             )}
-            title={`${masteryPct}% mastery${sm?.isRollup ? " · chapter average" : ""}`}
+            title={`${masteryPct}% retention (${sm?.state ?? "new"})`}
           >
             {masteryPct}%
           </span>

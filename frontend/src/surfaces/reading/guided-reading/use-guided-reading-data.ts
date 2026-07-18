@@ -21,7 +21,6 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
   const [error, setError] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [masteryByKey, setMasteryByKey] = useState<Record<string, ConceptMastery>>({})
-  const [masteredThreshold, setMasteredThreshold] = useState(0.75)
   const [dueCount, setDueCount] = useState(0)
 
   // Chapter list inputs: the outline (numbered chapters where available)…
@@ -79,7 +78,6 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
     fetchConceptMastery(docId)
       .then((r) => {
         setMasteryByKey(r.byConcept || {})
-        if (r.masteredThreshold) setMasteredThreshold(r.masteredThreshold)
       })
       .catch(() => {})
     if (chapterKey) {
@@ -103,7 +101,6 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
     preparing,
     load,
     masteryByKey,
-    masteredThreshold,
     dueCount,
     refreshMastery,
   }

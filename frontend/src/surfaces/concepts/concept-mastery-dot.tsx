@@ -1,31 +1,32 @@
-/** A small mastery indicator (concept or section). Hollow = not studied; otherwise a
- *  brand dot whose opacity tracks mastery. `isRollup` marks a section-level rollup. */
+import type { MemoryState } from "@/gateways/api/progress"
+
+const STATE_CLASS: Record<MemoryState, string> = {
+  new: "border border-muted-foreground/40",
+  solid: "bg-brand",
+  shaky: "bg-amber-400",
+  fading: "bg-rose-400",
+}
+
+/** A small memory indicator (concept or section). Hollow = not reviewed; otherwise the
+ *  retention state's color (solid / shaky / fading). */
 export function ConceptMasteryDot({
-  mastery,
-  attempts,
-  isRollup,
+  state = "new",
+  retention,
   className,
 }: {
-  mastery?: number
-  attempts?: number
-  isRollup?: boolean
+  state?: MemoryState
+  retention?: number | null
   className?: string
 }) {
-  if (!attempts || attempts === 0 || mastery === undefined) {
-    return (
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full border border-muted-foreground/40 ${className ?? ""}`}
-        title="Not studied yet"
-        aria-hidden
-      />
-    )
-  }
-  const m = Math.min(1, Math.max(0, mastery))
+  const title =
+    state === "new"
+      ? "Not reviewed yet"
+      : `Retention ${retention != null ? Math.round(retention * 100) : "—"}% · ${state}`
   return (
     <span
-      className={`h-2 w-2 shrink-0 rounded-full bg-brand ${className ?? ""}`}
-      style={{ opacity: 0.2 + 0.8 * m }}
-      title={`Mastery ${Math.round(m * 100)}%${isRollup ? " (rolled up)" : ""}`}
+      className={`h-2 w-2 shrink-0 rounded-full ${STATE_CLASS[state]} ${className ?? ""}`}
+      title={title}
+      aria-hidden
     />
   )
 }

@@ -1,53 +1,50 @@
-"""Persisted study events + view-time mastery computation.
+"""Persisted study events + view-time memory-state computation.
 
-Mastery per section = coverage x accuracy x decay:
-  - coverage: distinct reviewed concepts / total concepts in the section
-  - accuracy: Beta-Binomial posterior mean of review correctness (graded events only)
-  - decay:    exp(-dt / tau), dt = days since last graded review, tau = MASTERY_TAU_DAYS
+The three-question tracking model gives every number one job:
+  - "what should I do?"  → forecast (due now + horizon), computed here
+  - "what's the state of my memory?" → per-section COVERAGE + RETENTION, computed here
+  - "what have I done?"  → activity heatmap + cadence (here) and sessions (sessions.py)
 
-Only raw events persist; mastery is recomputed on read because decay is
-time-dependent. Internal sections roll up as a concept-count-weighted average
-over their descendant leaf sections.
+Coverage = distinct reviewed concepts / total concepts in the section.
+Retention = mean FSRS retrievability over the section's reviewed concepts — the SAME
+memory model that schedules the review queue (srs.retrievability), so "fading" here
+and "due" there can never disagree. States: new (nothing reviewed) · solid (≥ 0.9)
+· shaky (0.7–0.9) · fading (< 0.7).
+
+Only raw events + FSRS rows persist; everything is recomputed on read because
+retention is time-dependent. Internal sections roll up as concept-count-weighted
+averages over their descendant leaf sections.
 """
 
 from __future__ import annotations
 
-import math
-import os
 import time
 from typing import Any
 
 from app.process.content import get_toc_tree
 from app.gateways import db
+from app.supplemental.study import srs
+
+# Retention state thresholds (fractions of modelled recall probability). 0.9 is FSRS's
+# scheduling target — an item at its due date sits exactly on the solid/shaky line.
+RETENTION_SOLID = 0.9
+RETENTION_SHAKY = 0.7
+
+STATE_NEW = "new"
+STATE_SOLID = "solid"
+STATE_SHAKY = "shaky"
+STATE_FADING = "fading"
 
 
-def _alpha() -> float:
-    return float(os.environ.get("MASTERY_ALPHA", "1"))
-
-
-def _beta() -> float:
-    return float(os.environ.get("MASTERY_BETA", "1"))
-
-
-def _tau_days() -> float:
-    return float(os.environ.get("MASTERY_TAU_DAYS", "14"))
-
-
-def _retention_k() -> float:
-    """Decay constant so retrievability hits the retention target at the due date:
-    exp(-interval / tau) = R  ⇒  tau = interval / ln(1/R), i.e. tau = k · interval."""
-    r = float(os.environ.get("MASTERY_RETENTION", "0.9"))
-    r = min(0.99, max(0.5, r))
-    return 1.0 / math.log(1.0 / r)
-
-
-def _stability_tau(interval_days: float | None, default_tau: float) -> float:
-    """Per-unit decay time-constant from its SM-2 interval (retrievability ← stability):
-    a fragile concept (short interval) fades fast, a well-spaced one slowly. Falls back to
-    the global ``default_tau`` for units never put through spaced review (interval ≤ 0)."""
-    if interval_days and interval_days > 0:
-        return max(1.0, _retention_k() * float(interval_days))
-    return default_tau
+def retention_state(retention: float | None) -> str:
+    """Bucket a retention fraction into the presentation state."""
+    if retention is None:
+        return STATE_NEW
+    if retention >= RETENTION_SOLID:
+        return STATE_SOLID
+    if retention >= RETENTION_SHAKY:
+        return STATE_SHAKY
+    return STATE_FADING
 
 
 # --------------------------------------------------------------------------- #
@@ -102,7 +99,7 @@ def record_engagement(
 
 def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dict[str, Any]]:
     # Untagged (legacy) events count in every doc scope. ``graded_only`` excludes passive
-    # engagement (read/listen, correct == null) so they never dilute mastery accuracy.
+    # engagement (read/listen, correct == null) so they never dilute accuracy stats.
     # ts is returned as epoch seconds (callers use time.gmtime / arithmetic on it).
     with db() as conn:
         return conn.execute(
@@ -114,12 +111,14 @@ def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dic
         ).fetchall()
 
 
-def compute_activity(doc: str | None = None) -> dict[str, Any]:
-    """Daily study volume (UTC) from the event floor, for a heatmap.
+def compute_activity(doc: str | None = None, now: float | None = None) -> dict[str, Any]:
+    """Daily study volume (UTC) from the event floor, for a heatmap — plus CADENCE:
+    how many of the last 7 days had at least one graded review (derived, never stored).
 
     Returns a sparse list of {date: 'YYYY-MM-DD', count} (days with no events
     are omitted; the frontend lays out the full calendar grid).
     """
+    now = time.time() if now is None else now
     try:
         events = _fetch_events(doc)  # ALL engagement (read/listen too), not just graded
     except Exception as exc:  # noqa: BLE001 — surface as a soft error, never 500
@@ -127,6 +126,8 @@ def compute_activity(doc: str | None = None) -> dict[str, Any]:
 
     counts: dict[str, int] = {}
     by_kind: dict[str, int] = {}
+    graded_days: set[str] = set()
+    week_floor = now - 7 * 86400.0
     for e in events:
         ts = e.get("ts")
         if not ts:
@@ -135,17 +136,20 @@ def compute_activity(doc: str | None = None) -> dict[str, Any]:
         counts[day] = counts.get(day, 0) + 1
         k = e.get("kind") or ("review" if e.get("correct") is not None else "other")
         by_kind[k] = by_kind.get(k, 0) + 1
+        if e.get("correct") is not None and ts >= week_floor:
+            graded_days.add(day)
 
     return {
         "days": [{"date": d, "count": c} for d, c in sorted(counts.items())],
         "total": sum(counts.values()),
         "max": max(counts.values()) if counts else 0,
         "byKind": by_kind,
+        "cadence": {"reviewedDays": len(graded_days), "windowDays": 7},
     }
 
 
 def compute_forecast(doc: str | None = None, days: int = 7) -> dict[str, Any]:
-    """Forgetting forecast from the spaced-review schedule: how many concepts are due now and
+    """Forgetting forecast from the spaced-review schedule: how many items are due now and
     how many fall due over the next ``days`` — so the dashboard can say 'N fade by Friday'."""
     try:
         with db() as conn:
@@ -180,54 +184,67 @@ def compute_forecast(doc: str | None = None, days: int = 7) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# Pure math (no DB) — unit-testable
+# Memory state: coverage + retention (pure aggregation over FSRS rows)
 # --------------------------------------------------------------------------- #
 
-def compute_leaf_mastery(
-    events: list[dict[str, Any]],
-    content_ids: set[str],
-    total: int,
-    now: float,
-    alpha: float,
-    beta: float,
-    tau_days: float,
-    id_field: str = "concept_key",
-) -> dict[str, Any]:
-    """Mastery for one leaf section from its own events.
+# Review-row fields srs.retrievability needs, in the state-dict shape srs speaks.
+_RETENTION_SELECT = (
+    'SELECT key, state, stability, difficulty, step, interval, ease, '
+    'extract(epoch from due)::float8 AS due, '
+    'extract(epoch from last_review)::float8 AS "lastReview" '
+    "FROM concept_reviews WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s"
+)
 
-    ``events`` are this section's graded review events; ``content_ids`` the ids of its content
-    units; ``total`` their count (coverage denominator). ``id_field`` selects which event field
-    identifies the studied unit — ``concept_key`` (``triple_id`` was the retired KG path; the
-    concept path — so the same coverage×accuracy×decay math serves both.
-    """
-    if not events:
-        return {
-            "mastery": 0.0,
-            "coverage": 0.0,
-            "accuracy": 0.0,
-            "decay": 0.0,
-            "attempts": 0,
-            "lastSeen": None,
-        }
-    attempts = len(events)
-    correct = sum(1 for e in events if e.get("correct"))
-    accuracy = (correct + alpha) / (attempts + alpha + beta)
 
-    tested = {e[id_field] for e in events if e.get(id_field)}
-    covered = len(tested & content_ids)
-    coverage = (covered / total) if total > 0 else 0.0
+def _retention_by_key(doc: str | None, now: float) -> dict[str, float]:
+    """concept key → modelled recall probability right now (reviewed items only)."""
+    try:
+        with db() as conn:
+            rows = conn.execute(_RETENTION_SELECT, {"doc": doc}).fetchall()
+    except Exception:
+        return {}
+    out: dict[str, float] = {}
+    for r in rows:
+        ret = srs.retrievability(dict(r), now)
+        if ret is not None:
+            out[r["key"]] = ret
+    return out
 
-    last_seen = max(e["ts"] for e in events)
-    dt_days = max(0.0, (now - last_seen) / 86400.0)
-    decay = math.exp(-dt_days / tau_days) if tau_days > 0 else 1.0
 
+def _concepts_by_section(doc: str | None) -> dict[str, list[str]]:
+    """sectionKey → its concept keys (one query — the coverage denominators)."""
+    try:
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT section_key AS sk, key FROM ext_concepts "
+                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
+                {"doc": doc},
+            ).fetchall()
+    except Exception:
+        return {}
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        if r.get("sk"):
+            out.setdefault(r["sk"], []).append(r["key"])
+    return out
+
+
+def summarize_memory(concept_keys: list[str], retention: dict[str, float]) -> dict[str, Any]:
+    """Pure: one unit's memory summary from its concept keys + the retention map.
+
+    coverage = reviewed/total; retention = mean over reviewed items (None when nothing
+    is reviewed yet); fading = reviewed items below the shaky floor."""
+    total = len(concept_keys)
+    revd = [retention[k] for k in concept_keys if k in retention]
+    reviewed = len(revd)
+    mean_ret = (sum(revd) / reviewed) if reviewed else None
     return {
-        "mastery": coverage * accuracy * decay,
-        "coverage": coverage,
-        "accuracy": accuracy,
-        "decay": decay,
-        "attempts": attempts,
-        "lastSeen": last_seen,
+        "total": total,
+        "reviewed": reviewed,
+        "coverage": (reviewed / total) if total else 0.0,
+        "retention": mean_ret,
+        "state": retention_state(mean_ret),
+        "fading": sum(1 for v in revd if v < RETENTION_SHAKY),
     }
 
 
@@ -275,140 +292,53 @@ def descendant_leaves(
     return out
 
 
-def _weighted_average(pairs: list[tuple[float, float]]) -> float:
-    num = sum(value * weight for value, weight in pairs)
-    den = sum(weight for _value, weight in pairs)
-    return (num / den) if den > 0 else 0.0
-
-
-# --------------------------------------------------------------------------- #
-# Concept coverage
-# --------------------------------------------------------------------------- #
-
-def _section_concept_ids(section_key: str, doc: str | None) -> set[str]:
-    """The concept keys taught in a section — the per-concept coverage denominator."""
-    try:
-        with db() as conn:
-            rows = conn.execute(
-                "SELECT key FROM ext_concepts WHERE section_key = %(s)s "
-                "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
-                {"s": section_key, "doc": doc},
-            ).fetchall()
-        return {r["key"] for r in rows}
-    except Exception:
-        return set()
-
-
-def _concept_intervals(doc: str | None) -> dict[str, float]:
-    """concept key → current SM-2 interval in days, for retrievability-based decay."""
-    try:
-        with db() as conn:
-            rows = conn.execute(
-                "SELECT key, interval FROM concept_reviews WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
-                {"doc": doc},
-            ).fetchall()
-        return {r["key"]: float(r.get("interval") or 0.0) for r in rows}
-    except Exception:
-        return {}
-
-
-def _section_tau(content_ids: set[str], intervals: dict[str, float], default_tau: float) -> float:
-    """A leaf section's effective decay τ = stability from the mean SM-2 interval of its
-    spaced-reviewed concepts (falls back to the global τ when none have been reviewed)."""
-    revd = [intervals[c] for c in content_ids if intervals.get(c, 0.0) > 0]
-    eff = (sum(revd) / len(revd)) if revd else None
-    return _stability_tau(eff, default_tau)
-
-
-# --------------------------------------------------------------------------- #
-# Top-level: DB-backed assembly
-# --------------------------------------------------------------------------- #
-
 def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[str, Any]:
+    """Per-section memory state: {coverage, retention, state, total, reviewed, fading}
+    for every TOC section, with internal sections summarizing their descendant leaves'
+    concepts. ``overall`` is the whole course's summary. Needs only ext_concepts +
+    concept_reviews — the event floor doesn't participate (retention already encodes
+    time and outcomes through FSRS)."""
     now = time.time() if now is None else now
-    alpha, beta, tau = _alpha(), _beta(), _tau_days()
 
     forest, _sections, err = get_toc_tree(doc)
     if err:
-        return {"bySection": {}, "overall": 0.0, "weakest": [], "error": err}
+        return {"bySection": {}, "overall": summarize_memory([], {}), "error": err}
 
     labels, titles, children = collect_sections(forest)
-    leaf_keys = [k for k in labels if not children.get(k)]
-
-    events = _fetch_events(doc, graded_only=True)
-    events_by_section: dict[str, list[dict[str, Any]]] = {}
-    for e in events:
-        sk = (e.get("section_key") or "").strip()
-        if sk:
-            events_by_section.setdefault(sk, []).append(e)
-
-    # Sections are covered by their concepts (the triple-era coverage path is retired).
-    intervals = _concept_intervals(doc)
-    leaf_stats: dict[str, dict[str, Any]] = {}
-    weights: dict[str, int] = {}
-    for k in leaf_keys:
-        content_ids = _section_concept_ids(k, doc)
-        id_field = "concept_key"
-        tau_eff = _section_tau(content_ids, intervals, tau)
-        total = len(content_ids)
-        weights[k] = total
-        leaf_stats[k] = compute_leaf_mastery(
-            events_by_section.get(k, []), content_ids, total, now, alpha, beta, tau_eff, id_field=id_field
-        )
+    section_concepts = _concepts_by_section(doc)
+    retention = _retention_by_key(doc, now)
 
     by_section: dict[str, dict[str, Any]] = {}
     for k in labels:
-        if children.get(k):  # internal section → rollup over descendant leaves
-            leaves = descendant_leaves(k, children)
-            mastery = _weighted_average(
-                [(leaf_stats[lk]["mastery"], weights[lk]) for lk in leaves if lk in leaf_stats]
-            )
-            attempts = sum(leaf_stats[lk]["attempts"] for lk in leaves if lk in leaf_stats)
-            seen = [leaf_stats[lk]["lastSeen"] for lk in leaves if leaf_stats.get(lk, {}).get("lastSeen")]
-            by_section[k] = {
-                "mastery": mastery,
-                "attempts": attempts,
-                "lastSeen": max(seen) if seen else None,
-                "isRollup": True,
-            }
-        else:  # leaf section → its own stats
-            st = leaf_stats.get(k, {})
-            by_section[k] = {
-                "mastery": st.get("mastery", 0.0),
-                "coverage": st.get("coverage", 0.0),
-                "accuracy": st.get("accuracy", 0.0),
-                "attempts": st.get("attempts", 0),
-                "lastSeen": st.get("lastSeen"),
-            }
+        leaves = descendant_leaves(k, children)
+        keys: list[str] = []
+        for lk in leaves:
+            keys.extend(section_concepts.get(lk, []))
+        by_section[k] = summarize_memory(keys, retention)
 
-    overall = _weighted_average([(leaf_stats[k]["mastery"], weights[k]) for k in leaf_keys])
+    all_keys = [key for keys in section_concepts.values() for key in keys]
+    overall = summarize_memory(all_keys, retention)
 
-    studyable = [k for k in leaf_keys if weights.get(k, 0) > 0]
-    studyable.sort(key=lambda k: (leaf_stats[k]["mastery"], k))
-    weakest = [
-        {
-            "sectionKey": k,
-            "label": labels[k],
-            "title": titles.get(k),
-            "mastery": leaf_stats[k]["mastery"],
-        }
-        for k in studyable[:3]
+    # The map's attention hook: studied sections with the weakest retention first.
+    studied = [
+        {"sectionKey": k, "label": labels[k], "title": titles.get(k), **by_section[k]}
+        for k in labels
+        if not children.get(k) and by_section[k]["reviewed"] > 0
     ]
+    studied.sort(key=lambda s: (s["retention"] if s["retention"] is not None else 1.0, s["sectionKey"]))
 
     return {
         "bySection": by_section,
         "overall": overall,
-        "weakest": weakest,
-        "params": {"alpha": alpha, "beta": beta, "tauDays": tau},
+        "fading": [s for s in studied if s["state"] == STATE_FADING][:5],
+        "thresholds": {"solid": RETENTION_SOLID, "shaky": RETENTION_SHAKY},
     }
 
 
 def compute_concept_mastery(now: float | None = None, doc: str | None = None) -> dict[str, Any]:
-    """Per-concept mastery + SR schedule state. Joins the study-event floor (accuracy/decay/
-    attempts, keyed by concept_key) with concept_reviews (due/state). One concept = one unit, so
-    coverage is 1 once it's been studied — mastery is then accuracy×decay."""
+    """Per-concept memory state + schedule, joined with the event floor's per-concept
+    detail (attempts / correct / lastSeen — history, not part of the state math)."""
     now = time.time() if now is None else now
-    alpha, beta, tau = _alpha(), _beta(), _tau_days()
     try:
         with db() as conn:
             concepts = conn.execute(
@@ -417,15 +347,11 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
                 {"doc": doc},
             ).fetchall()
             reviews: dict[str, dict[str, Any]] = {}
-            for r in conn.execute(
-                'SELECT key, extract(epoch from due)::float8 AS due, state, interval FROM concept_reviews '
-                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
-                {"doc": doc},
-            ).fetchall():
-                reviews[r["key"]] = r
+            for r in conn.execute(_RETENTION_SELECT, {"doc": doc}).fetchall():
+                reviews[r["key"]] = dict(r)
         events = _fetch_events(doc, graded_only=True)
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
-        return {"byConcept": {}, "overall": 0.0, "error": str(exc)}
+        return {"byConcept": {}, "counts": {}, "error": str(exc)}
 
     events_by_concept: dict[str, list[dict[str, Any]]] = {}
     for e in events:
@@ -434,44 +360,35 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
             events_by_concept.setdefault(ck, []).append(e)
 
     by_concept: dict[str, dict[str, Any]] = {}
-    masteries: list[float] = []
+    counts = {STATE_NEW: 0, STATE_SOLID: 0, STATE_SHAKY: 0, STATE_FADING: 0, "total": 0}
     for c in concepts:
         ck = c["key"]
-        rv = reviews.get(ck, {})
-        # Retrievability from this concept's own spaced-rep stability, not a global τ.
-        tau_eff = _stability_tau(rv.get("interval"), tau)
-        st = compute_leaf_mastery(
-            events_by_concept.get(ck, []), {ck}, 1, now, alpha, beta, tau_eff, id_field="concept_key"
-        )
+        rv = reviews.get(ck)
+        ret = srs.retrievability(rv, now) if rv else None
+        state = retention_state(ret)
+        evs = events_by_concept.get(ck, [])
+        attempts = len(evs)
+        correct = sum(1 for e in evs if e.get("correct"))
         by_concept[ck] = {
             "name": c["name"],
             "sectionKey": c["sectionKey"],
-            "mastery": st["mastery"],
-            "accuracy": st["accuracy"],
-            "attempts": st["attempts"],
-            "lastSeen": st["lastSeen"],
-            "due": rv.get("due"),
-            "state": rv.get("state", "new"),
+            "retention": ret,
+            "state": state,
+            "due": (rv or {}).get("due"),
+            "scheduleState": (rv or {}).get("state", "new"),
+            "attempts": attempts,
+            "accuracy": (correct / attempts) if attempts else None,
+            "lastSeen": max((e["ts"] for e in evs), default=None),
         }
-        masteries.append(st["mastery"])
+        counts[state] += 1
+        counts["total"] += 1
 
-    overall = (sum(masteries) / len(masteries)) if masteries else 0.0
-
-    # Concept gate for the "learn next" view: mastered (>= threshold) or ready (everything
-    # else). Concepts are independent lessons — there is no prerequisite locking, so `gate`
-    # is never "locked" and `blockedBy` is always empty (kept for response-shape stability).
-    mastered_th = float(os.environ.get("MASTERY_MASTERED", "0.7"))
-    mastered = {ck for ck, v in by_concept.items() if v["mastery"] >= mastered_th}
-    counts = {"mastered": 0, "ready": 0, "locked": 0, "total": len(by_concept)}
-    for ck, v in by_concept.items():
-        gate = "mastered" if ck in mastered else "ready"
-        v["gate"] = gate
-        v["blockedBy"] = []
-        counts[gate] = counts.get(gate, 0) + 1
+    reviewed_ret = [v["retention"] for v in by_concept.values() if v["retention"] is not None]
+    overall = (sum(reviewed_ret) / len(reviewed_ret)) if reviewed_ret else None
 
     return {
         "byConcept": by_concept,
         "overall": overall,
         "counts": counts,
-        "masteredThreshold": mastered_th,
+        "thresholds": {"solid": RETENTION_SOLID, "shaky": RETENTION_SHAKY},
     }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Skeleton } from "@/kit/ui/skeleton"
-import { fetchActivity, type ActivityDay } from "@/gateways/api/progress"
+import { fetchActivity, type ActivityDay, type ActivityResponse } from "@/gateways/api/progress"
 
 const WEEKS = 53
 const DAY_MS = 86_400_000
@@ -41,6 +41,7 @@ function cellStyle(count: number, max: number): React.CSSProperties {
 
 export function StudyHeatmap({ doc }: { doc?: string }) {
   const [days, setDays] = useState<ActivityDay[] | null>(null)
+  const [cadence, setCadence] = useState<ActivityResponse["cadence"]>(undefined)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -49,7 +50,10 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
       .then((r) => {
         if (!active) return
         if (r.error) setError(r.error)
-        else setDays(r.days)
+        else {
+          setDays(r.days)
+          setCadence(r.cadence)
+        }
       })
       .catch((e) => {
         if (active) setError(e instanceof Error ? e.message : "Failed to load activity")
@@ -105,11 +109,21 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">Study activity</span>
-        {days && (
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {total} review{total === 1 ? "" : "s"} this year
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {cadence && (
+            <span
+              className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium tabular-nums text-brand"
+              title="Days with at least one graded review in the last week"
+            >
+              {cadence.reviewedDays}/{cadence.windowDays} days this week
+            </span>
+          )}
+          {days && (
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {total} review{total === 1 ? "" : "s"} this year
+            </span>
+          )}
+        </span>
       </div>
 
       <div className="overflow-x-auto p-3">

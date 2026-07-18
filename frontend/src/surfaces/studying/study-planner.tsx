@@ -5,6 +5,7 @@ import { AlarmClock, CalendarCheck2, History } from "lucide-react"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { PageHeader } from "@/kit/patterns/page-header"
 import { SectionCard } from "@/kit/patterns/section-card"
+import { StudyHeatmap } from "@/surfaces/library"
 import { StatTile } from "@/kit/patterns/stat-tile"
 import {
   fetchReviewCalendar,
@@ -278,6 +279,8 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
           </SectionCard>
         </div>
 
+        <div className="flex flex-col gap-4">
+        <StudyHeatmap />
         <SectionCard
           title={
             <span className="flex items-center gap-2">
@@ -298,6 +301,7 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
             </ul>
           )}
         </SectionCard>
+        </div>
       </div>
     </div>
   )

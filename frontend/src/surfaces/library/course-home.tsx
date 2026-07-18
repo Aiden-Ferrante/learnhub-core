@@ -13,16 +13,14 @@ import {
   Sparkles,
 } from "lucide-react"
 import { SyllabusTree } from "@/surfaces/library/syllabus-tree"
-import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
 import { countSections, displaySectionTitle, findChapterForSection, findNodeBySectionKey, type LearnTreeNode } from "@/gateways/api/outline"
-import { ProgressRing } from "@/kit/patterns/progress-ring"
 import { SectionCard } from "@/kit/patterns/section-card"
 import { StatTile } from "@/kit/patterns/stat-tile"
 import { fetchCourseStatus, type CoursePipelineStatus } from "@/gateways/api/pipeline"
-import { fetchForecast, type ForecastResponse, type MasteryResponse, type WeakestSection } from "@/gateways/api/progress"
+import { type FadingSection, type MasteryResponse, type MemoryState, type SectionMemory } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library/courses"
 
 type CourseHomeProps = {
@@ -33,7 +31,7 @@ type CourseHomeProps = {
   error: string | null
   mastery: MasteryResponse | null
   onOpenSection: (scope: string | null, node: LearnTreeNode | null) => void
-  onReview: (section: WeakestSection) => void
+  onReview: (section: FadingSection) => void
   onReadBook: () => void
   onDeepRead?: () => void
   onViewConcepts: () => void
@@ -91,6 +89,64 @@ function PracticeTile({
   )
 }
 
+const STATE_LABEL: Record<MemoryState, string> = {
+  new: "not studied",
+  solid: "solid",
+  shaky: "shaky",
+  fading: "fading",
+}
+
+const STATE_DOT: Record<MemoryState, string> = {
+  new: "bg-muted-foreground/30",
+  solid: "bg-brand",
+  shaky: "bg-amber-400",
+  fading: "bg-rose-400",
+}
+
+/** One chapter's row on the memory map: coverage bar + retention state + fading chip. */
+function MemoryRow({
+  label,
+  memory,
+  onOpen,
+}: {
+  label: string
+  memory: SectionMemory
+  onOpen: () => void
+}) {
+  const coveragePct = Math.round(memory.coverage * 100)
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-brand/5"
+    >
+      <span className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[memory.state]}`} aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+      {memory.fading > 0 && (
+        <span className="shrink-0 rounded-full bg-rose-400/15 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-rose-400">
+          {memory.fading} fading
+        </span>
+      )}
+      <span className="w-24 shrink-0">
+        <span className="block h-1.5 overflow-hidden rounded-full bg-muted">
+          <span
+            className="block h-full rounded-full bg-brand/70"
+            style={{ width: `${coveragePct}%` }}
+          />
+        </span>
+      </span>
+      <span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+        {memory.total === 0
+          ? "no concepts"
+          : memory.retention != null
+            ? `${Math.round(memory.retention * 100)}% · ${STATE_LABEL[memory.state]}`
+            : `${memory.reviewed}/${memory.total}`}
+      </span>
+    </button>
+  )
+}
+
+
 export function CourseHome({
   course,
   tree,
@@ -123,39 +179,34 @@ export function CourseHome({
     [course.learnDocId],
   )
 
-  // Forgetting forecast — what's fading, so review becomes a daily, actionable habit.
-  const { data: forecastData } = useAsyncData(() => fetchForecast(course.learnDocId), [course.learnDocId])
-  const forecast = forecastData && !forecastData.error ? forecastData : null
-
-  const { studied, needsReview } = useMemo(() => {
-    const leaves = mastery
-      ? Object.values(mastery.bySection).filter((m) => !m.isRollup)
-      : []
-    return {
-      studied: leaves.filter((m) => m.attempts > 0).length,
-      needsReview: leaves.filter((m) => m.attempts > 0 && m.mastery < 0.5).length,
-    }
-  }, [mastery])
-
-  const overallPct = mastery ? Math.round(mastery.overall * 100) : 0
-  const weakest = mastery?.weakest ?? []
+  const overall = mastery?.overall ?? null
+  const fadingSections = mastery?.fading ?? []
   const isEmpty = !loading && !error && tree.length === 0
 
+  // The memory map's rows: the syllabus's top-level chapters + their memory summaries.
+  const chapterRows = useMemo(() => {
+    if (!mastery) return []
+    return tree
+      .filter((n) => n.isSection && n.sectionKey)
+      .map((n) => ({ node: n, memory: mastery.bySection[n.sectionKey!] }))
+      .filter((r): r is { node: LearnTreeNode; memory: SectionMemory } => !!r.memory)
+  }, [tree, mastery])
+
   let headline: { icon: React.ReactNode; text: string }
-  if (needsReview > 0) {
+  if (overall && overall.fading > 0) {
     headline = {
       icon: <Flame className="h-4 w-4 text-amber-500" />,
-      text: `${needsReview} section${needsReview === 1 ? "" : "s"} have faded — review to bring them back.`,
+      text: `${overall.fading} concept${overall.fading === 1 ? "" : "s"} are fading — review to bring them back.`,
     }
-  } else if (studied === 0) {
+  } else if (!overall || overall.reviewed === 0) {
     headline = {
       icon: <Sparkles className="h-4 w-4 text-brand" />,
-      text: "Pick any section below and start a review to begin tracking mastery.",
+      text: "Pick any chapter below and start a review to begin tracking your memory.",
     }
   } else {
     headline = {
       icon: <Sparkles className="h-4 w-4 text-brand" />,
-      text: "You're on top of your material — keep the streak going.",
+      text: "Everything you've studied is holding — keep the cadence going.",
     }
   }
 
@@ -197,14 +248,19 @@ export function CourseHome({
               )}
             </div>
           </div>
-          {mastery && <ProgressRing pct={overallPct} />}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatTile label="Sections" value={sectionsTotal} />
-          <StatTile label="Studied" value={mastery ? studied : "—"} />
-          <StatTile label="Need review" value={mastery ? needsReview : "—"} />
-          <StatTile label="Overall" value={mastery ? `${overallPct}%` : "—"} />
+          <StatTile label="Concepts" value={conceptCount ?? "—"} />
+          <StatTile
+            label="Covered"
+            value={overall ? `${overall.reviewed}/${overall.total}` : "—"}
+          />
+          <StatTile
+            label="Retention"
+            value={overall?.retention != null ? `${Math.round(overall.retention * 100)}%` : "—"}
+          />
         </div>
 
         {/* Pipeline strip: one status for the whole ingest→study pipeline, replacing the
@@ -334,66 +390,46 @@ export function CourseHome({
         </div>
       )}
 
-      {/* Study activity heatmap */}
-      {!error && !isEmpty && forecast && (forecast.dueNow > 0 || (forecast.soon ?? 0) > 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-amber-500/15">
-              <Flame className="h-5 w-5 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {forecast.dueNow > 0
-                  ? `${forecast.dueNow} concept${forecast.dueNow === 1 ? "" : "s"} due for review now`
-                  : "You're caught up on reviews"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {(forecast.soon ?? 0) > 0
-                  ? `${forecast.soon} more fade over the next 7 days — a few minutes keeps them fresh.`
-                  : "Nothing else fades this week."}
-              </p>
-            </div>
+      {/* The memory map — per-chapter coverage + retention, the course's state at a glance. */}
+      {!error && !isEmpty && chapterRows.length > 0 && (
+        <SectionCard
+          title="Memory map"
+          description="Per chapter: how much you've covered, and how well it's holding right now."
+          bodyClassName="p-0"
+        >
+          <div className="divide-y">
+            {chapterRows.map(({ node, memory }) => (
+              <MemoryRow
+                key={node.sectionKey}
+                label={displaySectionTitle(node.label, node.title)}
+                memory={memory}
+                onOpen={() => onOpenSection(node.sectionKey, node)}
+              />
+            ))}
           </div>
-          {onReviewAll && forecast.dueNow > 0 && (
-            <Button type="button" size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onReviewAll}>
-              <RotateCcw className="h-3.5 w-3.5" />
-              Review {forecast.dueNow} now
-            </Button>
-          )}
-        </div>
+        </SectionCard>
       )}
 
-      {!error && !isEmpty && <StudyHeatmap doc={course.id} />}
-
-      {/* Review rail */}
-      {weakest.length > 0 && (
-        <SectionCard title="Pick up where you left off" bodyClassName="p-3">
+      {/* Fading rail — studied sections whose retention dropped below the floor. */}
+      {fadingSections.length > 0 && (
+        <SectionCard title="Bring these back" bodyClassName="p-3">
           <div className="flex flex-wrap gap-2">
-            {weakest.map((w) => {
-              const pct = Math.round(w.mastery * 100)
-              return (
-                <button
-                  key={w.sectionKey}
-                  type="button"
-                  onClick={() => onReview(w)}
-                  className="group flex min-w-[11rem] flex-1 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand/5"
-                >
-                  <span className="text-xs text-muted-foreground">Review section</span>
-                  <span className="truncate text-sm font-medium">
-                    {displaySectionTitle(w.label, w.title)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-brand"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
-                  </div>
-                </button>
-              )
-            })}
+            {fadingSections.map((w) => (
+              <button
+                key={w.sectionKey}
+                type="button"
+                onClick={() => onReview(w)}
+                className="group flex min-w-[11rem] flex-1 flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand/5"
+              >
+                <span className="text-xs text-muted-foreground">Fading — review</span>
+                <span className="truncate text-sm font-medium">
+                  {displaySectionTitle(w.label, w.title)}
+                </span>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  retention {w.retention != null ? `${Math.round(w.retention * 100)}%` : "—"}
+                </span>
+              </button>
+            ))}
           </div>
         </SectionCard>
       )}

@@ -10,19 +10,21 @@ import { cn } from "@/kit/lib/utils"
 
 /** Underline tint = live mastery state: unseen (quiet invite), learning, due again (amber),
  *  mastered (solid). This is where the reader meets the retention loop. */
-export function masteryTint(m: ConceptMastery | undefined, threshold: number): string {
-  if (!m || !m.attempts) return "border-dotted border-brand/50"
-  if (m.mastery >= threshold) return "border-solid border-brand/60"
-  if (m.due != null && m.due <= Date.now() / 1000) return "border-dotted border-amber-400/80"
+export function masteryTint(m: ConceptMastery | undefined): string {
+  if (!m || m.state === "new") return "border-dotted border-brand/50"
+  if (m.state === "solid") return "border-solid border-brand/60"
+  if (m.state === "fading" || (m.due != null && m.due <= Date.now() / 1000))
+    return "border-dotted border-amber-400/80"
   return "border-dotted border-brand/90"
 }
 
 /** Highlighter wash (toggleable in reading settings): brightest on unseen concepts,
  *  amber when due, nearly invisible once mastered — the chapter fades as you learn it. */
-export function masteryWash(m: ConceptMastery | undefined, threshold: number): string {
-  if (m && m.attempts) {
-    if (m.mastery >= threshold) return "rounded-[3px] bg-brand/[0.05]"
-    if (m.due != null && m.due <= Date.now() / 1000) return "rounded-[3px] bg-amber-400/10"
+export function masteryWash(m: ConceptMastery | undefined): string {
+  if (m && m.state !== "new") {
+    if (m.state === "solid") return "rounded-[3px] bg-brand/[0.05]"
+    if (m.state === "fading" || (m.due != null && m.due <= Date.now() / 1000))
+      return "rounded-[3px] bg-amber-400/10"
   }
   return "rounded-[3px] bg-brand/10"
 }

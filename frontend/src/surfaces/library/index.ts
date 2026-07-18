@@ -9,6 +9,7 @@
 export { CourseFallback } from "@/surfaces/library/course-guard"
 export { CourseHome } from "@/surfaces/library/course-home"
 export { CourseShelf } from "@/surfaces/library/course-shelf"
+export { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 export { SyllabusTree } from "@/surfaces/library/syllabus-tree"
 export { useCourseChapters } from "@/surfaces/library/use-course-chapters"
 export { useCourseData } from "@/surfaces/library/use-course-data"

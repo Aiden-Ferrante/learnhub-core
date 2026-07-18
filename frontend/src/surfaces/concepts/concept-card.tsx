@@ -6,6 +6,7 @@ import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
 import { ConceptMasteryDot } from "@/surfaces/concepts/concept-mastery-dot"
 import { cn } from "@/kit/lib/utils"
 import { type ConceptLesson } from "@/gateways/api/concepts"
+import type { ConceptMastery } from "@/gateways/api/progress"
 import { KIND_BADGE, KIND_BORDER } from "@/surfaces/concepts/kind-palette"
 
 export function prettyScope(key?: string): string {
@@ -17,13 +18,11 @@ export function prettyScope(key?: string): string {
  *  Self-contained (owns its open state) so it's reusable across the document and section views. */
 export function ConceptCard({
   concept: c,
-  mastery,
-  attempts,
+  memory,
   onOpen,
 }: {
   concept: ConceptLesson
-  mastery?: number
-  attempts?: number
+  memory?: ConceptMastery
   /** When set, shows an "open lesson" button that routes to the focused concept view. */
   onOpen?: () => void
 }) {
@@ -51,7 +50,7 @@ export function ConceptCard({
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
           <span className="flex flex-1 flex-wrap items-center gap-2">
-            {mastery !== undefined && <ConceptMasteryDot mastery={mastery} attempts={attempts} />}
+            {memory !== undefined && <ConceptMasteryDot state={memory.state} retention={memory.retention} />}
             <span className="font-medium">{c.name}</span>
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
               {c.kind}

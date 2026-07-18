@@ -1,14 +1,16 @@
-"""Tests for view-time mastery math (coverage x accuracy x decay) and tree rollup.
+"""Tests for view-time memory-state math (coverage + FSRS retention) and tree rollup.
 
-Pure functions only — no ArangoDB. A fixed ``now`` makes decay deterministic.
+Pure functions only — no DB. Retention values are injected directly, so the FSRS
+model itself is exercised in test_srs.py; here we test the aggregation + buckets.
 """
 
-import math
-
 from app.supplemental.study.mastery import (
+    RETENTION_SHAKY,
+    RETENTION_SOLID,
     collect_sections,
-    compute_leaf_mastery,
     descendant_leaves,
+    retention_state,
+    summarize_memory,
 )
 
 NOW = 1_000_000.0
@@ -30,49 +32,50 @@ def _entity(name):
     return {"id": name, "label": name, "sectionKey": None, "isSection": False, "children": []}
 
 
-# --- compute_leaf_mastery ---
+# --- retention buckets + unit summary ---
 
-def test_no_events_is_zero():
-    st = compute_leaf_mastery([], {"a", "b"}, 2, NOW, 1, 1, 14)
-    assert st["mastery"] == 0.0
-    assert st["attempts"] == 0
-    assert st["lastSeen"] is None
-
-
-def test_coverage_accuracy_decay_product():
-    events = [
-        {"concept_key": "a", "correct": True, "ts": NOW},
-        {"concept_key": "b", "correct": True, "ts": NOW},
-    ]
-    st = compute_leaf_mastery(events, {"a", "b", "c", "d"}, 4, NOW, 1, 1, 14)
-    assert st["coverage"] == 0.5  # 2 of 4 content triples tested
-    assert st["accuracy"] == (2 + 1) / (2 + 2)  # Beta(1,1) posterior mean = 0.75
-    assert st["decay"] == 1.0  # answered "now"
-    assert math.isclose(st["mastery"], 0.5 * 0.75 * 1.0)
+def test_retention_state_buckets():
+    assert retention_state(None) == "new"
+    assert retention_state(RETENTION_SOLID) == "solid"
+    assert retention_state(0.95) == "solid"
+    assert retention_state(0.8) == "shaky"
+    assert retention_state(RETENTION_SHAKY) == "shaky"
+    assert retention_state(0.69) == "fading"
+    assert retention_state(0.0) == "fading"
 
 
-def test_accuracy_is_smoothed_not_raw():
-    # one lucky correct answer must NOT read as 100% accuracy
-    events = [{"concept_key": "a", "correct": True, "ts": NOW}]
-    st = compute_leaf_mastery(events, {"a"}, 1, NOW, 1, 1, 14)
-    assert st["accuracy"] == (1 + 1) / (1 + 2)  # 0.666...
-    assert st["accuracy"] < 1.0
+def test_summarize_memory_never_reviewed_is_new():
+    m = summarize_memory(["c1", "c2"], {})
+    assert m == {"total": 2, "reviewed": 0, "coverage": 0.0, "retention": None,
+                 "state": "new", "fading": 0}
 
 
-def test_decay_halves_around_tau():
-    events = [{"concept_key": "a", "correct": True, "ts": NOW - 14 * DAY}]
-    st = compute_leaf_mastery(events, {"a"}, 1, NOW, 1, 1, 14)
-    assert math.isclose(st["decay"], math.exp(-1))  # dt == tau → exp(-1)
+def test_summarize_memory_coverage_and_mean_retention():
+    m = summarize_memory(["c1", "c2", "c3", "c4"], {"c1": 1.0, "c2": 0.8})
+    assert m["total"] == 4 and m["reviewed"] == 2
+    assert m["coverage"] == 0.5
+    assert abs(m["retention"] - 0.9) < 1e-9
+    assert m["state"] == "solid"  # mean sits exactly on the solid line
+    assert m["fading"] == 0
 
 
-def test_tested_triples_outside_content_dont_count_coverage():
-    events = [{"concept_key": "ghost", "correct": True, "ts": NOW}]
-    st = compute_leaf_mastery(events, {"a", "b"}, 2, NOW, 1, 1, 14)
-    assert st["coverage"] == 0.0  # 'ghost' is not a content triple
-    assert st["mastery"] == 0.0
+def test_summarize_memory_counts_fading_items():
+    m = summarize_memory(["c1", "c2", "c3"], {"c1": 0.95, "c2": 0.5, "c3": 0.65})
+    assert m["fading"] == 2
+    assert m["state"] == "shaky"  # mean 0.7 — on the shaky floor
+    assert m["coverage"] == 1.0
 
 
-# --- tree structure helpers ---
+def test_summarize_memory_empty_section():
+    m = summarize_memory([], {"c1": 0.9})
+    assert m["total"] == 0 and m["coverage"] == 0.0 and m["state"] == "new"
+
+
+def test_retention_ignores_keys_outside_the_section():
+    # Reviews for other sections' concepts (or skel-/chap- typed rows) never leak in.
+    m = summarize_memory(["c1"], {"other": 0.1, "skel-abc": 0.2})
+    assert m["reviewed"] == 0 and m["state"] == "new"
+
 
 def test_collect_sections_skips_entities_and_maps_children():
     forest = [
@@ -99,29 +102,3 @@ def test_descendant_leaves_terminates_on_cycle():
     # forever; the repeated node is treated as a leaf so the walk terminates.
     children = {"toc:1": ["toc:1.1"], "toc:1.1": ["toc:1"]}
     assert descendant_leaves("toc:1", children) == ["toc:1"]
-
-
-# --- Retrievability from spaced-rep stability (decay ← SM-2 interval) ----------
-
-def test_stability_tau_scales_with_interval():
-    from app.supplemental.study.mastery import _stability_tau, _retention_k
-
-    k = _retention_k()  # tau = k * interval, so retrievability = R at the due date
-    # Never-reviewed unit falls back to the global default tau.
-    assert _stability_tau(None, 14.0) == 14.0
-    assert _stability_tau(0, 14.0) == 14.0
-    # A fragile concept (short interval) decays faster than the default; a stable one slower.
-    assert _stability_tau(1, 14.0) < 14.0
-    assert _stability_tau(30, 14.0) > 14.0
-    # tau = k * interval for reviewed units.
-    assert math.isclose(_stability_tau(6, 14.0), k * 6, rel_tol=1e-9)
-
-
-def test_decay_hits_retention_target_at_due_date():
-    from app.supplemental.study.mastery import _stability_tau
-
-    # By construction, retrievability exp(-interval/tau) == retention target (0.9 default)
-    # when dt equals the concept's SM-2 interval.
-    for interval in (1.0, 6.0, 30.0):
-        tau = _stability_tau(interval, 14.0)
-        assert math.isclose(math.exp(-interval / tau), 0.9, rel_tol=1e-6)
