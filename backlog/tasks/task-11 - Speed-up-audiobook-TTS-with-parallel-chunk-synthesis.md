@@ -1,11 +1,11 @@
 ---
 id: TASK-11
 title: Speed up audiobook TTS with parallel chunk synthesis
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-18 01:16'
-updated_date: '2026-07-18 01:18'
+updated_date: '2026-07-18 01:52'
 labels: []
 dependencies: []
 ordinal: 11000
@@ -19,10 +19,10 @@ Audiobook narration synthesizes chunks strictly sequentially through Orpheus via
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ollama-compose runs with OLLAMA_NUM_PARALLEL=2 and the compose comment explains why 2 is safe now
-- [ ] #2 make_audiobook synthesizes missing chunks with 2 concurrent workers, MP3/timeline output identical in order and format
-- [ ] #3 checkpoint/resume and progress reporting still work under concurrency
-- [ ] #4 verified live: two llama-server slots active during an audiobook job and generation faster than the ~75 tok/s single-stream baseline
+- [x] #1 ollama-compose runs with OLLAMA_NUM_PARALLEL=2 and the compose comment explains why 2 is safe now
+- [x] #2 make_audiobook synthesizes missing chunks with 2 concurrent workers, MP3/timeline output identical in order and format
+- [x] #3 checkpoint/resume and progress reporting still work under concurrency
+- [x] #4 verified live: two llama-server slots active during an audiobook job and generation faster than the ~75 tok/s single-stream baseline
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -38,4 +38,12 @@ Audiobook narration synthesizes chunks strictly sequentially through Orpheus via
 
 <!-- SECTION:NOTES:BEGIN -->
 Compose half done: OLLAMA_NUM_PARALLEL=2 + rewritten safety comment in deploy/compose/docker-compose.yml (not yet applied — container recreate deferred so we only interrupt the running narration once). Code half BLOCKED: a concurrent session is mid-rewrite of make_audiobook (TASK-10 raw-text-only strip-down, working tree dirty as of 01:16 UTC). Monitor armed to resume when TASK-10 commits or flips Done; the concurrency change will be implemented on top of the new single-source make_audiobook.
+
+Verification: orpheus llama-server running with -np 2; ollama logs show slot id 0 and id 1 decoding concurrently at ~65 tok/s each (~130 tok/s aggregate vs 75 tok/s single-stream = 1.73x). Narration toc:1 (139 chunks) survived the mid-job container restart (ledger requeue + chunk checkpoints), resumed, completed done=139/139 with no error; MP3 (10.4MB) + exact timeline written, 139 chunks, playback times strictly monotonic (order preserved under concurrency). test_audiobook.py passes in the new image. NOTE: the compose NUM_PARALLEL=2 edit + this task file were swept into commit e6b70bb by the concurrent TASK-10 session; only audiobook.py is in this task's own commit.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Audiobook TTS now synthesizes chunks 2-at-a-time (ThreadPoolExecutor, AUDIOBOOK_TTS_WORKERS default 2) against OLLAMA_NUM_PARALLEL=2, with a parallel fill phase (checkpoint per chunk, lock-guarded progress) and a sequential assembly phase that preserves narration order and the exact timeline format. Verified live: two active llama-server slots, ~1.73x aggregate throughput (130 vs 75 tok/s), a real 139-chunk narration completed through a mid-job restart with correct MP3+timeline output.
+<!-- SECTION:FINAL_SUMMARY:END -->

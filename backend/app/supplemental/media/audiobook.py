@@ -18,6 +18,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -164,10 +165,13 @@ def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RA
     return [max(1.0, len(s)) / chars_per_sec + gap_sec for s in segments]
 
 
-# One narration synthesizes at a time: every chunk goes through the single shared GPU
-# (Orpheus via Ollama), so concurrent jobs would interleave and all finish late. Extra
-# jobs queue on this gate and run in POST order.
+# One narration synthesizes at a time: concurrent jobs would interleave and all finish
+# late. Extra jobs queue on this gate and run in POST order. WITHIN a narration, chunks
+# synthesize _TTS_WORKERS at a time — Ollama's OLLAMA_NUM_PARALLEL slots batch the
+# streams, which is nearly free on the bandwidth-bound GPU (~2x audiobook throughput).
+# Keep this in step with OLLAMA_NUM_PARALLEL in deploy/compose/docker-compose.yml.
 _TTS_GATE = threading.Semaphore(1)
+_TTS_WORKERS = max(1, int(os.environ.get("AUDIOBOOK_TTS_WORKERS", "2")))
 
 
 def _work_dir(doc_id: str, scope: str | None) -> str:
@@ -254,32 +258,47 @@ def make_audiobook(doc_id: str | None, scope: str | None,
     try:
         if on_progress:
             on_progress(0, total, "resuming from checkpoint" if manifest else None)
+
+        def _load_checkpoint(i: int) -> np.ndarray | None:
+            try:
+                return np.load(os.path.join(work, f"{i:05d}.npy"))
+            except (OSError, ValueError):
+                return None  # missing or unreadable checkpoint → resynthesize
+
+        # Fill phase: synthesize every missing chunk, _TTS_WORKERS at a time. Progress
+        # counts completions (finish order ≠ narration order under concurrency).
+        done_count = 0
+        progress_lock = threading.Lock()
+
+        def _fill(i: int, seg: str) -> None:
+            nonlocal done_count
+            if _load_checkpoint(i) is None:
+                _save_chunk(os.path.join(work, f"{i:05d}.npy"), synthesize(seg, voice=voice))
+            with progress_lock:
+                done_count += 1
+                if on_progress:
+                    on_progress(done_count, total, seg[:60])
+
+        with ThreadPoolExecutor(max_workers=_TTS_WORKERS) as pool:
+            list(pool.map(_fill, range(total), segments))
+
+        # Assembly: read the checkpoints back in narration order. Exact per-chunk
+        # playback times (the read-along timeline) fall out of the concat for free —
+        # capture them here, while the sample counts are in hand.
         pieces: list[np.ndarray] = []
-        # Exact per-chunk playback times (the read-along timeline) fall out of the concat
-        # for free — capture them here, while the sample counts are in hand.
         chunk_times: list[dict] = []
         cursor = 0
         for i, seg in enumerate(segments):
-            chunk = os.path.join(work, f"{i:05d}.npy")
-            wav = None
-            if os.path.exists(chunk):
-                try:
-                    wav = np.load(chunk)
-                except (OSError, ValueError):
-                    wav = None  # unreadable checkpoint → resynthesize
-            if wav is None:
-                wav = synthesize(seg, voice=voice)
-                _save_chunk(chunk, wav)
-            if wav.size:
-                start = cursor / SAMPLE_RATE
-                cursor += wav.size
-                chunk_times.append({"text": seg, "start": round(start, 3),
-                                    "end": round(cursor / SAMPLE_RATE, 3)})
-                cursor += _GAP.size
-                pieces.append(wav)
-                pieces.append(_GAP)
-            if on_progress:
-                on_progress(i + 1, total, seg[:60])
+            wav = _load_checkpoint(i)
+            if wav is None or not wav.size:
+                continue  # dud chunk (Orpheus emitted no audio) — narration skips it
+            start = cursor / SAMPLE_RATE
+            cursor += wav.size
+            chunk_times.append({"text": seg, "start": round(start, 3),
+                                "end": round(cursor / SAMPLE_RATE, 3)})
+            cursor += _GAP.size
+            pieces.append(wav)
+            pieces.append(_GAP)
     finally:
         _TTS_GATE.release()
 
