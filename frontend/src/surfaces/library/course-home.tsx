@@ -359,7 +359,9 @@ export function CourseHome({
       )}
 
       {/* The book across chapters (state strip), then you across time (heatmap). */}
-      {!error && !isEmpty && <ChapterStateStrip rows={chapterRows} onOpen={onOpenSection} />}
+      {!error && !isEmpty && (
+        <ChapterStateStrip rows={chapterRows} bySection={mastery?.bySection ?? {}} onOpen={onOpenSection} />
+      )}
       {!error && !isEmpty && <StudyHeatmap doc={course.learnDocId} />}
 
       {/* Course outline */}
