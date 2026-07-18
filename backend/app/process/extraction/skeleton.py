@@ -2,7 +2,7 @@
 scaffold the learner reproduces from memory (free recall + self-grade), the keystone of the
 chapter learning path.
 
-Also owns the per-chapter PATH PROGRESS store, which later stages (orient, quizzes, exam,
+Also owns the per-chapter PATH PROGRESS store, which the path stages (orient, read,
 lock-in) write into so the journey has one source of truth for soft-gate completion.
 """
 

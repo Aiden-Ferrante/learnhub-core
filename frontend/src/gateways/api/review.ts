@@ -18,16 +18,11 @@ export type ReviewCard = {
   pageStart?: number | null
   pageEnd?: number | null
   /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
-   *  seeded by the chapter walk's self-grades. 'figure' = a figure-recall card (image front,
-   *  caption reveal), seeded by chapter-scoped review. 'chapter' = a chapter-resurface card
+   *  seeded by the chapter walk's self-grades. 'chapter' = a chapter-resurface card
    *  (recall what the chapter covered), seeded by reading. Absent/'concept' = a concept card. */
-  itemType?: 'concept' | 'skeleton' | 'figure' | 'chapter'
+  itemType?: 'concept' | 'skeleton' | 'chapter'
   /** Skeleton/chapter cards only: the true structure snapshot for the reveal. */
   children?: { heading: string; essence?: string }[]
-  /** Figure cards only: the figure's reading-order n for /api/learn/figure. */
-  figureOrder?: number | null
-  /** Figure cards only: the source page, kept on the row at seed time. */
-  page?: number | null
 }
 
 export type ReviewQueueResponse = {
@@ -69,22 +64,6 @@ export async function submitReviewGrade(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
-  })
-  return parseJsonResponse<ReviewGradeResponse>(res)
-}
-
-// Seed-or-advance a FIGURE-recall item ("what does this figure show?"). Sent with the full
-// snapshot every time — the backend upsert keeps caption/section fresh on the row.
-export async function submitFigureReviewGrade(
-  docId: string,
-  figureOrder: number,
-  grade: ReviewGrade,
-  snapshot?: { caption?: string; sectionKey?: string; chapterScope?: string; page?: number | null },
-): Promise<ReviewGradeResponse> {
-  const res = await fetch('/api/learn/review/grade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ figure: true, doc: docId, figureOrder, grade, ...snapshot }),
   })
   return parseJsonResponse<ReviewGradeResponse>(res)
 }

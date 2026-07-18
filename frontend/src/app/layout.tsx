@@ -21,7 +21,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Learn Hub | Study from your textbooks",
-  description: "Turn a PDF into concepts you can study — read, quiz, and master.",
+  description: "Turn a PDF into concepts you can study — read, recall, and master.",
 }
 
 export default function RootLayout({

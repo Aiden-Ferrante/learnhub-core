@@ -39,7 +39,6 @@ export function LockInPanel({ scope, docId, onNavigate, onDone }: LockInPanelPro
   }
 
   const skeletonDone = !!stages.skeleton?.done
-  const examPass = !!stages.exam?.pass
 
   const lockIn = () => {
     setLocked(true)
@@ -67,7 +66,6 @@ export function LockInPanel({ scope, docId, onNavigate, onDone }: LockInPanelPro
 
       <div className="space-y-1.5">
         <Row ok={skeletonDone} label="Skeleton recalled" />
-        <Row ok={examPass} label="Chapter exam passed" />
       </div>
 
       <div className="rounded-lg border bg-card p-3">

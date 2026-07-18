@@ -30,7 +30,7 @@ export function InfoModal() {
           </div>
           <DialogDescription className="text-base text-muted-foreground leading-relaxed">
             Turn a textbook or PDF into a course you actually study. Learn Hub breaks each chapter into
-            learnable concepts, then drives you through reading, quizzes, and spaced-repetition recall so the
+            learnable concepts, then drives you through reading and spaced-repetition recall so the
             material sticks. Runs fully local on Ollama — no API keys.
           </DialogDescription>
         </DialogHeader>
@@ -53,7 +53,7 @@ export function InfoModal() {
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-brand mt-2 flex-shrink-0"></div>
                 <p className="text-sm text-foreground leading-relaxed">
-                  <span className="font-semibold">Quizzes &amp; spaced repetition:</span> passage-grounded questions and recall reviews that resurface concepts right before you forget them
+                  <span className="font-semibold">Spaced repetition:</span> recall reviews that resurface concepts right before you forget them
                 </p>
               </div>
               <div className="flex items-start gap-3">
@@ -104,7 +104,7 @@ export function InfoModal() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">3. Study</p>
-                  <p className="text-xs text-muted-foreground">Read, take passage-grounded quizzes, and run recall reviews</p>
+                  <p className="text-xs text-muted-foreground">Read, rebuild chapters from memory, and run recall reviews</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">

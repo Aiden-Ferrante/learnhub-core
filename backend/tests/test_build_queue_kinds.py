@@ -17,7 +17,7 @@ def test_other_kinds_get_distinct_keys():
     distinct = [k for k in KINDS if k != "extract"]  # extract deliberately shares build's key
     keys = {_bkey("doc1", "toc:1", k) for k in distinct}
     assert len(keys) == len(distinct)  # no collisions among the rest
-    assert _bkey("doc1", "toc:1", "quizzes") != _bkey("doc1", "toc:2", "quizzes")
+    assert _bkey("doc1", "toc:1", "guides") != _bkey("doc1", "toc:2", "guides")
 
 
 def test_build_and_extract_share_one_key():
@@ -29,4 +29,4 @@ def test_build_and_extract_share_one_key():
 
 def test_kinds_registry_shape():
     assert "build" in KINDS
-    assert {"quizzes", "guides", "skeleton", "orient"} <= set(KINDS)
+    assert {"guides", "skeleton", "orient"} <= set(KINDS)

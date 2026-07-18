@@ -68,7 +68,7 @@ type GuidedReadingProps = {
   /** Reports the chapter the reader lands on, so the reading position persists. */
   onScopeChange?: (sectionKey: string) => void
   /** Open a drawer once the chapter resolves (e.g. course-home "Review all" lands here). */
-  initialDrawer?: "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen"
+  initialDrawer?: "review" | "walk" | "lockin" | "tutor" | "listen"
 }
 
 // ---------------------------------------------------------------------------
@@ -101,9 +101,9 @@ export function GuidedReading({
     dueCount,
     refreshMastery,
   } = useGuidedReadingData(docId, chapterKey, tree)
-  // Path stepper: the chapter's stage machine (orient/read/skeleton/quizzes/exam/lockin);
+  // Path stepper: the chapter's stage machine (orient/read/skeleton/lockin);
   // chapter_progress is the same store the old lesson flow wrote, so history carries over.
-  const { stages, loadProgress, markStage, noteQuizAnswer } = useChapterPath(chapterKey, docId)
+  const { stages, loadProgress, markStage } = useChapterPath(chapterKey, docId)
   const [drawer, setDrawer] = useState<StudyDrawer>(null)
   const [notes, setNotes] = useState<MarginNote[]>([])
   const [wide, setWide] = useState(false)
@@ -238,12 +238,6 @@ export function GuidedReading({
         break
       case "skeleton":
         setDrawer("walk")
-        break
-      case "quizzes":
-        setDrawer("quiz")
-        break
-      case "exam":
-        setDrawer("exam")
         break
       case "lockin":
         setDrawer("lockin")
@@ -769,7 +763,7 @@ export function GuidedReading({
         />
       )}
 
-      {/* Study drawer — quiz / review / exam over the same surface (spec §8 step 5). */}
+      {/* Study drawer — review / walk / lock-in / tutor / listen over the same surface. */}
       {drawer && (
         <StudyDrawerPanel
           drawer={drawer}
@@ -778,9 +772,7 @@ export function GuidedReading({
           docId={docId}
           tree={tree}
           onClose={() => setDrawer(null)}
-          onSwitch={setDrawer}
           onRefreshMastery={refreshMastery}
-          onQuizAnswered={noteQuizAnswer}
           onProgress={loadProgress}
         />
       )}

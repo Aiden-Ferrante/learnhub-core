@@ -5,15 +5,12 @@ import { useAsyncData } from "@/kit/hooks/use-async-data"
 import {
   BookMarked,
   BookOpen,
-  Brain,
   ChevronLeft,
   Flame,
   GraduationCap,
-  History,
   RotateCcw,
   Search,
   Sparkles,
-  Target,
 } from "lucide-react"
 import { SyllabusTree } from "@/surfaces/library/syllabus-tree"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
@@ -25,7 +22,7 @@ import { ProgressRing } from "@/kit/patterns/progress-ring"
 import { SectionCard } from "@/kit/patterns/section-card"
 import { StatTile } from "@/kit/patterns/stat-tile"
 import { fetchCourseStatus, type CoursePipelineStatus } from "@/gateways/api/pipeline"
-import { fetchForecast, fetchMistakes, type ForecastResponse, type MasteryResponse, type Mistake, type WeakestSection } from "@/gateways/api/progress"
+import { fetchForecast, type ForecastResponse, type MasteryResponse, type WeakestSection } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library/courses"
 
 type CourseHomeProps = {
@@ -44,8 +41,6 @@ type CourseHomeProps = {
   onOpenConcept?: (conceptKey: string) => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
-  onDrill?: () => void
-  onBrainDump?: () => void
   dueCount?: number
   onReviewAll?: () => void
   onRetry?: () => void
@@ -111,16 +106,11 @@ export function CourseHome({
   onOpenConcept,
   onBackToShelf,
   continueNode,
-  onDrill,
-  onBrainDump,
   dueCount = 0,
   onReviewAll,
   onRetry,
 }: CourseHomeProps) {
   const sectionsTotal = useMemo(() => countSections(tree), [tree])
-  // Mistakes are supplementary — a failure here must not break the page.
-  const { data: mistakesData } = useAsyncData(() => fetchMistakes(course.id, 5), [course.id])
-  const mistakes: Mistake[] = mistakesData && !mistakesData.error ? mistakesData.mistakes : []
 
   // Concept count is supplementary.
   const { data: conceptsData } = useAsyncData(() => fetchDocumentConcepts(course.learnDocId), [course.learnDocId])
@@ -160,7 +150,7 @@ export function CourseHome({
   } else if (studied === 0) {
     headline = {
       icon: <Sparkles className="h-4 w-4 text-brand" />,
-      text: "Pick any section below and start a quiz to begin tracking mastery.",
+      text: "Pick any section below and start a review to begin tracking mastery.",
     }
   } else {
     headline = {
@@ -244,10 +234,6 @@ export function CourseHome({
             >
               Concepts {pipeline.chaptersWithConcepts ?? 0}/{pipeline.chaptersTotal ?? 0} chapters
             </span>
-            <span aria-hidden>·</span>
-            <span>
-              Quizzes {pipeline.chaptersWithQuizzes ?? 0}/{pipeline.chaptersTotal ?? 0}
-            </span>
           </div>
         )}
 
@@ -260,44 +246,24 @@ export function CourseHome({
 
       </div>
 
-      {/* Practice — strengthen what you already know. Distinct from the in-chapter assessments
-          on the guided path: these are cross-chapter, self-directed, and ungraded. */}
-      {!error && !isEmpty &&
-        (onReviewAll || (onDrill && studied > 0) || (onBrainDump && (conceptCount ?? 0) > 0)) && (
-          <SectionCard
-            title="Practice"
-            description="Cross-chapter, self-directed, ungraded — strengthen what you already know."
-            bodyClassName="p-3"
-          >
-            <div className="grid gap-2 sm:grid-cols-3">
-              {onReviewAll && (
-                <PracticeTile
-                  icon={<RotateCcw className="h-4 w-4 text-brand" />}
-                  title="Review"
-                  desc="Spaced-repetition cards that have come due — keeps what you learned from fading."
-                  badge={dueCount > 0 ? `${dueCount} due` : "Caught up"}
-                  onClick={onReviewAll}
-                />
-              )}
-              {onDrill && studied > 0 && (
-                <PracticeTile
-                  icon={<Target className="h-4 w-4 text-brand" />}
-                  title="Drill weak spots"
-                  desc="Adaptive multiple-choice on your weakest concepts — missed first, across all chapters."
-                  onClick={onDrill}
-                />
-              )}
-              {onBrainDump && (conceptCount ?? 0) > 0 && (
-                <PracticeTile
-                  icon={<Brain className="h-4 w-4 text-brand" />}
-                  title="Free recall"
-                  desc="Close the book and write what you remember about a chapter — then see your gaps."
-                  onClick={onBrainDump}
-                />
-              )}
-            </div>
-          </SectionCard>
-        )}
+      {/* Practice — the review queue is the one cross-chapter practice surface. */}
+      {!error && !isEmpty && onReviewAll && (
+        <SectionCard
+          title="Practice"
+          description="Spaced review — strengthen what you already know."
+          bodyClassName="p-3"
+        >
+          <div className="grid gap-2 sm:grid-cols-3">
+            <PracticeTile
+              icon={<RotateCcw className="h-4 w-4 text-brand" />}
+              title="Review"
+              desc="Spaced-repetition cards that have come due — keeps what you learned from fading."
+              badge={dueCount > 0 ? `${dueCount} due` : "Caught up"}
+              onClick={onReviewAll}
+            />
+          </div>
+        </SectionCard>
+      )}
 
       {/* Error state */}
       {error && (
@@ -425,57 +391,6 @@ export function CourseHome({
                     </div>
                     <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
                   </div>
-                </button>
-              )
-            })}
-          </div>
-        </SectionCard>
-      )}
-
-      {/* Recent mistakes */}
-      {!error && !isEmpty && mistakes.length > 0 && (
-        <SectionCard
-          title={
-            <span className="flex items-center gap-2">
-              <History className="h-3.5 w-3.5" /> Recent mistakes
-            </span>
-          }
-          bodyClassName="p-0"
-        >
-          <div className="divide-y">
-            {mistakes.map((m, i) => {
-              const node = findNodeBySectionKey(tree, m.sectionKey)
-              const sectionTitle = node
-                ? displaySectionTitle(node.label, node.title)
-                : displaySectionTitle(m.sectionKey)
-              return (
-                <button
-                  key={`${m.sectionKey}-${m.ts}-${i}`}
-                  type="button"
-                  onClick={() =>
-                    onReview({
-                      sectionKey: m.sectionKey,
-                      label: node?.label ?? m.sectionKey,
-                      title: node?.title,
-                      mastery: 0,
-                    })
-                  }
-                  className="flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-brand/5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{sectionTitle}</div>
-                    {m.stem && (
-                      <div className="truncate text-xs text-muted-foreground">{m.stem}</div>
-                    )}
-                    {m.expected && (
-                      <div className="truncate text-xs text-muted-foreground">
-                        Answer: <span className="text-foreground/80">{m.expected}</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {relativeTime(m.ts)}
-                  </span>
                 </button>
               )
             })}

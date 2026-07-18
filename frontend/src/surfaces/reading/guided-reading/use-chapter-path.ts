@@ -1,19 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useToast } from "@/kit/hooks/use-toast"
 import { PATH_STAGES, doneMap } from "@/surfaces/reading/learn-path"
 import { fetchChapterProgress, updateChapterStage } from "@/gateways/api/chapter"
 
 /** The chapter path's stage machine: {stageKey: done} from chapter_progress — the same
- *  store the old lesson flow wrote, so history carries over. Owns loading, marking (with
- *  the "what now?" toast), and the quiz soft gate (5 real answers mark the quizzes stage).
- *  The read soft gate lives in use-reader-scroll and calls markStage back. */
+ *  store the old lesson flow wrote, so history carries over. Owns loading and marking
+ *  (with the "what now?" toast). The read soft gate lives in use-reader-scroll and
+ *  calls markStage back. */
 export function useChapterPath(chapterKey: string | null, docId: string) {
   const [stages, setStages] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
-  // Soft-gate counter for the quiz stage (nothing else reports it).
-  const quizAnswers = useRef(0)
 
   const loadProgress = useCallback(async () => {
     if (!chapterKey) return
@@ -27,7 +25,6 @@ export function useChapterPath(chapterKey: string | null, docId: string) {
 
   useEffect(() => {
     setStages({})
-    quizAnswers.current = 0
     loadProgress()
   }, [loadProgress])
 
@@ -52,10 +49,5 @@ export function useChapterPath(chapterKey: string | null, docId: string) {
     [chapterKey, docId, loadProgress, stages, toast],
   )
 
-  const noteQuizAnswer = () => {
-    quizAnswers.current += 1
-    if (quizAnswers.current >= 5 && !stages.quizzes) markStage("quizzes")
-  }
-
-  return { stages, loadProgress, markStage, noteQuizAnswer }
+  return { stages, loadProgress, markStage }
 }

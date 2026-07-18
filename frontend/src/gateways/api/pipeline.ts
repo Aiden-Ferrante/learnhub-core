@@ -2,7 +2,7 @@
 import { parseJsonResponse } from './http'
 
 // One pipeline status per course: whether the learn content exists (a dead learnDocId is the
-// "content link broken" empty state), and chapter-level concept/quiz coverage for the strip.
+// "content link broken" empty state), and chapter-level concept coverage for the strip.
 export type CoursePipelineStatus = {
   doc: string
   exists: boolean
@@ -14,7 +14,6 @@ export type CoursePipelineStatus = {
   outlineEntries?: number
   chaptersTotal?: number
   chaptersWithConcepts?: number
-  chaptersWithQuizzes?: number
   conceptCount?: number
   error?: string
 }
@@ -130,7 +129,7 @@ export type ChapterBuildJob = {
 
 /** Every artifact the processing queue can produce. "build" = extraction + deep overlay;
  *  the rest regenerate one artifact for one chapter. */
-export type BuildKind = 'build' | 'quizzes' | 'guides' | 'skeleton' | 'orient'
+export type BuildKind = 'build' | 'guides' | 'skeleton' | 'orient'
 
 export async function enqueueChapterBuild(
   doc: string,

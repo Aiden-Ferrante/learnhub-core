@@ -437,7 +437,7 @@ export function CourseShelf({
           <h3 className="text-xl font-semibold">Start your first course</h3>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
             Drop in a PDF and Learn Hub turns it into concepts you can study —
-            read it, get quizzed, and track what you&rsquo;ve mastered.
+            read it, recall it, and track what you&rsquo;ve mastered.
           </p>
           <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full bg-muted/60 px-2.5 py-1">1 · Upload</span>
@@ -606,7 +606,7 @@ export function CourseShelf({
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
               This permanently removes the course and everything built from it: the converted
-              book, sections, figures, extracted concepts, quiz questions, and your review
+              book, sections, figures, extracted concepts, and your review
               history for it.
             </p>
             <p>The original PDF on your computer is not touched.</p>

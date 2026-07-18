@@ -11,14 +11,11 @@ export type PathStage = {
   lead: string
 }
 
-// Single source of truth for the path, shared by the rail, the resume logic, and
-// the course-level Today plan (mirrored server-side in app/plan.py — keep in sync).
+// Single source of truth for the path, shared by the rail and the resume logic.
 export const PATH_STAGES: PathStage[] = [
   { key: "orient", label: "Orient", lead: "See where this chapter is headed before you dive in." },
   { key: "read", label: "Read", lead: "Read it through — meet the ideas in their own order first." },
   { key: "skeleton", label: "Learn", lead: "Now rebuild it top-down from memory — frame it, then learn each branch." },
-  { key: "quizzes", label: "Quizzes", lead: "Retrieve and apply each concept — application questions across the chapter." },
-  { key: "exam", label: "Exam", lead: "One graded, interleaved pass over the whole chapter — pass to lock it in." },
   { key: "lockin", label: "Lock in", lead: "Let it set — the keepers go into spaced review." },
 ]
 

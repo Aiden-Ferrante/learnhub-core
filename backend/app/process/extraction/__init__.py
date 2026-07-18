@@ -13,8 +13,7 @@ from app.process.extraction.concept_store import (
     delete_concept,
     fetch_document_concepts,
     fetch_section_concepts,
-    section_question_flags,
-    set_concept_questions,
+    section_concept_rows,
     update_concept,
 )
 from app.process.extraction.concepts_extract import extract_concepts_document
@@ -42,8 +41,7 @@ __all__ = [
     "record_skeleton_grade",
     "refresh_orient",
     "refresh_skeleton",
-    "section_question_flags",
-    "set_concept_questions",
+    "section_concept_rows",
     "update_concept",
     "update_stage",
 ]

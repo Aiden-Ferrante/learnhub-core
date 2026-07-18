@@ -97,7 +97,7 @@ export function useCourseData(courseId: string) {
     [courseId],
   )
 
-  /** Re-pull mastery + due after study activity (drill done, review graded, …). */
+  /** Re-pull mastery + due after study activity (review graded, walk finished, …). */
   const refresh = useCallback(() => {
     if (!docKey) return
     loadMastery(docKey)

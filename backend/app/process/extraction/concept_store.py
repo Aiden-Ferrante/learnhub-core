@@ -171,7 +171,7 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
                 "kind": r["kind"],
                 "signal": r["signal"],
                 "source": r.get("source"),
-                "questions": [],  # extraction-era questions retired; quiz_questions is the live store
+                "questions": [],  # retired field, kept for response-shape stability
                 "sectionKey": r["sectionKey"],
                 "pageStart": r.get("pageStart"),
                 "pageEnd": r.get("pageEnd"),
@@ -225,21 +225,6 @@ def delete_concept(key: str) -> dict:
     return {"deleted": key, "concept": row.get("name")}
 
 
-def set_concept_questions(key: str, questions: list | None) -> dict:
-    """Replace a concept's cached quiz MCQs (``quizQuestions``); [] / None clears so it
-    re-authors on next study. Returns {updated, quizQuestions} | {error, status}."""
-    from psycopg.types.json import Json
-
-    with db() as conn:
-        row = conn.execute(
-            "UPDATE ext_concepts SET quiz_questions = %(q)s WHERE key = %(k)s RETURNING key",
-            {"q": Json(questions) if questions else None, "k": key},
-        ).fetchone()
-    if row is None:
-        return {"error": f"concept {key} not found", "status": 404}
-    return {"updated": key, "quizQuestions": len(questions) if questions else 0}
-
-
 def concept_counts_by_doc() -> dict[str, int]:
     """Concept count per document — decorates the course list."""
     with db() as conn:
@@ -251,12 +236,10 @@ def concept_counts_by_doc() -> dict[str, int]:
         }
 
 
-def section_question_flags(doc_id: str) -> list[dict]:
-    """Per-concept (sectionKey, has quiz questions) rows — course-status coverage input."""
+def section_concept_rows(doc_id: str) -> list[dict]:
+    """One row per concept (its sectionKey) — course-status coverage input."""
     with db() as conn:
         return conn.execute(
-            'SELECT section_key AS "sectionKey", '
-            "COALESCE(jsonb_array_length(quiz_questions), 0) > 0 AS \"hasQuestions\" "
-            "FROM ext_concepts WHERE doc_id = %(d)s",
+            'SELECT section_key AS "sectionKey" FROM ext_concepts WHERE doc_id = %(d)s',
             {"d": doc_id},
         ).fetchall()

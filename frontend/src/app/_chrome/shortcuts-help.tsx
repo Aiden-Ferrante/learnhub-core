@@ -30,13 +30,6 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: "Quiz",
-    items: [
-      { keys: ["1", "–", "9"], label: "Pick an answer" },
-      { keys: ["↵"], label: "Next question" },
-    ],
-  },
-  {
     title: "Reader",
     items: [
       { keys: ["Ctrl", "F"], label: "Find in book" },

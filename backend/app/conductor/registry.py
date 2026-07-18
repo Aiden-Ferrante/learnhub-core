@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.process.content import resolve_doc_id
-from app.process.content import scope_section_keys
 from app.conductor.build import run_extract
 from app.conductor.ingest import run_convert
 from app.conductor.worker import ensure_worker, register_runner
@@ -17,18 +16,12 @@ from app.process.extraction import author_guides_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
 from app.gateways import set_doc_resolver
 from app.supplemental.media import run_audiobook
-from app.supplemental.study import author_scope_sync
 
 
 def _latest_doc_id() -> str | None:
     # Injected into gateways/ledger (set_doc_resolver) — the dependency-inversion seam that
     # keeps the ledger below process/content while sharing the one resolve rule.
     return resolve_doc_id(None)
-
-
-def _run_quizzes(job: dict[str, Any], ctx) -> dict[str, Any]:
-    keys = sorted(scope_section_keys(job["docId"], job["scope"]) or {job["scope"]})
-    return author_scope_sync(job["docId"], keys, on_progress=ctx.progress)
 
 
 def _run_guides(job: dict[str, Any], ctx) -> dict[str, Any]:
@@ -48,7 +41,6 @@ def install() -> None:
     register_runner("convert", run_convert)
     register_runner("build", run_extract)  # compat alias — deep overlay retired
     register_runner("extract", run_extract)
-    register_runner("quizzes", _run_quizzes)
     register_runner("guides", _run_guides)
     register_runner("skeleton", _run_skeleton)
     register_runner("orient", _run_orient)

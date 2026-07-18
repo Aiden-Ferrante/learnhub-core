@@ -5,8 +5,7 @@ import { Button } from "@/kit/ui/button"
 import { KIND_BADGE } from "@/surfaces/concepts"
 import { ConceptMarkdown } from "@/surfaces/concepts"
 import { SectionFigures } from "@/surfaces/reading"
-import { figureUrl } from "@/gateways/api/content"
-import { fetchReviewQueue, submitFigureReviewGrade, submitReviewGrade, type ReviewCard, type ReviewGrade, type ReviewQueueResponse } from "@/gateways/api/review"
+import { fetchReviewQueue, submitReviewGrade, type ReviewCard, type ReviewGrade, type ReviewQueueResponse } from "@/gateways/api/review"
 import { GRADES } from "@/surfaces/studying/grade-scale"
 import { useStudyHotkeys } from "@/surfaces/studying/use-study-hotkeys"
 
@@ -67,18 +66,7 @@ export function ReviewPanel({
   const grade = useCallback(
     (g: ReviewGrade) => {
       if (!card) return
-      if (card.itemType === "figure" && card.docId && card.figureOrder != null) {
-        // Full snapshot every time: the first grade SEEDS the row (new cards have no
-        // review row yet); re-grades keep its caption/section fresh.
-        submitFigureReviewGrade(card.docId, card.figureOrder, g, {
-          caption: card.signal,
-          sectionKey: card.sectionKey,
-          chapterScope: scope,
-          page: card.page,
-        }).catch(() => {})
-      } else {
-        submitReviewGrade(card.conceptKey, g, docId).catch(() => {})
-      }
+      submitReviewGrade(card.conceptKey, g, docId).catch(() => {})
       onAnswered?.()
       setDone((d) => d + 1)
       setStats((s) => (g >= 3 ? { ...s, good: s.good + 1 } : { ...s, again: s.again + 1 }))
@@ -129,10 +117,9 @@ export function ReviewPanel({
   }
 
   const isSkeleton = card.itemType === "skeleton"
-  const isFigure = card.itemType === "figure"
   const isChapter = card.itemType === "chapter"
   const kindClass =
-    isSkeleton || isFigure || isChapter
+    isSkeleton || isChapter
       ? "bg-brand/15 text-brand"
       : KIND_BADGE[card.kind] || "bg-muted text-muted-foreground"
 
@@ -168,38 +155,16 @@ export function ReviewPanel({
 
         {!revealed ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 overflow-auto text-center">
-            {isFigure && card.docId && card.figureOrder != null && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={figureUrl(card.docId, card.figureOrder)}
-                alt="Figure to recall"
-                className="max-h-64 w-full rounded-lg border bg-white object-contain"
-              />
-            )}
             <p className="text-sm text-muted-foreground">
               {isSkeleton
                 ? "Rebuild this branch from memory — what sits under it, and what does each part say?"
                 : isChapter
                   ? "You read this chapter a while ago — recall its main threads before they fade."
-                  : isFigure
-                    ? "What does this figure show?"
-                    : "Recall what this concept means."}
+                  : "Recall what this concept means."}
             </p>
             <Button onClick={() => setRevealed(true)}>
               Reveal <kbd className="ml-2 rounded bg-muted px-1 text-[10px]">space</kbd>
             </Button>
-          </div>
-        ) : isFigure ? (
-          <div className="flex flex-1 flex-col gap-3 overflow-auto">
-            {card.docId && card.figureOrder != null && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={figureUrl(card.docId, card.figureOrder)}
-                alt={card.signal}
-                className="max-h-56 w-full rounded-lg border bg-white object-contain"
-              />
-            )}
-            <p className="text-sm font-medium">{card.signal}</p>
           </div>
         ) : isSkeleton || isChapter ? (
           <ul className="flex-1 space-y-1.5 text-sm">

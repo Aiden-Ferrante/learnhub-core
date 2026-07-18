@@ -9,7 +9,7 @@ import { scopeFromSegments, scopeToPath } from "@/kit/lib/scope-url"
 
 type Params = Promise<{ courseId: string; scope?: string[] }>
 
-const DRAWERS = ["quiz", "review", "exam", "walk", "lockin", "tutor", "listen"] as const
+const DRAWERS = ["review", "walk", "lockin", "tutor", "listen"] as const
 type Drawer = (typeof DRAWERS)[number]
 
 function ChapterInner({ params }: { params: Params }) {

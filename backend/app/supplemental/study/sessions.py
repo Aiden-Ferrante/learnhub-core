@@ -46,7 +46,7 @@ def cluster_events(events: list[dict[str, Any]], gap: float = GAP_SECONDS) -> li
         scopes: list[str] = []
         graded = correct = 0
         for e in run:
-            k = e.get("kind") or ("quiz" if e.get("correct") is not None else "other")
+            k = e.get("kind") or ("review" if e.get("correct") is not None else "other")
             kinds[k] = kinds.get(k, 0) + 1
             d = e.get("doc")
             if d and d not in docs:

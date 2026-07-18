@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from app.conductor import prepare_upload
 from app.gateways import KINDS, cancel_build, enqueue_build, list_builds
 from app.process.content import chapter_key_of, document_overview, fetch_latest_document, find_by_source_hash, resolve_doc_id
-from app.process.extraction import section_question_flags
+from app.process.extraction import section_concept_rows
 from app.process.ingestion import source_hash_of
 
 router = APIRouter()
@@ -179,7 +179,7 @@ def api_jobs(doc: str | None = None) -> JSONResponse:
 @router.get("/api/course-status")
 def api_course_status(doc: str = Query(...)) -> JSONResponse:
     """One pipeline status for a course: does the content exist, is there an outline, and
-    how far concept/quiz coverage has progressed per chapter. Drives the UI status strip
+    how far concept coverage has progressed per chapter. Drives the UI status strip
     and reason-aware empty states (exists=false -> broken content link)."""
     try:
         row = document_overview(doc)
@@ -187,7 +187,7 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
             return JSONResponse(
                 {"doc": doc, "exists": False, "reason": "doc-not-found"}, status_code=404
             )
-        concept_rows = section_question_flags(doc)
+        concept_rows = section_concept_rows(doc)
         outline = row.get("outline") or []
         top = [e for e in outline if (e.get("listDepth") or 0) == 0]
         # Numbered chapters are the study surface; front/back matter (Title Page, Index…)
@@ -198,13 +198,10 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
         chapter_keys = {e.get("sectionKey") for e in chapters if e.get("sectionKey")}
 
         with_concepts: set[str] = set()
-        with_quizzes: set[str] = set()
         for c in concept_rows:
             ck = chapter_key_of(c.get("sectionKey") or "")
             if ck in chapter_keys:
                 with_concepts.add(ck)
-                if c.get("hasQuestions"):
-                    with_quizzes.add(ck)
         return JSONResponse(
             {
                 "doc": doc,
@@ -216,7 +213,6 @@ def api_course_status(doc: str = Query(...)) -> JSONResponse:
                 "outlineEntries": len(outline),
                 "chaptersTotal": len(chapter_keys),
                 "chaptersWithConcepts": len(with_concepts),
-                "chaptersWithQuizzes": len(with_quizzes),
                 "conceptCount": len(concept_rows),
             }
         )

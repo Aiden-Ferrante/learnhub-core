@@ -9,8 +9,6 @@ import { cleanCourseTitle } from "@/kit/lib/course-title"
 const SUBPAGE_LABELS: Record<string, string> = {
   chapter: "Chapter",
   concepts: "Concepts",
-  drill: "Drill",
-  dump: "Free recall",
   read: "Book",
 }
 

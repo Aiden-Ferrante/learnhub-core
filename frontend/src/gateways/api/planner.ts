@@ -37,7 +37,7 @@ export type WorkingSession = {
   durationMin: number
   events: number
   kinds: Record<string, number>
-  /** The dominant kind — what the session mostly was (read/quiz/recall/drill/resurface…). */
+  /** The dominant kind — what the session mostly was (read/review/skeleton/resurface…). */
   kind: string
   courses: { doc: string; title: string }[]
   scopes: string[]

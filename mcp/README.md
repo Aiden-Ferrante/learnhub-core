@@ -12,9 +12,9 @@ learn service serves with its own database access (`app/api/admin_routes.py`). K
 | Group | Tools |
 |---|---|
 | **Inspect** (read) | `list_courses`, `get_outline`, `get_chapter`, `get_section`, `search_text`, `list_concepts`, `concept_mastery`, `due_reviews`, `section_content` |
-| **Processing** (write) | `extract`, `extraction_status`, `prepare_quizzes`, `quiz_prepare_status` |
-| **Study** (write) | `quiz_next`, `quiz_answer`, `grade_review` |
-| **Author/curate** (write) | `update_concept`, `set_concept_questions` |
+| **Processing** (write) | `extract`, `extraction_status` |
+| **Study** (write) | `grade_review` |
+| **Author/curate** (write) | `update_concept` |
 | **Reading & audio** | `orient`, `skeleton`, `reading_guide`, `prepare_reading_guide`, `flashcard_deck`, `audiobook_voices`, `generate_audiobook`, `audiobook_status`, `audiobook_list` |
 
 Most tools take a course `doc` (a learnDocId from `list_courses`) and an optional `scope`

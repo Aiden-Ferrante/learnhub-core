@@ -15,7 +15,7 @@ type ChapterWalkProps = {
   docId?: string
   /** Full syllabus tree — the walk is the scope chapter's subtree of it. */
   tree?: LearnTreeNode[]
-  /** Bubble quiz answers up (mastery refresh). */
+  /** Bubble grades up (mastery refresh). */
   onAnswered?: () => void
   /** Walk finished → advance to the next path stage. */
   onComplete?: () => void
@@ -374,7 +374,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
             )}
           </div>
         ) : (
-          <SectionConceptsPanel scope={step.sectionKey} docId={docId} onAnswered={onAnswered} />
+          <SectionConceptsPanel scope={step.sectionKey} docId={docId} />
         )}
       </div>
 

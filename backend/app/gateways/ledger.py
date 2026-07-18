@@ -64,7 +64,7 @@ def _row_to_job(row: dict[str, Any]) -> dict[str, Any]:
     })
     return job
 
-KINDS = ("convert", "build", "extract", "quizzes", "guides", "skeleton", "orient", "audiobook")
+KINDS = ("convert", "build", "extract", "guides", "skeleton", "orient", "audiobook")
 
 # The "no doc id given" resolver, injected at startup by conductor/registry.py —
 # keeps the ledger below process/content while sharing the one resolve rule.

@@ -1,9 +1,9 @@
 """Persisted study events + view-time mastery computation.
 
 Mastery per section = coverage x accuracy x decay:
-  - coverage: distinct quizzed concepts / total concepts in the section
-  - accuracy: Beta-Binomial posterior mean of quiz correctness (quizzes only)
-  - decay:    exp(-dt / tau), dt = days since last quiz, tau = MASTERY_TAU_DAYS
+  - coverage: distinct reviewed concepts / total concepts in the section
+  - accuracy: Beta-Binomial posterior mean of review correctness (graded events only)
+  - decay:    exp(-dt / tau), dt = days since last graded review, tau = MASTERY_TAU_DAYS
 
 Only raw events persist; mastery is recomputed on read because decay is
 time-dependent. Internal sections roll up as a concept-count-weighted average
@@ -54,66 +54,29 @@ def _stability_tau(interval_days: float | None, default_tau: float) -> float:
 # The floor: append-only study events
 # --------------------------------------------------------------------------- #
 
-def record_quiz_event(
+def record_grade_event(
     section_key: str | None,
     correct: bool,
     doc: str | None = None,
-    stem: str | None = None,
-    expected: str | None = None,
     concept_key: str | None = None,
-    kind: str = "quiz",
-    confidence: str | None = None,
+    kind: str = "review",
 ) -> None:
-    """Append one graded study event (quiz answer, MCQ, or recall grade). No-op for whole-graph
-    quizzes (no section to attribute). Never raises: event recording must not break study flow.
-    ``kind`` tags the engagement type (quiz | review | exam | recall …); ``confidence`` is the
-    learner's pre-reveal self-rating (guess | shaky | confident) for calibration."""
+    """Append one graded study event (a review grade — the loop's only graded activities are
+    concept and skeleton recall). No-op without a section to attribute. Never raises: event
+    recording must not break study flow. ``kind`` tags the activity (review | skeleton |
+    resurface)."""
     if not section_key or not section_key.strip():
         return
     try:
         with db() as conn:
             conn.execute(
-                "INSERT INTO study_events (section_key, concept_key, correct, ts, doc, "
-                "stem, expected, kind, confidence) VALUES (%(sk)s,%(ck)s,%(correct)s, now(), "
-                "%(doc)s,%(stem)s,%(expected)s,%(kind)s,%(conf)s)",
+                "INSERT INTO study_events (section_key, concept_key, correct, ts, doc, kind) "
+                "VALUES (%(sk)s,%(ck)s,%(correct)s, now(), %(doc)s,%(kind)s)",
                 {"sk": section_key.strip(), "ck": concept_key or "",
-                 "correct": bool(correct), "doc": doc or None, "stem": stem or None,
-                 "expected": expected or None, "kind": kind, "conf": confidence or None},
+                 "correct": bool(correct), "doc": doc or None, "kind": kind},
             )
     except Exception:
         pass
-
-
-def compute_calibration(doc: str | None = None) -> dict[str, Any]:
-    """Calibration: for each pre-reveal confidence level, what fraction were actually correct?
-    Well-calibrated = 'confident' high, 'guess' low. Surfaces overconfidence (the illusion of
-    competence)."""
-    try:
-        with db() as conn:
-            rows = conn.execute(
-                "SELECT confidence, correct FROM study_events "
-                "WHERE (%(d)s::text IS NULL OR doc = %(d)s OR doc IS NULL) "
-                "AND confidence IS NOT NULL AND correct IS NOT NULL",
-                {"d": doc},
-            ).fetchall()
-    except Exception as exc:  # noqa: BLE001
-        return {"buckets": [], "total": 0, "error": str(exc)}
-
-    order = ["guess", "shaky", "confident"]
-    agg: dict[str, list[int]] = {c: [0, 0] for c in order}
-    for r in rows:
-        c = r.get("confidence")
-        if c in agg:
-            agg[c][0] += 1
-            if r.get("correct"):
-                agg[c][1] += 1
-    buckets = [
-        {"confidence": c, "count": n, "correct": ok, "accuracy": round(100 * ok / n) if n else 0}
-        for c in order
-        for (n, ok) in [agg[c]]
-        if n > 0
-    ]
-    return {"buckets": buckets, "total": len(rows)}
 
 
 # Engagement kinds that are graded (feed accuracy/mastery) vs passive (read/listen — activity only).
@@ -121,8 +84,9 @@ def compute_calibration(doc: str | None = None) -> dict[str, Any]:
 def record_engagement(
     kind: str, section_key: str | None, doc: str | None = None, concept_key: str | None = None
 ) -> None:
-    """Append a NON-graded engagement event (read, listen, orient, brain-dump …) so the dashboard
-    reflects all study activity, not just quizzes. ``correct`` is null (not an accuracy signal)."""
+    """Append a NON-graded engagement event (read, listen, orient …) so the dashboard
+    reflects all study activity, not just graded reviews. ``correct`` is null (not an
+    accuracy signal)."""
     if not section_key or not section_key.strip():
         return
     try:
@@ -143,7 +107,7 @@ def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dic
     with db() as conn:
         return conn.execute(
             "SELECT section_key, concept_key, correct, "
-            "extract(epoch from ts)::float8 AS ts, doc, stem, expected, kind FROM study_events "
+            "extract(epoch from ts)::float8 AS ts, doc, kind FROM study_events "
             "WHERE (%(doc)s::text IS NULL OR doc = %(doc)s OR doc IS NULL) "
             "AND (%(gradedOnly)s = false OR correct IS NOT NULL)",
             {"doc": doc, "gradedOnly": graded_only},
@@ -153,7 +117,7 @@ def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dic
 def compute_activity(doc: str | None = None) -> dict[str, Any]:
     """Daily study volume (UTC) from the event floor, for a heatmap.
 
-    Returns a sparse list of {date: 'YYYY-MM-DD', count} (days with no quizzes
+    Returns a sparse list of {date: 'YYYY-MM-DD', count} (days with no events
     are omitted; the frontend lays out the full calendar grid).
     """
     try:
@@ -169,7 +133,7 @@ def compute_activity(doc: str | None = None) -> dict[str, Any]:
             continue
         day = time.strftime("%Y-%m-%d", time.gmtime(ts))
         counts[day] = counts.get(day, 0) + 1
-        k = e.get("kind") or ("quiz" if e.get("correct") is not None else "other")
+        k = e.get("kind") or ("review" if e.get("correct") is not None else "other")
         by_kind[k] = by_kind.get(k, 0) + 1
 
     return {
@@ -231,7 +195,7 @@ def compute_leaf_mastery(
 ) -> dict[str, Any]:
     """Mastery for one leaf section from its own events.
 
-    ``events`` are this section's quiz/recall events; ``content_ids`` the ids of its content
+    ``events`` are this section's graded review events; ``content_ids`` the ids of its content
     units; ``total`` their count (coverage denominator). ``id_field`` selects which event field
     identifies the studied unit — ``concept_key`` (``triple_id`` was the retired KG path; the
     concept path — so the same coverage×accuracy×decay math serves both.

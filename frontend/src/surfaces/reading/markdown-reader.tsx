@@ -60,7 +60,7 @@ function tidyMarkdown(content: string): string {
 }
 
 /** Inline math-aware text for the LLM-generated layer (concept signals, deep
- *  explanations, quiz checks, briefing lines) — models emit TeX for math books
+ *  explanations, briefing lines) — models emit TeX for math books
  *  and it must never show raw. Normalizes \\( \\) / \\[ \\] to $-delimiters
  *  (remark-math only parses those), then renders markdown + KaTeX. */
 export function MathText({ text, className }: { text: string; className?: string }) {

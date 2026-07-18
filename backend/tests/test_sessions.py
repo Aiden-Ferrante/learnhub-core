@@ -29,12 +29,12 @@ def test_unsorted_input_and_single_event_session():
 
 
 def test_dominant_kind_prefers_graded_over_passive():
-    # 3 quiz answers inside a longer reading stretch → a quiz session.
+    # 3 review grades inside a longer reading stretch → a review session.
     events = [ev(T0), ev(T0 + MIN), ev(T0 + 2 * MIN), ev(T0 + 3 * MIN)]
-    events += [ev(T0 + 4 * MIN + i, kind="quiz", correct=True) for i in range(3)]
+    events += [ev(T0 + 4 * MIN + i, kind="review", correct=True) for i in range(3)]
     (s,) = cluster_events(events)
-    assert s["kind"] == "quiz"
-    assert s["kinds"] == {"read": 4, "quiz": 3}
+    assert s["kind"] == "review"
+    assert s["kinds"] == {"read": 4, "review": 3}
     # Pure reading stays a reading session.
     (r,) = cluster_events([ev(T0), ev(T0 + MIN)])
     assert r["kind"] == "read"
@@ -42,8 +42,8 @@ def test_dominant_kind_prefers_graded_over_passive():
 
 def test_accuracy_and_touched_docs_scopes():
     events = [
-        ev(T0, kind="quiz", correct=True),
-        ev(T0 + MIN, kind="quiz", correct=False, doc="d2", section="toc:2"),
+        ev(T0, kind="review", correct=True),
+        ev(T0 + MIN, kind="review", correct=False, doc="d2", section="toc:2"),
         ev(T0 + 2 * MIN),  # passive, no correct
     ]
     (s,) = cluster_events(events)
@@ -52,10 +52,11 @@ def test_accuracy_and_touched_docs_scopes():
     assert s["scopes"] == ["toc:1", "toc:2"]
 
 
-def test_null_kind_counts_as_quiz_when_graded():
+def test_null_kind_counts_as_review_when_graded():
+    # Legacy graded events with no kind tag still count as reviews.
     (s,) = cluster_events([{"ts": T0, "kind": None, "doc": "d1", "sectionKey": None, "correct": True}])
-    assert s["kinds"] == {"quiz": 1}
-    assert s["kind"] == "quiz"
+    assert s["kinds"] == {"review": 1}
+    assert s["kind"] == "review"
 
 
 def test_events_without_ts_are_ignored():

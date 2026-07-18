@@ -139,7 +139,6 @@ CREATE TABLE ext_concepts (
   signal        text,
   source        text,
   "order"       int,
-  quiz_questions jsonb,
   created_at    timestamptz);
 CREATE INDEX ON ext_concepts (doc_id, section_key);
 
@@ -194,20 +193,22 @@ FULL OUTER JOIN ext_skeleton s
 -- still prunes these explicitly until the study layer is re-anchored)
 -- ═══════════════════════════════════════════════════════════════════════
 
+-- item_type: NULL = concept card; 'skeleton' (structure recall) and 'chapter' (resurface)
+-- are the typed items. heading/children snapshot the reveal for typed rows.
 CREATE TABLE concept_reviews (
   key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc_id text, section_key text, due timestamptz, ease real,
   interval double precision, reps int, lapses int, state text, last_grade int, last_review timestamptz,
-  item_type text, chapter_scope text, first_review timestamptz, caption text, page int, "order" int,
-  heading text, children jsonb, figure_order int,
+  item_type text, chapter_scope text, first_review timestamptz,
+  heading text, children jsonb,
   stability real, difficulty real, step int);
 CREATE INDEX ON concept_reviews (doc_id, due);
 
 -- NOTE: `doc` is the learn-doc-key (= raw_documents.key). Spelled `doc` not `doc_id`
 -- for historical reasons; unchanged this pass.
+-- kind: review | skeleton | resurface (graded, correct set) · read | listen | orient (passive).
 CREATE TABLE study_events (
   key text PRIMARY KEY DEFAULT gen_random_uuid()::text, doc text, section_key text, concept_key text,
-  kind text, correct boolean, ts timestamptz,
-  confidence text, triple_id text, stem text, expected text);
+  kind text, correct boolean, ts timestamptz);
 CREATE INDEX ON study_events (doc, ts);
 CREATE INDEX ON study_events (concept_key);
 

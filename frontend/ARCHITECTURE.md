@@ -13,7 +13,7 @@ frontend/                   # root = framework configs only (next/tailwind/ts/sh
 │                           # Dockerfile's `COPY /app/public` line) if a real one arrives.
 └── src/                    # ALL custom code lives here
     ├── app/                # Next.js routes ONLY — thin entry points that mount surface hubs
-    │   ├── courses/…       #   shelf → course home → chapter/read/concepts/drill/dump
+    │   ├── courses/…       #   shelf → course home → chapter/read/concepts
     │   ├── study/ process/ upload/ reader/ login/ styleguide/
     │   ├── _chrome/        #   nav shell: top nav, breadcrumbs, user menu, shortcuts
     │   └── api/…           #   ~40 thin proxy handlers → learn backend (the client never
@@ -23,7 +23,7 @@ frontend/                   # root = framework configs only (next/tailwind/ts/sh
     │   ├── reading/        #   book/chapter readers, guided-reading/, audiobook, prefs/theme
     │   ├── concepts/       #   concepts screen + shared concept primitives (markdown, kind
     │   │                   #   palette, mastery dot, section panel)
-    │   ├── studying/       #   quiz/drill/exam/dump/review/lock-in panels, planner, hotkeys
+    │   ├── studying/       #   review/walk/lock-in panels (skeleton + concept recall), planner, hotkeys
     │   └── processing/     #   upload widget, documents table + context, build console
     ├── gateways/           # ALL backend talk (same word, same meaning as backend gateways/)
     │   ├── api/            #   typed fetchers, one module per backend domain (no barrel —

@@ -1,8 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Check, CheckCircle2, ChevronDown, Zap } from "lucide-react"
-import { AnswerFeedback } from "@/surfaces/studying"
+import { useEffect, useState } from "react"
+import { Check, CheckCircle2 } from "lucide-react"
 import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
 import { MathText } from "@/surfaces/reading"
 import { Button } from "@/kit/ui/button"
@@ -10,137 +9,6 @@ import { Skeleton } from "@/kit/ui/skeleton"
 import { cn } from "@/kit/lib/utils"
 import { fetchSectionConcepts, type ConceptLesson } from "@/gateways/api/concepts"
 import { KIND_CHIP } from "@/surfaces/concepts/kind-palette"
-import { QuizChoiceList } from "@/surfaces/studying"
-import { useConceptQuizSession } from "@/surfaces/studying"
-import { useStudyHotkeys } from "@/surfaces/studying"
-
-const QUICK_CHECK_QUESTIONS = 2
-
-/** A compact, collapsible "study → check → next" loop scoped to one sub-section: a couple of
- *  concept MCQs so you retrieve right after encoding, instead of reading the whole chapter
- *  then quizzing at the end. Records study events so mastery moves. */
-function ConceptQuickCheck({
-  scope,
-  docId,
-  onAnswered,
-}: {
-  scope: string
-  docId?: string
-  onAnswered?: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [answered, setAnswered] = useState(0)
-  const onQuizAnswered = useCallback(() => {
-    setAnswered((n) => n + 1)
-    onAnswered?.()
-  }, [onAnswered])
-  const {
-    session,
-    picked,
-    result,
-    loading,
-    error,
-    start: nextQuestion,
-    answer: choose,
-  } = useConceptQuizSession(scope, docId, onQuizAnswered)
-
-  const begin = () => {
-    setOpen(true)
-    setAnswered(0)
-    nextQuestion()
-  }
-
-  const finished = answered >= QUICK_CHECK_QUESTIONS && !!result
-
-  // Keyboard: 1-9 pick a choice; Enter advances to the next question (matches the kbd hints).
-  // useStudyHotkeys registers ONCE — the old inline listener re-registered every render
-  // because `choose` wasn't memoized.
-  useStudyHotkeys((e) => {
-    if (session && !result && /^[1-9]$/.test(e.key)) {
-      const i = Number(e.key) - 1
-      if (i < session.choices.length) {
-        e.preventDefault()
-        choose(i)
-      }
-    } else if (result && !finished && e.key === "Enter") {
-      e.preventDefault()
-      nextQuestion()
-    }
-  }, open)
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={begin}
-        title="Two quick questions to confirm this subsection landed before you move on"
-        className="flex items-center gap-1.5 self-start rounded-md border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-brand/50 hover:text-brand"
-      >
-        <Zap className="h-3.5 w-3.5" />
-        Quick check
-      </button>
-    )
-  }
-
-  return (
-    <div className="rounded-lg border bg-background/40 p-3">
-      <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <Zap className="h-3.5 w-3.5 text-brand" />
-          Quick check
-        </span>
-        <span className="tabular-nums">
-          {Math.min(answered + (result ? 0 : 1), QUICK_CHECK_QUESTIONS)}/{QUICK_CHECK_QUESTIONS}
-        </span>
-      </div>
-
-      {error ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-destructive">{error}</p>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={nextQuestion}>
-            Retry
-          </Button>
-        </div>
-      ) : loading ? (
-        <p className="text-xs text-muted-foreground">Building a question…</p>
-      ) : finished ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-brand">
-            <CheckCircle2 className="h-4 w-4" />
-            Checked — on to the next section.
-          </p>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setOpen(false)}>
-            Hide
-          </Button>
-        </div>
-      ) : session ? (
-        <div className="flex flex-col gap-2">
-          <ConceptMarkdown content={session.stem} className="text-sm" />
-          <QuizChoiceList choices={session.choices} picked={picked} result={result} onPick={choose} size="sm" />
-          {result && (
-            <div className="flex flex-col gap-2 pt-0.5">
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={cn(
-                    "text-xs font-medium",
-                    result.correct ? "text-emerald-500" : "text-rose-500",
-                  )}
-                >
-                  {result.correct ? "✓ Correct" : `✗ ${result.expected}`}
-                </span>
-                <Button size="sm" className="h-7 gap-1 text-xs" onClick={nextQuestion}>
-                  Next
-                  <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-                </Button>
-              </div>
-              <AnswerFeedback signal={result.signal} source={result.source} />
-            </div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  )
-}
 
 type RecallMark = "got" | "fuzzy"
 
@@ -240,16 +108,14 @@ function ConceptRecallRow({
 
 /** The concepts of one leaf TOC section as an ACTIVE-RECALL list: bare names first
  *  (describe each from memory), definitions revealed per concept to check, self-mark,
- *  auto-advance to the next unchecked name. The quick-check MCQs follow as the graded
- *  retrieval. */
+ *  auto-advance to the next unchecked name. Graded retrieval lives in the review
+ *  queue — this list is the encoding pass. */
 export function SectionConceptsPanel({
   scope,
   docId,
-  onAnswered,
 }: {
   scope: string | null
   docId?: string
-  onAnswered?: () => void
 }) {
   const [concepts, setConcepts] = useState<ConceptLesson[]>([])
   const [loading, setLoading] = useState(false)
@@ -373,7 +239,6 @@ export function SectionConceptsPanel({
           All checked — run a quick check to lock them in.
         </p>
       )}
-      <ConceptQuickCheck key={scope ?? ""} scope={scope} docId={docId} onAnswered={onAnswered} />
     </div>
   )
 }

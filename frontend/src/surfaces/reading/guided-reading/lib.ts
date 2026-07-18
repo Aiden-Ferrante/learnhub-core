@@ -11,12 +11,10 @@ import {
 import type { Measure } from "@/surfaces/reading/use-reading-prefs"
 import type { LearnTreeNode, OutlineEntry } from "@/gateways/api/outline"
 
-export type StudyDrawer = "quiz" | "review" | "exam" | "walk" | "lockin" | "tutor" | "listen" | null
+export type StudyDrawer = "review" | "walk" | "lockin" | "tutor" | "listen" | null
 
 export const DRAWER_TITLES: Record<Exclude<StudyDrawer, null>, string> = {
-  quiz: "Chapter quiz",
   review: "Review",
-  exam: "Chapter exam",
   walk: "Learn — top-down walk",
   lockin: "Lock in",
   tutor: "Tutor",

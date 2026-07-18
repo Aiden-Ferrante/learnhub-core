@@ -11,7 +11,6 @@ import { usePolling } from "@/kit/hooks/use-polling"
 
 const KIND_LABEL: Record<BuildKind, string> = {
   build: "Building",
-  quizzes: "Authoring quizzes",
   guides: "Authoring guides",
   skeleton: "Skeleton",
   orient: "Orient",

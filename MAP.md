@@ -180,15 +180,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | File | Purpose |
 |---|---|
 | [`reviews.py`](backend/app/supplemental/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
-| [`quiz_session.py`](backend/app/supplemental/study/quiz_session.py) | MCQ build / stash answer / grade |
-| [`concept_quiz_gen.py`](backend/app/supplemental/study/concept_quiz_gen.py) | Deterministic (triple-based) quiz builder |
-| [`concept_quiz_llm.py`](backend/app/supplemental/study/concept_quiz_llm.py) | LLM-authored application questions + cache |
-| [`mastery.py`](backend/app/supplemental/study/mastery.py) | Per-concept mastery calibration + rollups |
+| [`mastery.py`](backend/app/supplemental/study/mastery.py) | Event floor + mastery/activity/forecast read models |
 | [`srs.py`](backend/app/supplemental/study/srs.py) | SM-2 schedule primitive |
-| [`cards.py`](backend/app/supplemental/study/cards.py) | Card quizzability + distractor selection |
-| [`drill.py`](backend/app/supplemental/study/drill.py) | Drill on weak concepts |
-| [`exam.py`](backend/app/supplemental/study/exam.py) | Exam mode (multi-question scoring) |
-| [`recall.py`](backend/app/supplemental/study/recall.py) | Recall vs. recognition check |
 | [`sessions.py`](backend/app/supplemental/study/sessions.py) | _(describe me)_ |
 | [`calendar.py`](backend/app/supplemental/study/calendar.py) | _(describe me)_ |
 
@@ -220,10 +213,10 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | File | Purpose |
 |---|---|
 | [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + guided-reading reads |
-| [`study_routes.py`](backend/app/api/study_routes.py) | Doing study: chapter path (orient/skeleton/progress), reviews, quizzes, exams, drills, recall |
+| [`study_routes.py`](backend/app/api/study_routes.py) | Doing study: chapter path (orient/skeleton/progress) + the spaced-review queue |
 | [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
 | [`content_routes.py`](backend/app/api/content_routes.py) | The book: courses list/delete, outline, chapters, sections, elements, figures, keyword search |
-| [`concept_routes.py`](backend/app/api/concept_routes.py) | Concept layer: reads + curation (edit / delete / replace quiz questions) |
+| [`concept_routes.py`](backend/app/api/concept_routes.py) | Concept layer: reads + curation (edit / delete) |
 | [`media_routes.py`](backend/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
 | [`process_routes.py`](backend/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
 | [`progress_routes.py`](backend/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
@@ -294,8 +287,8 @@ flowchart TD
 | Layer | Location | What it is |
 |---|---|---|
 | pages | [`app/`](frontend/src/app) | Thin route entry points (+ `_chrome/` nav shell); each mounts a surface hub |
-| surfaces | [`surfaces/`](frontend/src/surfaces) | `library/` (shelf + course home) · `reading/` (readers + guided-reading) · `concepts/` · `studying/` (quiz/drill/exam/review/planner) · `processing/` (upload + build console) — each hub-gated |
-| API client | [`gateways/api/`](frontend/src/gateways/api) | Typed fetchers, one module per domain (outline, content, concepts, progress, review, quiz, chapter, audiobook, planner, pipeline, system) + `toc.ts` outline helpers |
+| surfaces | [`surfaces/`](frontend/src/surfaces) | `library/` (shelf + course home) · `reading/` (readers + guided-reading) · `concepts/` · `studying/` (review/walk/planner) · `processing/` (upload + build console) — each hub-gated |
+| API client | [`gateways/api/`](frontend/src/gateways/api) | Typed fetchers, one module per domain (outline, content, concepts, progress, review, chapter, audiobook, planner, pipeline, system) + `toc.ts` outline helpers |
 | kit | [`kit/`](frontend/src/kit) | `ui/` (shadcn) · `patterns/` (stat-tile, status-pill…) · `layout/` (brand, theme) · `hooks/` · `lib/` |
 | server-only | [`gateways/server/`](frontend/src/gateways/server) | Everything that must never reach the client bundle (table below) |
 | proxy routes | [`app/api/learn/`](frontend/src/app/api/learn) | ~40 thin handlers → backend (one per backend endpoint) |

@@ -5,7 +5,7 @@ Linear states: ``missing → converted → extracted`` (extracted ≡ studyable)
 Conversion and extraction are SEPARATE steps by design (2026-07-18): converting a book
 gives you its structure (the TOC tree) and the reader immediately; concept extraction is
 an hours-long whole-book LLM pass, so it runs on demand, per chapter, picked from the
-TOC (the Process tab's per-chapter Build). Enrichment (skeleton / guides / quizzes /
+TOC (the Process tab's per-chapter Build). Enrichment (skeleton / guides /
 audiobook) is likewise on-demand. ``LEARN_AUTOCHAIN=1`` re-enables the old
 convert→extract-everything chain for unattended bulk ingests.
 

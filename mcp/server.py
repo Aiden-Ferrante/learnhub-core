@@ -34,9 +34,9 @@ mcp = FastMCP(
         "Drive the Learn Hub — courses built from textbook PDFs into concept-based study "
         "decks with spaced repetition. Typical flow: list_courses() to get a `doc` id, then "
         "get_outline / list_concepts / concept_mastery / due_reviews to inspect. Run processing "
-        "with extract() and prepare_quizzes(). Study interactively with quiz_next() → quiz_answer(), "
-        "and grade recalls with grade_review(grade 1-4). Curate with update_concept() and "
-        "set_concept_questions(). Every study/concept call needs the course `doc` (a learnDocId); "
+        "with extract(). Grade recalls with grade_review(grade 1-4) — the study loop is "
+        "skeleton + concept recall on spaced review. Curate with update_concept(). "
+        "Every study/concept call needs the course `doc` (a learnDocId); "
         "`scope` is a TOC section key like 'toc:language-models' (omit = whole course)."
     ),
 )
@@ -44,7 +44,7 @@ mcp = FastMCP(
 
 def _req(method: str, path: str, *, params: dict | None = None, json: dict | None = None) -> Any:
     """One HTTP call to the learn API → parsed JSON (or an {'error': ...} dict). Long timeout
-    because extraction/prepare kick off background jobs but conversion/quiz can still be slow."""
+    because extraction kicks off background jobs but conversion can still be slow."""
     url = f"{LEARN_URL}{path}"
     try:
         with httpx.Client(timeout=120.0) as c:
@@ -173,35 +173,7 @@ def extraction_status(doc: str, scope: str | None = None) -> Any:
     return _req("GET", "/api/extract/status", params=params)
 
 
-@mcp.tool()
-def prepare_quizzes(doc: str, scope: str) -> Any:
-    """Author the higher-order quiz questions (apply/distinguish/why) for every concept in a
-    chapter `scope`, in the background. Returns {total, authored, running}."""
-    return _req("POST", "/api/concept-quiz/prepare", json={"doc": doc, "scope": scope})
-
-
-@mcp.tool()
-def quiz_prepare_status(doc: str, scope: str) -> Any:
-    """How many of a chapter `scope`'s concepts have quiz questions authored yet (+ running flag)."""
-    return _req("GET", "/api/concept-quiz/prepare", params={"doc": doc, "scope": scope})
-
-
 # ── Study (writes study events) ─────────────────────────────────────────────────────────────
-@mcp.tool()
-def quiz_next(doc: str, scope: str | None = None) -> Any:
-    """Draw one multiple-choice question for the course (or chapter `scope`). Returns a `sessionId`,
-    a `stem`, and `choices`; pass the chosen index to quiz_answer(). The answer is held server-side."""
-    return _req("POST", "/api/concept-quiz/session", json={"doc": doc, "scope": scope})
-
-
-@mcp.tool()
-def quiz_answer(session_id: str, choice_index: int) -> Any:
-    """Submit an answer to a quiz_next() session (0-based `choice_index`). Returns correctness +
-    the right answer + explanation, and records the attempt so mastery moves."""
-    return _req("POST", "/api/concept-quiz/answer",
-                json={"sessionId": session_id, "choiceIndex": choice_index})
-
-
 @mcp.tool()
 def grade_review(concept_key: str, grade: int, doc: str | None = None) -> Any:
     """Grade a recall on a concept (1=Again, 2=Hard, 3=Good, 4=Easy): advances its spaced-repetition
@@ -217,14 +189,6 @@ def update_concept(concept_key: str, fields: dict) -> Any:
     (definition|theorem|principle|result|method), prereqNames (list[str]), questions
     (list of {q,a} study cards). Keys/provenance are immutable; review history is preserved."""
     return _req("PATCH", f"/api/concept/{concept_key}", json=fields)
-
-
-@mcp.tool()
-def set_concept_questions(concept_key: str, questions: list[dict] | None = None) -> Any:
-    """Replace a concept's cached quiz MCQs. Pass a list of
-    {stem, options:[4], answerIndex, explanation, kind} to set them, or omit/null to CLEAR so the
-    concept re-authors fresh on next study (use after changing the author prompt/model)."""
-    return _req("PUT", f"/api/concept/{concept_key}/questions", json={"questions": questions})
 
 
 # ── Reading & audio ─────────────────────────────────────────────────────────────────────────

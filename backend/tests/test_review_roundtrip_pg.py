@@ -20,7 +20,6 @@ from app.gateways import db
 from app.supplemental.study.reviews import (
     build_review_queue,
     chapter_review_key,
-    figure_review_key,
     grade_review,
     skeleton_review_key,
 )
@@ -113,7 +112,7 @@ def test_concept_review_regrade_round_trip(clean_pgtest_rows):
     # The grade appended to the mastery floor (best-effort, but should have landed).
     with db() as conn:
         n = conn.execute(
-            "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'quiz'",
+            "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'review'",
             {"d": DOC},
         ).fetchone()["n"]
     assert n >= 2
@@ -133,7 +132,7 @@ def test_chapter_item_regrade_round_trip(clean_pgtest_rows):
     payload2, status2 = grade_review({}, key, 2, now + 1)
     assert status2 == 200, payload2
 
-    # Chapter grades log a distinct 'resurface' study event (not 'quiz'/'recall').
+    # Chapter grades log a distinct 'resurface' study event (not 'review'/'skeleton').
     with db() as conn:
         n = conn.execute(
             "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'resurface'",
@@ -170,31 +169,7 @@ def test_skeleton_item_seed_then_regrade(clean_pgtest_rows):
 
     with db() as conn:
         n = conn.execute(
-            "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'recall'",
+            "SELECT count(*) AS n FROM study_events WHERE doc = %(d)s AND kind = 'skeleton'",
             {"d": DOC},
         ).fetchone()["n"]
     assert n >= 2
-
-
-def test_figure_item_seed_then_regrade(clean_pgtest_rows):
-    """Figure first grade carries doc + figureOrder + caption; re-grade by fig- key."""
-    now = time.time()
-    body = {
-        "figure": True, "doc": DOC, "figureOrder": 7, "caption": "Figure 1. A diagram.",
-        "sectionKey": SCOPE, "page": 12, "chapterScope": SCOPE,
-    }
-    payload, status = grade_review(body, "", 3, now)
-    assert status == 200, payload
-    key = figure_review_key(DOC, 7)
-    assert payload["conceptKey"] == key
-
-    with db() as conn:
-        row = conn.execute(
-            "SELECT item_type, figure_order, caption FROM concept_reviews WHERE key = %(k)s",
-            {"k": key},
-        ).fetchone()
-    assert row["item_type"] == "figure" and row["figure_order"] == 7
-    assert row["caption"] == "Figure 1. A diagram."
-
-    payload2, status2 = grade_review({}, key, 4, now + 1)
-    assert status2 == 200, payload2

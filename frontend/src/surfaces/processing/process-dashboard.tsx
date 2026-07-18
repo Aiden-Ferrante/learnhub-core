@@ -30,7 +30,7 @@ import { nextNightEpoch } from "@/kit/lib/schedule"
  *  extraction outcomes). */
 
 /** The receipt's payload: what was actually extracted, inspectable and cullable in place.
- *  Junk concepts die here in one tap instead of surviving into quizzes and reviews. */
+ *  Junk concepts die here in one tap instead of surviving into reviews. */
 function ConceptReceipt({ docId, scope }: { docId: string; scope: string }) {
   const [concepts, setConcepts] = useState<ConceptLesson[] | null>(null)
   const [error, setError] = useState<string | null>(null)

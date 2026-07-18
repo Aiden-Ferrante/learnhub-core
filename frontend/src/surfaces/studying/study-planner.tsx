@@ -31,10 +31,8 @@ const LOAD_CLASSES = ["", "bg-brand/10", "bg-brand/25", "bg-brand/45", "bg-brand
 const KIND_BADGES: Record<string, string> = {
   read: "bg-sky-500/15 text-sky-400",
   listen: "bg-sky-500/10 text-sky-500",
-  quiz: "bg-emerald-500/15 text-emerald-400",
   review: "bg-emerald-500/15 text-emerald-400",
   recall: "bg-violet-500/15 text-violet-400",
-  drill: "bg-amber-500/15 text-amber-400",
   resurface: "bg-brand/15 text-brand",
 }
 
@@ -286,7 +284,7 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
               <History className="h-4 w-4" /> Recent sessions
             </span>
           }
-          description="Derived from your study activity — reading, quizzing, recall. No timers to run."
+          description="Derived from your study activity — reading, reviews, recall. No timers to run."
         >
           {sessions == null ? (
             <p className="text-sm text-muted-foreground">Loading sessions…</p>
