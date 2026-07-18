@@ -12,7 +12,6 @@ service-based system topology (frontend / backend / tools as separate containers
 frontend/  Next.js 15 app (:3001) — auth, UI, and a proxy layer that forwards
            /api/learn/* to the backend with the X-User-Db tenancy header
 backend/   FastAPI service (:8010) — everything below
-mcp/       FastMCP server driving the backend over REST only (no DB access)
 deploy/    docker-compose + service images (app, learn, ollama)
            Tools: PostgreSQL :5432, Ollama :11434
 ```

@@ -1,8 +1,8 @@
 """Concept routes: read the extracted concept layer + curate it.
 
 Reads serve the concepts surface; the write routes (edit / delete) exist for
-curation — mostly driven by the MCP server. A concept delete cascades to its
-review schedule via the study facade (each domain cleans its own table).
+curation. A concept delete cascades to its review schedule via the study facade
+(each domain cleans its own table).
 """
 
 from __future__ import annotations

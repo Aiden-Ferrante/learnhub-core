@@ -10,6 +10,5 @@ links:
   adr: docs/adr/
   extra:
     process-tab: http://localhost:3001/process
-    mcp-server: mcp/server.py
-mc: [learnhub, learn-hub-mcp, ollama]
-tags: [learning, knowledge-graph, mcp, channel-brand]
+mc: [learnhub, ollama]
+tags: [learning, knowledge-graph, channel-brand]

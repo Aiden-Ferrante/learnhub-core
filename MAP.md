@@ -22,7 +22,6 @@ coral = off-the-shelf services.
 ```mermaid
 flowchart LR
   browser["browser"]
-  claude["Claude Code"]
 
   subgraph compose["docker compose network"]
     app["app · frontend<br/>:3001"]
@@ -31,11 +30,7 @@ flowchart LR
     ollama["Ollama<br/>:11434"]
   end
 
-  mcp["mcp server<br/>FastMCP · stdio"]
-
   browser -->|:3001| app
-  claude -->|stdio| mcp
-  mcp -->|:8010| learn
   app -->|learn:8000| learn
   app -->|auth + user data| pg
   learn --> pg
@@ -44,21 +39,19 @@ flowchart LR
   classDef client fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   classDef built fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
   classDef tool fill:#FAECE7,stroke:#993C1D,color:#4A1B0C;
-  class browser,claude client;
-  class app,learn,mcp built;
+  class browser client;
+  class app,learn built;
   class pg,ollama tool;
   style compose fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click app "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend" "frontend/"
   click learn "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend" "backend/"
-  click mcp "https://github.com/Aiden-Ferrante/learnhub/blob/main/mcp/server.py" "mcp/server.py"
 ```
 
 | Box | Directory | What it is |
 |---|---|---|
 | app | [`frontend/`](frontend) | Next.js UI + proxy layer (`/api/learn/*` → backend) |
 | learn | [`backend/`](backend) | FastAPI service — everything in section 2 below |
-| mcp | [`mcp/server.py`](mcp/server.py) | FastMCP server; drives the backend over REST only |
 | compose / tools | [`deploy/compose/`](deploy/compose) | docker-compose + service images |
 | Postgres / Ollama | (off-the-shelf images) | database · local LLM |
 
