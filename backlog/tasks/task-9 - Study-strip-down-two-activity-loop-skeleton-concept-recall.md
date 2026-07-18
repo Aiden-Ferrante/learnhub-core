@@ -1,11 +1,11 @@
 ---
 id: TASK-9
 title: 'Study strip-down: two-activity loop (skeleton + concept recall)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-18 00:07'
-updated_date: '2026-07-18 00:29'
+updated_date: '2026-07-18 00:34'
 labels: []
 dependencies: []
 ordinal: 9000
@@ -19,11 +19,11 @@ Apply docs/STUDY-SIMPLIFICATION.md: delete quizzes/exams/drills/free-recall/figu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Removed modules/routes/surfaces gone; grep sweep (concept-quiz, exam, drill, recall/check, calibration, mistakes, quiz_session, author_scope, figure_order) has zero code hits in backend/app + frontend/src
-- [ ] #2 quiz_questions / dump-view / triple_id / figure-column investigations resolved and recorded
-- [ ] #3 Backend tests green after pruning removed-module tests; frontend build green
-- [ ] #4 Live smoke: skeleton grade + concept review grade both feed /api/mastery, /api/activity, /api/forecast, /api/study/sessions
-- [ ] #5 Schema (init SQL + live DB) drops quiz/figure-only columns; ARCHITECTURE.md + study __init__ docstring describe the two-activity loop
+- [x] #1 Removed modules/routes/surfaces gone; grep sweep (concept-quiz, exam, drill, recall/check, calibration, mistakes, quiz_session, author_scope, figure_order) has zero code hits in backend/app + frontend/src
+- [x] #2 quiz_questions / dump-view / triple_id / figure-column investigations resolved and recorded
+- [x] #3 Backend tests green after pruning removed-module tests; frontend build green
+- [x] #4 Live smoke: skeleton grade + concept review grade both feed /api/mastery, /api/activity, /api/forecast, /api/study/sessions
+- [x] #5 Schema (init SQL + live DB) drops quiz/figure-only columns; ARCHITECTURE.md + study __init__ docstring describe the two-activity loop
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -37,3 +37,9 @@ Investigations resolved: quiz_questions read only by deleted modules + concept_s
 <!-- SECTION:NOTES:BEGIN -->
 All phases + extra scope applied. Backend: 7 modules deleted, routes/conductor/ledger/facades stripped, mastery recorder renamed record_grade_event (kinds: review/skeleton/resurface), reviews.py figure-free. Schema: init SQL + live ALTERs (study_events -stem/-expected/-confidence/-triple_id; concept_reviews -caption/-page/-order/-figure_order; ext_concepts -quiz_questions). Frontend: 8 files + 2 routes deleted, path stages now orient/read/skeleton/lockin, review panel/gateway figure-free. MCP: 5 tools removed. 124 backend tests green (incl PG tier vs live DB), tsc + both hub checkers clean, MAP/ARCHITECTURE regenerated. Building images for live smoke.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Study loop stripped to skeleton + concept recall (both FSRS) — 73 files, -3,261 lines, commit 99e4279. Verified: grep sweep zero code hits; 124 backend tests green incl PG tier; tsc + hub checkers clean; live smoke on :3001 — chapter rail shows 0/4 stages with Review/Tutor/Listen drawers only, one skeleton grade + one concept grade (fresh ch11 extraction, 4 concepts) moved mastery/activity/forecast/sessions and study_events holds exactly {review:1, skeleton:1}. Investigation verdicts recorded in docs/STUDY-SIMPLIFICATION.md Applied section.
+<!-- SECTION:FINAL_SUMMARY:END -->
