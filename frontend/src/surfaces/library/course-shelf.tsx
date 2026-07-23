@@ -45,6 +45,7 @@ import {
   deleteGroup,
   EMPTY_GROUPS_STATE,
   fetchGroupsState,
+  moveGroup,
   persistGroupsState,
   renameGroup,
   takeLegacyGroupsState,
@@ -493,6 +494,9 @@ export function CourseShelf({
               onNewGroup={() => openNewGroupDialog(null)}
               onRenameGroup={openRenameDialog}
               onDeleteGroup={handleDeleteGroup}
+              onMoveGroup={(dragId, target) =>
+                setGroupsState((s) => moveGroup(s, dragId, target))
+              }
             />
           </div>
           {/* Right-border drag handle — the sidebar's only resizable edge. */}

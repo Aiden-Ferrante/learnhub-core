@@ -19,7 +19,27 @@ import {
   DropdownMenuTrigger,
 } from "@/kit/ui/dropdown-menu"
 import { cn } from "@/kit/lib/utils"
-import type { GroupTreeNode } from "@/surfaces/library/course-groups"
+import type { GroupDropTarget, GroupTreeNode } from "@/surfaces/library/course-groups"
+
+// Drag-and-drop plumbing shared by every row: who's dragging, where they hover,
+// and the drop dispatch. One object so the recursive rows stay light.
+type DropZone = "before" | "after" | "into"
+type GroupDnd = {
+  dragId: string | null
+  hint: { id: string; zone: DropZone } | null
+  onDragStart: (id: string) => void
+  onHover: (id: string, zone: DropZone) => void
+  onEnd: () => void
+  onDrop: (target: GroupDropTarget) => void
+}
+
+/** Which zone of a row the pointer is over: top quarter = before, bottom quarter
+ *  = after, the middle half = into (re-parent). */
+function zoneFor(e: React.DragEvent<HTMLElement>): DropZone {
+  const rect = e.currentTarget.getBoundingClientRect()
+  const y = (e.clientY - rect.top) / rect.height
+  return y < 0.25 ? "before" : y > 0.75 ? "after" : "into"
+}
 
 type GroupSidebarProps = {
   tree: GroupTreeNode[]
@@ -31,6 +51,7 @@ type GroupSidebarProps = {
   onNewGroup: () => void
   onRenameGroup: (groupId: string, currentName: string) => void
   onDeleteGroup: (groupId: string) => void
+  onMoveGroup: (dragId: string, target: GroupDropTarget) => void
 }
 
 function GroupRow({
@@ -39,6 +60,7 @@ function GroupRow({
   selectedGroupId,
   courseCounts,
   expanded,
+  dnd,
   onToggleExpand,
   onSelect,
   onRenameGroup,
@@ -49,6 +71,7 @@ function GroupRow({
   selectedGroupId: string | null
   courseCounts: Record<string, number>
   expanded: Set<string>
+  dnd: GroupDnd
   onToggleExpand: (id: string) => void
   onSelect: (groupId: string | null) => void
   onRenameGroup: (groupId: string, currentName: string) => void
@@ -59,13 +82,41 @@ function GroupRow({
   const isExpanded = expanded.has(group.id)
   const isSelected = group.id === selectedGroupId
   const count = courseCounts[group.id] ?? 0
+  const hint = dnd.hint?.id === group.id ? dnd.hint.zone : null
+  const isDragging = dnd.dragId === group.id
 
   return (
     <li className="list-none">
       <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move"
+          e.dataTransfer.setData("text/plain", group.id) // Firefox needs data to drag
+          dnd.onDragStart(group.id)
+        }}
+        onDragEnd={dnd.onEnd}
+        onDragOver={(e) => {
+          if (!dnd.dragId || dnd.dragId === group.id) return
+          e.preventDefault()
+          e.stopPropagation()
+          e.dataTransfer.dropEffect = "move"
+          dnd.onHover(group.id, zoneFor(e))
+        }}
+        onDrop={(e) => {
+          if (!dnd.dragId) return
+          e.preventDefault()
+          e.stopPropagation()
+          const zone = zoneFor(e)
+          dnd.onDrop(zone === "into" ? { kind: "into", groupId: group.id } : { kind: zone, groupId: group.id })
+        }}
         className={cn(
-          "group/row flex items-center gap-1 rounded-md py-1 pr-1 text-sm",
+          "group/row relative flex items-center gap-1 rounded-md py-1 pr-1 text-sm",
           isSelected ? "bg-brand/15 text-foreground" : "hover:bg-muted/60",
+          isDragging && "opacity-40",
+          hint === "into" && "ring-1 ring-inset ring-brand/70 bg-brand/10",
+          // before/after indicators: a 2px line hugging the row edge.
+          hint === "before" && "before:absolute before:inset-x-1 before:-top-px before:h-0.5 before:rounded before:bg-brand",
+          hint === "after" && "after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded after:bg-brand",
         )}
         style={{ paddingLeft: `${depth * 0.75 + 0.25}rem` }}
       >
@@ -135,6 +186,7 @@ function GroupRow({
               selectedGroupId={selectedGroupId}
               courseCounts={courseCounts}
               expanded={expanded}
+              dnd={dnd}
               onToggleExpand={onToggleExpand}
               onSelect={onSelect}
               onRenameGroup={onRenameGroup}
@@ -156,6 +208,7 @@ export function GroupSidebar({
   onNewGroup,
   onRenameGroup,
   onDeleteGroup,
+  onMoveGroup,
 }: GroupSidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
@@ -166,6 +219,27 @@ export function GroupSidebar({
       else next.add(id)
       return next
     })
+  }
+
+  // Drag state for reorganizing the tree. Drops dispatch to onMoveGroup, which
+  // guards invalid moves (own subtree) in the pure model.
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropHint, setDropHint] = useState<{ id: string; zone: DropZone } | null>(null)
+  const dnd: GroupDnd = {
+    dragId,
+    hint: dropHint,
+    onDragStart: setDragId,
+    onHover: (id, zone) =>
+      setDropHint((h) => (h?.id === id && h.zone === zone ? h : { id, zone })),
+    onEnd: () => {
+      setDragId(null)
+      setDropHint(null)
+    },
+    onDrop: (target) => {
+      if (dragId) onMoveGroup(dragId, target)
+      setDragId(null)
+      setDropHint(null)
+    },
   }
 
   return (
@@ -187,11 +261,23 @@ export function GroupSidebar({
             <button
               type="button"
               onClick={() => onSelect(null)}
+              onDragOver={(e) => {
+                if (!dnd.dragId) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = "move"
+                dnd.onHover("__root__", "into")
+              }}
+              onDrop={(e) => {
+                if (!dnd.dragId) return
+                e.preventDefault()
+                dnd.onDrop({ kind: "into", groupId: null }) // un-nest to top level
+              }}
               className={cn(
                 "flex w-full items-center gap-1.5 rounded-md py-1 pl-[0.25rem] pr-1 text-sm",
                 selectedGroupId === null
                   ? "bg-brand/15 text-foreground"
                   : "hover:bg-muted/60",
+                dnd.hint?.id === "__root__" && "ring-1 ring-inset ring-brand/70 bg-brand/10",
               )}
             >
               <span className="w-4 shrink-0" />
@@ -210,6 +296,7 @@ export function GroupSidebar({
               selectedGroupId={selectedGroupId}
               courseCounts={courseCounts}
               expanded={expanded}
+              dnd={dnd}
               onToggleExpand={handleToggleExpand}
               onSelect={onSelect}
               onRenameGroup={onRenameGroup}

@@ -90,7 +90,9 @@ export function takeLegacyGroupsState(): GroupsState | null {
   }
 }
 
-/** Assemble a forest from the flat group list. Orphaned parents are treated as roots. */
+/** Assemble a forest from the flat group list. Orphaned parents are treated as roots.
+ *  Sibling order = array order (drag-and-drop reordering owns it; was alphabetical
+ *  before groups became reorderable). */
 export function buildGroupTree(groups: CourseGroup[]): GroupTreeNode[] {
   const byId = new Map(groups.map((g) => [g.id, g]))
   const nodes = new Map<string, GroupTreeNode>(
@@ -103,12 +105,46 @@ export function buildGroupTree(groups: CourseGroup[]): GroupTreeNode[] {
     if (parent) parent.children.push(node)
     else roots.push(node)
   }
-  const sortRec = (list: GroupTreeNode[]) => {
-    list.sort((a, b) => a.group.name.localeCompare(b.group.name))
-    list.forEach((n) => sortRec(n.children))
-  }
-  sortRec(roots)
   return roots
+}
+
+/** Where a dragged group lands: onto a group (re-parent; null = root/un-nest), or
+ *  next to a sibling ("before"/"after" adopt that sibling's parent). */
+export type GroupDropTarget =
+  | { kind: "into"; groupId: string | null }
+  | { kind: "before" | "after"; groupId: string }
+
+/** Move a group via drag-and-drop. Pure: returns a new state (array position defines
+ *  sibling order). Invalid moves — unknown ids, or a target inside the dragged
+ *  group's own subtree — return the state unchanged. */
+export function moveGroup(
+  state: GroupsState,
+  dragId: string,
+  target: GroupDropTarget,
+): GroupsState {
+  const drag = state.groups.find((g) => g.id === dragId)
+  if (!drag) return state
+  // A group cannot be dropped into (or next to a child of) its own subtree.
+  const subtree = new Set(descendantGroupIds(dragId, state.groups))
+  if (target.groupId && subtree.has(target.groupId)) return state
+
+  let parentId: string | null
+  if (target.kind === "into") {
+    parentId = target.groupId
+  } else {
+    const sibling = state.groups.find((g) => g.id === target.groupId)
+    if (!sibling) return state
+    parentId = sibling.parentId
+  }
+
+  const rest = state.groups.filter((g) => g.id !== dragId)
+  const moved: CourseGroup = { ...drag, parentId }
+  let at = rest.length // "into" appends as the parent's last child
+  if (target.kind !== "into") {
+    const i = rest.findIndex((g) => g.id === target.groupId)
+    at = target.kind === "before" ? i : i + 1
+  }
+  return { ...state, groups: [...rest.slice(0, at), moved, ...rest.slice(at)] }
 }
 
 /** A group's id plus all of its descendant group ids. */
