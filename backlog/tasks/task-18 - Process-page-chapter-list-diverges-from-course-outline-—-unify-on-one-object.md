@@ -1,11 +1,11 @@
 ---
 id: TASK-18
 title: Process page chapter list diverges from course outline — unify on one object
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-23 15:35'
-updated_date: '2026-07-23 15:54'
+updated_date: '2026-07-23 16:13'
 labels:
   - frontend
   - backend
@@ -41,11 +41,11 @@ SEPARATE DATA-QUALITY OBSERVATION (log, maybe own task): FoSA's converted outlin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 For every ready document, the chapter list shown on the Process page equals the top-level chapters shown by the course page's syllabus tree (same keys, same titles, same count)
-- [ ] #2 FoSA shows the same chapter count on both surfaces (no ~2 phantom-chapter duplication in the build list)
-- [ ] #3 PoSD's content-less entries (e.g. Back Cover) are handled identically on both surfaces
-- [ ] #4 There is ONE server-side derivation of a course's chapters; both surfaces consume it (documented in the chapter.ts / chapters.py contract comments)
-- [ ] #5 Enqueuing a build from the Process page can only target a real chapter that exists in the course outline
+- [x] #1 For every ready document, the chapter list shown on the Process page equals the top-level chapters shown by the course page's syllabus tree (same keys, same titles, same count)
+- [x] #2 FoSA shows the same chapter count on both surfaces (no ~2 phantom-chapter duplication in the build list)
+- [x] #3 PoSD's content-less entries (e.g. Back Cover) are handled identically on both surfaces
+- [x] #4 There is ONE server-side derivation of a course's chapters; both surfaces consume it (documented in the chapter.ts / chapters.py contract comments)
+- [x] #5 Enqueuing a build from the Process page can only target a real chapter that exists in the course outline
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,3 +53,15 @@ SEPARATE DATA-QUALITY OBSERVATION (log, maybe own task): FoSA's converted outlin
 <!-- SECTION:PLAN:BEGIN -->
 Direction (b) from cycle plan, approved: 1. chapter_units returns EXACTLY the visible toc-tree's top-level nodes (same keys/titles/order) + hasContent flag per unit (scope_blocks probe); legacy has_content-gate + container-descent deleted (parts stage already demotes Part containers at convert). 2. frontend CourseChapter type gains hasContent?; Process dashboard disables Build/Schedule when hasContent===false instead of hiding rows. 3. Drift-proof pytest: chapter_units keys/titles == toc-tree top-level on a fixture incl. content-less node + container-with-content-children (the FoSA shape). 4. Live diff script scripts/check_chapter_drift.sh across all ready docs. 5. Live: FoSA 54->28, PoSD 24->25 w/ Back Cover build-disabled.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Verified 2026-07-23: (i) 3 new drift-proof pytests (tests/test_chapter_units.py) — units == tree tops, FoSA-explosion + PoSD-drop regression cases; full suite 126 passed incl PG tier. (ii) scripts/check_chapter_drift.py vs OLD backend: caught both drifts (FoSA 54v28, PoSD 24v25, exit 1); vs rebuilt backend: all 6 converted docs OK, exit 0. (iii) Live UI: FoSA Process page = 28 rows, 'Discussion Questions' one row, no duplicate titles; PoSD = 25 rows, 'Back Cover' listed as 'no content' with NO Build button. (iv) Enqueued a real build (PoSD toc:22) from the UI -> chapter_builds row created, canceled cleanly (status=canceled). Contract comments updated in chapters.py + chapter.ts.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+chapter_units now returns exactly the visible toc-tree's top-level nodes + hasContent flag; Process dashboard disables Build on content-less entries instead of hiding them. One derivation, both surfaces are views of it — proven by unit tests, a live diff script (kept in scripts/), and browser verification. Commit 57bd247.
+<!-- SECTION:FINAL_SUMMARY:END -->
