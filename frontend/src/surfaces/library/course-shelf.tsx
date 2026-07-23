@@ -2,7 +2,7 @@
 
 import { StatusPill, type DomainStatus } from "@/kit/patterns/status-pill"
 import { ProgressRing } from "@/kit/patterns/progress-ring"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { BookOpen, GraduationCap, Loader2, MoreVertical, Plus, RotateCcw, Trash2, Zap } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
@@ -76,6 +76,13 @@ const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; 
 }
 
 const ROOT_PARENT = "__root__"
+
+// Group-sidebar width bounds (px): wide enough for nested group names, never so
+// wide the course grid collapses. Persisted per device.
+const SIDEBAR_WIDTH_KEY = "learnhub_group_sidebar_width"
+const SIDEBAR_DEFAULT = 224 // matches the old fixed lg:w-56
+const SIDEBAR_MIN = 200
+const SIDEBAR_MAX = 440
 
 function CourseCard({
   course,
@@ -310,6 +317,19 @@ export function CourseShelf({
 
   const groupTree = useMemo(() => buildGroupTree(groupsState.groups), [groupsState.groups])
 
+  // Sidebar width: drag the RIGHT edge only (desktop layout). A device preference,
+  // so it lives in localStorage — not in the server-side user-settings groups state.
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
+  const resizeStart = useRef<{ x: number; width: number } | null>(null)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
+    if (saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) setSidebarWidth(saved)
+  }, [])
+  const resizedWidth = (e: { clientX: number }) => {
+    const r = resizeStart.current
+    return r ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, r.width + e.clientX - r.x)) : sidebarWidth
+  }
+
   // groupId → count of courses tagged into it (including descendants).
   const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -459,7 +479,10 @@ export function CourseShelf({
         </div>
       ) : (
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="lg:w-56 lg:shrink-0">
+        <div
+          className="relative lg:w-[var(--gs-w)] lg:shrink-0"
+          style={{ "--gs-w": `${sidebarWidth}px` } as React.CSSProperties}
+        >
           <div className="lg:sticky lg:top-4 lg:h-[520px]">
             <GroupSidebar
               tree={groupTree}
@@ -471,6 +494,28 @@ export function CourseShelf({
               onRenameGroup={openRenameDialog}
               onDeleteGroup={handleDeleteGroup}
             />
+          </div>
+          {/* Right-border drag handle — the sidebar's only resizable edge. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize groups sidebar"
+            className="group absolute -right-2.5 top-0 hidden h-full w-2.5 cursor-col-resize touch-none lg:block"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.currentTarget.setPointerCapture(e.pointerId)
+              resizeStart.current = { x: e.clientX, width: sidebarWidth }
+            }}
+            onPointerMove={(e) => {
+              if (resizeStart.current) setSidebarWidth(resizedWidth(e))
+            }}
+            onPointerUp={(e) => {
+              if (!resizeStart.current) return
+              localStorage.setItem(SIDEBAR_WIDTH_KEY, String(resizedWidth(e)))
+              resizeStart.current = null
+            }}
+          >
+            <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-brand/60" />
           </div>
         </div>
 
