@@ -18,6 +18,7 @@ import { Skeleton } from "@/kit/ui/skeleton"
 import { MachineStrip } from "@/surfaces/processing/machine-strip"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { fetchCourseChapters, type CourseChapter } from "@/gateways/api/chapter"
+import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
 import { deleteConcept, fetchSectionConcepts, type ConceptLesson } from "@/gateways/api/concepts"
 import { cancelChapterBuild, enqueueChapterBuild, type ChapterBuildJob } from "@/gateways/api/pipeline"
 import { fetchChapterBuilds, fetchLearnDocuments, type LearnDocumentInfo } from "@/gateways/api/system"
@@ -187,6 +188,22 @@ export function ProcessDashboard() {
   const [docs, setDocs] = useState<LearnDocumentInfo[]>([])
   const [docId, setDocId] = useState<string | null>(null)
   const [chapters, setChapters] = useState<CourseChapter[]>([])
+  // Numbered display names via the SAME numberSections/numberedSectionTitle the
+  // syllabus tree uses — the two surfaces render identical strings by construction.
+  const chapterNames = useMemo(() => {
+    const nodes: LearnTreeNode[] = chapters.map((c) => ({
+      id: c.key,
+      label: c.label || c.title,
+      title: c.title,
+      sectionKey: c.key,
+      isSection: true,
+      children: [],
+    }))
+    const numbers = numberSections(nodes)
+    const out = new Map<string, string>()
+    for (const n of nodes) out.set(n.id, numberedSectionTitle(numbers.get(n.id), n.label, n.title))
+    return out
+  }, [chapters])
   const [builds, setBuilds] = useState<ChapterBuildJob[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -313,8 +330,8 @@ export function ProcessDashboard() {
                     >
                       {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </button>
-                    <span className="min-w-0 flex-1 truncate text-sm" title={c.title}>
-                      {c.title}
+                    <span className="min-w-0 flex-1 truncate text-sm" title={chapterNames.get(c.key) ?? c.title}>
+                      {chapterNames.get(c.key) ?? c.title}
                     </span>
 
                     {job?.status === "running" ? (

@@ -63,9 +63,13 @@ def test_chapter_units_mirror_toc_tree_top_level(monkeypatch):
 
     data = chapters_mod.chapter_units("doc1")
 
-    tops = [(n["sectionKey"], n.get("title") or n.get("label")) for n in forest]
-    units = [(u["key"], u["title"]) for u in data["chapters"]]
-    assert units == tops  # same keys, same titles, same order — no drift possible
+    tops = [(n["sectionKey"], n.get("title") or n.get("label"), n.get("label")) for n in forest]
+    units = [(u["key"], u["title"], u["label"]) for u in data["chapters"]]
+    assert units == tops  # same keys, titles, labels, order — no drift possible
+    # label is the numbered-title input: numbered chapters carry their number …
+    assert data["chapters"][0]["label"] == "1"
+    # … slug chapters carry the label the tree shows (numberSections synthesizes from it).
+    assert data["chapters"][2]["label"] == "Discussion Questions"
 
 
 def test_container_children_are_never_promoted_to_units(monkeypatch):

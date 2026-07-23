@@ -121,7 +121,10 @@ export async function fetchGuidedReading(doc: string, scope: string): Promise<Gu
 // chapters arrive flagged `hasContent: false`; disable or style them, never
 // filter silently.
 
-export type CourseChapter = { key: string; title: string; hasContent?: boolean }
+// `label` is the tree node's label (the chapter's own number, or the slug title) —
+// feed it with `title` through numberSections/numberedSectionTitle to render the
+// SAME numbered string the syllabus tree shows.
+export type CourseChapter = { key: string; title: string; label?: string; hasContent?: boolean }
 
 export async function fetchCourseChapters(
   doc: string,

@@ -40,11 +40,11 @@ def main() -> int:
         chapters = get(f"/api/chapters?doc={key}").get("chapters") or []
         tree = get(f"/api/toc-tree?doc={key}").get("tree") or []
         tops = [
-            (n["sectionKey"], n.get("title") or n.get("label"))
+            (n["sectionKey"], n.get("title") or n.get("label"), n.get("label") or "")
             for n in tree
             if n.get("isSection") and n.get("sectionKey")
         ]
-        units = [(c["key"], c["title"]) for c in chapters]
+        units = [(c["key"], c["title"], c.get("label") or "") for c in chapters]
         if units == tops:
             print(f"  OK   {title} — {len(units)} chapters")
         else:

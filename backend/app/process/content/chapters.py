@@ -44,11 +44,14 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
             except Exception:  # noqa: BLE001
                 return False
 
-        # One unit per visible top-level tree node — the tree IS the list.
+        # One unit per visible top-level tree node — the tree IS the list. `label`
+        # rides along so consumers can render the SAME numbered title the syllabus
+        # tree shows (numberSections/numberedSectionTitle need it).
         units = [
             {
                 "key": n["sectionKey"],
                 "title": n.get("title") or n.get("label") or n["sectionKey"],
+                "label": n.get("label") or "",
                 "hasContent": has_content(n["sectionKey"]),
             }
             for n in forest
