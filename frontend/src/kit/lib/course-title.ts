@@ -10,6 +10,11 @@ export function cleanCourseTitle(raw: string): { title: string; author?: string 
   if (!name.includes(" -- ")) return { title: name }
   const segs = name.split(" -- ").map((s) => s.trim()).filter(Boolean)
   const title = (segs[0] || name).replace(/\s?_ /g, ": ") // "_" is a sanitized ":"
-  const author = segs[1] && !META_SEG.test(segs[1]) ? segs[1].replace(/_ /g, ". ") : undefined
+  // Some filenames carry the prefix in the segment itself ("-- by Luciano Ramalho --");
+  // strip it here so display code can always prepend its own "by " without doubling.
+  const author =
+    segs[1] && !META_SEG.test(segs[1])
+      ? segs[1].replace(/_ /g, ". ").replace(/^by\s+/i, "")
+      : undefined
   return { title, author }
 }
