@@ -5,6 +5,16 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.11.1] — 2026-07-23
+
+### Fixed
+- **Process chapter rows now show the course outline's exact numbered titles**
+  ("1  Introduction", not "Introduction") — units carry the tree node's label and
+  the dashboard renders through the same `numberSections`/`numberedSectionTitle`
+  functions the syllabus tree uses, so the strings are identical by construction
+  (including synthesized numbers for slug chapters). The drift script compares
+  labels too. (TASK-21, follow-up to TASK-18)
+
 ## [0.11.0] — 2026-07-23
 
 Frontend QOL sweep — sub-cycle B of the Road to 1.0. Six tasks: five shipped,
