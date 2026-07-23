@@ -347,32 +347,39 @@ export function ProcessDashboard() {
                       </span>
                     ) : null}
 
-                    {(!job || job.status === "done" || job.status === "error" || job.status === "canceled") && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-xs"
-                          disabled={busyScope === c.key}
-                          onClick={() => act(() => enqueueChapterBuild(docId!, c.key, null), c.key)}
-                        >
-                          <Wand2 className="h-3 w-3" />
-                          Build
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          disabled={busyScope === c.key}
-                          onClick={() => act(() => enqueueChapterBuild(docId!, c.key, nextNightEpoch()), c.key)}
-                          title="Schedule for tonight, 2:00 AM"
-                        >
-                          <Clock className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
+                    {(!job || job.status === "done" || job.status === "error" || job.status === "canceled") &&
+                      (c.hasContent === false ? (
+                        // Same list as the course outline — content-less entries are
+                        // shown (never silently dropped) but can't be built.
+                        <span className="shrink-0 text-xs text-muted-foreground" title="This entry has no content to extract from">
+                          no content
+                        </span>
+                      ) : (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1 px-2 text-xs"
+                            disabled={busyScope === c.key}
+                            onClick={() => act(() => enqueueChapterBuild(docId!, c.key, null), c.key)}
+                          >
+                            <Wand2 className="h-3 w-3" />
+                            Build
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={busyScope === c.key}
+                            onClick={() => act(() => enqueueChapterBuild(docId!, c.key, nextNightEpoch()), c.key)}
+                            title="Schedule for tonight, 2:00 AM"
+                          >
+                            <Clock className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
                   </div>
                   {isOpen && (
                     <div className="border-t bg-muted/20">

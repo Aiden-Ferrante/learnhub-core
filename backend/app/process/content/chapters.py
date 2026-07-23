@@ -1,12 +1,12 @@
 """Canonical chapter units — THE single source for "what are this book's chapters".
 
-The course dashboard's syllabus tree (get_toc_tree) is the outline of record.
-Every other surface — the guided-reading picker, the book reader's chapter list,
-the Today plan — must derive its chapter list from here, so they cannot drift.
-
-A unit is a tree node that actually spans section content; content-less
-containers (e.g. DDIA's "Part I", which exists only in the outline) are
-descended into rather than listed, so their chapters surface individually.
+The course dashboard's syllabus tree (get_toc_tree) is the outline of record, and
+a unit is EXACTLY one of its top-level nodes — same keys, titles, and order — so
+the Process build list, the chapter pickers, and the course page can never
+disagree. Content-less units (e.g. a curated-but-visible "Back Cover") are still
+listed, flagged ``hasContent: false``; consumers style or disable, never filter
+silently. (Part containers don't need special-casing here: the convert-time parts
+stage already demotes them out of the top level.)
 """
 
 from __future__ import annotations
@@ -44,30 +44,16 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
             except Exception:  # noqa: BLE001
                 return False
 
-        units: list[dict[str, str]] = []
-
-        def has_numbered_descendant(n: dict[str, Any]) -> bool:
-            for c in n.get("children") or []:
-                if re.match(r"^toc:\d+$", c.get("sectionKey") or "") or has_numbered_descendant(c):
-                    return True
-            return False
-
-        def visit(nodes: list[dict[str, Any]] | None) -> None:
-            for n in nodes or []:
-                key = n.get("sectionKey")
-                if not (n.get("isSection") and key):
-                    continue
-                # A container holding numbered chapters (e.g. DDIA's "Part I") is never
-                # itself a unit — its chapters are.
-                if not re.match(r"^toc:\d+$", key) and has_numbered_descendant(n):
-                    visit(n.get("children"))
-                    continue
-                if has_content(key):
-                    units.append({"key": key, "title": n.get("title") or n.get("label") or key})
-                else:
-                    visit(n.get("children"))
-
-        visit(forest)
+        # One unit per visible top-level tree node — the tree IS the list.
+        units = [
+            {
+                "key": n["sectionKey"],
+                "title": n.get("title") or n.get("label") or n["sectionKey"],
+                "hasContent": has_content(n["sectionKey"]),
+            }
+            for n in forest
+            if n.get("isSection") and n.get("sectionKey")
+        ]
         return {"docId": doc_id, "chapters": units}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}

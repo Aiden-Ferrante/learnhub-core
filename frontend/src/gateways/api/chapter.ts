@@ -115,11 +115,13 @@ export async function fetchGuidedReading(doc: string, scope: string): Promise<Gu
 }
 
 // --- Canonical chapters ---------------------------------------------------------
-// The course dashboard's syllabus tree is the outline of record. /api/chapters is
-// its single server-side derivation (content-bearing tree nodes, Parts descended);
-// EVERY chapter list in the app must come from here so surfaces cannot drift.
+// The course dashboard's syllabus tree is the outline of record. /api/chapters
+// returns EXACTLY its top-level nodes (same keys/titles/order) — EVERY chapter
+// list in the app must come from here so surfaces cannot drift. Content-less
+// chapters arrive flagged `hasContent: false`; disable or style them, never
+// filter silently.
 
-export type CourseChapter = { key: string; title: string }
+export type CourseChapter = { key: string; title: string; hasContent?: boolean }
 
 export async function fetchCourseChapters(
   doc: string,
