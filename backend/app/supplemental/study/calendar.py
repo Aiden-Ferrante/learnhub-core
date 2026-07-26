@@ -16,20 +16,53 @@ from app.gateways import db
 
 _TYPES = ("concept", "skeleton", "figure", "chapter")
 
+# Per-bucket cap on the ITEM list (counts stay exact). A day with more than this many
+# reviews sends the first slice plus ``itemsTruncated`` so the UI can say "+N more"
+# instead of silently implying the list is everything.
+_ITEM_CAP = 50
+
 
 def _bucket() -> dict[str, Any]:
-    return {"total": 0, "courses": {}}
+    return {"total": 0, "courses": {}, "items": []}
 
 
-def _add(bucket: dict[str, Any], doc: str, title: str, item_type: str) -> None:
+def _add(
+    bucket: dict[str, Any],
+    doc: str,
+    title: str,
+    item_type: str,
+    item: dict[str, Any] | None = None,
+) -> None:
     bucket["total"] += 1
     course = bucket["courses"].setdefault(doc, {"doc": doc, "title": title, "count": 0, "byType": {}})
     course["count"] += 1
     course["byType"][item_type] = course["byType"].get(item_type, 0) + 1
+    if item is not None and len(bucket["items"]) < _ITEM_CAP:
+        bucket["items"].append(item)
 
 
 def _courses_list(bucket: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(bucket["courses"].values(), key=lambda c: -c["count"])
+
+
+def _item_name(row: dict[str, Any]) -> str:
+    """What to CALL this review item in a list: its own heading (skeleton/chapter), the
+    concept's name, or — for legacy rows carrying neither — the section it belongs to."""
+    for candidate in (row.get("heading"), row.get("conceptName"), row.get("sectionKey")):
+        text = (candidate or "").strip()
+        if text:
+            return text
+    return "Review item"
+
+
+def _shape_items(bucket: dict[str, Any]) -> dict[str, Any]:
+    """Bucket → wire shape: courses sorted, items capped-with-a-flag, totals exact."""
+    return {
+        "total": bucket["total"],
+        "courses": _courses_list(bucket),
+        "items": bucket["items"],
+        "itemsTruncated": max(0, bucket["total"] - len(bucket["items"])),
+    }
 
 
 def build_review_calendar(days: int = 60) -> dict[str, Any]:
@@ -43,14 +76,25 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
                 r["k"]: r["t"]
                 for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
             }
+            # LEFT JOIN so concept rows can be NAMED in the agenda; skeleton/chapter rows
+            # carry their own heading and simply miss the join.
             rows = conn.execute(
-                'SELECT doc_id AS "docId", item_type AS "itemType", '
-                "extract(epoch from due)::float8 AS due FROM concept_reviews "
-                "WHERE due IS NOT NULL AND due <= to_timestamp(%(hz)s)",
+                'SELECT r.doc_id AS "docId", r.item_type AS "itemType", r.key AS key, '
+                'r.heading AS heading, r.section_key AS "sectionKey", '
+                'c.name AS "conceptName", '
+                "extract(epoch from r.due)::float8 AS due FROM concept_reviews r "
+                "LEFT JOIN ext_concepts c ON c.key = r.key "
+                "WHERE r.due IS NOT NULL AND r.due <= to_timestamp(%(hz)s) "
+                "ORDER BY r.due",
                 {"hz": horizon},
             ).fetchall()
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
-        return {"dueNow": {"total": 0, "courses": []}, "days": [], "horizonDays": days, "error": str(exc)}
+        return {
+            "dueNow": {"total": 0, "courses": [], "items": [], "itemsTruncated": 0},
+            "days": [],
+            "horizonDays": days,
+            "error": str(exc),
+        }
 
     due_now = _bucket()
     by_day: dict[str, dict[str, Any]] = {}
@@ -61,18 +105,24 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
             continue
         tracked += 1
         item_type = r.get("itemType") if r.get("itemType") in _TYPES else "concept"
+        item = {
+            "key": r.get("key"),
+            "doc": doc,
+            "title": titles[doc],
+            "name": _item_name(r),
+            "type": item_type,
+            "scope": r.get("sectionKey"),
+            "due": r["due"],
+        }
         if r["due"] <= now:
-            _add(due_now, doc, titles[doc], item_type)
+            _add(due_now, doc, titles[doc], item_type, item)
         else:
             day = time.strftime("%Y-%m-%d", time.gmtime(r["due"]))
-            _add(by_day.setdefault(day, _bucket()), doc, titles[doc], item_type)
+            _add(by_day.setdefault(day, _bucket()), doc, titles[doc], item_type, item)
 
     return {
-        "dueNow": {"total": due_now["total"], "courses": _courses_list(due_now)},
-        "days": [
-            {"date": d, "total": b["total"], "courses": _courses_list(b)}
-            for d, b in sorted(by_day.items())
-        ],
+        "dueNow": _shape_items(due_now),
+        "days": [{"date": d, **_shape_items(b)} for d, b in sorted(by_day.items())],
         "horizonDays": days,
         "tracked": tracked,
     }

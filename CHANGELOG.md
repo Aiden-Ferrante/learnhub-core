@@ -5,6 +5,23 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.13.0] — 2026-07-26
+
+### Added
+- **The review calendar now says what's due, by name.** A "What's due" agenda under the
+  grid lists every scheduled item — concept names, chapter headings, type badge, course —
+  with **overdue pinned at the top**. Clicking a day filters the agenda; "Show all"
+  clears. Previously a due day was only a number in a square and item names weren't in
+  the payload at all, so a library whose reviews were all overdue rendered an entirely
+  blank calendar. (TASK-25)
+
+### Changed
+- **The calendar is laid out as real months** — "July 2026", "August 2026", … each its
+  own Monday-aligned grid — instead of one continuous nine-week run. (TASK-25)
+- `build_review_calendar` carries item identities (`items[]` per bucket, named via
+  heading → concept name → section key) with exact counts and an `itemsTruncated`
+  remainder rather than a silent cap.
+
 ## [0.12.2] — 2026-07-26
 
 ### Added

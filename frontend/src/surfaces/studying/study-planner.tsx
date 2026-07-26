@@ -31,6 +31,7 @@ import {
   saveManualSession,
   type CalendarCourse,
   type CalendarDay,
+  type CalendarItem,
   type ReviewCalendar,
   type SessionsResponse,
   type WorkingSession,
@@ -99,6 +100,30 @@ function CourseChips({ courses, onOpen }: { courses: CalendarCourse[]; onOpen: (
   )
 }
 
+/** The horizon as real calendar months (Monday-aligned, leading blanks), so a date sits
+ *  where the eye expects it instead of in one continuous nine-week run. */
+function monthBlocks(today: string, horizonDays: number) {
+  const start = new Date(`${today}T00:00:00Z`)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + horizonDays)
+  const blocks: { key: string; label: string; leading: number; days: string[] }[] = []
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1))
+  while (cursor <= end) {
+    const y = cursor.getUTCFullYear()
+    const m = cursor.getUTCMonth()
+    const first = new Date(Date.UTC(y, m, 1))
+    const dayCount = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+    blocks.push({
+      key: `${y}-${m}`,
+      label: first.toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" }),
+      leading: (first.getUTCDay() + 6) % 7, // Monday-aligned
+      days: Array.from({ length: dayCount }, (_, i) => utcDate(new Date(Date.UTC(y, m, i + 1)))),
+    })
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  }
+  return blocks
+}
+
 function CalendarGrid({
   calendar,
   selected,
@@ -115,61 +140,180 @@ function CalendarGrid({
   }, [calendar.days])
 
   const today = utcDate(new Date())
-  // Lay the horizon out as Monday-aligned weeks starting from this week.
-  const cells = useMemo(() => {
-    const start = new Date(`${today}T00:00:00Z`)
-    const lead = (start.getUTCDay() + 6) % 7 // days since Monday
-    start.setUTCDate(start.getUTCDate() - lead)
-    const total = Math.ceil((lead + HORIZON_DAYS) / 7) * 7
-    return Array.from({ length: total }, (_, i) => {
-      const d = new Date(start)
-      d.setUTCDate(start.getUTCDate() + i)
-      return utcDate(d)
-    })
+  const horizonEnd = useMemo(() => {
+    const d = new Date(`${today}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + HORIZON_DAYS)
+    return utcDate(d)
   }, [today])
+  const months = useMemo(() => monthBlocks(today, HORIZON_DAYS), [today])
 
   const max = Math.max(1, ...calendar.days.map((d) => d.total))
   const load = (n: number) => LOAD_CLASSES[n === 0 ? 0 : Math.min(4, 1 + Math.floor((n / max) * 3))]
 
   return (
-    <div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <span key={d}>{d}</span>
-        ))}
-      </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {cells.map((date) => {
-          const day = byDate.get(date)
-          const count = day?.total ?? 0
-          const isPast = date < today
-          const isToday = date === today
-          return (
-            <button
-              key={date}
-              type="button"
-              disabled={!day || isPast}
-              onClick={() => onSelect(selected === date ? null : date)}
-              title={count ? `${date} · ${count} due` : date}
-              className={cn(
-                "flex aspect-square flex-col items-center justify-center rounded-md border border-transparent text-xs",
-                isPast ? "text-muted-foreground/40" : "text-foreground/90",
-                !isPast && load(count),
-                day && !isPast && "cursor-pointer hover:border-border",
-                isToday && "border-brand/60",
-                selected === date && "border-brand ring-1 ring-brand/50",
-              )}
-            >
-              <span className={cn("leading-none", isToday && "font-semibold text-brand")}>
-                {Number(date.slice(8, 10))}
-              </span>
-              {count > 0 && !isPast && (
-                <span className="mt-0.5 text-[10px] font-medium leading-none tabular-nums">{count}</span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+    <div className="flex flex-col gap-4">
+      {months.map((month) => (
+        <div key={month.key}>
+          <p className="mb-1.5 text-xs font-medium text-foreground/80">{month.label}</p>
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {Array.from({ length: month.leading }, (_, i) => (
+              <span key={`pad-${i}`} />
+            ))}
+            {month.days.map((date) => {
+              const day = byDate.get(date)
+              const count = day?.total ?? 0
+              // Outside [today, horizon] the grid is context, not a target.
+              const outside = date < today || date > horizonEnd
+              const isToday = date === today
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  disabled={!day || outside}
+                  onClick={() => onSelect(selected === date ? null : date)}
+                  title={count ? `${date} · ${count} due` : date}
+                  className={cn(
+                    "flex aspect-square flex-col items-center justify-center rounded-md border border-transparent text-xs",
+                    outside ? "text-muted-foreground/40" : "text-foreground/90",
+                    !outside && load(count),
+                    day && !outside && "cursor-pointer hover:border-border",
+                    isToday && "border-brand/60",
+                    selected === date && "border-brand ring-1 ring-brand/50",
+                  )}
+                >
+                  <span className={cn("leading-none", isToday && "font-semibold text-brand")}>
+                    {Number(date.slice(8, 10))}
+                  </span>
+                  {count > 0 && !outside && (
+                    <span className="mt-0.5 text-[10px] font-medium leading-none tabular-nums">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const ITEM_TYPE_BADGES: Record<string, string> = {
+  concept: "bg-violet-500/15 text-violet-400",
+  skeleton: "bg-brand/15 text-brand",
+  chapter: "bg-sky-500/15 text-sky-400",
+  figure: "bg-emerald-500/15 text-emerald-400",
+}
+
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  concept: "concept",
+  skeleton: "structure",
+  figure: "figure",
+  chapter: "chapter",
+}
+
+function AgendaItem({ item, onOpen }: { item: CalendarItem; onOpen: (doc: string) => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(item.doc)}
+        className="group flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted/60"
+      >
+        <span
+          className={cn(
+            "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none",
+            ITEM_TYPE_BADGES[item.type] || "bg-muted text-muted-foreground",
+          )}
+        >
+          {ITEM_TYPE_LABELS[item.type] || item.type}
+        </span>
+        <span className="min-w-0 flex-1 text-sm leading-snug">
+          <span className="block truncate group-hover:underline">{item.name}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={courseDot(item.title)} />
+            <span className="truncate">{cleanCourseTitle(item.title).title}</span>
+          </span>
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/** What's actually due, by name — overdue pinned first, then day by day. The grid
+ *  answers "when"; this answers "what". */
+function ReviewAgenda({
+  calendar,
+  selected,
+  onOpenCourse,
+}: {
+  calendar: ReviewCalendar
+  selected: string | null
+  onOpenCourse: (doc: string) => void
+}) {
+  const days = selected ? calendar.days.filter((d) => d.date === selected) : calendar.days
+  const showOverdue = !selected && calendar.dueNow.total > 0
+  const nothing = !showOverdue && days.length === 0
+
+  if (nothing) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {selected
+          ? "Nothing due on this day."
+          : calendar.tracked
+            ? "Nothing scheduled in the horizon — you're all caught up."
+            : "Nothing tracked yet. Study a chapter and its reviews land here."}
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {showOverdue && (
+        <div>
+          <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-status-due">
+            <AlarmClock className="h-3.5 w-3.5" /> Overdue · {calendar.dueNow.total}
+          </p>
+          <ul className="flex flex-col">
+            {calendar.dueNow.items.map((item) => (
+              <AgendaItem key={item.key} item={item} onOpen={onOpenCourse} />
+            ))}
+          </ul>
+          {calendar.dueNow.itemsTruncated > 0 && (
+            <p className="px-1.5 text-xs text-muted-foreground">
+              +{calendar.dueNow.itemsTruncated} more overdue
+            </p>
+          )}
+        </div>
+      )}
+      {days.map((day) => (
+        <div key={day.date}>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              timeZone: "UTC",
+            })}
+            {" · "}
+            {day.total}
+          </p>
+          <ul className="flex flex-col">
+            {day.items.map((item) => (
+              <AgendaItem key={item.key} item={item} onOpen={onOpenCourse} />
+            ))}
+          </ul>
+          {day.itemsTruncated > 0 && (
+            <p className="px-1.5 text-xs text-muted-foreground">+{day.itemsTruncated} more</p>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -443,7 +587,6 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
         .reduce((n, d) => n + d.total, 0),
     [calendar],
   )
-  const selectedDay = selected ? calendar?.days.find((d) => d.date === selected) : null
 
   return (
     <div className="flex flex-col gap-4">
@@ -481,26 +624,35 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
 
           <SectionCard
             title="Review calendar"
-            description={`Everything scheduled over the next ${HORIZON_DAYS} days, all courses pooled. Click a day for the breakdown.`}
+            description={`Everything scheduled over the next ${HORIZON_DAYS} days, all courses pooled. Click a day to filter the list.`}
           >
             {calendar ? (
               <>
                 <CalendarGrid calendar={calendar} selected={selected} onSelect={setSelected} />
-                {selectedDay && (
-                  <div className="mt-3 rounded-md border bg-muted/20 p-3">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {new Date(`${selectedDay.date}T00:00:00Z`).toLocaleDateString(undefined, {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        timeZone: "UTC", // days are bucketed in UTC — keep the label on the same clock
-                      })}
-                      {" · "}
-                      {selectedDay.total} due
+                <div className="mt-4 border-t pt-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {selected
+                        ? new Date(`${selected}T00:00:00Z`).toLocaleDateString(undefined, {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            timeZone: "UTC", // days are bucketed in UTC — keep the label on the same clock
+                          })
+                        : "What's due"}
                     </p>
-                    <CourseChips courses={selectedDay.courses} onOpen={onOpenCourse} />
+                    {selected && (
+                      <button
+                        type="button"
+                        onClick={() => setSelected(null)}
+                        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                      >
+                        Show all
+                      </button>
+                    )}
                   </div>
-                )}
+                  <ReviewAgenda calendar={calendar} selected={selected} onOpenCourse={onOpenCourse} />
+                </div>
               </>
             ) : (
               <p className="text-sm text-muted-foreground">Loading calendar…</p>

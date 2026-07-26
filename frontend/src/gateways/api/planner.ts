@@ -11,14 +11,33 @@ export type CalendarCourse = {
   byType: Record<string, number>
 }
 
-export type CalendarDay = {
-  date: string // YYYY-MM-DD (UTC)
+/** One scheduled review, named — what the agenda actually lists. */
+export type CalendarItem = {
+  key: string
+  doc: string
+  /** Raw course title (run it through cleanCourseTitle for display). */
+  title: string
+  /** Item heading, concept name, or section key — always something showable. */
+  name: string
+  type: string
+  scope?: string | null
+  due: number
+}
+
+/** Counts are exact; `items` is capped, with `itemsTruncated` carrying the remainder. */
+export type CalendarBucket = {
   total: number
   courses: CalendarCourse[]
+  items: CalendarItem[]
+  itemsTruncated: number
+}
+
+export type CalendarDay = CalendarBucket & {
+  date: string // YYYY-MM-DD (UTC)
 }
 
 export type ReviewCalendar = {
-  dueNow: { total: number; courses: CalendarCourse[] }
+  dueNow: CalendarBucket
   /** Only days with something due — the grid lays out the full range. */
   days: CalendarDay[]
   horizonDays: number
