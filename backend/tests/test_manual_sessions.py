@@ -33,6 +33,33 @@ def test_validate_block_rejects_impossible_spans():
     assert validate_block(1000, 1000 + 3600) is None  # a normal hour
 
 
+def test_compute_activity_counts_manual_blocks(monkeypatch):
+    """v0.12.1 (user decision): manual blocks light the heatmap (+1 on their start day,
+    byKind['manual']) and any-activity days drive the cadence window — which no longer
+    requires a GRADED event."""
+    import app.supplemental.study.manual as manual_mod
+    import app.supplemental.study.mastery as mastery_mod
+
+    now = 1_800_000_000.0
+    day = 86_400.0
+    # One graded event 10 days ago (outside the 7-day window), one manual block yesterday.
+    monkeypatch.setattr(
+        mastery_mod, "_fetch_events",
+        lambda doc: [{"ts": now - 10 * day, "kind": "review", "correct": True}],
+    )
+    monkeypatch.setattr(
+        manual_mod, "fetch_manual_rows",
+        lambda doc, since: [
+            {"key": "m1", "doc": "d", "note": None, "start": now - 1 * day, "end": now - 1 * day + 3600}
+        ],
+    )
+
+    act = mastery_mod.compute_activity(doc=None, now=now)
+    assert act["total"] == 2  # event day + manual day
+    assert act["byKind"]["manual"] == 1
+    assert act["cadence"] == {"activeDays": 1, "windowDays": 7}  # manual day counts, old event doesn't
+
+
 def test_merge_sessions_orders_newest_first_across_layers():
     derived = cluster_events(
         [

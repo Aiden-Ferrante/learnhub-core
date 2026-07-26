@@ -112,21 +112,30 @@ def _fetch_events(doc: str | None = None, graded_only: bool = False) -> list[dic
 
 
 def compute_activity(doc: str | None = None, now: float | None = None) -> dict[str, Any]:
-    """Daily study volume (UTC) from the event floor, for a heatmap — plus CADENCE:
-    how many of the last 7 days had at least one graded review (derived, never stored).
+    """Daily study volume (UTC) for a heatmap: the event floor PLUS the user's manual
+    time blocks (one count on the block's start day) — plus CADENCE: how many of the
+    last 7 days had ANY study activity (derived, never stored).
+
+    2026-07-26 (v0.12.1, user decision): manual blocks count here and the cadence
+    window counts any-activity days, not just graded ones — the card is labeled
+    "activity" accordingly. Events already included passive read/listen kinds.
 
     Returns a sparse list of {date: 'YYYY-MM-DD', count} (days with no events
     are omitted; the frontend lays out the full calendar grid).
     """
+    from app.supplemental.study.manual import fetch_manual_rows
+
     now = time.time() if now is None else now
     try:
         events = _fetch_events(doc)  # ALL engagement (read/listen too), not just graded
+        # A year-plus of manual blocks — the heatmap grid shows ~53 weeks.
+        manual = fetch_manual_rows(doc, since=now - 400 * 86400.0)
     except Exception as exc:  # noqa: BLE001 — surface as a soft error, never 500
         return {"days": [], "total": 0, "max": 0, "error": str(exc), "byKind": {}}
 
     counts: dict[str, int] = {}
     by_kind: dict[str, int] = {}
-    graded_days: set[str] = set()
+    active_days: set[str] = set()
     week_floor = now - 7 * 86400.0
     for e in events:
         ts = e.get("ts")
@@ -136,15 +145,21 @@ def compute_activity(doc: str | None = None, now: float | None = None) -> dict[s
         counts[day] = counts.get(day, 0) + 1
         k = e.get("kind") or ("review" if e.get("correct") is not None else "other")
         by_kind[k] = by_kind.get(k, 0) + 1
-        if e.get("correct") is not None and ts >= week_floor:
-            graded_days.add(day)
+        if ts >= week_floor:
+            active_days.add(day)
+    for m in manual:
+        day = time.strftime("%Y-%m-%d", time.gmtime(float(m["start"])))
+        counts[day] = counts.get(day, 0) + 1
+        by_kind["manual"] = by_kind.get("manual", 0) + 1
+        if float(m["start"]) >= week_floor:
+            active_days.add(day)
 
     return {
         "days": [{"date": d, "count": c} for d, c in sorted(counts.items())],
         "total": sum(counts.values()),
         "max": max(counts.values()) if counts else 0,
         "byKind": by_kind,
-        "cadence": {"reviewedDays": len(graded_days), "windowDays": 7},
+        "cadence": {"activeDays": len(active_days), "windowDays": 7},
     }
 
 

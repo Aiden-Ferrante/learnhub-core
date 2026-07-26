@@ -38,7 +38,8 @@ export type ActivityResponse = {
   /** Per-engagement-kind counts (review | skeleton | read | listen | …). */
   byKind?: Record<string, number>
   /** Cadence: days with at least one graded review in the trailing window. */
-  cadence?: { reviewedDays: number; windowDays: number }
+  /** Days with ANY study activity (events or manual blocks) in the trailing window. */
+  cadence?: { activeDays: number; windowDays: number }
   error?: string
 }
 

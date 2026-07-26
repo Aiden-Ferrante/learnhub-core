@@ -113,14 +113,14 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
           {cadence && (
             <span
               className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium tabular-nums text-brand"
-              title="Days with at least one graded review in the last week"
+              title="Days with any study activity in the last week"
             >
-              {cadence.reviewedDays}/{cadence.windowDays} days this week
+              {cadence.activeDays}/{cadence.windowDays} days this week
             </span>
           )}
           {days && (
             <span className="text-xs tabular-nums text-muted-foreground">
-              {total} review{total === 1 ? "" : "s"} this year
+              {total} activit{total === 1 ? "y" : "ies"} this year
             </span>
           )}
         </span>
@@ -164,7 +164,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
                       title={
                         cell.future
                           ? undefined
-                          : `${cell.count} review${cell.count === 1 ? "" : "s"} · ${cell.key}`
+                          : `${cell.count} activit${cell.count === 1 ? "y" : "ies"} · ${cell.key}`
                       }
                     />
                   ))}
