@@ -11,6 +11,7 @@ Depends on: process/content, process/extraction (chapter stage ledger), gateways
 """
 
 from app.supplemental.study.calendar import build_review_calendar, build_study_debt
+from app.supplemental.study.manual import delete_manual_session, upsert_manual_session
 from app.supplemental.study.mastery import compute_activity, compute_concept_mastery, compute_forecast, compute_mastery, record_engagement
 from app.supplemental.study.reviews import build_review_queue, delete_concept_reviews, ensure_chapter_item, grade_review
 from app.supplemental.study.sessions import fetch_sessions
@@ -24,8 +25,10 @@ __all__ = [
     "compute_forecast",
     "compute_mastery",
     "delete_concept_reviews",
+    "delete_manual_session",
     "ensure_chapter_item",
     "fetch_sessions",
     "grade_review",
     "record_engagement",
+    "upsert_manual_session",
 ]

@@ -82,9 +82,20 @@ def cluster_events(events: list[dict[str, Any]], gap: float = GAP_SECONDS) -> li
     return sessions
 
 
+def merge_sessions(
+    derived: list[dict[str, Any]], manual: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Interleave derived sessions with manual blocks, newest-first — pure, so the
+    ordering rule is testable without a DB."""
+    return sorted(derived + manual, key=lambda s: float(s["start"]), reverse=True)
+
+
 def fetch_sessions(doc: str | None = None, days: int = 90) -> dict[str, Any]:
-    """Sessionize the last ``days`` of study events (optionally one course), with course
-    titles resolved and a summary strip (count / minutes / per-kind event totals)."""
+    """Sessionize the last ``days`` of study events (optionally one course), merge in the
+    user's manual time blocks (manual.py — the one stored layer), with course titles
+    resolved and a summary strip (count / minutes / per-kind event totals)."""
+    from app.supplemental.study.manual import fetch_manual_rows
+
     since = time.time() - max(1, days) * 86400.0
     try:
         with db() as conn:
@@ -99,10 +110,11 @@ def fetch_sessions(doc: str | None = None, days: int = 90) -> dict[str, Any]:
                 r["k"]: r["t"]
                 for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
             }
+        manual = fetch_manual_rows(doc, since)
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
         return {"sessions": [], "summary": {}, "error": str(exc)}
 
-    sessions = cluster_events(rows)
+    sessions = merge_sessions(cluster_events(rows), manual)
     by_kind: dict[str, int] = {}
     for s in sessions:
         s["courses"] = [{"doc": d, "title": titles.get(d) or d} for d in s.pop("docs")]

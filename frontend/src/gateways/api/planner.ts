@@ -43,6 +43,10 @@ export type WorkingSession = {
   scopes: string[]
   graded: number
   correct: number
+  /** Manual time blocks (the stored corrections layer) — editable; derived sessions are not. */
+  manual?: boolean
+  key?: string
+  note?: string | null
 }
 
 export type SessionsResponse = {
@@ -58,4 +62,35 @@ export async function fetchSessions(days = 90, docId?: string): Promise<Sessions
   if (docId) params.set('doc', docId)
   const res = await fetch(`/api/learn/study-sessions?${params}`, { cache: 'no-store' })
   return parseJsonResponse<SessionsResponse>(res)
+}
+
+// --- Manual time blocks --------------------------------------------------------
+// The one stored layer over the derived sessions (backend manual_sessions table).
+// `doc` is the learn-doc-key; timestamps are epoch SECONDS, matching WorkingSession.
+
+export type ManualSessionInput = {
+  doc: string
+  start: number
+  end: number
+  note?: string | null
+  /** Present = update that block; absent = create. */
+  key?: string
+}
+
+export async function saveManualSession(
+  input: ManualSessionInput,
+): Promise<{ ok?: boolean; key?: string; error?: string }> {
+  const res = await fetch('/api/learn/study/manual-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  return parseJsonResponse<{ ok?: boolean; key?: string; error?: string }>(res)
+}
+
+export async function deleteManualSession(key: string): Promise<{ ok?: boolean; error?: string }> {
+  const res = await fetch(`/api/learn/study/manual-session?key=${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+  })
+  return parseJsonResponse<{ ok?: boolean; error?: string }>(res)
 }

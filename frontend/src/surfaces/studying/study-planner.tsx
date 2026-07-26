@@ -1,15 +1,34 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { AlarmClock, CalendarCheck2, History } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { AlarmClock, CalendarCheck2, History, Pencil, Plus, Trash2 } from "lucide-react"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { PageHeader } from "@/kit/patterns/page-header"
 import { SectionCard } from "@/kit/patterns/section-card"
 import { StudyHeatmap } from "@/surfaces/library"
 import { StatTile } from "@/kit/patterns/stat-tile"
+import { Button } from "@/kit/ui/button"
+import { Input } from "@/kit/ui/input"
+import { Label } from "@/kit/ui/label"
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/kit/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/kit/ui/select"
+import {
+  deleteManualSession,
   fetchReviewCalendar,
   fetchSessions,
+  saveManualSession,
   type CalendarCourse,
   type CalendarDay,
   type ReviewCalendar,
@@ -17,6 +36,7 @@ import {
   type WorkingSession,
 } from "@/gateways/api/planner"
 import { coverHue } from "@/surfaces/library"
+import { useDocuments } from "@/surfaces/processing"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { cn } from "@/kit/lib/utils"
 
@@ -35,6 +55,7 @@ const KIND_BADGES: Record<string, string> = {
   review: "bg-emerald-500/15 text-emerald-400",
   recall: "bg-violet-500/15 text-violet-400",
   resurface: "bg-brand/15 text-brand",
+  manual: "bg-amber-500/15 text-amber-400",
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -153,12 +174,21 @@ function CalendarGrid({
   )
 }
 
-function SessionRow({ session }: { session: WorkingSession }) {
+function SessionRow({
+  session,
+  onEdit,
+  onDelete,
+}: {
+  session: WorkingSession
+  /** Only manual blocks are editable — derived sessions are facts and get no affordance. */
+  onEdit?: (s: WorkingSession) => void
+  onDelete?: (s: WorkingSession) => void
+}) {
   const start = new Date(session.start * 1000)
   const when = `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
   const duration = session.durationMin >= 1 ? `${Math.round(session.durationMin)} min` : "brief"
   return (
-    <li className="flex items-start gap-2 rounded-md px-1.5 py-1.5">
+    <li className="group/session flex items-start gap-2 rounded-md px-1.5 py-1.5">
       <span
         className={cn(
           "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none",
@@ -176,13 +206,182 @@ function SessionRow({ session }: { session: WorkingSession }) {
             {session.courses.map((c) => cleanCourseTitle(c.title).title).join(", ")}
           </span>
         )}
+        {session.note && (
+          <span className="block truncate text-xs italic text-muted-foreground/80">{session.note}</span>
+        )}
       </span>
       {session.graded > 0 && (
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {session.correct}/{session.graded}
         </span>
       )}
+      {session.manual && onEdit && onDelete && (
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/session:opacity-100">
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:text-foreground"
+            aria-label="Edit manual session"
+            onClick={() => onEdit(session)}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:text-destructive"
+            aria-label="Delete manual session"
+            onClick={() => onDelete(session)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </span>
+      )}
     </li>
+  )
+}
+
+// Local-time form helpers for the manual-session dialog.
+const toLocalDate = (sec: number) => {
+  const d = new Date(sec * 1000)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+const toLocalTime = (sec: number) => {
+  const d = new Date(sec * 1000)
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+}
+
+/** Log/edit a manual study-time block: course, local date + start time, duration, note.
+ *  Duration (not end time) keeps "end before start" unrepresentable in the form; the
+ *  backend still validates. */
+function ManualSessionDialog({
+  open,
+  editing,
+  courses,
+  onClose,
+  onSaved,
+}: {
+  open: boolean
+  editing: WorkingSession | null
+  courses: { doc: string; title: string }[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [doc, setDoc] = useState("")
+  const [date, setDate] = useState("")
+  const [time, setTime] = useState("")
+  const [minutes, setMinutes] = useState("30")
+  const [note, setNote] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Re-seed the form each open: edit prefills from the block, add defaults to "the last
+  // half hour, first course".
+  useEffect(() => {
+    if (!open) return
+    setError(null)
+    if (editing) {
+      setDoc(editing.courses[0]?.doc ?? "")
+      setDate(toLocalDate(editing.start))
+      setTime(toLocalTime(editing.start))
+      setMinutes(String(Math.max(1, Math.round(editing.durationMin))))
+      setNote(editing.note ?? "")
+    } else {
+      const nowSec = Date.now() / 1000
+      setDoc(courses[0]?.doc ?? "")
+      setDate(toLocalDate(nowSec))
+      setTime(toLocalTime(nowSec - 1800))
+      setMinutes("30")
+      setNote("")
+    }
+  }, [open, editing, courses])
+
+  const save = async () => {
+    const start = new Date(`${date}T${time}`).getTime() / 1000
+    const mins = parseInt(minutes, 10)
+    if (!doc || !Number.isFinite(start) || !Number.isFinite(mins) || mins <= 0) {
+      setError("Pick a course, a valid start, and a positive duration.")
+      return
+    }
+    setBusy(true)
+    const res = await saveManualSession({
+      doc,
+      start,
+      end: start + mins * 60,
+      note: note.trim() || null,
+      key: editing?.key,
+    })
+    setBusy(false)
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Edit study time" : "Log study time"}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>Course</Label>
+            <Select value={doc} onValueChange={setDoc}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a course" />
+              </SelectTrigger>
+              <SelectContent>
+                {courses.map((c) => (
+                  <SelectItem key={c.doc} value={c.doc}>
+                    {c.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ms-date">Date</Label>
+              <Input id="ms-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ms-time">Start</Label>
+              <Input id="ms-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ms-minutes">Duration (minutes)</Label>
+            <Input
+              id="ms-minutes"
+              type="number"
+              min={1}
+              max={1440}
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ms-note">Note (optional)</Label>
+            <Input
+              id="ms-note"
+              value={note}
+              placeholder="e.g. chapter 3 on paper"
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={busy}>
+            {editing ? "Save changes" : "Log time"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -206,6 +405,36 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
       cancelled = true
     }
   }, [])
+
+  // Manual time blocks: courses to pick from (learn-doc-keyed), dialog state, refetch.
+  const { documents } = useDocuments()
+  const manualCourses = useMemo(
+    () =>
+      documents
+        .filter((d) => d.learnDocId)
+        .map((d) => ({ doc: d.learnDocId!, title: cleanCourseTitle(d.name).title })),
+    [documents],
+  )
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualEditing, setManualEditing] = useState<WorkingSession | null>(null)
+  const reloadSessions = useCallback(() => {
+    fetchSessions(SESSION_DAYS)
+      .then((ses) => {
+        setSessions(ses)
+        if (ses.error) setError(ses.error)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+  }, [])
+  const handleDeleteManual = useCallback(
+    (s: WorkingSession) => {
+      if (!s.key) return
+      deleteManualSession(s.key).then((res) => {
+        if (res.error) setError(res.error)
+        else reloadSessions()
+      })
+    },
+    [reloadSessions],
+  )
 
   const fadingSoon = useMemo(
     () =>
@@ -288,21 +517,51 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
             </span>
           }
           description="Derived from your study activity — reading, reviews, recall. No timers to run."
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => {
+                setManualEditing(null)
+                setManualOpen(true)
+              }}
+            >
+              <Plus className="h-3 w-3" />
+              Log time
+            </Button>
+          }
         >
           {sessions == null ? (
             <p className="text-sm text-muted-foreground">Loading sessions…</p>
           ) : sessions.sessions.length === 0 ? (
-            <EmptyState title="No sessions yet" description="Read or review something and it shows up here." />
+            <EmptyState title="No sessions yet" description="Read or review something — or log time manually — and it shows up here." />
           ) : (
             <ul className="flex flex-col divide-y divide-border/40">
               {sessions.sessions.slice(0, 20).map((s) => (
-                <SessionRow key={s.start} session={s} />
+                <SessionRow
+                  key={s.manual ? s.key : s.start}
+                  session={s}
+                  onEdit={(sess) => {
+                    setManualEditing(sess)
+                    setManualOpen(true)
+                  }}
+                  onDelete={handleDeleteManual}
+                />
               ))}
             </ul>
           )}
         </SectionCard>
         </div>
       </div>
+
+      <ManualSessionDialog
+        open={manualOpen}
+        editing={manualEditing}
+        courses={manualCourses}
+        onClose={() => setManualOpen(false)}
+        onSaved={reloadSessions}
+      />
     </div>
   )
 }

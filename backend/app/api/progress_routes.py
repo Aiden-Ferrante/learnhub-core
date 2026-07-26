@@ -18,8 +18,10 @@ from app.supplemental.study import (
     compute_concept_mastery,
     compute_forecast,
     compute_mastery,
+    delete_manual_session,
     fetch_sessions,
     record_engagement,
+    upsert_manual_session,
 )
 
 router = APIRouter()
@@ -74,5 +76,27 @@ def api_study_sessions(
     days: int = Query(90, ge=1, le=730),
 ) -> dict[str, Any]:
     """Working sessions derived from the study-event floor (gap-clustered, newest first),
-    with a summary strip. Optionally scoped to one course."""
+    merged with the user's manual time blocks, with a summary strip. Optionally scoped
+    to one course."""
     return fetch_sessions(doc, days=days)
+
+
+@router.post("/api/study/manual-session")
+def api_manual_session_upsert(payload: dict[str, Any] = Body(...)) -> JSONResponse:
+    """Create (no ``key``) or update (``key``) a manual study-time block. Timestamps are
+    epoch seconds. The write-side exception in this read-model router — manual blocks
+    ARE tracking data, owned here next to the sessions read they feed."""
+    data = upsert_manual_session(
+        doc=str(payload.get("doc") or ""),
+        start=float(payload.get("start") or 0),
+        end=float(payload.get("end") or 0),
+        note=(str(payload["note"]).strip() or None) if payload.get("note") else None,
+        key=str(payload["key"]) if payload.get("key") else None,
+    )
+    return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+
+
+@router.delete("/api/study/manual-session")
+def api_manual_session_delete(key: str = Query(...)) -> JSONResponse:
+    data = delete_manual_session(key)
+    return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)

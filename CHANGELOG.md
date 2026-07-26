@@ -5,6 +5,16 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.12.0] — 2026-07-26
+
+### Added
+- **Manual study-time entries** — log, edit, and delete your own time blocks from the
+  /study Recent-sessions panel (course, date, start, duration, note). Blocks live in
+  their own `manual_sessions` table (the one stored layer over the derived sessions),
+  merge into the session list and Time-studied totals, and cascade away with their
+  course. The study-event floor, activity heatmap, and cadence chip stay records of
+  what actually happened — derived sessions remain read-only. (TASK-22)
+
 ## [0.11.1] — 2026-07-23
 
 ### Fixed

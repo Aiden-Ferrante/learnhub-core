@@ -212,6 +212,18 @@ CREATE TABLE study_events (
 CREATE INDEX ON study_events (doc, ts);
 CREATE INDEX ON study_events (concept_key);
 
+-- Manual study-time blocks — the user's own corrections layer. Sessions stay a pure
+-- derived view over study_events; manual blocks are stored intervals merged into that
+-- view at read time (session list + time-studied totals only; heatmap/cadence stay
+-- graded-only). `doc` is the learn-doc-key, like study_events.
+CREATE TABLE manual_sessions (
+  key text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  doc text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
+  start_ts timestamptz NOT NULL, end_ts timestamptz NOT NULL,
+  note text, created_at timestamptz DEFAULT now(),
+  CHECK (end_ts > start_ts));
+CREATE INDEX ON manual_sessions (doc, start_ts);
+
 CREATE TABLE chapter_progress (key text PRIMARY KEY, doc_id text, scope text, stages jsonb);
 
 -- ═══════════════════════════════════════════════════════════════════════
