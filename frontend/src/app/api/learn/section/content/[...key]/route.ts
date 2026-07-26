@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { key: string[] } },
+  { params }: { params: Promise<{ key: string[] }> },
 ) {
-  const { key } = params
+  const { key } = await params
   const doc = req.nextUrl.searchParams.get('doc')
   const search = new URLSearchParams()
   if (doc) search.set('doc', doc)
