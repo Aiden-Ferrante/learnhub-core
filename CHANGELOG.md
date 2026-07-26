@@ -5,6 +5,19 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.12.1] — 2026-07-26
+
+### Changed
+- **Manual time blocks now light the Study activity heatmap** and count toward the
+  weekly cadence chip (any-activity days, not only graded ones) — user decision after
+  seeing v0.12.0 live. Labels follow the data: "N activities this year", chip tooltip
+  "any study activity". (The counts already included passive read/listen events.)
+
+### Fixed
+- Section `[...key]` proxy routes now await Next 15's async `params` — runtime was
+  fine via the compat shim, but the stale signature failed `tsc` against generated
+  route types whenever a build had run.
+
 ## [0.12.0] — 2026-07-26
 
 ### Added
