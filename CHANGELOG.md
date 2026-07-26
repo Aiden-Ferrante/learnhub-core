@@ -5,6 +5,21 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.14.0] — 2026-07-26
+
+### Added
+- **Skeleton practice** — a course-level structure drill, opened from a new button in the
+  course outline toolbar beside Read the book / Guided reading / Concepts. Pick the
+  abstraction level on demand instead of following a fixed walk:
+  **Chapters** (rebuild the whole book's chapter list — new), **Sections** (rebuild a
+  chapter's sections, with their essences), **Concepts** (recall a section's concepts).
+- **Sort mode** alongside recall: items are shuffled and dragged into order, then checked
+  with per-row "belongs at #N" hints and a score. Sort is **practice-only** — it never
+  writes to your schedule, and says so.
+- Recall at a structural level self-grades on the shared 1–4 scale and feeds the same
+  FSRS skeleton item the reader's chapter walk uses; the book-level list schedules under
+  a reserved `book` scope (real section keys are always `toc:*`, so it cannot collide).
+
 ## [0.13.0] — 2026-07-26
 
 ### Added

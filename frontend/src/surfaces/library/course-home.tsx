@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Flame,
   GraduationCap,
+  ListTree,
   RotateCcw,
   Search,
   Sparkles,
@@ -37,6 +38,8 @@ type CourseHomeProps = {
   onReadBook: () => void
   onDeepRead?: () => void
   onViewConcepts: () => void
+  /** Course-level structure drill (chapters → sections → concepts). */
+  onSkeletonPractice?: () => void
   /** Open one concept's detail (clicked as a leaf in the course outline). */
   onOpenConcept?: (conceptKey: string) => void
   onBackToShelf: () => void
@@ -103,6 +106,7 @@ export function CourseHome({
   onReadBook,
   onDeepRead,
   onViewConcepts,
+  onSkeletonPractice,
   onOpenConcept,
   onBackToShelf,
   continueNode,
@@ -413,6 +417,18 @@ export function CourseHome({
                   <span className="tabular-nums text-muted-foreground/70">· {conceptCount}</span>
                 )}
               </Button>
+              {onSkeletonPractice && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={onSkeletonPractice}
+                >
+                  <ListTree className="h-3.5 w-3.5" />
+                  Skeleton practice
+                </Button>
+              )}
             </div>
           </div>
           <SyllabusTree

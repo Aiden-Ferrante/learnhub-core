@@ -8,6 +8,7 @@
 
 export { StudyPlanner } from "@/surfaces/studying/study-planner"
 export { ChapterWalk } from "@/surfaces/studying/chapter-walk"
+export { SkeletonPractice } from "@/surfaces/studying/skeleton-practice"
 export { LessonPanel } from "@/surfaces/studying/lesson-panel"
 export { LockInPanel } from "@/surfaces/studying/lockin-panel"
 export { ReviewPanel } from "@/surfaces/studying/review-panel"
