@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CalendarCheck2 } from "lucide-react"
+import Link from "next/link"
+import { CalendarCheck2, ChevronRight } from "lucide-react"
 import { fetchStudyDebt, type StudyDebt } from "@/gateways/api/progress"
 
 /**
@@ -32,9 +33,15 @@ export function TodayStrip() {
 
   return (
     <>
-      <div
-        className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${
-          caughtUp ? "border-border/60 bg-card/40" : "border-brand/30 bg-brand/5"
+      {/* The whole strip is the way INTO the planner — the calendar itself stays on /study
+          (user fork 2026-07-26: no duplicate calendar on the shelf). */}
+      <Link
+        href="/study"
+        aria-label="Open the study planner"
+        className={`group flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+          caughtUp
+            ? "border-border/60 bg-card/40 hover:border-border hover:bg-card/70"
+            : "border-brand/30 bg-brand/5 hover:border-brand/60 hover:bg-brand/10"
         }`}
       >
         <div
@@ -68,7 +75,17 @@ export function TodayStrip() {
               : "Sessions also introduce a few new concepts each day."}
           </p>
         </div>
-      </div>
+        <span
+          className={`flex shrink-0 items-center gap-1 text-xs font-medium ${
+            caughtUp
+              ? "text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              : "text-brand"
+          }`}
+        >
+          Open planner
+          <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </span>
+      </Link>
 
     </>
   )

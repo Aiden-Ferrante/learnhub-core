@@ -5,6 +5,13 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [0.12.2] — 2026-07-26
+
+### Added
+- **The Today strip on the Courses page now opens the study planner** — the whole
+  card links to /study with an "Open planner" cue when items are due. The review
+  calendar stays on the study tab (chosen over duplicating it on the shelf). (TASK-24)
+
 ## [0.12.1] — 2026-07-26
 
 ### Changed
