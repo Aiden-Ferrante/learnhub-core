@@ -4,10 +4,12 @@ title: 'Engagement heartbeat: honest activity tracking across all studying surfa
 status: To Do
 assignee: []
 created_date: '2026-07-23 16:45'
+updated_date: '2026-08-05 23:38'
 labels:
   - frontend
   - studying
   - reading
+  - habit
 dependencies:
   - TASK-19
 references:

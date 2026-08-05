@@ -4,9 +4,11 @@ title: 'Event-floor hygiene: require doc on study-event writers, log write failu
 status: To Do
 assignee: []
 created_date: '2026-07-23 16:44'
+updated_date: '2026-08-05 23:38'
 labels:
   - backend
   - study
+  - habit
 dependencies: []
 references:
   - backend/app/supplemental/study/mastery.py

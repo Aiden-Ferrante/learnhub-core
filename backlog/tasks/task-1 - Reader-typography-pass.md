@@ -4,9 +4,11 @@ title: Reader typography pass
 status: To Do
 assignee: []
 created_date: '2026-07-17 21:17'
+updated_date: '2026-08-05 23:38'
 labels:
   - reader
   - design
+  - engagement
 milestone: m-0
 dependencies: []
 references:
