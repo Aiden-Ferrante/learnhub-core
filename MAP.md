@@ -177,6 +177,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`srs.py`](backend/app/supplemental/study/srs.py) | SM-2 schedule primitive |
 | [`sessions.py`](backend/app/supplemental/study/sessions.py) | _(describe me)_ |
 | [`calendar.py`](backend/app/supplemental/study/calendar.py) | _(describe me)_ |
+| [`manual.py`](backend/app/supplemental/study/manual.py) | _(describe me)_ |
 
 ### supplemental/media/ — audiobooks
 
