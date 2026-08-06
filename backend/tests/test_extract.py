@@ -10,6 +10,7 @@ from app.process.extraction.concepts_extract import build_user_prompt, normalize
 INP = SectionExtractInput(
     doc_id="doc1",
     section_key="toc:1.2",
+    source_section_key="toc:1.2",
     heading="1.2 Graphs",
     page_start=13,
     page_end=16,

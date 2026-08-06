@@ -9,16 +9,23 @@ from __future__ import annotations
 
 from app.process.content import resolve_doc_id
 from app.gateways import db
+from app.process.content import (
+    concept_filter,
+    fetch_blocks,
+    version_sections_by_source,
+)
 
 
 
 def concept_count(doc_id: str, section_keys: list[str]) -> int:
+    """How many concepts this version's sections carry. ``section_keys`` are the version's
+    own keys; concepts are the book's, so they are translated before the count."""
     if not section_keys:
         return 0
+    pred, binds = concept_filter(doc_id, section_keys)
     with db() as conn:
         return conn.execute(
-            "SELECT count(*) AS n FROM ext_concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
-            {"d": doc_id, "ks": section_keys},
+            f"SELECT count(*) AS n FROM ext_concepts WHERE {pred}", binds
         ).fetchone()["n"]
 
 
@@ -26,13 +33,10 @@ def _concept_reading_ranks(doc_id: str, rows: list[dict]) -> dict[str, int]:
     """Global reading rank per concept: section reading order, then within-section order.
     A strict unique rank gives every concept a stable global reading order."""
     sec_order: dict[str, int] = {}
-    with db() as conn:
-        srows = conn.execute(
-            'SELECT section_key AS k, "order" AS o FROM raw_content WHERE doc_id = %(d)s',
-            {"d": doc_id},
-        ).fetchall()
-    for r in srows:
-        k, o = r.get("k"), r.get("o") or 0
+    # Rank by THIS version's reading order, keyed by the book's section — concepts are
+    # extracted against the book, so a re-cut version reorders the same concepts.
+    for r in fetch_blocks(doc_id):
+        k, o = r.get("sourceSectionKey"), r.get("order") or 0
         if k is not None and (k not in sec_order or o < sec_order[k]):
             sec_order[k] = o
     ordered = sorted(
@@ -63,12 +67,7 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
         section_rank: dict[str, int] = {section_key: 0}
         section_titles: dict[str, str] = {}
         try:
-            with db() as conn:
-                blocks = conn.execute(
-                    'SELECT section_key AS "sectionKey", "order", heading, level '
-                    'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
-                    {"d": doc_id},
-                ).fetchall()
+            blocks = fetch_blocks(doc_id)
             if blocks:
                 from app.process.content import scope_blocks
 
@@ -77,7 +76,9 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
                 matched = scope_blocks(doc_id, section_key, rows=blocks)
                 ranked: dict[str, int] = {}
                 for b in matched:
-                    sk = b.get("sectionKey")
+                    # Scope matching used this version's placement; the concepts to pull
+                    # are the BOOK's, so key them by where the block came from.
+                    sk = b.get("sourceSectionKey") or b.get("sectionKey")
                     if sk and sk not in ranked:
                         ranked[sk] = b.get("order", len(ranked))
                         if b.get("heading"):
@@ -90,13 +91,15 @@ def fetch_section_concepts(section_key: str, doc_id: str | None = None) -> dict:
             section_rank = {section_key: 0}
             section_titles = {}
 
+        pred, binds = concept_filter(doc_id, scope_keys, alias="c")
         with db() as conn:
             rows = conn.execute(
                 'SELECT c.key AS "conceptKey", c.name, c.kind, c.signal, c.source, '
                 'c.section_key AS "sectionKey", c."order", s.page_start AS "pageStart", s.page_end AS "pageEnd" '
                 "FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id "
-                "WHERE c.doc_id = %(d)s AND c.section_key = ANY(%(ks)s::text[])",
-                {"d": doc_id, "ks": scope_keys},
+                # scope_keys are this version's; concepts are the book's.
+                f"WHERE {pred}",
+                binds,
             ).fetchall()
         # Reading order across the span: by section position, then within-section order.
         rows.sort(
@@ -150,13 +153,14 @@ def fetch_document_concepts(doc_id: str | None = None) -> dict:
         doc_id = resolve_doc_id(doc_id)
         if not doc_id:
             return {"docId": None, "concepts": []}
+        pred, binds = concept_filter(doc_id, alias="c")
         with db() as conn:
             rows = conn.execute(
                 'SELECT c.key, c.name, c.kind, c.signal, c.source, '
                 'c.section_key AS "sectionKey", s.page_start AS "pageStart", s.page_end AS "pageEnd", c."order" '
                 "FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id "
-                "WHERE c.doc_id = %(d)s",
-                {"d": doc_id},
+                f"WHERE {pred}",
+                binds,
             ).fetchall()
         if not rows:
             return {"docId": doc_id, "concepts": []}
@@ -237,9 +241,17 @@ def concept_counts_by_doc() -> dict[str, int]:
 
 
 def section_concept_rows(doc_id: str) -> list[dict]:
-    """One row per concept (its sectionKey) — course-status coverage input."""
+    """One row per concept, keyed by the VERSION section that carries it — course-status
+    coverage input. A book section split across two of this version's chapters contributes
+    to both, which is what makes coverage follow the outline you actually study."""
+    by_source = version_sections_by_source(doc_id)
+    pred, binds = concept_filter(doc_id)
     with db() as conn:
-        return conn.execute(
-            'SELECT section_key AS "sectionKey" FROM ext_concepts WHERE doc_id = %(d)s',
-            {"d": doc_id},
+        rows = conn.execute(
+            f'SELECT section_key AS "sectionKey" FROM ext_concepts WHERE {pred}', binds
         ).fetchall()
+    return [
+        {"sectionKey": vk}
+        for r in rows
+        for vk in by_source.get(r["sectionKey"], [r["sectionKey"]])
+    ]

@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.gateways import db
+from app.process.content.blocks import fetch_blocks
 
 
 def _snippet(text: str, terms: list[str], width: int = 260) -> str:
@@ -31,14 +32,18 @@ def keyword_search(doc_id: str | None, query: str, limit: int = 8, full: bool = 
     terms = [t for t in "".join(c if c.isalnum() else " " for c in query.lower()).split() if len(t) > 1]
     if not terms:
         return {"query": query, "matches": []}
-    with db() as conn:
-        blocks = conn.execute(
-            'SELECT section_key AS "sectionKey", heading, markdown, '
-            'page_start AS "pageStart", page_end AS "pageEnd" '
-            "FROM raw_content WHERE markdown IS NOT NULL "
-            "AND (%(d)s::text IS NULL OR doc_id = %(d)s)",
-            {"d": doc_id},
-        ).fetchall()
+    if doc_id:
+        blocks = fetch_blocks(doc_id, markdown=True, where="AND c.markdown IS NOT NULL")
+    else:
+        # No doc = search the whole library. Text is stored once per BOOK, so reading
+        # raw_content directly hits every book exactly once; joining version_blocks here
+        # would return a shared block once per version that keeps it.
+        with db() as conn:
+            blocks = conn.execute(
+                'SELECT section_key AS "sectionKey", heading, markdown, '
+                'page_start AS "pageStart", page_end AS "pageEnd" '
+                "FROM raw_content WHERE markdown IS NOT NULL"
+            ).fetchall()
     scored = []
     for b in blocks:
         md = b.get("markdown") or ""

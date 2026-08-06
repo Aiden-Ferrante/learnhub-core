@@ -16,6 +16,7 @@ from app.process.content import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.gateways import db
+from app.process.content import fetch_blocks
 from app.process.content import load_section_blocks
 from app.gateways import ollama_structured_completion
 from app.gateways import Orient, Skeleton
@@ -72,15 +73,10 @@ def _attach_depths(doc_id: str, sections: list[dict]) -> list[dict]:
         keys = [s.get("sectionKey") for s in sections if s.get("sectionKey")]
         levels: dict[str, int] = {}
         try:
-            with db() as conn:
-                lrows = conn.execute(
-                    'SELECT section_key AS sk, level AS lvl FROM raw_content '
-                    "WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[])",
-                    {"d": doc_id, "ks": keys},
-                ).fetchall()
-            for r in lrows:
-                sk, lvl = r.get("sk"), r.get("lvl")
-                if sk and lvl is not None:
+            wanted = set(keys)
+            for r in fetch_blocks(doc_id):
+                sk, lvl = r.get("sectionKey"), r.get("level")
+                if sk in wanted and lvl is not None:
                     levels[sk] = min(lvl, levels.get(sk, lvl))
         except Exception:  # noqa: BLE001
             levels = {}

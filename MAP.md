@@ -152,6 +152,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`toc_tree.py`](backend/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
 | [`find.py`](backend/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
 | [`toc_controller.py`](backend/app/process/content/toc_controller.py) | Staged TOC routing loop (bookmarks / pagematched / none) + decision log (pure) |
+| [`blocks.py`](backend/app/process/content/blocks.py) | _(describe me)_ |
+| [`versions.py`](backend/app/process/content/versions.py) | _(describe me)_ |
 
 ### process/extraction/ — LLM generation passes
 
@@ -178,6 +180,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`sessions.py`](backend/app/supplemental/study/sessions.py) | _(describe me)_ |
 | [`calendar.py`](backend/app/supplemental/study/calendar.py) | _(describe me)_ |
 | [`manual.py`](backend/app/supplemental/study/manual.py) | _(describe me)_ |
+| [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | _(describe me)_ |
 
 ### supplemental/media/ — audiobooks
 

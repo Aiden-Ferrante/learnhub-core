@@ -76,14 +76,20 @@ def clean_pgtest_rows():
         with db() as conn:
             conn.execute("DELETE FROM concept_reviews WHERE doc_id = %(d)s", {"d": DOC})
             conn.execute("DELETE FROM study_events WHERE doc = %(d)s", {"d": DOC})
-            # ext_concepts.doc_id FKs raw_documents; dropping the stub cascades the concepts.
-            conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": DOC})
+            # ext_concepts.doc_id FKs raw_documents, which FKs sources; dropping the
+            # source cascades the version and its concepts.
+            conn.execute("DELETE FROM sources WHERE key = %(d)s", {"d": DOC})
 
     _wipe()
     with db() as conn:
         conn.execute(
-            "INSERT INTO raw_documents (key, status) VALUES (%(d)s, 'ready') "
-            "ON CONFLICT (key) DO NOTHING",
+            "INSERT INTO sources (key) VALUES (%(d)s) ON CONFLICT (key) DO NOTHING",
+            {"d": DOC},
+        )
+        # A book is a source plus its Default version, keyed identically.
+        conn.execute(
+            "INSERT INTO raw_documents (key, source_id, status) "
+            "VALUES (%(d)s, %(d)s, 'ready') ON CONFLICT (key) DO NOTHING",
             {"d": DOC},
         )
     yield

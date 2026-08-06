@@ -28,7 +28,14 @@ from typing import Any, Callable
 
 from psycopg.types.json import Json
 
-from app.process.content import scope_section_keys
+from app.process.content import (
+    blocks_sql,
+    concept_filter,
+    scope_section_keys,
+    section_key_expr,
+    source_id_of,
+    source_sections,
+)
 from app.gateways import db
 from app.supplemental.study import srs
 from app.supplemental.study.mastery import record_grade_event
@@ -268,7 +275,7 @@ def _chapter_snapshot(doc_id: str, scope: str) -> tuple[str | None, list[dict[st
     children: list[dict[str, str]] = []
     with db() as conn:
         row = conn.execute(
-            "SELECT heading FROM raw_content WHERE doc_id = %(d)s AND section_key = %(s)s LIMIT 1",
+            blocks_sql(where=f"AND {section_key_expr()} = %(s)s") + " LIMIT 1",
             {"d": doc_id, "s": scope},
         ).fetchone()
         if row and row.get("heading"):
@@ -284,11 +291,15 @@ def _chapter_snapshot(doc_id: str, scope: str) -> tuple[str | None, list[dict[st
     if not children:
         span = scope_section_keys(doc_id, scope)
         if span:
+            # `span` holds this version's section keys; concepts carry the book's, so the
+            # span is translated rather than the concepts.
+            span = set(source_sections(doc_id, list(span))) or span
+            pred, binds = concept_filter(doc_id)
             with db() as conn:
                 concepts = conn.execute(
                     'SELECT name, signal, section_key AS "sectionKey" FROM ext_concepts '
-                    'WHERE doc_id = %(d)s ORDER BY "order"',
-                    {"d": doc_id},
+                    f'WHERE {pred} ORDER BY "order"',
+                    binds,
                 ).fetchall()
             children = [
                 {"heading": c["name"], "essence": (c.get("signal") or "")[:120]}
@@ -348,19 +359,26 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
         # exact-key matching misses everything under a chapter node.
         span = scope_section_keys(doc, scope)
         with db() as conn:
-            concepts = conn.execute(
+            cols = (
                 'SELECT c.key, c.name, c.kind, c.signal, c.source, c.section_key AS "sectionKey", '
                 'c.doc_id AS "docId", s.page_start AS "pageStart", s.page_end AS "pageEnd" '
                 'FROM ext_concepts c LEFT JOIN raw_structure s ON s.id = c.structure_id '
-                'WHERE (%(doc)s::text IS NULL OR c.doc_id = %(doc)s) ORDER BY c."order"',
-                {"doc": doc},
+            )
+            _pred, _binds = concept_filter(doc, alias="c")
+            concepts = conn.execute(
+                cols + f'WHERE {_pred} ORDER BY c."order"', _binds
             ).fetchall()
+            if doc:
+                # Keep links pointing at the version being studied, not its book.
+                for c in concepts:
+                    c["docId"] = doc
             reviews: dict[str, dict[str, Any]] = {}
+            # Concept cards follow the BOOK — every version of it shares one memory.
             for r in conn.execute(
                 "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
                 "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
                 "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter'))",
-                {"doc": doc},
+                {"doc": source_id_of(doc) if doc else None},
             ).fetchall():
                 reviews[r["key"]] = r
             # Skeleton (structure-recall) and chapter-resurface cards.
@@ -368,6 +386,7 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
                 'SELECT key, doc_id AS "docId", extract(epoch from due)::float8 AS due, state, '
                 'item_type AS "itemType", chapter_scope AS "chapterScope", section_key AS "sectionKey", '
                 "heading, children "
+                # …typed items follow the VERSION: a skeleton drill quizzes THIS outline.
                 "FROM concept_reviews WHERE item_type IN ('skeleton', 'chapter') "
                 "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
                 {"doc": doc},
@@ -438,8 +457,12 @@ def grade_review(body: dict, concept_key: str, grade: int, now: float) -> tuple[
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}, 500
 
-    # Append to the mastery floor (best-effort; never breaks the grade flow).
-    record_grade_event(section_key, correct=(grade >= 3), doc=doc_id, concept_key=concept_key)
+    # Append to the mastery floor (best-effort; never breaks the grade flow). The review row
+    # above is keyed to the BOOK (doc_id came from ext_concepts) so the memory is shared,
+    # but the event belongs to the VERSION you actually studied — that is what activity,
+    # sessions and the heatmap count. Falls back to the book when the caller sent no doc.
+    event_doc = str(body.get("doc") or "").strip() or doc_id
+    record_grade_event(section_key, correct=(grade >= 3), doc=event_doc, concept_key=concept_key)
     return {
         "conceptKey": concept_key,
         "due": next_state["due"],

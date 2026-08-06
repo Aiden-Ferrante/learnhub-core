@@ -31,26 +31,10 @@ OUTLINE = [
 CONTENT_KEYS = {"toc:1", "toc:1.1", "toc:2", "toc:discussion-questions", "toc:1~2", "toc:2~2"}
 
 
-class _FakeCursor:
-    def execute(self, *_a, **_k):
-        return self
-
-    def fetchall(self):
-        return []
-
-
-class _FakeDb:
-    def __enter__(self):
-        return _FakeCursor()
-
-    def __exit__(self, *_a):
-        return False
-
-
 def _install(monkeypatch, forest):
     monkeypatch.setattr(chapters_mod, "resolve_doc_id", lambda d: "doc1")
     monkeypatch.setattr(chapters_mod, "get_toc_tree", lambda d: (forest, 0, None))
-    monkeypatch.setattr(chapters_mod, "db", lambda: _FakeDb())
+    monkeypatch.setattr(chapters_mod, "fetch_blocks", lambda *a, **k: [])
     monkeypatch.setattr(
         scope_mod, "scope_blocks",
         lambda doc, key, rows=None: [{"markdown": "x"}] if key in CONTENT_KEYS else [],

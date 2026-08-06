@@ -56,7 +56,8 @@ Integrity lives in the database, not in application convention. Tables are group
 
 | Prefix | Owner | Tables |
 |---|---|---|
-| `raw_` | `process/` | `raw_documents` (identity + status), `raw_structure` (the TOC as a self-referencing tree; `id = doc_id::section_key`), `raw_content` (markdown blocks), `raw_elements` (figures/tables) |
+| `sources` | `process/` | The uploaded book itself — one row per PDF, holding the file-level facts (filename, hash, page count, figures) that are true no matter how many courses are cut from it |
+| `raw_` | `process/` | `raw_documents` (a **course version** over a source — identity + status + name/origin/is_main), `raw_structure` (the TOC as a self-referencing tree; `id = doc_id::section_key`), `raw_content` (markdown blocks), `raw_elements` (figures/tables) |
 | `ext_` | `process/extraction` | `ext_concepts`, `ext_orient`, `ext_skeleton`, `ext_guides` — plus `ext_briefing`, a **view** derived from orient + skeleton (aggregators are views, never stored tables) |
 | `study_`-ish | `supplemental/study` | `concept_reviews`, `study_events`, `chapter_progress` (unchanged this pass — no doc FK yet) |
 | operational | `gateways/ledger` + `conductor` | `chapter_builds` (job ledger), `learn_meta` (queue flag) |
@@ -83,6 +84,75 @@ tree and the reader immediately; concept extraction runs on demand, per chapter,
 TOC (Process tab) — a whole-book LLM pass is hours, not seconds. `LEARN_AUTOCHAIN=1`
 re-enables the old convert→extract-everything chain for unattended bulk ingests. See
 [MAP.md](MAP.md) § 4.
+
+## The book / course seam
+
+A **source** is the uploaded book. A **course version** (`raw_documents`) is a named path
+through it — its own `raw_structure` tree, its own study state. Every book has a `Default`
+version, created at upload from the PDF's own table of contents; a user can add versions
+that re-cut the same book into their own chapters.
+
+The design constraint that shaped this: roughly **48 SQL sites across 28 files key off
+`doc_id`**. Making a version *be* a `raw_documents` row means structure and tracking
+partition per version with no change to any of them — a threaded `version_id` column was
+rejected because one missed predicate leaks another version's data into your statistics.
+For every book ingested before versions existed, `raw_documents.key == source_id`
+(the identity backfill), so no row moved and no id changed.
+
+What belongs to which:
+
+| | Owns |
+|---|---|
+| **source** | the PDF on disk (`<SHARED_DIR>/ingest/<source>/original.pdf`), its figures, filename, hash, page count |
+| **version** | its `raw_structure` tree, `toc_route`, section/char counts, and all study state |
+
+Anything reaching for the uploaded material resolves through `source_id_of()` first —
+`/api/document/pdf` and `figure_path()` both do, so every version of a book serves the
+same original file.
+
+The split runs down the middle of the child tables:
+
+| | Owns |
+|---|---|
+| **book** | `raw_content` · `raw_elements` · `ext_concepts` (FK `sources`) |
+| **version** | `raw_structure` · `ext_orient`/`skeleton`/`guides` · all study state |
+| **`version_blocks`** | the join: which of the book's blocks a version keeps, where it places them, in what order |
+
+So two versions share one copy of the text. Distilling is deleting mapping rows, not
+copying markdown. Every read of a version's content goes through that join — see
+`process/content/blocks.py`, which owns it; a bare `raw_content WHERE doc_id` reads the
+whole BOOK and silently ignores a version's cut.
+
+Blocks report two section keys: `sectionKey` is the placement in *this* version's
+outline, `sourceSectionKey` is where it came from in the book. Concepts are extracted
+against the book, so inheritance resolves on the latter.
+
+**Concept inheritance.** Concepts are extracted against the book, so a version sees the
+ones its material was drawn from — a re-cut course inherits an extraction it never paid
+for. Every concept read goes through `concept_filter()` in `blocks.py`, the single place
+that decision lives; it returns the SQL predicate + binds, and falls back to the whole
+book when a version has no mapping at all (absent information must not read as "covers
+nothing"). Extraction *writes* against the book too, so building a chapter from a custom
+version enriches the source every other version inherits from.
+
+**Coverage per version, retention per source.** `concept_reviews` holds two kinds of row
+and they scope differently — the rule lives in `study/review_scope.py`:
+
+| Row | Scope | Why |
+|---|---|---|
+| concept card (`item_type IS NULL`) | the **book** | memory is memory; re-cutting an outline must not reset the scheduler |
+| `skeleton` / `chapter` | the **version** | structure recall drills *that* outline, in its order |
+
+So a new version of a studied book inherits its concepts' FSRS state (same due dates, same
+retention) while its structure drills start fresh. Grading a concept writes the review row
+against the book and the *study event* against the version you were reading, so shared
+memory and per-course activity stay separable.
+
+> Two smaller gaps remain, both frontend-side: `app_documents` cards still resolve their own
+> `learn_doc_id`, so setting main does not yet change what a shelf card opens; and
+> `section_count` is not recomputed after a version's material changes. The whole-library
+> review calendar attributes shared concept rows to the book, which is the only sensible
+> answer but means they appear under the Default course.
 
 ## Identifiers — the two document ids
 

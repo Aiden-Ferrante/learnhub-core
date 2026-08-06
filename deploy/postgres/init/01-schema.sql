@@ -3,7 +3,8 @@
 -- live in a per-user schema selected per request via SET search_path (X-User-Db).
 --
 -- SECTIONS (table-name prefixes; each section is owned by one backend package):
---   raw_*    the ingested book — identity, the TOC as a tree, content, media   (process/*)
+--   sources  the uploaded book itself — the PDF and its file-level facts       (process/*)
+--   raw_*    a COURSE VERSION over a source — the TOC as a tree, content, media (process/*)
 --   ext_*    LLM-guided extraction — concepts + per-chapter artifacts           (process/extraction)
 --   ext_briefing  a VIEW (derived, never stored) assembled from the ext_ parts
 --   study_*/…     study state (unchanged this pass; see ARCHITECTURE.md)
@@ -14,6 +15,19 @@
 -- doc_id FK with ON DELETE CASCADE, so deleting the document row removes its whole
 -- graph. A stub raw_documents row is created at upload (status='converting'), so a
 -- job or content row always has a parent to point at.
+--
+-- The book/course seam: `sources` is the uploaded PDF, `raw_documents` is a course
+-- VERSION over it, and deleting a source cascades through every version to the whole
+-- graph. The split runs down the middle of the child tables:
+--
+--   the BOOK owns  raw_content · raw_elements · ext_concepts   (FK sources)
+--   a VERSION owns raw_structure · ext_orient/skeleton/guides · all study state
+--   version_blocks joins them: which of the book's blocks this version keeps, and where
+--
+-- So two versions of one book share its text and its extracted concepts while keeping
+-- separate outlines and separate progress. Every read of a version's content goes
+-- through the version_blocks join (see process/content/blocks.py) — a bare
+-- `raw_content WHERE doc_id` is a read of the whole BOOK and ignores a version's cut.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -37,28 +51,52 @@ SET search_path TO learnhub, public;
 -- raw_  — the ingested book (owned by process/ingestion + process/content)
 -- ═══════════════════════════════════════════════════════════════════════
 
--- Identity + status. Born as a stub at upload (no markdown/outline — those live
--- in raw_content/raw_structure); the convert job flips status converting→ready
--- (or →error) and fills the counts. The full-document markdown is NOT stored: it
--- is reassembled from raw_content when a caller wants the whole blob.
-CREATE TABLE raw_documents (
+-- THE BOOK. One row per uploaded PDF: the file-level facts that belong to the
+-- source material itself and are true no matter how many courses are cut from it.
+-- The PDF on disk lives at <SHARED_DIR>/ingest/<sources.key>/original.pdf and its
+-- figures at <SHARED_DIR>/figures/<sources.key>/ — both keyed by the SOURCE, never
+-- by a version.
+CREATE TABLE sources (
   key             text PRIMARY KEY,
   title           text,
   source_filename text,
   source_hash     text,
+  page_count      int,
+  element_count   int,
+  has_page_provenance boolean,
+  created_at      timestamptz DEFAULT now());
+CREATE INDEX ON sources (source_hash);
+
+-- A COURSE VERSION over a source — a named path through the book. Every version
+-- owns its own raw_structure tree and its own study state; the source's content
+-- blocks and concepts are shared across all of them.
+--
+-- `key` is the learn-doc-key: the id every other table still references as doc_id,
+-- which is why versioning cost no change to the ~48 doc-keyed queries. For books
+-- ingested before versions existed, key == source_id (the identity backfill), so
+-- every pre-existing row already points at the right version.
+--
+-- Born as a stub at upload alongside its source; the convert job flips status
+-- converting→ready (or →error) and fills the counts. The full-document markdown is
+-- NOT stored: it is reassembled from raw_content when a caller wants the whole blob.
+CREATE TABLE raw_documents (
+  key             text PRIMARY KEY,
+  source_id       text NOT NULL REFERENCES sources(key) ON DELETE CASCADE,
+  name            text NOT NULL DEFAULT 'Default',  -- the version's name
+  origin          text NOT NULL DEFAULT 'default',  -- default (TOC-derived) | custom
+  is_main         boolean NOT NULL DEFAULT true,    -- the version the course card opens
   status          text NOT NULL DEFAULT 'ready',   -- converting | ready | error
   status_code     int,                             -- http status of a convert failure
   toc_route       text,                            -- TOC controller verdict: bookmarks |
                                                    -- bookmarks-pagematched | none
-  page_count      int,
   section_count   int,
-  element_count   int,
   char_count      int,
-  has_page_provenance boolean,
   created_at      timestamptz DEFAULT now(),
   last_updated    timestamptz);
-CREATE INDEX ON raw_documents (source_hash);
+CREATE INDEX ON raw_documents (source_id);
 CREATE INDEX ON raw_documents (status, created_at DESC);
+-- Exactly one main version per source, enforced here rather than in application code.
+CREATE UNIQUE INDEX raw_documents_one_main_per_source ON raw_documents (source_id) WHERE is_main;
 
 -- Structure — the TOC as ONE self-referencing tree. id is deterministic
 -- (doc_id || '::' || section_key) so any table holding (doc_id, section_key) can
@@ -84,13 +122,14 @@ CREATE TABLE raw_structure (
 CREATE INDEX ON raw_structure (doc_id, "order");
 CREATE INDEX ON raw_structure (doc_id, parent_id);
 
--- Content — the markdown, one block per split heading. structure_id points at the
--- TOC node that contains the block; NULLABLE because content is finer-grained than
--- the outline (a block can fall under no bookmarked node).
+-- Content — the markdown, one block per split heading. Belongs to the BOOK: doc_id is
+-- a source key, the text is stored once, and every version that keeps a block shares
+-- this row. Where a block sits in a given version is version_blocks' business, not a
+-- column here. `section_key` is the block's place in the book's own structure, which is
+-- what concepts are extracted against.
 CREATE TABLE raw_content (
   key          text PRIMARY KEY,
-  doc_id       text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
-  structure_id text REFERENCES raw_structure(id) ON DELETE CASCADE,
+  doc_id       text NOT NULL REFERENCES sources(key) ON DELETE CASCADE,
   section_key  text,
   number_key   text,
   heading      text,
@@ -103,10 +142,24 @@ CREATE TABLE raw_content (
 CREATE INDEX ON raw_content (doc_id, "order");
 CREATE INDEX ON raw_content (doc_id, section_key);
 
+-- A VERSION'S MATERIAL: which of the book's blocks this version keeps, where it places
+-- them, and in what order. Distilling a book is dropping rows here, not copying markdown.
+-- A Default version holds one row per block of its source, seeded at convert to
+-- reproduce the book's own structure — so the default reading experience is the general
+-- mechanism applied to the trivial case, not a separate code path.
+CREATE TABLE version_blocks (
+  version_id   text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
+  content_key  text NOT NULL REFERENCES raw_content(key)   ON DELETE CASCADE,
+  structure_id text REFERENCES raw_structure(id) ON DELETE SET NULL,  -- the section in THIS version
+  "order"      int  NOT NULL,
+  PRIMARY KEY (version_id, content_key));
+CREATE INDEX ON version_blocks (version_id, "order");
+CREATE INDEX ON version_blocks (structure_id);
+
 -- Media — figures / tables / code, anchored to a structure node + page.
 CREATE TABLE raw_elements (
   key           text PRIMARY KEY,
-  doc_id        text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
+  doc_id        text NOT NULL REFERENCES sources(key) ON DELETE CASCADE,
   structure_id  text REFERENCES raw_structure(id) ON DELETE CASCADE,
   section_key   text,
   type          text,
@@ -127,11 +180,13 @@ CREATE INDEX ON raw_elements (doc_id, section_key);
 -- ext_  — LLM-guided extraction (owned by process/extraction)
 -- ═══════════════════════════════════════════════════════════════════════
 
--- Concepts — many per structure node. No page columns: a concept inherits its
--- section's page span from raw_structure (joined on read where needed).
+-- Concepts — many per structure node. Belong to the BOOK (doc_id is a source key):
+-- they are extracted from the book's text against the book's own sections, so a custom
+-- version inherits them through its blocks instead of re-running extraction. No page
+-- columns: a concept inherits its section's page span from raw_structure.
 CREATE TABLE ext_concepts (
   key           text PRIMARY KEY,
-  doc_id        text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
+  doc_id        text NOT NULL REFERENCES sources(key) ON DELETE CASCADE,
   structure_id  text REFERENCES raw_structure(id) ON DELETE CASCADE,
   section_key   text,
   name          text,

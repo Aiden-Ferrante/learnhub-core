@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.gateways import db
+from app.process.content.blocks import fetch_blocks
 
 _NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
 _CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")
@@ -113,12 +113,7 @@ def _scope_keys_from_outline(doc_id: str, scope: str) -> set[str] | None:
 
 
 def _fetch_scope_rows(doc_id: str) -> list[dict]:
-    with db() as conn:
-        return conn.execute(
-            'SELECT section_key AS "sectionKey", "order", heading, level '
-            "FROM raw_content WHERE doc_id = %(d)s ORDER BY \"order\"",
-            {"d": doc_id},
-        ).fetchall()
+    return fetch_blocks(doc_id)
 
 
 def scope_blocks(doc_id: str, scope: str, rows: list[dict] | None = None) -> list[dict]:
@@ -165,6 +160,11 @@ _JUNK_HEADING = re.compile(r"(https?://|www\.|isbn|cambridge\.org|\b\d{9,}\b)", 
 class SectionExtractInput:
     doc_id: str
     section_key: str
+    # Where this block sits in the BOOK. Extraction writes concepts against the book, so a
+    # custom version's chapter enriches the source everything else inherits from — rather
+    # than minting concepts only that one version can see. Equal to section_key on a
+    # Default version.
+    source_section_key: str
     heading: str
     page_start: int | None
     page_end: int | None
@@ -185,13 +185,7 @@ def load_section_blocks(
 ) -> list[SectionExtractInput]:
     """A scope's blocks WITH their markdown, filtered to what's worth processing
     (drops heading-only stubs and front-matter junk, recording why into ``skipped_out``)."""
-    with db() as conn:
-        rows = conn.execute(
-            'SELECT section_key AS "sectionKey", "order", heading, level, markdown, '
-            'page_start AS "pageStart", page_end AS "pageEnd" '
-            'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
-            {"d": doc_id},
-        ).fetchall()
+    rows = fetch_blocks(doc_id, markdown=True)
     if scope:
         rows = scope_blocks(doc_id, scope, rows=rows)
     wanted = set(section_keys) if section_keys else None
@@ -213,6 +207,7 @@ def load_section_blocks(
             SectionExtractInput(
                 doc_id=doc_id,
                 section_key=sk,
+                source_section_key=r.get("sourceSectionKey") or sk,
                 heading=r.get("heading") or sk,
                 page_start=r.get("pageStart"),
                 page_end=r.get("pageEnd"),

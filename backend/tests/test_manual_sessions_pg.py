@@ -25,14 +25,20 @@ DOC = "pgtest-manual-doc"
 def seeded_doc():
     with db() as conn:
         conn.execute(
-            "INSERT INTO raw_documents (key, status) VALUES (%(d)s, 'ready') "
-            "ON CONFLICT (key) DO NOTHING",
+            "INSERT INTO sources (key) VALUES (%(d)s) ON CONFLICT (key) DO NOTHING",
+            {"d": DOC},
+        )
+        # A book is a source plus its Default version, keyed identically.
+        conn.execute(
+            "INSERT INTO raw_documents (key, source_id, status) "
+            "VALUES (%(d)s, %(d)s, 'ready') ON CONFLICT (key) DO NOTHING",
             {"d": DOC},
         )
     yield DOC
     with db() as conn:
-        # manual_sessions FKs raw_documents ON DELETE CASCADE — this also proves the cascade.
-        conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": DOC})
+        # manual_sessions FKs raw_documents, which FKs sources — dropping the source
+        # cascades the whole chain, which this also proves.
+        conn.execute("DELETE FROM sources WHERE key = %(d)s", {"d": DOC})
 
 
 def _manual_in(doc: str) -> list[dict]:
@@ -76,7 +82,7 @@ def test_course_delete_cascades_manual_blocks(seeded_doc):
     created = upsert_manual_session(seeded_doc, now - 600, now - 60)
     assert created.get("ok")
     with db() as conn:
-        conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": seeded_doc})
+        conn.execute("DELETE FROM sources WHERE key = %(d)s", {"d": seeded_doc})
         left = conn.execute(
             "SELECT count(*) AS n FROM manual_sessions WHERE doc = %(d)s", {"d": seeded_doc}
         ).fetchone()["n"]

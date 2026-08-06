@@ -9,6 +9,7 @@ from typing import Any
 
 from app.process.content.documents import resolve_doc_id
 from app.gateways import db
+from app.process.content.blocks import concept_filter, fetch_blocks, version_sections_by_source
 
 
 @dataclass
@@ -106,15 +107,10 @@ def fetch_section_titles(doc_id: str | None = None) -> dict[str, str]:
     if not doc_id:
         return {}
 
-    with db() as conn:
-        rows = conn.execute(
-            'SELECT section_key AS key, heading, "order" FROM raw_content '
-            "WHERE doc_id = %(doc)s AND heading IS NOT NULL AND heading <> '' ORDER BY \"order\"",
-            {"doc": doc_id},
-        ).fetchall()
+    rows = fetch_blocks(doc_id, where="AND c.heading IS NOT NULL AND c.heading <> ''")
     blocks = [
         {
-            "key": row.get("key"),
+            "key": row.get("sectionKey"),
             "heading": (row.get("heading") or "").strip(),
             "order": row.get("order") or 0,
         }
@@ -176,15 +172,25 @@ def _count_nodes(nodes: list[TreeNode]) -> int:
 
 
 def _concept_counts_by_section(doc_id: str) -> dict[str, int]:
-    """Number of extracted concepts per sectionKey for a document."""
+    """Concepts per section of THIS version's tree. Concepts belong to the book, so the
+    counts are fetched by book section and re-keyed onto whichever of the version's
+    sections drew material from them."""
     try:
+        by_source = version_sections_by_source(doc_id)
+        pred, binds = concept_filter(doc_id)
         with db() as conn:
             rows = conn.execute(
                 "SELECT section_key AS sk, count(*) AS n FROM ext_concepts "
-                "WHERE doc_id = %(d)s GROUP BY section_key",
-                {"d": doc_id},
+                f"WHERE {pred} GROUP BY section_key",
+                binds,
             ).fetchall()
-        return {r["sk"]: r["n"] for r in rows if r.get("sk")}
+        out: dict[str, int] = {}
+        for r in rows:
+            if not r.get("sk"):
+                continue
+            for vk in by_source.get(r["sk"], [r["sk"]]):
+                out[vk] = out.get(vk, 0) + r["n"]
+        return out
     except Exception:
         return {}
 
@@ -203,18 +209,21 @@ def _concepts_by_section(doc_id: str) -> dict[str, list[dict[str, Any]]]:
     """sectionKey -> [{key, name, kind}] in extraction order — the syllabus's concept leaves."""
     try:
         with db() as conn:
+            pred, binds = concept_filter(doc_id)
             rows = conn.execute(
                 "SELECT section_key AS sk, key, name, kind FROM ext_concepts "
-                'WHERE doc_id = %(d)s ORDER BY section_key, "order"',
-                {"d": doc_id},
+                f'WHERE {pred} ORDER BY section_key, "order"',
+                binds,
             ).fetchall()
+        by_source = version_sections_by_source(doc_id)
         out: dict[str, list[dict[str, Any]]] = {}
         for r in rows:
             sk = r.get("sk")
             if sk and r.get("name"):
-                out.setdefault(sk, []).append(
-                    {"key": r.get("key"), "name": r["name"], "kind": r.get("kind")}
-                )
+                for vk in by_source.get(sk, [sk]):
+                    out.setdefault(vk, []).append(
+                        {"key": r.get("key"), "name": r["name"], "kind": r.get("kind")}
+                    )
         return out
     except Exception:
         return {}

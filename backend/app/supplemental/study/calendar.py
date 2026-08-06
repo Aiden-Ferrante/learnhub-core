@@ -74,7 +74,8 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
         with db() as conn:
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
+                for r in conn.execute("SELECT d.key AS k, s.title AS t FROM raw_documents d "
+                                      "JOIN sources s ON s.key = d.source_id").fetchall()
             }
             # LEFT JOIN so concept rows can be NAMED in the agenda; skeleton/chapter rows
             # carry their own heading and simply miss the join.
@@ -138,7 +139,8 @@ def build_study_debt(days: int = 7) -> dict[str, Any]:
         with db() as conn:
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
+                for r in conn.execute("SELECT d.key AS k, s.title AS t FROM raw_documents d "
+                                      "JOIN sources s ON s.key = d.source_id").fetchall()
             }
             rows = conn.execute(
                 "SELECT doc_id AS d, "

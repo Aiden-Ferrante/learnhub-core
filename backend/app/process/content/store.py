@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from psycopg.types.json import Json
 
+from app.process.content.blocks import fetch_blocks
 from app.process.content.documents import fetch_latest_document, fetch_structure_entries, structure_id
 from app.process.content.elements import (
     ELEMENTS,
@@ -145,29 +146,42 @@ def persist_document(
 
     element_rows = _element_rows(doc_id, elements, blocks)
     with db() as conn, conn.transaction():
-        # Flip the upload stub to ready with the final counts (INSERT covers a re-convert or
-        # any path that skipped prepare_upload). Never touches app/UI-owned columns.
+        # The file-level facts belong to the book. Conversion only ever runs on a freshly
+        # uploaded source, so doc_id is the source key here (create_stub minted both).
         conn.execute(
             """
-            INSERT INTO raw_documents (key, title, source_filename, page_count, char_count,
-                section_count, element_count, has_page_provenance, source_hash, toc_route,
-                status, last_updated)
-            VALUES (%(key)s,%(title)s,%(sf)s,%(pc)s,%(cc)s,%(sec)s,%(ec)s,%(hpp)s,%(sh)s,
-                %(tr)s,'ready', now())
+            INSERT INTO sources (key, title, source_filename, page_count, element_count,
+                has_page_provenance, source_hash, created_at)
+            VALUES (%(key)s,%(title)s,%(sf)s,%(pc)s,%(ec)s,%(hpp)s,%(sh)s, now())
             ON CONFLICT (key) DO UPDATE SET
                 title=EXCLUDED.title, source_filename=EXCLUDED.source_filename,
-                page_count=EXCLUDED.page_count, char_count=EXCLUDED.char_count,
-                section_count=EXCLUDED.section_count, element_count=EXCLUDED.element_count,
-                has_page_provenance=EXCLUDED.has_page_provenance, source_hash=EXCLUDED.source_hash,
-                toc_route=EXCLUDED.toc_route, status='ready', last_updated=now()
+                page_count=EXCLUDED.page_count, element_count=EXCLUDED.element_count,
+                has_page_provenance=EXCLUDED.has_page_provenance,
+                source_hash=EXCLUDED.source_hash
             """,
             {"key": doc_id, "title": title, "sf": source_filename, "pc": page_count,
-             "cc": len(markdown), "sec": len(blocks), "ec": len(elements),
-             "hpp": has_page_provenance, "sh": source_hash, "tr": toc.route},
+             "ec": len(elements), "hpp": has_page_provenance, "sh": source_hash},
+        )
+        # Flip the upload stub to ready with the final counts (INSERT covers a re-convert or
+        # any path that skipped prepare_upload). Never touches app/UI-owned columns, and on
+        # conflict never touches the version's own identity (source_id/name/origin/is_main).
+        conn.execute(
+            """
+            INSERT INTO raw_documents (key, source_id, char_count, section_count, toc_route,
+                status, last_updated)
+            VALUES (%(key)s,%(key)s,%(cc)s,%(sec)s,%(tr)s,'ready', now())
+            ON CONFLICT (key) DO UPDATE SET
+                char_count=EXCLUDED.char_count, section_count=EXCLUDED.section_count,
+                toc_route=EXCLUDED.toc_route, status='ready', last_updated=now()
+            """,
+            {"key": doc_id, "cc": len(markdown), "sec": len(blocks), "tr": toc.route},
         )
 
         # Structure first — content/element FKs point at it. Delete children before the tree
         # (raw_content/raw_elements would cascade anyway, but be explicit for a re-convert).
+        # Re-convert replaces the BOOK's text; version_blocks rows cascade off it, so
+        # every version's mapping is rebuilt from the new blocks (a custom cut does not
+        # survive a re-convert — the blocks it pointed at no longer exist).
         conn.execute("DELETE FROM raw_content WHERE doc_id = %(d)s", {"d": doc_id})
         conn.execute("DELETE FROM raw_elements WHERE doc_id = %(d)s", {"d": doc_id})
         conn.execute("DELETE FROM raw_structure WHERE doc_id = %(d)s", {"d": doc_id})
@@ -180,16 +194,28 @@ def persist_document(
             )
 
         if blocks:
+            # The text belongs to the book — no placement column here.
             conn.cursor().executemany(
-                'INSERT INTO raw_content (key, doc_id, structure_id, section_key, heading, level, '
+                'INSERT INTO raw_content (key, doc_id, section_key, heading, level, '
                 'number_key, "order", markdown, char_count, page_start, page_end) '
-                'VALUES (%(key)s,%(doc_id)s,%(structure_id)s,%(section_key)s,%(heading)s,%(level)s,'
+                'VALUES (%(key)s,%(doc_id)s,%(section_key)s,%(heading)s,%(level)s,'
                 '%(number_key)s,%(order)s,%(markdown)s,%(char_count)s,%(page_start)s,%(page_end)s)',
-                [{"key": f"{doc_id}__{b.order}", "doc_id": doc_id, "structure_id": sid(b.section_key),
+                [{"key": f"{doc_id}__{b.order}", "doc_id": doc_id,
                   "section_key": b.section_key, "heading": b.heading, "level": b.level,
                   "number_key": b.number_key, "order": b.order, "markdown": b.markdown,
                   "char_count": len(b.markdown or ""), "page_start": b.page_start,
                   "page_end": b.page_end} for b in blocks],
+            )
+            # …and the Default version keeps all of it, in the book's own order and
+            # sections. This identity mapping is what makes the default reading
+            # experience the general version_blocks mechanism applied to the trivial case.
+            conn.cursor().executemany(
+                'INSERT INTO version_blocks (version_id, content_key, structure_id, "order") '
+                "VALUES (%(v)s,%(c)s,%(s)s,%(o)s) "
+                'ON CONFLICT (version_id, content_key) DO UPDATE SET '
+                'structure_id = EXCLUDED.structure_id, "order" = EXCLUDED."order"',
+                [{"v": doc_id, "c": f"{doc_id}__{b.order}", "s": sid(b.section_key),
+                  "o": b.order} for b in blocks],
             )
 
         if element_rows:
@@ -241,13 +267,7 @@ def fetch_section_content(section_key: str, doc_id: str | None = None, include_f
         if not doc_id:
             return {"sectionKey": section_key, "blocks": [], "markdown": ""}
 
-        with db() as conn:
-            rows = conn.execute(
-                'SELECT key AS "_key", section_key AS "sectionKey", heading, level, "order", '
-                'markdown, page_start AS "pageStart", page_end AS "pageEnd" '
-                'FROM raw_content WHERE doc_id = %(docId)s ORDER BY "order"',
-                {"docId": doc_id},
-            ).fetchall()
+        rows = fetch_blocks(doc_id, markdown=True)
         # Outline-first spanning with reading-order fallback — the one shared rule.
         matched = scope_blocks(doc_id, section_key, rows=rows)
         blocks = [

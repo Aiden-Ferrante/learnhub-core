@@ -276,7 +276,8 @@ def queue_summary() -> dict[str, Any]:
         try:
             with db() as conn:
                 doc_row = conn.execute(
-                    "SELECT title FROM raw_documents WHERE key = %(d)s",
+                    "SELECT s.title FROM raw_documents d "
+                    "JOIN sources s ON s.key = d.source_id WHERE d.key = %(d)s",
                     {"d": running["docId"]},
                 ).fetchone() or {}
                 ch = conn.execute(

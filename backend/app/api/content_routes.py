@@ -16,7 +16,9 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.process.content import (
     chapter_units,
+    create_version,
     delete_document,
+    delete_version,
     fetch_chapter,
     fetch_elements,
     fetch_latest_document,
@@ -26,7 +28,11 @@ from app.process.content import (
     get_toc_tree,
     keyword_search,
     list_documents,
+    list_versions,
+    rename_version,
     resolve_doc_id,
+    set_main_version,
+    source_id_of,
 )
 from app.process.extraction import concept_counts_by_doc
 
@@ -119,7 +125,9 @@ def api_outline(doc: str | None = None) -> JSONResponse:
 def api_document_pdf(doc: str | None = None):
     """The ORIGINAL uploaded PDF, untouched — the source of truth a reader can verify
     the extracted content against. 404 for documents ingested from non-PDF sources."""
-    doc_id = resolve_doc_id(doc)
+    # The PDF belongs to the book, not to the course version reading it — resolve to the
+    # source so every version of a book serves the same original file.
+    doc_id = source_id_of(resolve_doc_id(doc))
     # Ingest ids are uuid-ish; reject anything that could traverse the shared dir.
     if not doc_id or set(doc_id) - set("0123456789abcdef-"):
         return JSONResponse({"error": "doc required"}, status_code=400)
@@ -151,3 +159,65 @@ def api_figure(doc: str, n: int):
     if p is None:
         return JSONResponse({"error": "figure not found"}, status_code=404)
     return FileResponse(str(p), media_type="image/png")
+
+
+# ── course versions ────────────────────────────────────────────────────────
+# A book can carry several named courses over it. `doc` is any version of the book;
+# these all resolve to the book and act on its version set.
+
+
+@router.get("/api/versions")
+def api_list_versions(doc: str = Query(...)) -> JSONResponse:
+    """Every version of this doc's book, oldest first, with which one is main."""
+    try:
+        return JSONResponse(list_versions(doc))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.post("/api/version")
+def api_create_version(doc: str = Query(...), name: str = Query(..., min_length=1)) -> JSONResponse:
+    """A new version of this book, seeded from its Default (same outline, all material).
+    Created not-main; switching is a separate call."""
+    try:
+        data = create_version(doc, name)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.patch("/api/version")
+def api_update_version(
+    doc: str = Query(...),
+    name: str | None = Query(None),
+    main: bool | None = Query(None, description="true = make this the version the card opens"),
+) -> JSONResponse:
+    """Rename a version and/or make it main. Both are idempotent."""
+    try:
+        out: dict = {}
+        if name is not None:
+            data = rename_version(doc, name)
+            if data.get("error"):
+                return JSONResponse(data, status_code=data.pop("status", 400))
+            out.update(data)
+        if main:
+            data = set_main_version(doc)
+            if data.get("error"):
+                return JSONResponse(data, status_code=data.pop("status", 400))
+            out.update(data)
+        if not out:
+            return JSONResponse({"error": "nothing to update"}, status_code=400)
+        return JSONResponse(out)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.delete("/api/version")
+def api_delete_version(doc: str = Query(...)) -> JSONResponse:
+    """Delete ONE version — its outline, material mapping and study state. The book, its
+    text and its concepts survive. The Default cannot be deleted (409)."""
+    try:
+        data = delete_version(doc)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)

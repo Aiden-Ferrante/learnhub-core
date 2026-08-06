@@ -241,18 +241,24 @@ def match_renamed_concepts(
 def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
     # Re-extraction must be idempotent: clear this section's existing concepts first, else
     # concepts the new run no longer produces (renamed/dropped) linger.
-    from app.process.content import structure_id
+    from app.process.content import source_id_of, structure_id
+
+    # Concepts belong to the BOOK, keyed by the book's own sections — that is what lets
+    # every version of it inherit them. On a Default version these resolve to the same
+    # values the code used before versions existed.
+    src = source_id_of(sc.doc_id) or sc.doc_id
+    src_section = getattr(sc, "source_section_key", None) or sc.section_key
 
     rows = []
     for idx, c in enumerate(sc.concepts):
         rows.append(
             {
-                "key": concept_key(sc.doc_id, sc.section_key, c.name),
-                "doc_id": sc.doc_id,
+                "key": concept_key(src, src_section, c.name),
+                "doc_id": src,
                 # A concept anchors to its section's structure node; the FK is nullable so a
                 # concept in a non-bookmarked block (no structure node) still stores.
-                "structure_id": structure_id(sc.doc_id, sc.section_key),
-                "section_key": sc.section_key,
+                "structure_id": structure_id(src, src_section),
+                "section_key": src_section,
                 "name": c.name,
                 "kind": c.kind,
                 "signal": c.signal,
@@ -268,7 +274,7 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
         # that improves names must not punish past study time (docs/concept-identity.md).
         old = conn.execute(
             "SELECT key, name FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
-            {"d": sc.doc_id, "s": sc.section_key},
+            {"d": src, "s": src_section},
         ).fetchall()
         old_keys = {o["key"] for o in old}
         vanished = [o for o in old if o["key"] not in new_keys]
@@ -297,7 +303,7 @@ def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
                     )
         conn.execute(
             "DELETE FROM ext_concepts WHERE doc_id = %(d)s AND section_key = %(s)s",
-            {"d": sc.doc_id, "s": sc.section_key},
+            {"d": src, "s": src_section},
         )
         if rows:
             conn.cursor().executemany(

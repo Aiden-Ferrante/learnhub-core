@@ -17,6 +17,7 @@ from typing import Any
 from app.process.content.documents import resolve_doc_id
 from app.process.content.toc_tree import get_toc_tree
 from app.gateways import db
+from app.process.content.blocks import fetch_blocks
 
 
 def chapter_units(doc_id: str | None) -> dict[str, Any]:
@@ -31,12 +32,7 @@ def chapter_units(doc_id: str | None) -> dict[str, Any]:
 
         from app.process.content.scope import scope_blocks
 
-        with db() as conn:
-            rows = conn.execute(
-                'SELECT section_key AS "sectionKey", "order", heading, level '
-                'FROM raw_content WHERE doc_id = %(d)s ORDER BY "order"',
-                {"d": doc_id},
-            ).fetchall()
+        rows = fetch_blocks(doc_id)
         def has_content(key: str) -> bool:
             # Same outline-first rule as fetch_section_content (one shared resolver).
             try:
@@ -130,14 +126,13 @@ def fetch_chapter(doc_id: str | None, ref: str, max_chars: int = 0) -> dict[str,
     later = [e["page"] for e in tops if e["page"] > start]
     end = min(later) if later else 10**9
 
-    with db() as conn:
-        blocks = conn.execute(
-            'SELECT markdown, section_key AS "sectionKey", heading, '
-            'page_start AS "pageStart", page_end AS "pageEnd" '
-            "FROM raw_content WHERE doc_id = %(d)s AND page_start IS NOT NULL "
-            'AND page_start >= %(s)s AND page_start < %(e)s ORDER BY page_start ASC, "order" ASC',
-            {"d": resolved_doc, "s": start, "e": end},
-        ).fetchall()
+    blocks = fetch_blocks(
+        resolved_doc,
+        markdown=True,
+        where="AND c.page_start IS NOT NULL AND c.page_start >= %(s)s AND c.page_start < %(e)s",
+        params={"s": start, "e": end},
+        order='c.page_start ASC, vb."order" ASC',
+    )
     markdown = "\n\n".join(b.get("markdown") or "" for b in blocks if b.get("markdown")).strip()
     truncated = False
     if max_chars and len(markdown) > max_chars:

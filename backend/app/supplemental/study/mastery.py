@@ -21,7 +21,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.process.content import get_toc_tree
+from app.process.content import concept_filter, get_toc_tree, version_sections_by_source
+from app.supplemental.study.review_scope import review_scope
 from app.gateways import db
 from app.supplemental.study import srs
 
@@ -167,11 +168,12 @@ def compute_forecast(doc: str | None = None, days: int = 7) -> dict[str, Any]:
     """Forgetting forecast from the spaced-review schedule: how many items are due now and
     how many fall due over the next ``days`` — so the dashboard can say 'N fade by Friday'."""
     try:
+        pred, binds = review_scope(doc)
         with db() as conn:
             rows = conn.execute(
                 "SELECT extract(epoch from due)::float8 AS due FROM concept_reviews "
-                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
-                {"doc": doc},
+                f"WHERE {pred}",
+                binds,
             ).fetchall()
     except Exception as exc:  # noqa: BLE001
         return {"dueNow": 0, "horizon": [], "tracked": 0, "error": str(exc)}
@@ -203,19 +205,25 @@ def compute_forecast(doc: str | None = None, days: int = 7) -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 # Review-row fields srs.retrievability needs, in the state-dict shape srs speaks.
-_RETENTION_SELECT = (
+_RETENTION_COLS = (
     'SELECT key, state, stability, difficulty, step, interval, ease, '
     'extract(epoch from due)::float8 AS due, '
     'extract(epoch from last_review)::float8 AS "lastReview" '
-    "FROM concept_reviews WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s"
+    "FROM concept_reviews WHERE "
 )
+
+
+def _retention_query(doc: str | None) -> tuple[str, dict]:
+    """The retention read, scoped so a re-cut version inherits the memory it earned."""
+    pred, binds = review_scope(doc)
+    return _RETENTION_COLS + pred, binds
 
 
 def _retention_by_key(doc: str | None, now: float) -> dict[str, float]:
     """concept key → modelled recall probability right now (reviewed items only)."""
     try:
         with db() as conn:
-            rows = conn.execute(_RETENTION_SELECT, {"doc": doc}).fetchall()
+            rows = conn.execute(*_retention_query(doc)).fetchall()
     except Exception:
         return {}
     out: dict[str, float] = {}
@@ -230,13 +238,20 @@ def _concepts_by_section(doc: str | None) -> dict[str, list[str]]:
     """sectionKey → its concept keys (one query — the coverage denominators)."""
     try:
         with db() as conn:
+            # Coverage is per VERSION: the book's concepts for the sections this version
+            # draws from, re-keyed onto the version's own outline below.
+            pred, binds = concept_filter(doc)
             rows = conn.execute(
-                "SELECT section_key AS sk, key FROM ext_concepts "
-                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
-                {"doc": doc},
+                f"SELECT section_key AS sk, key FROM ext_concepts WHERE {pred}", binds
             ).fetchall()
     except Exception:
         return {}
+    by_source = version_sections_by_source(doc) if doc else {}
+    rows = [
+        {"sk": vk, "key": r["key"]}
+        for r in rows
+        for vk in (by_source.get(r["sk"], [r["sk"]]) if r.get("sk") else [])
+    ]
     out: dict[str, list[str]] = {}
     for r in rows:
         if r.get("sk"):
@@ -356,13 +371,14 @@ def compute_concept_mastery(now: float | None = None, doc: str | None = None) ->
     now = time.time() if now is None else now
     try:
         with db() as conn:
+            _pred, _binds = concept_filter(doc)
             concepts = conn.execute(
                 'SELECT key, name, section_key AS "sectionKey" FROM ext_concepts '
-                "WHERE %(doc)s::text IS NULL OR doc_id = %(doc)s",
-                {"doc": doc},
+                f"WHERE {_pred}",
+                _binds,
             ).fetchall()
             reviews: dict[str, dict[str, Any]] = {}
-            for r in conn.execute(_RETENTION_SELECT, {"doc": doc}).fetchall():
+            for r in conn.execute(*_retention_query(doc)).fetchall():
                 reviews[r["key"]] = dict(r)
         events = _fetch_events(doc, graded_only=True)
     except Exception as exc:  # noqa: BLE001 — soft error, never 500

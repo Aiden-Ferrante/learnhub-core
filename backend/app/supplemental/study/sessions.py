@@ -108,7 +108,8 @@ def fetch_sessions(doc: str | None = None, days: int = 90) -> dict[str, Any]:
             ).fetchall()
             titles = {
                 r["k"]: r["t"]
-                for r in conn.execute("SELECT key AS k, title AS t FROM raw_documents").fetchall()
+                for r in conn.execute("SELECT d.key AS k, s.title AS t FROM raw_documents d "
+                                      "JOIN sources s ON s.key = d.source_id").fetchall()
             }
         manual = fetch_manual_rows(doc, since)
     except Exception as exc:  # noqa: BLE001 — soft error, never 500

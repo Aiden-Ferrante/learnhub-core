@@ -12,7 +12,7 @@ import re
 import shutil
 from pathlib import Path
 
-from app.process.content.documents import fetch_latest_document
+from app.process.content.documents import fetch_latest_document, source_id_of
 from app.process.content.scope import is_ancestor_section_key
 from app.process.content.sections import SectionBlock
 from app.gateways import db
@@ -190,8 +190,9 @@ def fetch_elements(
 
 def figure_path(doc_id: str, order: int) -> Path | None:
     """Absolute path to a figure PNG for the ``/api/figure`` route, or None if it's missing.
+    Figures are written once per book, so a version resolves to its source before looking.
     Guards against path traversal (``doc_id`` is a UUID, ``order`` an int)."""
     shared = os.environ.get("SHARED_DIR", "/shared")
-    safe_doc = re.sub(r"[^A-Za-z0-9_-]", "", doc_id or "")
+    safe_doc = re.sub(r"[^A-Za-z0-9_-]", "", source_id_of(doc_id) or "")
     p = Path(shared) / "figures" / safe_doc / f"e{int(order)}.png"
     return p if p.is_file() else None
