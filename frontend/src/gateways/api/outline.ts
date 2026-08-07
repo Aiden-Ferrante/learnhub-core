@@ -228,3 +228,34 @@ export function flattenChapterOutline(
   return out
 }
 
+
+/** Build the nested tree from a flat outline (ordered rows carrying a depth).
+ *
+ * The outline is stored and edited flat; everything that reasons about structure —
+ * numbering above all — wants it nested. This is the bridge, and it exists so the outline
+ * editor can show the numbers the syllabus will actually render, live, as rows move.
+ * Rows with no sectionKey are sections not yet saved; they get a placeholder id so the
+ * numbering pass can still see them in place.
+ */
+export function treeFromFlatOutline(
+  rows: { sectionKey?: string; title: string; depth: number }[],
+): LearnTreeNode[] {
+  const roots: LearnTreeNode[] = []
+  const stack: { depth: number; node: LearnTreeNode }[] = []
+  rows.forEach((r, i) => {
+    const key = r.sectionKey ?? `pending-${i}`
+    const node: LearnTreeNode = {
+      id: key,
+      label: key,
+      title: r.title,
+      sectionKey: r.sectionKey ?? null,
+      isSection: true,
+      children: [],
+    }
+    while (stack.length && stack[stack.length - 1].depth >= r.depth) stack.pop()
+    if (stack.length) stack[stack.length - 1].node.children.push(node)
+    else roots.push(node)
+    stack.push({ depth: r.depth, node })
+  })
+  return roots
+}

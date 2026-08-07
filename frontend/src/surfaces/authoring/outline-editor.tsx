@@ -16,7 +16,7 @@
  * That is the difference between distilling and losing things.
  */
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,6 +29,10 @@ import {
 import { Button } from "@/kit/ui/button"
 import { Input } from "@/kit/ui/input"
 import { Skeleton } from "@/kit/ui/skeleton"
+import {
+  numberSections,
+  treeFromFlatOutline,
+} from "@/gateways/api/outline"
 import {
   fetchUnplacedBlocks,
   moveBlocks,
@@ -55,6 +59,13 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
   const [error, setError] = useState<string | null>(null)
   const [unplaced, setUnplaced] = useState<UnplacedBlock[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  // The numbers the syllabus will actually show, recomputed as rows move — so a chapter
+  // you drag to the top reads "1" here before you save, not after you go and look.
+  const numbers = useMemo(
+    () => numberSections(treeFromFlatOutline(rows)),
+    [rows],
+  )
 
   useEffect(() => {
     if (!dirty) setRows(initial)
@@ -172,6 +183,9 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
             className="flex items-center gap-1 border-b px-2 py-1 last:border-b-0"
             style={{ paddingLeft: `${8 + r.depth * 18}px` }}
           >
+            <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground/70">
+              {numbers.get(r.sectionKey ?? `pending-${i}`) ?? ""}
+            </span>
             <Input
               value={r.title}
               onChange={(e) => {

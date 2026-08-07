@@ -9,6 +9,10 @@ export { ChapterReader } from "@/surfaces/reading/chapter-reader"
 export { GuidedReading } from "@/surfaces/reading/guided-reading"
 export { PdfBookView } from "@/surfaces/reading/pdf-book-view"
 export { ReadingThemeToggle } from "@/surfaces/reading/reading-theme-toggle"
-export { MathText } from "@/surfaces/reading/markdown-reader"
+export { MathText, MarkdownReader } from "@/surfaces/reading/markdown-reader"
+// The reading theme + prose prefs travel with the renderer: anything that wants to show
+// text the way the learner will actually read it needs all three, or it is a lookalike.
+export { useReadingTheme, type ReadingTheme } from "@/surfaces/reading/use-reading-theme"
+export { useReadingPrefs, type ReadingPrefs } from "@/surfaces/reading/use-reading-prefs"
 export { SectionFigures } from "@/surfaces/reading/section-figures"
 export { fetchReadingProgress, saveReadingPosition, type ReadingProgress } from "@/surfaces/reading/reading-progress"
