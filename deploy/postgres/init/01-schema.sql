@@ -138,7 +138,8 @@ CREATE TABLE raw_content (
   markdown     text,
   char_count   int,
   page_start   int,
-  page_end     int);
+  page_end     int,
+  edited_at    timestamptz);   -- book-level edit; NULL = untouched since conversion
 CREATE INDEX ON raw_content (doc_id, "order");
 CREATE INDEX ON raw_content (doc_id, section_key);
 
@@ -147,11 +148,16 @@ CREATE INDEX ON raw_content (doc_id, section_key);
 -- A Default version holds one row per block of its source, seeded at convert to
 -- reproduce the book's own structure — so the default reading experience is the general
 -- mechanism applied to the trivial case, not a separate code path.
+-- markdown_override is copy-on-write: this course's own wording for a block it keeps.
+-- NULL = read the book's text, so a later fix to the book flows through; non-NULL wins and
+-- survives that fix. Editing the BOOK instead writes raw_content and reaches every version.
 CREATE TABLE version_blocks (
   version_id   text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
   content_key  text NOT NULL REFERENCES raw_content(key)   ON DELETE CASCADE,
   structure_id text REFERENCES raw_structure(id) ON DELETE SET NULL,  -- the section in THIS version
   "order"      int  NOT NULL,
+  markdown_override text,
+  edited_at    timestamptz,
   PRIMARY KEY (version_id, content_key));
 CREATE INDEX ON version_blocks (version_id, "order");
 CREATE INDEX ON version_blocks (structure_id);

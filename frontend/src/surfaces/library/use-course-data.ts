@@ -21,14 +21,14 @@ import { useDocuments } from "@/surfaces/processing"
 export function useCourseData(courseId: string) {
   const { documents, isInitialized } = useDocuments()
 
-  const course = useMemo<Course | null>(() => {
+  const card = useMemo<Course | null>(() => {
     const doc = documents.find((d) => d.id === courseId)
     return doc ? courseFromDocument(doc) : null
   }, [documents, courseId])
 
-  const isLive = course ? isCourseReady(course) : false
+  const isLive = card ? isCourseReady(card) : false
   // The card points at the BOOK; the course you actually study is one version of it.
-  const bookKey = course ? (course.learnDocId ?? course.id) : undefined
+  const bookKey = card ? (card.learnDocId ?? card.id) : undefined
 
   const [versions, setVersions] = useState<CourseVersion[]>([])
 
@@ -54,6 +54,16 @@ export function useCourseData(courseId: string) {
     [versions],
   )
   const docKey = activeVersion?.docId ?? bookKey
+
+  // The course handed to every surface carries the ACTIVE VERSION as its learnDocId. That
+  // is the whole propagation: the reader, concepts, the heatmap, the audiobook and skeleton
+  // practice all read `course.learnDocId`, so overriding it here is what makes them follow a
+  // switch — rather than teaching each one about versions and missing some. `bookKey` stays
+  // available for the few things that are genuinely about the book, like the version list.
+  const course = useMemo<Course | null>(
+    () => (card ? { ...card, learnDocId: docKey ?? card.learnDocId } : null),
+    [card, docKey],
+  )
 
   const [tree, setTree] = useState<LearnTreeNode[]>([])
   const [sectionCount, setSectionCount] = useState(0)

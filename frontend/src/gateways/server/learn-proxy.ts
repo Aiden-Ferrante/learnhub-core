@@ -80,16 +80,24 @@ export async function proxyLearnPost(
 export async function proxyLearnPatch(
   upstreamPath: string,
   searchParams?: URLSearchParams,
+  req?: Request,
 ): Promise<NextResponse> {
   try {
     const base = getLearnServiceBaseUrl()
     const qs = searchParams?.toString()
+    // PATCH carries a body where the payload is too big for a query string — material
+    // edits send whole sections of markdown. Forward it when there is one.
+    const body = req ? await req.text() : ''
     const upstream = await fetch(`${base}${upstreamPath}${qs ? `?${qs}` : ''}`, {
       method: 'PATCH',
-      headers: { 'X-User-Db': await getUserDbName() },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Db': await getUserDbName(),
+      },
+      ...(body ? { body } : {}),
     })
-    const body = await upstream.json().catch(() => ({}))
-    return NextResponse.json(body, { status: upstream.status })
+    const data = await upstream.json().catch(() => ({}))
+    return NextResponse.json(data, { status: upstream.status })
   } catch (error) {
     console.error(`learn proxy PATCH ${upstreamPath}:`, error)
     const message = error instanceof Error ? error.message : 'Unknown error'

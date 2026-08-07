@@ -9,6 +9,7 @@ import {
   Flame,
   GraduationCap,
   ListTree,
+  PencilLine,
   RotateCcw,
   Search,
   Sparkles,
@@ -42,6 +43,8 @@ type CourseHomeProps = {
   onViewConcepts: () => void
   /** Course-level structure drill (chapters → sections → concepts). */
   onSkeletonPractice?: () => void
+  /** Edit the words this course is built from. */
+  onEditMaterial?: () => void
   /** The courses cut from this book, and which one is open. Omitted = no picker. */
   bookKey?: string
   versions?: CourseVersion[]
@@ -114,6 +117,7 @@ export function CourseHome({
   onDeepRead,
   onViewConcepts,
   onSkeletonPractice,
+  onEditMaterial,
   bookKey,
   versions,
   activeVersion,
@@ -446,6 +450,18 @@ export function CourseHome({
                 >
                   <ListTree className="h-3.5 w-3.5" />
                   Skeleton practice
+                </Button>
+              )}
+              {onEditMaterial && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={onEditMaterial}
+                >
+                  <PencilLine className="h-3.5 w-3.5" />
+                  Edit material
                 </Button>
               )}
             </div>

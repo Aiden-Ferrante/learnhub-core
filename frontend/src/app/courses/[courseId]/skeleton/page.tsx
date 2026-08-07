@@ -21,7 +21,7 @@ export default function SkeletonPracticePage({
     <main className="mx-auto w-full px-4 pb-3 pt-3">
       <SkeletonPractice
         courseTitle={cleanCourseTitle(data.course.title).title}
-        docId={data.course.learnDocId ?? data.course.id}
+        docId={data.docKey ?? data.course.id}
         tree={data.tree}
         loading={data.loading}
         onBack={() => router.push(`/courses/${courseId}`)}

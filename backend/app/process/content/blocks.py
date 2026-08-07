@@ -41,12 +41,24 @@ _FROM = (
 # Placement first, the block's own key as the fallback for unplaced/finer-grained blocks.
 _SECTION_KEY = 'COALESCE(vs.section_key, c.section_key)'
 
+# Copy-on-write: this course's own wording wins, the book's text is the fallback. A version
+# with no override reads the book, so a later fix to the book flows straight through.
+_MARKDOWN = "COALESCE(vb.markdown_override, c.markdown)"
+# When this block's material last changed FOR THIS VERSION — its own rewrite if it has one,
+# else the book's edit. Compared against ext_concepts.created_at to derive staleness.
+_EDITED_AT = "COALESCE(vb.edited_at, c.edited_at)"
+
 _LEAN = (
     f'{_SECTION_KEY} AS "sectionKey", c.section_key AS "sourceSectionKey", '
     'vb."order" AS "order", c.heading, c.level, '
-    'c.page_start AS "pageStart", c.page_end AS "pageEnd"'
+    'c.page_start AS "pageStart", c.page_end AS "pageEnd", '
+    '(vb.markdown_override IS NOT NULL) AS "isRewritten"'
 )
-_FULL = f'c.key AS "_key", {_LEAN}, c.markdown, c.char_count AS "charCount"'
+_FULL = (
+    f'c.key AS "_key", {_LEAN}, {_MARKDOWN} AS markdown, '
+    f'length({_MARKDOWN}) AS "charCount", '
+    f'extract(epoch from {_EDITED_AT})::float8 AS "editedAt"'
+)
 
 
 def block_columns(*, markdown: bool = False) -> str:

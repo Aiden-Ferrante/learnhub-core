@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.process.content import (
@@ -19,6 +19,7 @@ from app.process.content import (
     create_version,
     delete_document,
     delete_version,
+    edit_block,
     fetch_chapter,
     fetch_elements,
     fetch_latest_document,
@@ -31,8 +32,11 @@ from app.process.content import (
     list_versions,
     rename_version,
     resolve_doc_id,
+    revert_block,
+    section_material,
     set_main_version,
     source_id_of,
+    stale_sections,
 )
 from app.process.extraction import concept_counts_by_doc
 
@@ -219,5 +223,55 @@ def api_delete_version(doc: str = Query(...)) -> JSONResponse:
     try:
         data = delete_version(doc)
         return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+# ── editing the material ───────────────────────────────────────────────────
+# Blocks keep their key through an edit — see process/content/editing.py for why
+# re-splitting the document on save would destroy every version's material.
+
+
+@router.get("/api/section/material")
+def api_section_material(doc: str = Query(...), scope: str = Query("")) -> JSONResponse:
+    """This course's editable blocks for a section — each with the key an edit addresses,
+    its own markdown, and whether this course has already rewritten it."""
+    try:
+        return JSONResponse(section_material(doc, scope))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.patch("/api/section/material")
+def api_edit_material(
+    doc: str = Query(...),
+    block: str = Query(..., description="raw_content key of the block being edited"),
+    target: str = Query("version", pattern="^(book|version)$"),
+    body: dict = Body(...),
+) -> JSONResponse:
+    """Rewrite one block. ``target=book`` fixes the source for every course cut from it;
+    ``target=version`` stores this course's own wording (copy-on-write)."""
+    try:
+        data = edit_block(doc, block, body.get("markdown") or "", target)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.delete("/api/section/material")
+def api_revert_material(doc: str = Query(...), block: str = Query(...)) -> JSONResponse:
+    """Drop this course's rewrite of a block and read the book's text again."""
+    try:
+        return JSONResponse(revert_block(doc, block))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.get("/api/material/stale")
+def api_stale_sections(doc: str = Query(...)) -> JSONResponse:
+    """Sections whose material changed after their concepts were built — the rebuild cue.
+    Derived from timestamps, so a rebuild clears it without anything resetting a flag."""
+    try:
+        return JSONResponse(stale_sections(doc))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

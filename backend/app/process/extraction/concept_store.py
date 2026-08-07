@@ -230,14 +230,38 @@ def delete_concept(key: str) -> dict:
 
 
 def concept_counts_by_doc() -> dict[str, int]:
-    """Concept count per document — decorates the course list."""
+    """Concept count per COURSE VERSION — decorates the course list.
+
+    Keyed by version, not by book, because the shelf shows each book's main version and
+    that may be a custom cut. Counting by ``ext_concepts.doc_id`` would key the answer by
+    the book and miss every custom version, which reads on the shelf as "0 concepts" for a
+    course that in fact inherits all of them.
+
+    Each version counts the concepts its own material carries, so a distilled cut honestly
+    shows fewer. A version with no material mapping falls back to its book's raw count —
+    the same "absent information is not emptiness" rule ``concept_filter`` applies.
+    """
     with db() as conn:
-        return {
+        mapped = {
             r["docId"]: r["n"]
             for r in conn.execute(
-                'SELECT doc_id AS "docId", count(*) AS n FROM ext_concepts GROUP BY doc_id'
+                'SELECT vb.version_id AS "docId", count(DISTINCT ec.key) AS n '
+                "FROM version_blocks vb "
+                "JOIN raw_content c ON c.key = vb.content_key "
+                "JOIN ext_concepts ec ON ec.doc_id = c.doc_id AND ec.section_key = c.section_key "
+                "GROUP BY 1"
             ).fetchall()
         }
+        unmapped = {
+            r["docId"]: r["n"]
+            for r in conn.execute(
+                'SELECT d.key AS "docId", count(ec.key) AS n '
+                "FROM raw_documents d JOIN ext_concepts ec ON ec.doc_id = d.source_id "
+                "WHERE NOT EXISTS (SELECT 1 FROM version_blocks vb WHERE vb.version_id = d.key) "
+                "GROUP BY 1"
+            ).fetchall()
+        }
+    return {**unmapped, **mapped}
 
 
 def section_concept_rows(doc_id: str) -> list[dict]:

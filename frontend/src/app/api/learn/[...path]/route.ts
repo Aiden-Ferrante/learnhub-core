@@ -46,5 +46,5 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { path } = await params
-  return proxyLearnPatch(upstreamPath(path), req.nextUrl.searchParams)
+  return proxyLearnPatch(upstreamPath(path), req.nextUrl.searchParams, req)
 }
