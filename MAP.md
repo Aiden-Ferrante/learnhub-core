@@ -155,6 +155,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`blocks.py`](backend/app/process/content/blocks.py) | _(describe me)_ |
 | [`versions.py`](backend/app/process/content/versions.py) | _(describe me)_ |
 | [`editing.py`](backend/app/process/content/editing.py) | _(describe me)_ |
+| [`outline_edit.py`](backend/app/process/content/outline_edit.py) | _(describe me)_ |
 
 ### process/extraction/ — LLM generation passes
 
