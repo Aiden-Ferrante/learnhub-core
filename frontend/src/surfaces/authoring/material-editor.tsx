@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, Loader2, RotateCcw, TriangleAlert } from "lucide-react"
+import { Loader2, RotateCcw, TriangleAlert } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { displaySectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
@@ -30,23 +30,13 @@ import {
 } from "@/gateways/api/editing"
 
 type MaterialEditorProps = {
-  courseTitle: string
-  versionName: string
   /** The ACTIVE version — edits with target 'version' land here. */
   docId: string
   tree: LearnTreeNode[]
   loading: boolean
-  onBack: () => void
 }
 
-export function MaterialEditor({
-  courseTitle,
-  versionName,
-  docId,
-  tree,
-  loading,
-  onBack,
-}: MaterialEditorProps) {
+export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
   const chapters = useMemo(() => tree.filter((n) => n.sectionKey), [tree])
   const [scope, setScope] = useState<string | null>(null)
   const [blocks, setBlocks] = useState<MaterialBlock[]>([])
@@ -113,17 +103,6 @@ export function MaterialEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-medium">{courseTitle}</h1>
-          <p className="text-xs text-muted-foreground">Editing material · {versionName}</p>
-        </div>
-      </div>
-
       {error && (
         <p className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}

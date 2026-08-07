@@ -20,6 +20,7 @@ from app.process.content import (
     delete_document,
     delete_version,
     edit_block,
+    move_blocks,
     fetch_chapter,
     fetch_elements,
     fetch_latest_document,
@@ -32,11 +33,14 @@ from app.process.content import (
     list_versions,
     rename_version,
     resolve_doc_id,
+    remove_blocks,
     revert_block,
+    save_outline,
     section_material,
     set_main_version,
     source_id_of,
     stale_sections,
+    unplaced_blocks,
 )
 from app.process.extraction import concept_counts_by_doc
 
@@ -273,5 +277,55 @@ def api_stale_sections(doc: str = Query(...)) -> JSONResponse:
     Derived from timestamps, so a rebuild clears it without anything resetting a flag."""
     try:
         return JSONResponse(stale_sections(doc))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+# ── editing a course's outline ─────────────────────────────────────────────
+# Saves are whole-outline and reconcile in place: a node's id encodes its section key and
+# version_blocks points at it, so delete-and-recreate would unplace every block on a reorder.
+
+
+@router.post("/api/outline")
+def api_save_outline(doc: str = Query(...), body: dict = Body(...)) -> JSONResponse:
+    """Reconcile this course's outline to the sections given — an ordered flat list of
+    ``{sectionKey?, title, depth}``. A section with no key is new. Removing sections is
+    refused on the Default course (409): concepts anchor to its tree."""
+    try:
+        data = save_outline(doc, body.get("sections") or [])
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.patch("/api/version/blocks")
+def api_move_blocks(
+    doc: str = Query(...), section: str = Query(...), body: dict = Body(...)
+) -> JSONResponse:
+    """File the given blocks under a different section of this course."""
+    try:
+        data = move_blocks(doc, body.get("blocks") or [], section)
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.post("/api/version/blocks/remove")
+def api_remove_blocks(doc: str = Query(...), body: dict = Body(...)) -> JSONResponse:
+    """Drop material from THIS course — distilling. The book and other courses keep it.
+    POST rather than DELETE because the block list is a body, not a query string."""
+    try:
+        data = remove_blocks(doc, body.get("blocks") or [])
+        return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
+@router.get("/api/version/unplaced")
+def api_unplaced_blocks(doc: str = Query(...)) -> JSONResponse:
+    """Material this course keeps but files under no section — so a delete never makes
+    content vanish silently, it just leaves it unplaced."""
+    try:
+        return JSONResponse(unplaced_blocks(doc))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

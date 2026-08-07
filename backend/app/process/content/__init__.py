@@ -14,7 +14,8 @@ resolution — what's inside chapter X — and extraction-ready block loading (s
 markdown→section splitting (sections), page-range assignment (pages), the canonical
 bookmark outline (outline), the staged TOC routing loop with its decision log
 (toc_controller), figures/tables (elements), the syllabus tree (toc_tree),
-chapter units + whole-chapter pulls (chapters), material editing — the book's text or
+chapter units + whole-chapter pulls (chapters), outline editing — reshaping a course's chapters and what sits in each
+(outline_edit) — material editing — the book's text or
 one course's copy-on-write rewrite of it, plus derived staleness (editing) — the version
 lifecycle —
 create-from-Default / rename / set-main / delete (versions) — keyword search (find), and
@@ -30,6 +31,12 @@ from app.process.content.blocks import (
     version_sections_by_source,
 )
 from app.process.content.chapters import chapter_key_of, chapter_units, fetch_chapter
+from app.process.content.outline_edit import (
+    move_blocks,
+    remove_blocks,
+    save_outline,
+    unplaced_blocks,
+)
 from app.process.content.editing import edit_block, revert_block, section_material, stale_sections
 from app.process.content.documents import (
     create_stub,
@@ -61,6 +68,10 @@ from app.process.content.versions import (
 )
 
 __all__ = [
+    "unplaced_blocks",
+    "save_outline",
+    "remove_blocks",
+    "move_blocks",
     "section_material",
     "stale_sections",
     "revert_block",
