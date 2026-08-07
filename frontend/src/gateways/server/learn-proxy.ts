@@ -76,3 +76,23 @@ export async function proxyLearnPost(
     return NextResponse.json({ error: `Learn service unavailable: ${message}` }, { status: 503 })
   }
 }
+
+export async function proxyLearnPatch(
+  upstreamPath: string,
+  searchParams?: URLSearchParams,
+): Promise<NextResponse> {
+  try {
+    const base = getLearnServiceBaseUrl()
+    const qs = searchParams?.toString()
+    const upstream = await fetch(`${base}${upstreamPath}${qs ? `?${qs}` : ''}`, {
+      method: 'PATCH',
+      headers: { 'X-User-Db': await getUserDbName() },
+    })
+    const body = await upstream.json().catch(() => ({}))
+    return NextResponse.json(body, { status: upstream.status })
+  } catch (error) {
+    console.error(`learn proxy PATCH ${upstreamPath}:`, error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: `Learn service unavailable: ${message}` }, { status: 503 })
+  }
+}

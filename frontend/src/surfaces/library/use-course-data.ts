@@ -15,6 +15,7 @@ import {
   type ReadingProgress,
 } from "@/surfaces/reading"
 import { courseFromDocument, isCourseReady, type Course } from "@/surfaces/library/courses"
+import { fetchVersions, type CourseVersion } from "@/gateways/api/versions"
 import { useDocuments } from "@/surfaces/processing"
 
 export function useCourseData(courseId: string) {
@@ -26,8 +27,33 @@ export function useCourseData(courseId: string) {
   }, [documents, courseId])
 
   const isLive = course ? isCourseReady(course) : false
-  // Syllabus, mastery, and reviews are all keyed by learnDocId.
-  const docKey = course ? (course.learnDocId ?? course.id) : undefined
+  // The card points at the BOOK; the course you actually study is one version of it.
+  const bookKey = course ? (course.learnDocId ?? course.id) : undefined
+
+  const [versions, setVersions] = useState<CourseVersion[]>([])
+
+  const loadVersions = useCallback(async (doc: string) => {
+    try {
+      const data = await fetchVersions(doc)
+      setVersions(data.error ? [] : data.versions)
+    } catch {
+      // A book with no version list still reads through its own key — see docKey.
+      setVersions([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isLive && bookKey) loadVersions(bookKey)
+  }, [isLive, bookKey, loadVersions])
+
+  // Syllabus, mastery and reviews are keyed by the ACTIVE version — the book's main one.
+  // Falling back to bookKey keeps a course readable if the version list fails or hasn't
+  // arrived yet, which is also what makes this safe for books ingested before versions.
+  const activeVersion = useMemo(
+    () => versions.find((v) => v.isMain) ?? null,
+    [versions],
+  )
+  const docKey = activeVersion?.docId ?? bookKey
 
   const [tree, setTree] = useState<LearnTreeNode[]>([])
   const [sectionCount, setSectionCount] = useState(0)
@@ -112,6 +138,12 @@ export function useCourseData(courseId: string) {
     loadDue(docKey)
   }, [docKey, loadTree, loadMastery, loadDue])
 
+  /** Re-read the version set after creating, switching, renaming or deleting one. A
+   *  changed main flips docKey, and the load effect above pulls the new course in. */
+  const refreshVersions = useCallback(() => {
+    if (bookKey) loadVersions(bookKey)
+  }, [bookKey, loadVersions])
+
   const continueSectionKey = readingProgress[courseId]
   const continueNode = continueSectionKey ? findNodeBySectionKey(tree, continueSectionKey) : null
 
@@ -120,6 +152,10 @@ export function useCourseData(courseId: string) {
     isInitialized,
     isLive,
     docKey,
+    bookKey,
+    versions,
+    activeVersion,
+    refreshVersions,
     tree: isLive ? tree : [],
     sectionCount: isLive ? sectionCount : 0,
     loading: isLive ? loading : false,

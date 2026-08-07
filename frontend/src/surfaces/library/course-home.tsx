@@ -16,6 +16,7 @@ import {
 import { SyllabusTree } from "@/surfaces/library/syllabus-tree"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import { ChapterStateStrip } from "@/surfaces/library/chapter-state-strip"
+import { VersionMenu } from "@/surfaces/library/version-menu"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
@@ -25,6 +26,7 @@ import { StatTile } from "@/kit/patterns/stat-tile"
 import { fetchCourseStatus, type CoursePipelineStatus } from "@/gateways/api/pipeline"
 import { type FadingSection, type MasteryResponse, type SectionMemory } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library/courses"
+import type { CourseVersion } from "@/gateways/api/versions"
 
 type CourseHomeProps = {
   course: Course
@@ -40,6 +42,11 @@ type CourseHomeProps = {
   onViewConcepts: () => void
   /** Course-level structure drill (chapters → sections → concepts). */
   onSkeletonPractice?: () => void
+  /** The courses cut from this book, and which one is open. Omitted = no picker. */
+  bookKey?: string
+  versions?: CourseVersion[]
+  activeVersion?: CourseVersion | null
+  onVersionsChanged?: () => void
   /** Open one concept's detail (clicked as a leaf in the course outline). */
   onOpenConcept?: (conceptKey: string) => void
   onBackToShelf: () => void
@@ -107,6 +114,10 @@ export function CourseHome({
   onDeepRead,
   onViewConcepts,
   onSkeletonPractice,
+  bookKey,
+  versions,
+  activeVersion,
+  onVersionsChanged,
   onOpenConcept,
   onBackToShelf,
   continueNode,
@@ -392,6 +403,14 @@ export function CourseHome({
                 <BookOpen className="h-3.5 w-3.5" />
                 Read the book
               </Button>
+              {bookKey && versions && onVersionsChanged && (
+                <VersionMenu
+                  bookKey={bookKey}
+                  versions={versions}
+                  activeVersion={activeVersion ?? null}
+                  onChanged={onVersionsChanged}
+                />
+              )}
               {onDeepRead && (
                 <Button
                   type="button"
