@@ -5,6 +5,87 @@ All notable changes to Learn Hub are documented here. Format follows
 P→B→T→R cycle (see the vault's Development Protocol) — the tag is the transaction
 commit.
 
+## [Unreleased]
+
+One arc: a textbook's own table of contents is not always the best course, so a
+book can now carry several of your own — each with its own outline, its own cut
+of the material, and its own progress.
+
+### Added
+- **Custom course versions** — several named courses over one book, with the
+  TOC-derived default still available. Material is **shared, never copied**, so
+  distilling a course deletes mapping rows rather than text and the book keeps
+  every word. Concepts are **inherited, not re-extracted**: a re-cut course sees
+  the concepts of whatever source sections its material came from, with no
+  extraction run to pay for. Tracking splits the way the three-question model
+  already did — coverage per version, retention per book — so a concept you have
+  learned stays learned however you re-cut the outline, while skeleton drills
+  quiz the outline in front of you.
+- **Version switcher** in the course toolbar — shows which cut of the book you
+  are studying, lists the others, and creates new ones. Picking a version makes
+  it the book's main one; there is deliberately no "viewing but not main" state,
+  so the course you switch to is the course you come back to. Creating a version
+  switches to it.
+- **Material editing** — the words a course teaches from are editable, and every
+  save answers one question: is this a fix to the **book** (writes the shared
+  text, every course cut from it sees the fix — for conversion damage like
+  `Complexity dened`), or **your wording for this course** (copy-on-write, so the
+  book and the other courses keep the original and a later book fix does not
+  overwrite your rewrite). Edits address a block, never a document. Staleness is
+  derived rather than stored — a section is stale when its material was edited
+  after its concepts were built — and a section with no concepts reads as
+  unbuilt, not stale. Rebuilding stays manual, because a chapter pass is minutes
+  of local model time and should not ambush a typo fix.
+- **Outline editing** — which chapters exist, how they nest, what order they run
+  in, and which of the book's blocks sit under each. Deleting a section never
+  deletes its material: the blocks become **unplaced** and surface in their own
+  panel, to be re-filed or dropped from the course deliberately. That is the
+  difference between distilling and losing things. Removing sections is refused
+  on the default course, whose tree is the book's canonical one that every other
+  course's concepts anchor to; renaming, reordering and nesting are safe
+  everywhere. Indent/outdent/up/down rather than drag-and-drop, because
+  restructuring a 150-section book is precision work.
+- **Editing in the reader's own rendering** — material renders through the
+  reader's own component, theme and prose settings, with an Edit handle on each
+  block. The page is not a preview of the course; it is the course, with
+  handles. The outline editor shows the numbers the syllabus will actually
+  render, live, as rows move.
+
+### Changed
+- `raw_documents` used to mean both the book and the course. Those split:
+  `sources` is the book, `raw_documents` is a course **version** over it, and a
+  new mapping table records which of the book's blocks a version keeps and where.
+  Both migrations are identity backfills — no row moved and no id changed.
+- Every block read goes through one module, because a bare query against the
+  book's content now reads the whole book and ignores a version's cut.
+- `raw_content.structure_id` is gone: with content owned by the book, a foreign
+  key into one version's tree meant rebuilding that tree would cascade-delete the
+  book's text.
+
+### Fixed
+- The version switch only half-propagated — the syllabus and mastery followed it
+  while the reader, concepts, heatmap, audiobook and skeleton practice read the
+  card's stored id and stayed on the book. The course hook now returns a course
+  whose document id **is** the active version, so all of them follow from one
+  override instead of fifteen call sites each learning about versions.
+- The shelf reported 0 concepts for any book whose main course is a custom cut:
+  concept counts grouped by the book while the shelf row is the version's id.
+  Counting now runs through the material mapping, so a distilled cut honestly
+  shows fewer.
+- The Next proxy forwarded only GET/POST/DELETE, so renaming a version and
+  setting it as main would have failed; its PATCH helper then forwarded query
+  parameters but not the body, which material edits need.
+
+### Not verified
+- None of the above has been exercised in a browser — `:3001` sits behind a login
+  wall, so every interactive flow (opening the menu, creating, switching,
+  deleting, and both editors) is unexercised. Behaviour was verified against the
+  live database instead, with content snapshots across three books byte-identical
+  before and after.
+- Reading position is keyed to the course card, so it is shared across versions;
+  a shelf card still shows the book's original section count rather than the
+  active version's.
+
 ## [0.14.0] — 2026-07-26
 
 ### Added
