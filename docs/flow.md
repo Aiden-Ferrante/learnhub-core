@@ -10,6 +10,7 @@ from `frontend/src/surfaces/` — never invented.
 
 **They** — open `localhost:3001` and log in.
 **It** — checks the credentials and puts them in their own tenant schema.
+**Code** — `frontend/src/gateways/server/auth.config.ts`, `frontend/src/gateways/server/auth-db.ts`, `frontend/src/app/api/auth/[...nextauth]/route.ts`
 **Breaks when** — the account doesn't exist yet. There is no self-serve signup:
 accounts are rows in `auth.users` (username, password hash, tenant `schema_name`)
 inserted directly against Postgres by hand. For anyone but the author this is where
@@ -19,6 +20,7 @@ the flow stops, and a provisioning command is a known gap.
 
 **They** — go to **Upload** (`/upload`) and drop a textbook in.
 **It** — takes the file, makes it a document, and hands it to processing.
+**Code** — `frontend/src/surfaces/processing/upload-documents.tsx`, `backend/app/process/ingestion/pdf_convert.py`
 **Breaks when** — the PDF is a scan rather than text, or its table of contents is
 malformed. Everything downstream is built on the converted outline, so a bad
 conversion is not recoverable later in the flow — it has to be re-done here.
@@ -30,6 +32,7 @@ conversion is not recoverable later in the flow — it has to be re-done here.
 over a chapter on demand to pull out its concepts. The **machine strip** shows model
 residency and a self-calibrating ETA; the **concept receipt** shows what was actually
 extracted, and lets bad concepts be culled in place before they reach study.
+**Code** — `frontend/src/surfaces/processing/process-dashboard.tsx`, `backend/app/process/content/documents.py`, `backend/app/process/content/chapters.py`, `backend/app/process/extraction/concepts_extract.py`, `backend/app/gateways/llm.py`
 **Breaks when** — you expect the whole book at once. Extraction is per-chapter and
 deliberate: a whole-book pass is hours, and studying chapter 2 shouldn't wait on
 chapter 40. Also `TASK-18`: Process counts build units while the course page renders
@@ -43,6 +46,7 @@ same book looks like two different books on two screens.
 syllabus tree, and read it in the **Chapter Reader** — guided reading, the Path
 strip, Tutor, Listen. Or read it continuously in the **Book Reader** (`/read`).
 **It** — renders the converted text with the concept layer available alongside.
+**Code** — `frontend/src/surfaces/reading/chapter-reader.tsx`, `frontend/src/surfaces/reading/book-reader.tsx`, `frontend/src/surfaces/library/course-home.tsx`, `backend/app/process/content/toc_tree.py`
 **Breaks when** — the chapter was never built. A section with no extraction is not
 broken, it is unbuilt, and those read differently: unbuilt means go to Process,
 stale means the material changed after its concepts were made.
@@ -53,6 +57,7 @@ stale means the material changed after its concepts were made.
 activities: **skeleton recall** — reconstruct the chapter's shape — and **concept
 recall** — do you know the ideas inside it.
 **It** — grades each item and schedules it with FSRS.
+**Code** — `frontend/src/surfaces/studying/review-panel.tsx`, `frontend/src/surfaces/studying/chapter-walk.tsx`, `backend/app/process/extraction/skeleton.py`, `backend/app/supplemental/study/srs.py`, `backend/app/supplemental/study/mastery.py`
 **Breaks when** — you read without grading anything. Mastery is computed from
 concepts and reviews only, and the docstring on `compute_mastery` says so on
 purpose: retention already encodes time and outcomes through FSRS. So reading moves
@@ -64,6 +69,7 @@ system counts. Grading is.**
 **They** — open **Study** (`/study`) and work the queue.
 **It** — pools every course: what is due now, a 60-day review calendar, a year-long
 activity heatmap, and session history clustered from gaps rather than stored.
+**Code** — `frontend/src/surfaces/studying/study-planner.tsx`, `backend/app/supplemental/study/calendar.py`, `backend/app/supplemental/study/reviews.py`, `backend/app/supplemental/study/sessions.py`
 **Breaks when** — nothing is due, and it is not obvious whether that means caught up
 or never started. An empty queue and an empty database look the same from here.
 
