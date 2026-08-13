@@ -24,6 +24,7 @@ const FLEET_APPS = [
   { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
   { id: "vault-dashboard", label: "Vault", port: 8989, blurb: "daily notes, habits, health" },
   { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads" },
+  { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
 ] as const
 
 const ME = "learnhub"
