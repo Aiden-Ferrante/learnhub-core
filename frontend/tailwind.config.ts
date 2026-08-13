@@ -1,7 +1,9 @@
 import type { Config } from "tailwindcss"
 
 const config: Config = {
-  darkMode: ["class"],
+  // Follow the OS, as shipyard does. Was ["class"] with no class ever set on
+  // <html>, which left every `dark:` utility permanently inactive.
+  darkMode: "media",
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}",

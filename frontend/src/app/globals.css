@@ -5,10 +5,16 @@
 /* Inter typography patterns (Channel brand) */
 
 :root {
-  /* Off-white, not pure white — calmer reading contrast (premium-tool restraint). */
-  --foreground-rgb: 230, 233, 237;
-  /* GitHub-dark canvas (#0d1117) — matches the Channel brand. */
-  --background-rgb: 13, 17, 23;
+  color-scheme: light dark;
+  --foreground-rgb: 24, 24, 27;    /* zinc-900 */
+  --background-rgb: 250, 250, 250; /* zinc-50  */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 244, 244, 245; /* zinc-100 */
+    --background-rgb: 9, 9, 11;      /* zinc-950 */
+  }
 }
 
 body {
@@ -63,47 +69,55 @@ body {
   }
 }
 
+/* Palette ported from shipyard so the fleet reads as one system: Tailwind zinc
+   neutrals for ground and surface, shipyard's oklch semantics converted to the
+   hsl triplets shadcn expects. Values only — the token names, the triplet
+   convention and Tailwind v3 are all unchanged.
+
+   Light is now the base and dark is a media override, inverting the old
+   dark-first order. The previous `.light` class was dead: `darkMode: ["class"]`
+   with no class ever set on <html> meant light never activated and every
+   `dark:` utility was permanently off. Following the OS is what shipyard does,
+   and it makes both halves of this file reachable. */
 @layer base {
   :root {
-    /* GitHub-dark canvas #0d1117 (Channel brand) */
-    --background: 216 28% 7%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 98%;         /* zinc-50  */
+    --foreground: 240 6% 10%;       /* zinc-900 */
 
-    /* Slightly raised surface #161b22 */
-    --card: 215 21% 11%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
 
-    --popover: 216 28% 7%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
 
-    /* Channel accent blue #4da3ff as the brand primary in dark mode */
-    --primary: 211 100% 65%;
-    --primary-foreground: 216 28% 7%;
+    /* shipyard accent oklch(0.65 0.19 250), deepened for contrast on a light ground */
+    --primary: 209 100% 43%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 5% 96%;        /* zinc-100 */
+    --secondary-foreground: 240 6% 10%;
 
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 5% 34%; /* zinc-600 */
 
-    --accent: 0 0% 12%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
 
-    --destructive: 0 62% 30%;
+    --destructive: 360 89% 62%;     /* shipyard danger */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 213 12% 20%;
-    --input: 213 12% 20%;
-    --ring: 211 100% 65%;
+    --border: 240 6% 90%;           /* zinc-200 */
+    --input: 240 6% 90%;
+    --ring: 205 100% 50%;
 
     --radius: 0.75rem;
 
-    /* Channel brand accent (#4da3ff). New code should use --brand-accent or the
+    /* Brand tracks shipyard's accent. New code should use --brand-accent or the
        `brand` Tailwind color (text-brand / bg-brand). --brand is a
        deprecated alias kept for the ~50 legacy `text-brand` call-sites. */
-    --brand-accent: 211 100% 65%;
-    --brand-accent-dark: 211 90% 55%;
-    --brand-accent-light: 211 100% 74%;
+    --brand-accent: 209 100% 43%;
+    --brand-accent-dark: 209 100% 34%;
+    --brand-accent-light: 205 100% 50%;
     --brand: var(--brand-accent);
     --brand-dark: var(--brand-accent-dark);
     --brand-light: var(--brand-accent-light);
@@ -111,75 +125,75 @@ body {
     /* Domain status colors — the ONE vocabulary for study/pipeline state.
        Use via Tailwind `status-*` colors (e.g. text-status-due, bg-status-mastered/15).
        mastered = retained · ready = available to study · due = review owed now ·
-       fading = will fall due soon · building = pipeline running · error = failed. */
-    --status-mastered: 152 55% 48%;
-    --status-ready: 211 100% 65%;
-    --status-due: 35 92% 55%;
-    --status-fading: 16 85% 58%;
-    --status-building: 265 65% 68%;
-    --status-error: 0 68% 58%;
-
-    /* Concept-kind hues (definition/theorem/principle/result/method chips). */
-    --kind-definition: 199 89% 60%;
-    --kind-theorem: 271 91% 75%;
-    --kind-principle: 43 96% 56%;
-    --kind-result: 160 64% 52%;
-    --kind-method: 351 95% 71%;
-  }
-
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
-
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-
-    /* Channel accent blue, slightly deeper for light-mode contrast */
-    --primary: 211 90% 52%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 0 0% 9%;
-
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 210 40% 96%;
-    --accent-foreground: 0 0% 9%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 211 90% 60%;
-
-    --radius: 0.75rem;
-
-    --brand-accent: 211 90% 52%;
-    --brand-accent-dark: 211 90% 44%;
-    --brand-accent-light: 211 95% 60%;
-    --brand: var(--brand-accent);
-    --brand-dark: var(--brand-accent-dark);
-    --brand-light: var(--brand-accent-light);
-
-    /* Domain status colors, deepened for light-mode contrast. */
-    --status-mastered: 152 60% 34%;
-    --status-ready: 211 90% 45%;
+       fading = will fall due soon · building = pipeline running · error = failed.
+       These stay domain-owned; only mastered/ready/error are pulled onto
+       shipyard's ok/accent/danger hues, since those three carry the same meaning
+       there and reading two greens across the fleet was the whole complaint. */
+    --status-mastered: 150 70% 32%;
+    --status-ready: 209 100% 43%;
     --status-due: 32 95% 40%;
     --status-fading: 16 80% 44%;
     --status-building: 265 55% 50%;
-    --status-error: 0 72% 45%;
+    --status-error: 360 89% 48%;
 
-    /* Concept-kind hues, deepened for light backgrounds. */
+    /* Concept-kind hues — deliberately untouched. They are a categorical scale
+       whose only job is being distinguishable from each other, not from
+       shipyard. Deepened variants for a light ground. */
     --kind-definition: 201 98% 39%;
     --kind-theorem: 271 81% 56%;
     --kind-principle: 32 95% 44%;
     --kind-result: 161 94% 30%;
     --kind-method: 347 77% 50%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 240 10% 4%;     /* zinc-950 */
+      --foreground: 240 5% 96%;     /* zinc-100 */
+
+      --card: 240 6% 10%;           /* zinc-900 */
+      --card-foreground: 240 5% 96%;
+
+      --popover: 240 6% 10%;
+      --popover-foreground: 240 5% 96%;
+
+      --primary: 205 100% 50%;      /* shipyard accent, full strength on dark */
+      --primary-foreground: 240 10% 4%;
+
+      --secondary: 240 4% 16%;      /* zinc-800 */
+      --secondary-foreground: 240 5% 96%;
+
+      --muted: 240 4% 16%;
+      --muted-foreground: 240 5% 65%; /* zinc-400 */
+
+      --accent: 240 4% 16%;
+      --accent-foreground: 240 5% 96%;
+
+      --destructive: 360 89% 62%;
+      --destructive-foreground: 0 0% 98%;
+
+      --border: 240 4% 16%;         /* zinc-800 */
+      --input: 240 4% 16%;
+      --ring: 205 100% 50%;
+
+      --brand-accent: 205 100% 50%;
+      --brand-accent-dark: 209 100% 43%;
+      --brand-accent-light: 207 100% 66%;
+
+      /* Domain colors lifted for a dark ground. */
+      --status-mastered: 150 70% 45%;
+      --status-ready: 205 100% 50%;
+      --status-due: 40 81% 54%;
+      --status-fading: 16 85% 58%;
+      --status-building: 265 65% 68%;
+      --status-error: 360 89% 62%;
+
+      --kind-definition: 199 89% 60%;
+      --kind-theorem: 271 91% 75%;
+      --kind-principle: 43 96% 56%;
+      --kind-result: 160 64% 52%;
+      --kind-method: 351 95% 71%;
+    }
   }
 }
 
