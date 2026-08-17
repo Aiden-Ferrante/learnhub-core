@@ -107,7 +107,7 @@ export function PdfBookView({ course, tree, loading, mastery, onBack, onSectionR
         <span className="min-w-0 flex-1 truncate text-sm font-medium" title={course.title}>
           {course.title}
         </span>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[11px] text-brand">
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-micro text-brand">
           <FileText className="h-3 w-3" />
           Original PDF
         </span>

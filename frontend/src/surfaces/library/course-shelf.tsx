@@ -180,7 +180,7 @@ function CourseCard({
             {coverMonogram(course.title)}
           </span>
           {course.format && (
-            <span className="rounded bg-background/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+            <span className="rounded bg-background/50 px-1.5 py-0.5 text-micro font-medium uppercase tracking-label text-muted-foreground backdrop-blur-sm">
               {course.format}
             </span>
           )}
@@ -192,11 +192,11 @@ function CourseCard({
 
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <StatusPill status={badge.status} pulse={badge.pulse} className="text-[10px]">
+              <StatusPill status={badge.status} pulse={badge.pulse} className="text-micro">
                 {badge.label}
               </StatusPill>
               {dueNow > 0 && (
-                <StatusPill status="due" className="text-[10px]">
+                <StatusPill status="due" className="text-micro">
                   {dueNow} due
                 </StatusPill>
               )}

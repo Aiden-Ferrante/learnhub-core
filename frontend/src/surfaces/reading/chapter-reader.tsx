@@ -225,7 +225,7 @@ export function ChapterReader({
           )}
         </div>
         {page != null && (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-micro tabular-nums text-muted-foreground">
             p.{page}
           </span>
         )}

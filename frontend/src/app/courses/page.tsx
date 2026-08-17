@@ -7,7 +7,7 @@ import { chapterHref } from "@/kit/lib/scope-url"
 export default function CoursesPage() {
   const router = useRouter()
   return (
-    <main className="mx-auto w-full px-4 pb-3 pt-3">
+    <main className="mx-auto w-full max-w-6xl px-6 pb-6 pt-6">
       <CourseShelf
         liveTree={[]}
         liveMastery={null}

@@ -132,7 +132,7 @@ export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
                     {displaySectionTitle(c.label, c.title)}
                   </span>
                   {stale.includes(key) && (
-                    <TriangleAlert className="h-3 w-3 shrink-0 text-amber-500" />
+                    <TriangleAlert className="h-3 w-3 shrink-0 text-status-due" />
                   )}
                 </button>
               )
@@ -147,8 +147,8 @@ export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
         )}
 
         {staleHere && (
-          <p className="flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <p className="flex items-start gap-2 rounded border border-status-due/40 bg-status-due/5 px-3 py-2 text-xs">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-due" />
             <span>
               This chapter&rsquo;s material changed after its concepts were built. Rebuild it from
               the Process tab when you&rsquo;re ready — your review history carries across.
@@ -181,7 +181,7 @@ export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
                 {!editing && (
                   <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                     {b.isRewritten && (
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-micro text-primary">
                         rewritten
                       </span>
                     )}
@@ -259,7 +259,7 @@ export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
                       >
                         Cancel
                       </Button>
-                      <span className="ml-auto tabular-nums text-[10px] text-muted-foreground">
+                      <span className="ml-auto tabular-nums text-micro text-muted-foreground">
                         {draft.length} chars
                       </span>
                     </div>

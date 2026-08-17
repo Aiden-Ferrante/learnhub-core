@@ -101,9 +101,9 @@ export function ReviewPanel({
         </p>
         {finished && (
           <p className="text-xs">
-            <span className="text-emerald-400">{stats.good} good</span>
+            <span className="text-status-mastered">{stats.good} good</span>
             <span className="text-muted-foreground"> · </span>
-            <span className="text-rose-400">{stats.again} to revisit</span>
+            <span className="text-destructive">{stats.again} to revisit</span>
           </p>
         )}
         <p className="text-xs text-muted-foreground">
@@ -145,11 +145,11 @@ export function ReviewPanel({
       <div className="flex flex-1 flex-col gap-4 rounded-lg border bg-card p-5">
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold">{card.name}</span>
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
+          <span className={`rounded px-1.5 py-0.5 text-micro font-medium uppercase ${kindClass}`}>
             {isSkeleton ? "structure" : isChapter ? "resurface" : card.kind}
           </span>
           {card.state === "new" && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">new</span>
+            <span className="rounded bg-muted px-1.5 py-0.5 text-micro text-muted-foreground">new</span>
           )}
         </div>
 
@@ -163,7 +163,7 @@ export function ReviewPanel({
                   : "Recall what this concept means."}
             </p>
             <Button onClick={() => setRevealed(true)}>
-              Reveal <kbd className="ml-2 rounded bg-muted px-1 text-[10px]">space</kbd>
+              Reveal <kbd className="ml-2 rounded bg-muted px-1 text-micro">space</kbd>
             </Button>
           </div>
         ) : isSkeleton || isChapter ? (
@@ -209,7 +209,7 @@ export function ReviewPanel({
               onClick={() => grade(g)}
             >
               <span>{label}</span>
-              <kbd className="rounded bg-muted px-1 text-[10px] opacity-70">{g}</kbd>
+              <kbd className="rounded bg-muted px-1 text-micro opacity-70">{g}</kbd>
             </Button>
           ))}
         </div>

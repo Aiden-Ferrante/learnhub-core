@@ -24,7 +24,7 @@ export function InfoModal() {
             <div className="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center">
               <GraduationCap className="h-5 w-5 text-brand" />
             </div>
-            <DialogTitle className="text-2xl font-bold text-foreground build-gradient-text">
+            <DialogTitle className="text-page font-semibold tracking-tight text-foreground">
               Learn Hub
             </DialogTitle>
           </div>
@@ -36,7 +36,7 @@ export function InfoModal() {
         </DialogHeader>
         <div className="space-y-8 pt-6">
           {/* Key Features Section */}
-          <div className="build-card">
+          <div className="rounded-lg border bg-card p-5">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-brand" />
@@ -72,7 +72,7 @@ export function InfoModal() {
           </div>
 
           {/* How to Use Section */}
-          <div className="build-card">
+          <div className="rounded-lg border bg-card p-5">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
                 <Info className="h-4 w-4 text-brand" />

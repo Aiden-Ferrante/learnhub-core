@@ -52,7 +52,7 @@ export function BriefingCard({
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           {briefing.objectives.length > 0 && (
             <div>
-              <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+              <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-label", mutedCls)}>
                 You&apos;ll be able to
               </div>
               <ul className="space-y-1 text-sm opacity-90">
@@ -67,13 +67,13 @@ export function BriefingCard({
           )}
           {briefing.watchFor.length > 0 && (
             <div>
-              <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+              <div className={cn("mb-1.5 text-xs font-semibold uppercase tracking-label", mutedCls)}>
                 Watch for
               </div>
               <ul className="space-y-1 text-sm opacity-90">
                 {briefing.watchFor.map((w, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-amber-400">•</span>
+                    <span className="text-status-due">•</span>
                     <MathText text={w} />
                   </li>
                 ))}
@@ -83,7 +83,7 @@ export function BriefingCard({
         </div>
         {briefing.sections.length > 0 && (
           <details className="mt-4 border-t pt-3 lg:hidden" open={briefing.sections.length <= 8}>
-            <summary className={cn("cursor-pointer text-xs font-semibold uppercase tracking-wide", mutedCls)}>
+            <summary className={cn("cursor-pointer text-xs font-semibold uppercase tracking-label", mutedCls)}>
               The road through · {briefing.sections.length} sections
             </summary>
             <div className="mt-1.5 space-y-1">

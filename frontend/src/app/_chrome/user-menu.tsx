@@ -6,9 +6,11 @@ export async function UserMenu() {
   if (!session?.user) return null
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-      <UserCircle2 className="h-4 w-4 text-brand" />
-      <span className="text-sm font-medium">{session.user.name}</span>
+    // No fill at rest — the fleet's header controls are an outline and nothing
+    // else, the same box shipyard's ⌘K trigger draws.
+    <div className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1">
+      <UserCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-meta text-muted-foreground">{session.user.name}</span>
       <form
         action={async () => {
           "use server"

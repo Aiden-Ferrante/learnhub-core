@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/kit/layout/theme-provider"
 import { DocumentProvider } from "@/surfaces/processing"
@@ -14,12 +13,6 @@ import { Toaster } from "@/kit/ui/toaster"
 import { UserMenu } from "@/app/_chrome/user-menu"
 import { ShortcutsHelp } from "@/app/_chrome/shortcuts-help"
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-})
-
 export const metadata: Metadata = {
   title: "Learn Hub | Study from your textbooks",
   description: "Turn a PDF into concepts you can study — read, recall, and master.",
@@ -31,8 +24,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <body className={inter.className}>
+    // No font class: the sans comes from tailwind.config's `sans`, which is the
+    // fleet stack (fleet.css --fleet-font-sans). This used to load Inter, and a
+    // different typeface is the loudest way one app in a fleet says it is a
+    // different product.
+    <html lang="en" suppressHydrationWarning>
+      <body>
         {/* Follow the OS, as shipyard does. Tokens now key off
             prefers-color-scheme, so this class is cosmetic — but "dark" would
             claim the opposite of what the page renders, and would silently pin
@@ -41,16 +38,20 @@ export default function RootLayout({
           <DocumentProvider>
             {/* Two tiers, matching the rest of the fleet: which app above, this
                 app's own sections below. */}
-            <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
-              <div className="container mx-auto px-4">
+            {/* No shadow: fleet.css's header is a 1px border and a blurred
+                translucent ground, nothing else. The gutter is px-6, the
+                fleet's 24px, and .container is now 72rem — so the header rule
+                starts and stops in the same place it does in the other apps. */}
+            <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
+              <div className="container mx-auto px-6">
                 {/* Tier heights pinned to the fleet's 38px + 49px (+1px header
                     border = 88px) — fleet.css enforces the same numbers on the
                     other four apps, so landing here no longer moves the chrome. */}
-                <div className="flex h-[38px] items-end border-b border-border/40">
+                <div className="flex h-[38px] items-end border-b border-border/60">
                   <FleetApps />
                 </div>
               </div>
-              <div className="container mx-auto flex h-[49px] items-center justify-between gap-4 px-4">
+              <div className="container mx-auto flex h-[49px] items-center justify-between gap-4 px-6">
                 <div className="flex min-w-0 items-center gap-2">
                   <HeaderBrand />
                   <Breadcrumbs />

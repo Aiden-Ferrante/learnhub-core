@@ -15,9 +15,11 @@ export function StatTile({
 }) {
   return (
     <div className={cn("rounded-lg border bg-background/40 px-3 py-2", className)}>
-      <div className="text-lg font-semibold tabular-nums leading-tight">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      {/* Mono, because it is a machine fact — the fleet's Tile does the same.
+          The label above it stays sans: a count is not prose, a caption is. */}
+      <div className="font-mono text-section font-semibold leading-tight tabular-nums">{value}</div>
+      <div className="text-micro uppercase tracking-tile text-muted-foreground">{label}</div>
+      {hint && <div className="mt-0.5 text-micro text-muted-foreground/70">{hint}</div>}
     </div>
   )
 }

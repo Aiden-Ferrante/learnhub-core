@@ -161,9 +161,9 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
           <Plus className="h-3.5 w-3.5" />
           Add section
         </Button>
-        {dirty && <span className="text-[10px] text-muted-foreground">unsaved changes</span>}
+        {dirty && <span className="text-micro text-muted-foreground">unsaved changes</span>}
         {isDefault && (
-          <span className="ml-auto text-[10px] text-muted-foreground">
+          <span className="ml-auto text-micro text-muted-foreground">
             This is the book&rsquo;s own course — sections can be renamed and reordered, but not
             removed.
           </span>
@@ -183,7 +183,7 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
             className="flex items-center gap-1 border-b px-2 py-1 last:border-b-0"
             style={{ paddingLeft: `${8 + r.depth * 18}px` }}
           >
-            <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground/70">
+            <span className="shrink-0 tabular-nums text-micro text-muted-foreground/70">
               {numbers.get(r.sectionKey ?? `pending-${i}`) ?? ""}
             </span>
             <Input
@@ -196,7 +196,7 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
               className="h-7 flex-1 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
             />
             {!r.sectionKey && (
-              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">new</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-micro text-primary">new</span>
             )}
             <div className="flex shrink-0 items-center">
               <IconBtn label="Move up" onClick={() => move(i, -1)}><ChevronUp className="h-3 w-3" /></IconBtn>
@@ -219,7 +219,7 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
       <section className="space-y-2">
         <header className="flex items-center gap-2">
           <h2 className="text-xs font-medium">Unplaced material</h2>
-          <span className="tabular-nums text-[10px] text-muted-foreground">
+          <span className="tabular-nums text-micro text-muted-foreground">
             {unplaced.length} block{unplaced.length === 1 ? "" : "s"}
           </span>
           {selected.size > 0 && (
@@ -281,7 +281,7 @@ export function OutlineEditor({ docId, isDefault, initial, loading, onSaved }: O
                   }
                 />
                 <span className="min-w-0 flex-1 truncate">{b.heading || b.sourceSectionKey}</span>
-                <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground/70">
+                <span className="shrink-0 tabular-nums text-micro text-muted-foreground/70">
                   {b.charCount}
                 </span>
               </label>

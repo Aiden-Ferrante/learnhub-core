@@ -462,8 +462,8 @@ export function SkeletonPractice({
                       "flex items-start gap-2 rounded-md border px-2 py-1.5 text-sm",
                       !checked && "cursor-grab bg-card hover:border-border active:cursor-grabbing",
                       dragKey === it.key && "opacity-40",
-                      checked && ok && "border-emerald-500/40 bg-emerald-500/10",
-                      checked && !ok && "border-rose-500/40 bg-rose-500/10",
+                      checked && ok && "border-status-mastered/40 bg-status-mastered/10",
+                      checked && !ok && "border-destructive/40 bg-destructive/10",
                       !checked && "border-border/60",
                     )}
                   >
@@ -473,9 +473,9 @@ export function SkeletonPractice({
                     {!checked ? (
                       <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     ) : ok ? (
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-mastered" />
                     ) : (
-                      <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+                      <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                     )}
                     <span className="min-w-0 flex-1 leading-snug">
                       <span className="block">{it.label}</span>

@@ -66,7 +66,7 @@ function ConceptRow({
         <ConceptMasteryDot state={mastery?.state} retention={mastery?.retention} className="mt-1.5" />
         <span
           className={cn(
-            "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
+            "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-micro font-medium leading-none",
             KIND_BADGE[entry.kind || ""] || "bg-muted text-muted-foreground",
           )}
         >
@@ -136,7 +136,7 @@ function TreeNode({
           {numberedSectionTitle(numbers.get(node.id), node.label, node.title)}
         </span>
         {count > 0 && (
-          <span className="mt-0.5 shrink-0 tabular-nums text-xs text-muted-foreground">{count}</span>
+          <span className="mt-0.5 shrink-0 font-mono text-micro tabular-nums text-muted-foreground">{count}</span>
         )}
       </div>
       {isExpanded && (

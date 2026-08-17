@@ -94,7 +94,7 @@ function PracticeTile({
           {title}
         </span>
         {badge && (
-          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium tabular-nums text-muted-foreground">
             {badge}
           </span>
         )}
@@ -158,7 +158,7 @@ export function CourseHome({
   let headline: { icon: React.ReactNode; text: string }
   if (overall && overall.fading > 0) {
     headline = {
-      icon: <Flame className="h-4 w-4 text-amber-500" />,
+      icon: <Flame className="h-4 w-4 text-status-due" />,
       text: `${overall.fading} concept${overall.fading === 1 ? "" : "s"} are fading — review to bring them back.`,
     }
   } else if (!overall || overall.reviewed === 0) {
@@ -240,7 +240,7 @@ export function CourseHome({
                 <span className="text-brand">✓</span> Outline
               </span>
             ) : (
-              <span className="text-amber-500">No outline</span>
+              <span className="text-status-due">No outline</span>
             )}
             <span aria-hidden>·</span>
             <span

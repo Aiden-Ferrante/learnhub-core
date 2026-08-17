@@ -279,7 +279,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
 
       <div className="flex items-end gap-3">
         <div className="space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Voice</span>
+          <span className="text-xs font-medium uppercase tracking-label text-muted-foreground">Voice</span>
           <select
             value={voice}
             onChange={(e) => setVoice(e.target.value)}

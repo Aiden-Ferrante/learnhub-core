@@ -558,7 +558,7 @@ export function GuidedReading({
           check-dots, the CURRENT stage keeps its label, the rest are quiet dots. */}
       {chapterKey && (
         <div className="flex items-center gap-1 overflow-x-auto border-b bg-card/60 px-3 py-1">
-          <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="mr-1 shrink-0 text-micro font-semibold uppercase tracking-label text-muted-foreground">
             Path
           </span>
           {PATH_STAGES.map((s) => {
@@ -594,7 +594,7 @@ export function GuidedReading({
               </button>
             )
           })}
-          <span className="ml-1 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          <span className="ml-1 shrink-0 text-micro tabular-nums text-muted-foreground">
             {PATH_STAGES.filter((s) => stages[s.key]).length}/{PATH_STAGES.length}
           </span>
           {/* Study actions, pinned to the bar — always reachable while reading. */}

@@ -18,15 +18,19 @@ import { SkeletonCard, SkeletonRow, SkeletonStatStrip } from "@/kit/patterns/ske
 
 const STATUSES: DomainStatus[] = ["mastered", "ready", "due", "fading", "building", "error", "neutral"]
 
+/* The fleet's six steps (fleet.css --fleet-text-*). Tailwind's own names are
+   aliased onto them in tailwind.config.ts — text-xs IS micro, text-sm IS meta —
+   so the ~380 existing call sites landed on this scale without being rewritten.
+   New code should use the named step: it says which rung it means. */
 const TYPE_SCALE = [
-  { cls: "text-2xl font-semibold tracking-tight", label: "text-2xl · screen titles" },
-  { cls: "text-xl font-semibold tracking-tight", label: "text-xl · page headers" },
-  { cls: "text-lg font-semibold", label: "text-lg · card values" },
-  { cls: "text-base", label: "text-base · long-form UI copy" },
-  { cls: "text-sm font-medium", label: "text-sm medium · row titles, buttons" },
-  { cls: "text-sm text-muted-foreground", label: "text-sm muted · descriptions" },
-  { cls: "text-xs text-muted-foreground", label: "text-xs muted · labels, hints" },
-  { cls: "text-[11px] font-medium", label: "11px medium · pills" },
+  { cls: "text-page font-semibold tracking-tight", label: "page · 26px — the name of the surface" },
+  { cls: "text-section font-semibold tracking-tight", label: "section · 19px — a section heading" },
+  { cls: "text-title font-semibold", label: "title · 15px — card titles (= text-lg)" },
+  { cls: "text-body", label: "body · 14px — descriptions, prose in chrome (= text-base)" },
+  { cls: "text-meta font-medium", label: "meta · 12.5px — row titles, buttons (= text-sm)" },
+  { cls: "text-meta text-muted-foreground", label: "meta muted · secondary lines" },
+  { cls: "text-micro text-muted-foreground", label: "micro · 11px — chips, counts, labels (= text-xs)" },
+  { cls: "text-micro uppercase tracking-label text-muted-foreground", label: "micro uppercase · 0.12em — the eyebrow label" },
 ]
 
 const SWATCHES = [
@@ -62,7 +66,7 @@ export default function Styleguide() {
           {SWATCHES.map((s) => (
             <div key={s.name} className="space-y-1">
               <div className={`h-10 rounded-md ${s.cls}`} />
-              <div className="text-[11px] text-muted-foreground">{s.name}</div>
+              <div className="text-micro text-muted-foreground">{s.name}</div>
             </div>
           ))}
         </div>
@@ -73,7 +77,7 @@ export default function Styleguide() {
           {TYPE_SCALE.map((t) => (
             <div key={t.label} className="flex items-baseline justify-between gap-4">
               <span className={t.cls}>The quick brown fox</span>
-              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{t.label}</span>
+              <span className="shrink-0 font-mono text-micro text-muted-foreground">{t.label}</span>
             </div>
           ))}
         </div>

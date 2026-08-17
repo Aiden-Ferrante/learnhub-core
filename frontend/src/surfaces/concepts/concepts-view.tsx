@@ -141,7 +141,7 @@ export function ConceptsView({ course, tree, onBack, initialConceptKey }: Concep
 
       {ready.length > 0 && (
         <div className="rounded-lg border bg-card p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-2 flex items-center gap-1.5 text-micro font-medium uppercase tracking-label text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-brand" /> Ready to learn
           </p>
           <div className="flex flex-wrap gap-1.5">

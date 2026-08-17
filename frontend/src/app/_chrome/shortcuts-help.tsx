@@ -82,7 +82,7 @@ export function ShortcutsHelp() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {GROUPS.map((group) => (
             <div key={group.title} className="space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h4 className="text-xs font-semibold uppercase tracking-label text-muted-foreground">
                 {group.title}
               </h4>
               <ul className="space-y-1.5">

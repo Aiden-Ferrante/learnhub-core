@@ -33,7 +33,11 @@ export function AppNav() {
   )
 
   return (
-    <nav className="flex items-center gap-1" aria-label="Primary">
+    // The .fleet-nav idiom: plain text links, the current one marked by weight
+    // and ink rather than a fill, accent on hover. The filled `bg-muted` pill
+    // this used to draw is the same shape tier one uses for "which app you are
+    // in", one row above — two different questions wearing the same badge.
+    <nav className="flex items-center gap-4" aria-label="Primary">
       {LINKS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`)
         return (
@@ -41,17 +45,19 @@ export function AppNav() {
             key={href}
             href={href}
             title={label}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3",
+              "flex items-center gap-1.5 rounded-sm text-meta transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
               active
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:text-primary",
             )}
           >
             <Icon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{label}</span>
             {href === "/study" && dueNow > 0 && (
-              <span className="ml-0.5 rounded-full bg-status-due/15 px-1.5 text-[11px] font-semibold tabular-nums text-status-due">
+              <span className="ml-0.5 rounded-full bg-status-due/15 px-1.5 font-mono text-micro font-semibold tabular-nums text-status-due">
                 {dueNow}
               </span>
             )}

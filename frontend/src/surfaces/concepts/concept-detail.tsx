@@ -59,7 +59,7 @@ export function ConceptDetail({
         <div className="flex flex-wrap items-center gap-2">
           {memory !== undefined && <ConceptMasteryDot state={memory.state} retention={memory.retention} />}
           <h2 className="text-xl font-semibold leading-tight">{c.name}</h2>
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
+          <span className={`rounded px-1.5 py-0.5 text-micro font-medium uppercase ${kindClass}`}>
             {c.kind}
           </span>
         </div>
@@ -71,11 +71,11 @@ export function ConceptDetail({
         </p>
       </div>
 
-      <ConceptMarkdown content={c.signal} className="text-[15px] leading-relaxed" />
+      <ConceptMarkdown content={c.signal} className="text-title leading-relaxed" />
 
       {c.source && (
         <div className="rounded-lg border bg-muted/20 p-3">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1 text-micro font-medium uppercase tracking-label text-muted-foreground">
             From the text
           </p>
           <ConceptMarkdown content={c.source} className="text-sm italic text-muted-foreground" />
@@ -94,7 +94,7 @@ export function ConceptDetail({
 
       {(c.questions || []).length > 0 && (
         <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1.5 text-micro font-medium uppercase tracking-label text-muted-foreground">
             Test yourself
           </p>
           <ul className="flex flex-col gap-2">
@@ -120,11 +120,11 @@ export function ConceptDetail({
 
       {c.conceptKey && (
         <div className="border-t pt-4">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-2 text-micro font-medium uppercase tracking-label text-muted-foreground">
             How well did you recall this?
           </p>
           {graded ? (
-            <p className="text-sm text-emerald-400">{graded}</p>
+            <p className="text-sm text-status-mastered">{graded}</p>
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {GRADES.map(({ grade: g, label, cls }) => (

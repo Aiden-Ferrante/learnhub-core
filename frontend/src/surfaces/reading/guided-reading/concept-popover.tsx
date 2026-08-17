@@ -61,7 +61,7 @@ export function ConceptPopover({
           <span className="text-sm font-semibold">{concept.name}</span>
           <span
             className={cn(
-              "rounded-full border px-1.5 py-0.5 text-[10px]",
+              "rounded-full border px-1.5 py-0.5 text-micro",
               KIND_CHIP[concept.kind] ?? "border-border text-muted-foreground",
             )}
           >

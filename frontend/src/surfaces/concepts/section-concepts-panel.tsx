@@ -50,7 +50,7 @@ function ConceptRecallRow({
         {mark === "got" ? (
           <Check className="h-3.5 w-3.5 shrink-0 text-brand" />
         ) : mark === "fuzzy" ? (
-          <span className="shrink-0 text-xs font-semibold text-amber-400">~</span>
+          <span className="shrink-0 text-xs font-semibold text-status-due">~</span>
         ) : (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full border border-muted-foreground/40" />
         )}
@@ -67,7 +67,7 @@ function ConceptRecallRow({
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "rounded-full border px-1.5 py-0.5 text-[10px]",
+                  "rounded-full border px-1.5 py-0.5 text-micro",
                   KIND_CHIP[concept.kind] ?? "border-border text-muted-foreground",
                 )}
               >
@@ -92,7 +92,7 @@ function ConceptRecallRow({
                 size="sm"
                 className={cn(
                   "h-7 px-2.5 text-xs",
-                  mark === "fuzzy" && "border-amber-400/60 text-amber-400",
+                  mark === "fuzzy" && "border-status-due/60 text-status-due",
                 )}
                 onClick={() => onMark("fuzzy")}
               >

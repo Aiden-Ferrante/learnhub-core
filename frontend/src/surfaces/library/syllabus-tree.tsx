@@ -69,7 +69,7 @@ function ExtractButton({
           if (state !== "running") onExtract(scope)
         }}
         className={cn(
-          "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+          "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-micro font-medium transition-colors",
           state === "running"
             ? "border-brand/40 text-brand"
             : state === "error"
@@ -218,7 +218,7 @@ function TreeRow({
           disabled={!isSection}
         >
           {isSection ? (
-            <span className={cn("font-medium", isChapter && "text-[0.925rem] font-semibold")}>
+            <span className={cn("font-medium", isChapter && "text-title font-semibold")}>
               {numberedSectionTitle(numbers.get(node.id), node.label, node.title)}
             </span>
           ) : (
@@ -227,7 +227,7 @@ function TreeRow({
         </button>
         {isSection && (node.conceptCount ?? 0) > 0 ? (
           <span
-            className="shrink-0 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-brand"
+            className="shrink-0 rounded-full bg-brand/10 px-1.5 py-0.5 text-micro font-medium tabular-nums text-brand"
             title={`${node.conceptCount} concept${node.conceptCount === 1 ? "" : "s"}`}
           >
             {node.conceptCount}
@@ -236,13 +236,13 @@ function TreeRow({
         {isSection && (node.conceptCount ?? 0) > 0 && masteryPct != null ? (
           <span
             className={cn(
-              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+              "shrink-0 rounded-full px-1.5 py-0.5 text-micro font-medium tabular-nums",
               masteryPct >= 90
-                ? "bg-emerald-500/10 text-emerald-500"
+                ? "bg-status-mastered/10 text-status-mastered"
                 : masteryPct >= 70
                   ? "bg-brand/10 text-brand"
                   : masteryPct > 0
-                    ? "bg-amber-500/10 text-amber-500"
+                    ? "bg-status-due/10 text-status-due"
                     : "bg-muted text-muted-foreground",
             )}
             title={`${masteryPct}% retention (${sm?.state ?? "new"})`}
@@ -276,7 +276,7 @@ function TreeRow({
                   <Sparkles className="h-3 w-3 shrink-0 text-brand/60" />
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
                   {c.kind && (
-                    <span className="shrink-0 rounded bg-muted px-1 py-px text-[9px] opacity-0 transition-opacity group-hover/concept:opacity-100">
+                    <span className="shrink-0 rounded bg-muted px-1 py-px text-micro opacity-0 transition-opacity group-hover/concept:opacity-100">
                       {c.kind}
                     </span>
                   )}

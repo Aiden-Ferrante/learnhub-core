@@ -12,11 +12,15 @@ function blockClass(memory: SectionMemory | undefined): string {
   if (!memory || memory.total === 0) return "bg-muted text-muted-foreground"
   switch (memory.state) {
     case "solid":
-      return "bg-brand text-brand-foreground"
+      // text-background, matching its two siblings below. `text-brand-foreground`
+      // resolved to nothing — tailwind.config defines brand with only
+      // DEFAULT/dark/light — so this label had been inheriting ambient ink on a
+      // solid blue chip.
+      return "bg-brand text-background"
     case "shaky":
-      return "bg-amber-400 text-amber-950"
+      return "bg-status-due text-background"
     case "fading":
-      return "bg-rose-400 text-rose-950"
+      return "bg-status-fading text-background"
     default:
       return "bg-brand/25 text-foreground/80" // built, nothing reviewed yet
   }
@@ -97,7 +101,7 @@ function ChapterBreakdown({
                 <button
                   type="button"
                   onClick={() => onOpen(node.sectionKey, node)}
-                  className={`inline-flex h-5 min-w-9 items-center justify-center rounded-[4px] px-1.5 text-[10px] font-medium tabular-nums transition-transform hover:scale-110 ${blockClass(memory)}`}
+                  className={`inline-flex h-5 min-w-9 items-center justify-center rounded-[4px] px-1.5 text-micro font-medium tabular-nums transition-transform hover:scale-110 ${blockClass(memory)}`}
                   title={title}
                   aria-label={title}
                 >
@@ -132,7 +136,7 @@ export function ChapterStateStrip({
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">Chapters</span>
-        <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-2 text-micro text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-[2px] bg-muted" /> unbuilt
           </span>
@@ -143,10 +147,10 @@ export function ChapterStateStrip({
             <span className="h-2 w-2 rounded-[2px] bg-brand" /> solid
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-amber-400" /> shaky
+            <span className="h-2 w-2 rounded-[2px] bg-status-due" /> shaky
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-rose-400" /> fading
+            <span className="h-2 w-2 rounded-[2px] bg-status-fading" /> fading
           </span>
         </span>
       </div>

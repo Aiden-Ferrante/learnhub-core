@@ -112,7 +112,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
         <span className="flex items-center gap-2">
           {cadence && (
             <span
-              className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium tabular-nums text-brand"
+              className="rounded-full bg-brand/10 px-2 py-0.5 text-micro font-medium tabular-nums text-brand"
               title="Days with any study activity in the last week"
             >
               {cadence.activeDays}/{cadence.windowDays} days this week
@@ -132,7 +132,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
         ) : (
           <div className="inline-flex flex-col gap-1.5">
             {/* Month labels */}
-            <div className="flex gap-[3px] pl-6 text-[10px] text-muted-foreground">
+            <div className="flex gap-[3px] pl-6 text-micro text-muted-foreground">
               {weeks.map((_, i) => {
                 const label = monthLabels.find((l) => l.col === i)
                 return (
@@ -145,7 +145,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
 
             <div className="flex gap-[3px]">
               {/* Weekday gutter */}
-              <div className="mr-0.5 flex w-5 shrink-0 flex-col gap-[3px] text-[9px] text-muted-foreground">
+              <div className="mr-0.5 flex w-5 shrink-0 flex-col gap-[3px] text-micro text-muted-foreground">
                 {["", "Mon", "", "Wed", "", "Fri", ""].map((d, i) => (
                   <div key={i} className="flex h-2.5 items-center leading-none">
                     {d}
@@ -173,7 +173,7 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-end gap-1.5 pt-0.5 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-end gap-1.5 pt-0.5 text-micro text-muted-foreground">
               <span>Less</span>
               {[0, 1, 2, 3, 4].map((lvl) => (
                 <div

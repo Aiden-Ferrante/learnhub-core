@@ -14,7 +14,7 @@ export function masteryTint(m: ConceptMastery | undefined): string {
   if (!m || m.state === "new") return "border-dotted border-brand/50"
   if (m.state === "solid") return "border-solid border-brand/60"
   if (m.state === "fading" || (m.due != null && m.due <= Date.now() / 1000))
-    return "border-dotted border-amber-400/80"
+    return "border-dotted border-status-due/80"
   return "border-dotted border-brand/90"
 }
 
@@ -24,7 +24,7 @@ export function masteryWash(m: ConceptMastery | undefined): string {
   if (m && m.state !== "new") {
     if (m.state === "solid") return "rounded-[3px] bg-brand/[0.05]"
     if (m.state === "fading" || (m.due != null && m.due <= Date.now() / 1000))
-      return "rounded-[3px] bg-amber-400/10"
+      return "rounded-[3px] bg-status-due/10"
   }
   return "rounded-[3px] bg-brand/10"
 }

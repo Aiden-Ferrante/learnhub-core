@@ -10,9 +10,18 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Both stacks are the fleet's, hand-synced from fleet-ui/fleet.css
+      // (--fleet-font-sans / --fleet-font-mono). Copied rather than @import-ed
+      // for the same reason the app registry is duplicated in _chrome: this
+      // builds in Docker, and reaching outside the build context breaks the
+      // image rather than the page. Keep the two in step.
+      //
+      // Inter was here as a "Channel brand" decision. A different typeface is
+      // the strongest signal there is that you have left the site, and this is
+      // the admin tier, where the promise is the opposite one.
       fontFamily: {
-        'sans': ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        'mono': ['JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', 'monospace'],
+        'sans': ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Noto Sans', 'Arial', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'],
+        'mono': ['ui-monospace', 'SF Mono', 'Cascadia Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       letterSpacing: {
         'tighter': '-0.02em',
@@ -21,6 +30,13 @@ const config: Config = {
         'wide': '0.01em',
         'wider': '0.02em',
         'widest': '0.05em',
+        // The three uppercase-label registers, matching shipyard: section
+        // eyebrows, tile/facet labels, table headers. The scale above tops out
+        // at 0.05em, so every uppercase label in the app was rendering at
+        // essentially no tracking — the one idiom that most says "shipyard".
+        'label': '0.12em',
+        'tile': '0.09em',
+        'th': '0.08em',
       },
       colors: {
         // Canonical Channel brand accent (theme-aware via CSS var).
@@ -109,9 +125,37 @@ const config: Config = {
         "text-dark": "#333333",
         "text-light": "#E6E6E6",
       },
+      // THE TYPE SCALE — the fleet's six steps, hand-synced from fleet.css
+      // (--fleet-text-*). Shipyard's note on why they exist: hierarchy carried
+      // by grey level alone is the weakest of the three channels and the first
+      // to collapse under density.
+      //
+      // The six are named, AND Tailwind's own names are aliased onto them. That
+      // is the fleet's standard adoption trick applied to type instead of
+      // colour: ~380 existing `text-xs` / `text-sm` call sites move onto the
+      // scale in this one edit instead of 380 of them. Every alias resolves
+      // DOWN or level (12->11, 14->12.5, 16->14, 20->19), so fixed-height rows
+      // and small buttons gain slack rather than clipping. New code should
+      // prefer the named steps; the aliases exist so the old code is not a lie.
+      //
+      // Untouched on purpose: the @tailwindcss/typography `prose-*` chain, which
+      // the reading surface drives from user preference and which carries its
+      // own scale (see app/styleguide/page.tsx).
       fontSize: {
-        // Make text-lg the same visual size as current text-base for hierarchy without increasing size
-        lg: ["1rem", { lineHeight: "1.5rem" }],
+        micro: ["0.6875rem", { lineHeight: "1.4" }],    /* 11px   — chips, counts, meta */
+        meta: ["0.78125rem", { lineHeight: "1.45" }],   /* 12.5px — secondary lines */
+        body: ["0.875rem", { lineHeight: "1.6" }],      /* 14px   — descriptions, prose in chrome */
+        title: ["0.9375rem", { lineHeight: "1.35" }],   /* 15px   — card titles */
+        section: ["1.1875rem", { lineHeight: "1.25" }], /* 19px   — a section heading */
+        page: ["1.625rem", { lineHeight: "1.15" }],     /* 26px   — the name of the surface */
+
+        xs: ["0.6875rem", { lineHeight: "1.4" }],       /* -> micro */
+        sm: ["0.78125rem", { lineHeight: "1.45" }],     /* -> meta */
+        base: ["0.875rem", { lineHeight: "1.6" }],      /* -> body */
+        lg: ["0.9375rem", { lineHeight: "1.35" }],      /* -> title */
+        xl: ["1.1875rem", { lineHeight: "1.25" }],      /* -> section */
+        "2xl": ["1.625rem", { lineHeight: "1.15" }],    /* -> page */
+        "3xl": ["1.625rem", { lineHeight: "1.15" }],    /* -> page; nothing lives between section and page */
       },
       borderRadius: {
         lg: "var(--radius)",

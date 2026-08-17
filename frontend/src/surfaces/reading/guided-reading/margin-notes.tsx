@@ -42,7 +42,7 @@ export function MarginNotes({
           <div className={cn("truncate text-xs font-medium", paper ? "text-paper-ink-strong" : "text-foreground/90")}>
             {n.name}
           </div>
-          <div className={cn("mt-0.5 line-clamp-3 text-[11px] leading-snug", mutedCls)}>
+          <div className={cn("mt-0.5 line-clamp-3 text-micro leading-snug", mutedCls)}>
             <MathText text={n.signal} />
           </div>
         </button>

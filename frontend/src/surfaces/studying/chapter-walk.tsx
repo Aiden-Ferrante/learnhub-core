@@ -23,8 +23,8 @@ type ChapterWalkProps = {
 
 // Self-grade scale for each recall step (mirrors the backend GRADE_VALUE).
 const GRADES: { value: SkeletonGrade; label: string; cls: string }[] = [
-  { value: "missed", label: "Missed a lot", cls: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
-  { value: "partial", label: "Partial", cls: "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" },
+  { value: "missed", label: "Missed a lot", cls: "border-destructive/40 text-destructive hover:bg-destructive/10" },
+  { value: "partial", label: "Partial", cls: "border-status-due/40 text-status-due hover:bg-status-due/10" },
   { value: "most", label: "Most of it", cls: "border-brand/50 text-brand hover:bg-brand/10" },
   { value: "nailed", label: "Nailed it", cls: "border-brand/60 text-brand hover:bg-brand/15" },
 ]
@@ -421,7 +421,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
             ) : (
               <ArrowRight className="h-3.5 w-3.5" />
             )}
-            <kbd className="ml-1 hidden rounded bg-background/20 px-1 text-[10px] sm:inline">→</kbd>
+            <kbd className="ml-1 hidden rounded bg-background/20 px-1 text-micro sm:inline">→</kbd>
           </Button>
         )}
       </div>

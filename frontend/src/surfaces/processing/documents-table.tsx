@@ -91,13 +91,13 @@ export function DocumentsTable() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "New":
-        return <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 mr-2"></span>
+        return <span className="h-1.5 w-1.5 rounded-full bg-status-ready mr-2"></span>
       case "Processed":
-        return <CheckCircle className="h-3.5 w-3.5 text-green-500 mr-2" />
+        return <CheckCircle className="h-3.5 w-3.5 text-status-mastered mr-2" />
       case "Error":
         return <AlertCircle className="h-3.5 w-3.5 text-destructive mr-2" />
       default:
-        return <span className="h-1.5 w-1.5 rounded-full bg-gray-400 mr-2"></span>
+        return <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 mr-2"></span>
     }
   }
 
@@ -134,7 +134,7 @@ export function DocumentsTable() {
           {selectedDocuments.length > 0 && (
             <button 
               onClick={handleDeleteSelected} 
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
             >
               <Trash2 className="h-4 w-4" />
               <span>Delete Selected ({selectedDocuments.length})</span>
@@ -148,10 +148,10 @@ export function DocumentsTable() {
           <thead>
             <tr className="border-b border-border/20 bg-muted/5">
               <th className="w-12 pl-6 py-3"></th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Name</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left py-3">Status</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right py-3 pr-4">Size (KB)</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center py-3 pr-6">Actions</th>
+              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-left py-3">Name</th>
+              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-left py-3">Status</th>
+              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-right py-3 pr-4">Size (KB)</th>
+              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-center py-3 pr-6">Actions</th>
             </tr>
           </thead>
         <tbody>
@@ -216,9 +216,9 @@ export function DocumentsTable() {
                   <div className="flex items-center gap-2">
                     {getStatusIcon(doc.status)}
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      doc.status === 'Processed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                      doc.status === 'Error' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                      'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400'
+                      doc.status === 'Processed' ? 'bg-status-mastered/10 text-status-mastered' :
+                      doc.status === 'Error' ? 'bg-destructive/10 text-destructive' :
+                      'bg-status-ready/10 text-status-ready'
                     }`}>{doc.status}</span>
                   </div>
                 </td>
@@ -270,7 +270,7 @@ export function DocumentsTable() {
                         setDeleteTarget({ type: 'single', docId: doc.id, docName: doc.name })
                         setShowDeleteDialog(true)
                       }}
-                      className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                       aria-label={`Delete ${doc.name}`}
                       title="Delete document"
                     >

@@ -86,7 +86,7 @@ function ConceptReceipt({ docId, scope }: { docId: string; scope: string }) {
       <div className="max-h-64 space-y-1 overflow-y-auto">
         {concepts.map((c) => (
           <div key={c.conceptKey ?? c.name} className="group flex items-start gap-2 text-xs">
-            <span className="mt-0.5 shrink-0 rounded bg-muted px-1 py-px text-[10px] text-muted-foreground">
+            <span className="mt-0.5 shrink-0 rounded bg-muted px-1 py-px text-micro text-muted-foreground">
               {c.kind}
             </span>
             <span className="min-w-0 flex-1">
@@ -148,7 +148,7 @@ function OutcomeReport({ job, docId }: { job: ChapterBuildJob; docId: string }) 
         {counts.empty > 0 && <span>{counts.empty} empty</span>}
         {counts.skipped > 0 && <span>{counts.skipped} skipped</span>}
         {counts.error > 0 && <span className="text-destructive">{counts.error} errors</span>}
-        {counts.gated > 0 && <span className="text-amber-400">{counts.gated} gated (ungrounded)</span>}
+        {counts.gated > 0 && <span className="text-status-due">{counts.gated} gated (ungrounded)</span>}
         {counts.chunked > 0 && <span>{counts.chunked} chunked (oversize)</span>}
       </div>
       {noteworthy.length > 0 && (
@@ -158,7 +158,7 @@ function OutcomeReport({ job, docId }: { job: ChapterBuildJob; docId: string }) 
               <span
                 className={cn(
                   "mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                  o.status === "error" ? "bg-destructive" : o.status === "empty" ? "bg-amber-400" : "bg-muted-foreground/50",
+                  o.status === "error" ? "bg-destructive" : o.status === "empty" ? "bg-status-due" : "bg-muted-foreground/50",
                 )}
               />
               <span className="min-w-0 flex-1 truncate text-foreground/80" title={o.heading}>

@@ -51,12 +51,15 @@ const SESSION_DAYS = 30
 // Static class lookups (Tailwind needs literal class names to keep them).
 const LOAD_CLASSES = ["", "bg-brand/10", "bg-brand/25", "bg-brand/45", "bg-brand/70"]
 const KIND_BADGES: Record<string, string> = {
-  read: "bg-sky-500/15 text-sky-400",
-  listen: "bg-sky-500/10 text-sky-500",
-  review: "bg-emerald-500/15 text-emerald-400",
-  recall: "bg-violet-500/15 text-violet-400",
+  read: "bg-status-ready/15 text-status-ready",
+  // listen was a second, adjacent blue. The palette move collapsed both onto
+  // status-ready, which left two session kinds wearing the same badge — so it
+  // takes the fading hue, the only one this map was not already using.
+  listen: "bg-status-fading/15 text-status-fading",
+  review: "bg-status-mastered/15 text-status-mastered",
+  recall: "bg-status-building/15 text-status-building",
   resurface: "bg-brand/15 text-brand",
-  manual: "bg-amber-500/15 text-amber-400",
+  manual: "bg-status-due/15 text-status-due",
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -155,7 +158,7 @@ function CalendarGrid({
       {months.map((month) => (
         <div key={month.key}>
           <p className="mb-1.5 text-xs font-medium text-foreground/80">{month.label}</p>
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-7 gap-1 text-center text-micro uppercase tracking-label text-muted-foreground">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
               <span key={d}>{d}</span>
             ))}
@@ -190,7 +193,7 @@ function CalendarGrid({
                     {Number(date.slice(8, 10))}
                   </span>
                   {count > 0 && !outside && (
-                    <span className="mt-0.5 text-[10px] font-medium leading-none tabular-nums">
+                    <span className="mt-0.5 text-micro font-medium leading-none tabular-nums">
                       {count}
                     </span>
                   )}
@@ -205,10 +208,10 @@ function CalendarGrid({
 }
 
 const ITEM_TYPE_BADGES: Record<string, string> = {
-  concept: "bg-violet-500/15 text-violet-400",
+  concept: "bg-status-building/15 text-status-building",
   skeleton: "bg-brand/15 text-brand",
-  chapter: "bg-sky-500/15 text-sky-400",
-  figure: "bg-emerald-500/15 text-emerald-400",
+  chapter: "bg-status-ready/15 text-status-ready",
+  figure: "bg-status-mastered/15 text-status-mastered",
 }
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -228,7 +231,7 @@ function AgendaItem({ item, onOpen }: { item: CalendarItem; onOpen: (doc: string
       >
         <span
           className={cn(
-            "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none",
+            "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-micro font-medium uppercase leading-none",
             ITEM_TYPE_BADGES[item.type] || "bg-muted text-muted-foreground",
           )}
         >
@@ -277,7 +280,7 @@ function ReviewAgenda({
     <div className="flex flex-col gap-3">
       {showOverdue && (
         <div>
-          <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-status-due">
+          <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-label text-status-due">
             <AlarmClock className="h-3.5 w-3.5" /> Overdue · {calendar.dueNow.total}
           </p>
           <ul className="flex flex-col">
@@ -294,7 +297,7 @@ function ReviewAgenda({
       )}
       {days.map((day) => (
         <div key={day.date}>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1 text-xs font-medium uppercase tracking-label text-muted-foreground">
             {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(undefined, {
               weekday: "short",
               month: "short",
@@ -335,7 +338,7 @@ function SessionRow({
     <li className="group/session flex items-start gap-2 rounded-md px-1.5 py-1.5">
       <span
         className={cn(
-          "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none",
+          "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-micro font-medium uppercase leading-none",
           KIND_BADGES[session.kind] || "bg-muted text-muted-foreground",
         )}
       >
@@ -631,7 +634,7 @@ export function StudyPlanner({ onOpenCourse }: { onOpenCourse: (doc: string) => 
                 <CalendarGrid calendar={calendar} selected={selected} onSelect={setSelected} />
                 <div className="mt-4 border-t pt-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-label text-muted-foreground">
                       {selected
                         ? new Date(`${selected}T00:00:00Z`).toLocaleDateString(undefined, {
                             weekday: "long",

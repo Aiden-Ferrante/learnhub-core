@@ -3,8 +3,8 @@ import type { MemoryState } from "@/gateways/api/progress"
 const STATE_CLASS: Record<MemoryState, string> = {
   new: "border border-muted-foreground/40",
   solid: "bg-brand",
-  shaky: "bg-amber-400",
-  fading: "bg-rose-400",
+  shaky: "bg-status-due",
+  fading: "bg-status-fading",
 }
 
 /** A small memory indicator (concept or section). Hollow = not reviewed; otherwise the

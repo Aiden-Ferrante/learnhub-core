@@ -20,7 +20,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
   }
 
   return (
-    <main className="mx-auto w-full px-4 pb-3 pt-3">
+    <main className="mx-auto w-full max-w-6xl px-6 pb-6 pt-6">
       <CourseHome
         course={data.course}
         tree={data.tree}

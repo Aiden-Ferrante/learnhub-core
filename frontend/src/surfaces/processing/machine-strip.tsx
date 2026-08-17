@@ -104,7 +104,7 @@ export function MachineStrip() {
               "no model loaded"
             )
           ) : (
-            <span className="text-amber-400">Ollama unreachable</span>
+            <span className="text-destructive">Ollama unreachable</span>
           )}
         </span>
 
@@ -141,7 +141,7 @@ export function MachineStrip() {
           type="button"
           variant={status.queue.paused ? "outline" : "ghost"}
           size="sm"
-          className={cn("ml-auto h-7 gap-1.5 px-2 text-xs", status.queue.paused && "text-amber-400")}
+          className={cn("ml-auto h-7 gap-1.5 px-2 text-xs", status.queue.paused && "text-status-due")}
           onClick={togglePause}
           disabled={busy}
           title={

@@ -93,7 +93,7 @@ export function LessonPanel({
       <div className="flex flex-1 flex-col gap-3 rounded-lg border bg-card p-5">
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold">{c.name}</span>
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${kindClass}`}>
+          <span className={`rounded px-1.5 py-0.5 text-micro font-medium uppercase ${kindClass}`}>
             {c.kind}
           </span>
         </div>
@@ -109,7 +109,7 @@ export function LessonPanel({
         <Button
           type="button"
           variant="outline"
-          className="border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+          className="border-destructive/40 text-destructive hover:bg-destructive/10"
           onClick={() => mark(false)}
         >
           Needs review
@@ -117,7 +117,7 @@ export function LessonPanel({
         <Button
           type="button"
           variant="outline"
-          className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+          className="border-status-mastered/40 text-status-mastered hover:bg-status-mastered/10"
           onClick={() => mark(true)}
         >
           Got it

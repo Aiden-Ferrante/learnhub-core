@@ -2,40 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Inter typography patterns (Channel brand) */
-
 :root {
   color-scheme: light dark;
-  --foreground-rgb: 24, 24, 27;    /* zinc-900 */
-  --background-rgb: 250, 250, 250; /* zinc-50  */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 244, 244, 245; /* zinc-100 */
-    --background-rgb: 9, 9, 11;      /* zinc-950 */
-  }
-}
-
+/* Ground and ink come from --background / --foreground below, and from nowhere
+   else. There used to be a second pair here — --background-rgb / --foreground-rgb,
+   as comma triplets for rgb() — holding the same four zinc values in a second
+   notation, and because this rule is unlayered it beat the `@apply bg-background
+   text-foreground` in @layer base and was the pair actually painting the page.
+   Two definitions of the ground is how one of them quietly goes stale. */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
   scroll-behavior: smooth;
 }
 
-/* Base page container styles */
+/* The page container. 72rem, matching the max-w-6xl the rest of the fleet
+   centres on — the header sits in this, so a wider one here is the chrome
+   moving when you switch apps, which is the one thing the shared shell exists
+   to prevent. It was 90rem.
+
+   No extra padding at lg either: call sites pass px-6, and the fleet's gutter
+   is that 24px everywhere. The reading and book surfaces keep their own full
+   width, the way shipyard's chart does — a document is allowed to disagree
+   with the dashboard about how wide it wants to be. */
 .container {
-  max-width: 90rem;
+  max-width: 72rem;
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-}
-
-@media (min-width: 1024px) {
-  .container {
-    padding-left: 2rem;
-    padding-right: 2rem;
-  }
 }
 
 @layer utilities {
@@ -284,74 +278,15 @@ body {
   text-underline-offset: 3px;
 }
 
-/* Modern UI Elements */
-.glass-card {
-  @apply bg-card/80 backdrop-blur-md shadow-xl;
-  border: 1px solid;
-  border-color: rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.light .glass-card {
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.10);
-}
-
-.glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 16px 20px -6px rgba(0, 0, 0, 0.10), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-}
-
-.light .glass-card:hover {
-  border-color: rgba(0, 0, 0, 0.15);
-}
-
-.glass-card h2 {
-  letter-spacing: 0.01em;
-}
-
-.glass-card p {
-  line-height: 1.6;
-}
-
-.gradient-text {
-  background: linear-gradient(to right, hsl(var(--brand)), hsl(var(--brand-light)));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-}
-
-.hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.10), 0 6px 8px -6px rgba(0, 0, 0, 0.08);
-}
-
-.animate-glow {
-  animation: glow 2s ease-in-out infinite alternate;
-}
-
-@keyframes glow {
-  from {
-    box-shadow: 0 0 5px rgba(77, 163, 255, 0.2), 0 0 10px rgba(77, 163, 255, 0.1);
-  }
-  to {
-    box-shadow: 0 0 10px rgba(77, 163, 255, 0.3), 0 0 20px rgba(77, 163, 255, 0.2);
-  }
-}
-
-/* Light mode row selection highlight using the brand accent */
-.light .row-selected {
-  background-color: hsl(var(--brand) / 0.08);
-}
-
-.light .row-selected:hover {
-  background-color: hsl(var(--brand) / 0.12);
-}
+/* Removed 2026-08-17, with the move onto the fleet's look: .glass-card,
+   .gradient-text, .hover-lift, .animate-glow (+ its keyframes) and
+   .light .row-selected. Between them they were the whole "premium" visual
+   language this app arrived with — blurred translucent panels, a gradient
+   wordmark, lift-on-hover and a pulsing glow — and none of it appears anywhere
+   in the fleet, whose surfaces are a 1px border and a flat fill. Four of the
+   five already had zero call sites; the gradient wordmark was the only one
+   still rendering, and it is now the plain .fleet-brand treatment.
+   Recoverable from git if a marketing page ever wants them back. */
 
 /* Slider Styles */
 .slider-thumb::-webkit-slider-thumb {
@@ -387,27 +322,10 @@ body {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Button Styles */
-.btn-primary {
-  @apply px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md text-sm 
-         hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-md;
-}
-
-.btn-secondary {
-  @apply px-4 py-2 bg-secondary text-secondary-foreground font-medium rounded-md text-sm 
-         hover:bg-secondary/90 transition-colors flex items-center gap-2;
-}
-
-.btn-outline {
-  @apply px-4 py-2 bg-transparent border border-border text-foreground font-medium rounded-md text-sm 
-         hover:bg-muted transition-colors flex items-center gap-2;
-}
-
-.btn-destructive {
-  @apply px-4 py-2 bg-destructive/20 text-destructive font-medium rounded-md text-sm 
-         hover:bg-destructive/30 transition-colors flex items-center gap-2;
-}
-
+/* Button Styles.
+   .btn-primary / -secondary / -outline / -destructive were removed with the
+   fleet move: zero call sites, and a second button language competing with
+   kit/ui/button.tsx is how a surface ends up with two kinds of primary. */
 .btn-icon {
   @apply p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors;
 }
@@ -423,16 +341,15 @@ body {
   position: relative;
 }
 
-/* Light mode: soften elevation globally to reduce heavy shadows */
+/* Light mode: soften elevation globally to reduce heavy shadows. Kept, and it
+   pulls the same direction as the fleet move — shipyard's surfaces are a 1px
+   border and a flat fill, with no shadow at all below the floating layer. */
 .light .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important; }
 .light .shadow, 
 .light .shadow-md { box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important; }
 .light .shadow-lg { box-shadow: 0 6px 14px -6px rgba(0,0,0,0.10) !important; }
 .light .shadow-xl { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
 .light .shadow-2xl { box-shadow: 0 12px 22px -10px rgba(0,0,0,0.14) !important; }
-
-/* Light mode: tune specific custom elements */
-.light .glass-card:hover { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
 
 /* Progress bar indeterminate animation - smooth sliding with gradient shine */
 @keyframes progress {
@@ -588,33 +505,9 @@ body {
   color: inherit;
 }
 
-/* Survivors of the legacy build-typography sheet (hash-tab era) — everything else was dead. */
-.build-gradient-text {
-  background: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--brand-light)));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.build-card {
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: 12px;
-  padding: 2rem;
-  transition: all 0.2s ease;
-}
-
-.build-card:hover {
-  border-color: hsl(var(--brand) / 0.3);
-  box-shadow: 0 8px 32px hsl(var(--brand) / 0.1);
-  transform: translateY(-2px);
-}
-
-.dark .build-card {
-  background: hsl(var(--card) / 0.8);
-  backdrop-filter: blur(12px);
-}
-
-.dark .build-card:hover {
-  background: hsl(var(--card) / 0.9);
-}
+/* The last two survivors of the legacy build-typography sheet (hash-tab era)
+   went with the fleet move. .build-card was a third card idiom — 12px radius,
+   2rem padding, a blur-and-glow hover on panels that were not clickable — next
+   to kit/patterns/section-card and the plain `rounded-lg border bg-card` the
+   other twenty files use. Its five call sites now use that plain one, which is
+   the same box shipyard draws. .build-gradient-text went with .gradient-text. */

@@ -50,7 +50,7 @@ export function FleetApps() {
 
   return (
     <nav aria-label="Fleet" className="flex items-center gap-1 overflow-x-auto">
-      <p className="mr-3 whitespace-nowrap text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+      <p className="mr-3 whitespace-nowrap text-micro uppercase tracking-[0.14em] text-muted-foreground">
         fleet
       </p>
       {FLEET_APPS.map((a) =>
@@ -59,7 +59,7 @@ export function FleetApps() {
           <span
             key={a.id}
             aria-current="page"
-            className="rounded-t-md border-b-2 border-primary px-2.5 py-1.5 text-[12.5px]
+            className="rounded-t-md border-b-2 border-primary px-2.5 py-1.5 text-meta
               font-medium text-foreground"
           >
             {a.label}
@@ -71,7 +71,7 @@ export function FleetApps() {
             // clickable and pointing at the reader's own machine.
             href={origin ? `${origin.protocol}//${origin.hostname}:${a.port}` : undefined}
             title={a.blurb}
-            className="rounded-t-md border-b-2 border-transparent px-2.5 py-1.5 text-[12.5px]
+            className="rounded-t-md border-b-2 border-transparent px-2.5 py-1.5 text-meta
               text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             {a.label}

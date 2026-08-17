@@ -31,7 +31,7 @@ export function OutlineRail({
   if (items.length === 0) return null
   return (
     <nav className="sticky top-0 hidden max-h-[calc(100dvh-220px)] w-56 shrink-0 self-start overflow-y-auto pb-4 pr-1 pt-1 lg:block">
-      <div className={cn("mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide", mutedCls)}>
+      <div className={cn("mb-2 px-2 text-micro font-semibold uppercase tracking-label", mutedCls)}>
         In this chapter
       </div>
       <div className="space-y-0.5">

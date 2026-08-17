@@ -43,11 +43,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
+    <div className="w-full max-w-sm rounded-lg border bg-card p-6">
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <BrandMark className="h-10 w-10 text-brand" />
-        <h1 className="text-xl font-bold gradient-text">Learn Hub</h1>
-        <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
+        <h1 className="text-section font-semibold tracking-tight">Learn Hub</h1>
+        <p className="text-meta text-muted-foreground">Sign in to your workspace</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -95,7 +95,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-[calc(100vh-65px)] items-center justify-center p-4">
+    // 88px, not 65: the layout renders the two-tier header on this page too, and
+    // the fleet pins it at 38 + 49 + 1. The old number was 23px short, which is
+    // exactly the scrollbar this page had on a viewport-height screen.
+    <main className="flex min-h-[calc(100vh-88px)] items-center justify-center p-4">
       <Suspense>
         <LoginForm />
       </Suspense>
