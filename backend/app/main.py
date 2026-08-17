@@ -6,13 +6,16 @@ algorithm lives in a domain package. If you're adding a route here, it belongs i
 """
 
 import os
+from datetime import datetime
+from typing import Any
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api import all_routers
 from app.conductor import install as install_job_runners
-from app.gateways import set_request_db_name
+from app.gateways import db, ollama_base_url, set_request_db_name
 
 app = FastAPI(title="Learn Hub", version="0.2.0")
 
@@ -32,7 +35,38 @@ async def user_db_middleware(request: Request, call_next):
 
 @app.get("/health")
 def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
+    """Fleet health shape — ``{ok, checks, freshness}`` (mission-control renders it).
+
+    ``ok`` tracks postgres only: the app serves without Ollama (LLM work just queues),
+    so ``checks.ollama = false`` must not flip ``ok``. Always answers 200, fast —
+    a down dependency is a false check, never an error here.
+    """
+    checks = {"postgres": False, "ollama": False}
+    freshness: dict[str, str] = {}
+    try:
+        with db() as conn:
+            conn.execute("SELECT 1")
+            checks["postgres"] = True
+            # Jobs-ledger freshness: newest activity across the chapter_builds
+            # timestamps (epoch seconds -> ISO-8601, per the fleet convention).
+            row = conn.execute(
+                "SELECT MAX(GREATEST(COALESCE(requested_at, 0), COALESCE(started_at, 0), "
+                "COALESCE(finished_at, 0))) AS ts FROM chapter_builds"
+            ).fetchone()
+            if row and row.get("ts"):
+                freshness["jobs"] = datetime.fromtimestamp(row["ts"]).astimezone().isoformat()
+    except Exception:  # noqa: BLE001 — health must answer whatever is down
+        pass
+    try:
+        checks["ollama"] = (
+            httpx.get(f"{ollama_base_url()}/api/tags", timeout=2.0).status_code == 200
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    body: dict[str, Any] = {"ok": checks["postgres"], "checks": checks}
+    if freshness:
+        body["freshness"] = freshness
+    return JSONResponse(body)
 
 
 @app.get("/", response_class=HTMLResponse)

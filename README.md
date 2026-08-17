@@ -116,11 +116,10 @@ Task tracking uses [Backlog.md](https://github.com/MrLesk/Backlog.md) — `backl
 
 ## Status
 
-Working and in daily use. Known gaps, tracked rather than hidden:
+Working and in daily use. `/health` serves the fleet `{ok, checks, freshness}` shape
+(postgres + ollama checks, jobs-ledger freshness). Known gaps, tracked rather than hidden:
 
 - **No account provisioning command.** Users are inserted into `auth.users` by hand.
-- **`/health` returns `{"status":"ok"}`**, not the `{ok, checks, freshness}` shape the rest of
-  the local fleet uses.
 - **No Makefile.** The stack is driven by `start.sh` / `stop.sh`; there is no
   `make dev` / `make prod` / `make test`.
 
