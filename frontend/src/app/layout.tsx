@@ -43,11 +43,14 @@ export default function RootLayout({
                 app's own sections below. */}
             <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
               <div className="container mx-auto px-4">
-                <div className="border-b border-border/40 pt-1.5">
+                {/* Tier heights pinned to the fleet's 38px + 49px (+1px header
+                    border = 88px) — fleet.css enforces the same numbers on the
+                    other four apps, so landing here no longer moves the chrome. */}
+                <div className="flex h-[38px] items-end border-b border-border/40">
                   <FleetApps />
                 </div>
               </div>
-              <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+              <div className="container mx-auto flex h-[49px] items-center justify-between gap-4 px-4">
                 <div className="flex min-w-0 items-center gap-2">
                   <HeaderBrand />
                   <Breadcrumbs />
