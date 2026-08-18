@@ -132,7 +132,9 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
         ) : (
           <div className="inline-flex flex-col gap-1.5">
             {/* Month labels */}
-            <div className="flex gap-[3px] pl-6 text-micro text-muted-foreground">
+            {/* pl-8 = the weekday gutter's w-7 + mr-1 below. The two have to add
+                up or the month labels sit off their columns. */}
+            <div className="flex gap-[3px] pl-8 text-micro text-muted-foreground">
               {weeks.map((_, i) => {
                 const label = monthLabels.find((l) => l.col === i)
                 return (
@@ -145,7 +147,10 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
 
             <div className="flex gap-[3px]">
               {/* Weekday gutter */}
-              <div className="mr-0.5 flex w-5 shrink-0 flex-col gap-[3px] text-micro text-muted-foreground">
+              {/* w-7, not w-5: these labels were text-[9px] and fit a 20px box.
+                  Lifting them to the 11px floor made "Mon" ~22px wide, which
+                  overran the gutter into the first column of squares. */}
+              <div className="mr-1 flex w-7 shrink-0 flex-col gap-[3px] text-micro text-muted-foreground">
                 {["", "Mon", "", "Wed", "", "Fri", ""].map((d, i) => (
                   <div key={i} className="flex h-2.5 items-center leading-none">
                     {d}
