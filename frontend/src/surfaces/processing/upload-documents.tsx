@@ -5,7 +5,14 @@ import type React from "react"
 import { useState } from "react"
 import { Upload, AlertCircle, FileText, Loader2 } from "lucide-react"
 import { useDocuments } from "@/surfaces/processing/document-context"
-import { isSupportedIngestFile, prepareFilesForIngestion } from "@/surfaces/processing/convert-pdf"
+import {
+  isPdfFile,
+  isSupportedIngestFile,
+  loadConvertedDocument,
+  markdownNameFor,
+  markdownToFile,
+  startPdfConversion,
+} from "@/surfaces/processing/convert-pdf"
 import { toast } from "@/kit/hooks/use-toast"
 
 export function UploadDocuments() {
@@ -28,45 +35,83 @@ export function UploadDocuments() {
     return validFiles
   }
 
+  /**
+   * Start each file's ingestion and give it a card straight away. For a PDF that means
+   * upload + enqueue only — we do NOT wait out the conversion here. The card (carrying
+   * the learn-service docId) is persisted within one autosave, so the book survives a
+   * reload, a closed tab, or a dropped connection; DocumentProvider settles it when the
+   * job reports done.
+   */
   const ingestFiles = async (files: File[]) => {
     const validFiles = validateFiles(files)
     if (validFiles.length === 0) return
 
-    const hasPdf = validFiles.some((f) => f.name.toLowerCase().endsWith(".pdf"))
+    const plainFiles = validFiles.filter((f) => !isPdfFile(f))
+    const pdfs = validFiles.filter(isPdfFile)
+    if (plainFiles.length > 0) addDocuments(plainFiles.map((file) => ({ file })))
+    if (pdfs.length === 0) return
+
     setIsConverting(true)
     setError(null)
-
     try {
-      if (hasPdf) {
-        toast({
-          title: "Converting PDF",
-          description: "Turning PDF into Markdown for ingestion…",
-        })
+      for (const file of pdfs) {
+        try {
+          const start = await startPdfConversion(file)
+
+          if (start.kind === "job") {
+            addDocuments([
+              {
+                file,
+                name: markdownNameFor(file.name),
+                converting: true,
+                convertedFromPdf: true,
+                originalPdfName: file.name,
+                learnDocId: start.docId,
+              },
+            ])
+            toast({
+              title: "Converting PDF",
+              description: `"${file.name}" is converting in the background — it stays in your library even if you leave this page.`,
+            })
+            continue
+          }
+
+          // Already ingested, or an older synchronous server: content is available now.
+          const result =
+            start.kind === "duplicate"
+              ? await loadConvertedDocument(start.docId, file.name, start.existingTitle)
+              : start.result
+          addDocuments([
+            {
+              file: markdownToFile(result.markdown, result.outputFilename),
+              convertedFromPdf: true,
+              originalPdfName: file.name,
+              pageCount: result.pageCount,
+              learnDocId: result.learnDocId,
+              duplicateOf: result.duplicateOf,
+            },
+          ])
+          toast(
+            result.duplicateOf
+              ? {
+                  title: "Already in your library",
+                  description: `"${file.name}" matches an existing book — linked to its content instead of converting a second copy.`,
+                }
+              : {
+                  title: "PDF converted",
+                  description: `"${file.name}" is ready as Markdown.`,
+                },
+          )
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          setError(message)
+          toast({
+            title: `Could not start "${file.name}"`,
+            description: message,
+            variant: "destructive",
+          })
+        }
       }
-      const prepared = await prepareFilesForIngestion(validFiles)
-      addDocuments(prepared)
-      const duplicates = prepared.filter((p) => p.duplicateOf)
-      for (const d of duplicates) {
-        toast({
-          title: "Already in your library",
-          description: `"${d.originalPdfName}" matches an existing book — linked to its content instead of converting a second copy.`,
-        })
-      }
-      const converted = prepared.filter((p) => p.convertedFromPdf && !p.duplicateOf)
-      if (converted.length > 0) {
-        toast({
-          title: "PDF converted",
-          description: `${converted.length} file(s) ready as Markdown. Use Preview TOC before processing if you need section hierarchy.`,
-        })
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-      toast({
-        title: "PDF conversion failed",
-        description: message,
-        variant: "destructive",
-      })
     } finally {
       setIsConverting(false)
     }
@@ -132,11 +177,11 @@ export function UploadDocuments() {
             )}
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
-            {busy ? "Converting PDF…" : "Drag & Drop Files"}
+            {busy ? "Uploading…" : "Drag & Drop Files"}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
             {busy ? (
-              "Please wait while PDFs are converted to Markdown"
+              "Conversion continues in the background once the upload finishes"
             ) : (
               <>
                 or <button type="button" className="font-medium text-brand hover:text-brand/80 underline underline-offset-2">browse files</button>

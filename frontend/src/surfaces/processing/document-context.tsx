@@ -3,14 +3,22 @@
 import type React from "react"
 
 import { createContext, useContext, useState, useEffect, useRef } from "react"
-import type { PreparedIngestFile } from "@/surfaces/processing/convert-pdf"
+import {
+  ConversionUnavailable,
+  awaitPdfConversion,
+  markdownToFile,
+  type PreparedIngestFile,
+} from "@/surfaces/processing/convert-pdf"
+import { toast } from "@/kit/hooks/use-toast"
 
 export type DocumentAddInput = File | PreparedIngestFile
 
 export type Document = {
   id: string
+  /** `Converting` = the book is being converted server-side; the card is a durable
+   *  placeholder holding its learnDocId until the job reports done. */
+  status: "New" | "Converting" | "Processed" | "Error"
   name: string
-  status: "New" | "Processed" | "Error"
   uploadStatus: "Uploaded"
   size: string
   file: File
@@ -27,7 +35,8 @@ type DocumentContextType = {
   /** True once the initial server load has settled — lets deep links distinguish
    *  "documents still loading" from "no such document". */
   isInitialized: boolean
-  addDocuments: (items: DocumentAddInput[]) => void
+  /** Returns the cards it created, so a caller can settle one later by id. */
+  addDocuments: (items: DocumentAddInput[]) => Document[]
   deleteDocuments: (documentIds: string[]) => void
   renameDocument: (documentId: string, name: string) => void
 }
@@ -150,15 +159,65 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [documents, isInitialized])
 
-  const addDocuments = (items: DocumentAddInput[]) => {
+  /** Patch one card in place — how a `Converting` placeholder becomes a finished book. */
+  const updateDocument = (documentId: string, patch: Partial<Document>) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (doc.id === documentId ? { ...doc, ...patch } : doc)),
+    )
+  }
+
+  // The ONE place a `Converting` card settles — whether an upload just started it or a
+  // reload found one half-done. Conversion runs server-side and takes minutes, so the
+  // card is written first and watched second: losing this tab only delays the flip, it
+  // can never orphan a book that the learn service went on to finish.
+  const settlingRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!isInitialized) return
+    for (const doc of documents) {
+      if (doc.status !== "Converting" || !doc.learnDocId) continue
+      if (settlingRef.current.has(doc.id)) continue
+      settlingRef.current.add(doc.id)
+
+      const cardId = doc.id
+      const cardName = doc.name
+      awaitPdfConversion(doc.learnDocId)
+        .then((result) => {
+          const converted = markdownToFile(result.markdown, result.outputFilename)
+          updateDocument(cardId, {
+            status: "New",
+            file: converted,
+            size: (converted.size / 1024).toFixed(2),
+            convertedFromPdf: true,
+          })
+          toast({
+            title: "PDF converted",
+            description: `"${cardName}" is ready. Use Preview TOC before processing if you need section hierarchy.`,
+          })
+        })
+        .catch((error) => {
+          settlingRef.current.delete(cardId) // let a later visit pick it back up
+          // We only stopped watching; the job outlives us. Leave the card Converting.
+          if (error instanceof ConversionUnavailable) return
+          const message = error instanceof Error ? error.message : String(error)
+          updateDocument(cardId, { status: "Error", error: message })
+          toast({
+            title: "PDF conversion failed",
+            description: message,
+            variant: "destructive",
+          })
+        })
+    }
+  }, [documents, isInitialized])
+
+  const addDocuments = (items: DocumentAddInput[]): Document[] => {
     const newDocuments = items.map((item) => {
       const prepared: PreparedIngestFile =
         item instanceof File ? { file: item } : item
-      const { file, convertedFromPdf, originalPdfName, learnDocId } = prepared
+      const { file, name, converting, convertedFromPdf, originalPdfName, learnDocId } = prepared
       return {
         id: generateUUID(),
-        name: file.name,
-        status: "New" as const,
+        name: name ?? file.name,
+        status: converting ? ("Converting" as const) : ("New" as const),
         uploadStatus: "Uploaded" as const,
         size: (file.size / 1024).toFixed(2),
         file,
@@ -169,6 +228,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     })
 
     setDocuments((prev) => [...prev, ...newDocuments])
+    return newDocuments
   }
 
   const deleteDocuments = (documentIds: string[]) => {

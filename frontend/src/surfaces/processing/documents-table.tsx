@@ -92,6 +92,8 @@ export function DocumentsTable() {
     switch (status) {
       case "New":
         return <span className="h-1.5 w-1.5 rounded-full bg-status-ready mr-2"></span>
+      case "Converting":
+        return <Loader2 className="h-3.5 w-3.5 text-status-building mr-2 animate-spin" />
       case "Processed":
         return <CheckCircle className="h-3.5 w-3.5 text-status-mastered mr-2" />
       case "Error":
@@ -217,6 +219,7 @@ export function DocumentsTable() {
                     {getStatusIcon(doc.status)}
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                       doc.status === 'Processed' ? 'bg-status-mastered/10 text-status-mastered' :
+                      doc.status === 'Converting' ? 'bg-status-building/10 text-status-building' :
                       doc.status === 'Error' ? 'bg-destructive/10 text-destructive' :
                       'bg-status-ready/10 text-status-ready'
                     }`}>{doc.status}</span>

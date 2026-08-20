@@ -7,7 +7,7 @@ export type PdfConvertResponse = {
   docId?: string;
 };
 
-type ConvertResult = {
+export type ConvertResult = {
   markdown: string;
   outputFilename: string;
   pageCount: number;
@@ -19,6 +19,14 @@ type ConvertResult = {
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 25 * 60 * 1000; // big books take minutes; allow plenty
 const MAX_POLL_MISSES = 5; // ~15s of consecutive transient failures before giving up
+
+/**
+ * We stopped watching, but the job itself is very likely still running server-side
+ * (connection blip, or we hit the poll deadline). Distinct from a real conversion
+ * failure: the caller must leave the card `Converting` and try again later rather
+ * than burn it as `Error` — the learn service finishes regardless of this tab.
+ */
+export class ConversionUnavailable extends Error {}
 
 function resultFrom(r: PdfConvertResponse): ConvertResult {
   if (!r.markdown || !r.outputFilename) {
@@ -32,12 +40,21 @@ function resultFrom(r: PdfConvertResponse): ConvertResult {
   };
 }
 
+/** What `startPdfConversion` found: a job to wait on, an already-ingested book, or
+ *  (back-compat) a synchronous server that converted inline. */
+export type ConversionStart =
+  | { kind: 'job'; docId: string }
+  | { kind: 'duplicate'; docId: string; existingTitle?: string }
+  | { kind: 'sync'; result: ConvertResult };
+
 /**
- * Convert a PDF to markdown. Conversion runs as a background job on the learn service
- * (it can take minutes for a large book, longer than the ~5-min app->learn fetch limit),
- * so we start the job and poll for completion from the browser (which has no such limit).
+ * Upload the PDF and enqueue its conversion. Fast — it returns as soon as the learn
+ * service has stashed the bytes and minted the document id, NOT when the book is
+ * converted. The returned `docId` is the learn-service document id (the service uses
+ * it as the job id too), so the caller can persist a card for this book immediately,
+ * before the minutes-long conversion it must not depend on surviving.
  */
-export async function convertPdfToMarkdown(file: File): Promise<ConvertResult> {
+export async function startPdfConversion(file: File): Promise<ConversionStart> {
   const form = new FormData();
   form.append('file', file, file.name);
 
@@ -48,39 +65,59 @@ export async function convertPdfToMarkdown(file: File): Promise<ConvertResult> {
   }
 
   // Identical content already ingested (matched by hash): reuse the stored conversion
-  // instead of building a third copy of the same book. Fetch its markdown so the caller
-  // gets the same shape a fresh conversion would produce.
+  // instead of building a third copy of the same book.
   if (startData.status === 'duplicate' && startData.docId) {
-    const docId = startData.docId as string;
-    const docRes = await fetch(`/api/learn/document?id=${encodeURIComponent(docId)}`, {
-      cache: 'no-store',
-    });
-    const docData = (await docRes.json().catch(() => ({}))) as {
-      document?: { markdown?: string; pageCount?: number; sourceFilename?: string } | null;
-    };
-    const doc = docData.document;
-    if (!doc?.markdown) {
-      throw new Error(
-        'This PDF is already in your library, but its stored content could not be loaded — delete the existing course first if you want to re-ingest it.',
-      );
-    }
-    const base = file.name.replace(/\.pdf$/i, '');
     return {
-      markdown: doc.markdown,
-      outputFilename: `${base}.md`,
-      pageCount: doc.pageCount ?? 0,
-      learnDocId: docId,
-      duplicateOf: (startData.existingTitle as string) || doc.sourceFilename || docId,
+      kind: 'duplicate',
+      docId: startData.docId as string,
+      existingTitle: startData.existingTitle as string | undefined,
     };
   }
 
   // Back-compat: an older synchronous server returns the full result directly.
   if (!startData.jobId && startData.markdown) {
-    return resultFrom(startData as PdfConvertResponse);
+    return { kind: 'sync', result: resultFrom(startData as PdfConvertResponse) };
   }
   const jobId = startData.jobId as string | undefined;
   if (!jobId) throw new Error('Conversion did not start (no job id)');
+  return { kind: 'job', docId: jobId };
+}
 
+/** Read an already-converted book's stored content, in the shape a fresh conversion
+ *  produces. Used for the duplicate-hash path. */
+export async function loadConvertedDocument(
+  docId: string,
+  pdfName: string,
+  existingTitle?: string,
+): Promise<ConvertResult> {
+  const docRes = await fetch(`/api/learn/document?id=${encodeURIComponent(docId)}`, {
+    cache: 'no-store',
+  });
+  const docData = (await docRes.json().catch(() => ({}))) as {
+    document?: { markdown?: string; pageCount?: number; sourceFilename?: string } | null;
+  };
+  const doc = docData.document;
+  if (!doc?.markdown) {
+    throw new Error(
+      'This PDF is already in your library, but its stored content could not be loaded — delete the existing course first if you want to re-ingest it.',
+    );
+  }
+  return {
+    markdown: doc.markdown,
+    outputFilename: markdownNameFor(pdfName),
+    pageCount: doc.pageCount ?? 0,
+    learnDocId: docId,
+    duplicateOf: existingTitle || doc.sourceFilename || docId,
+  };
+}
+
+/**
+ * Wait for a conversion job to finish, polling from the browser (the app->learn fetch
+ * has a ~5-min limit; a big book takes longer). Throws `ConversionUnavailable` when we
+ * merely lost sight of the job — the caller keeps waiting — and a plain Error only when
+ * the conversion itself failed.
+ */
+export async function awaitPdfConversion(jobId: string): Promise<ConvertResult> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let consecutiveMisses = 0; // transient poll failures (blip/auth refresh) — tolerate a few
   while (Date.now() < deadline) {
@@ -96,14 +133,14 @@ export async function convertPdfToMarkdown(file: File): Promise<ConvertResult> {
       // (HTTP 404 + status:"unknown"). Anything else (503 "unreachable", 401, 5xx) → retry.
       if (!sRes.ok && s.status !== 'unknown') {
         if (++consecutiveMisses > MAX_POLL_MISSES) {
-          throw new Error('Lost connection to the conversion service — please retry.');
+          throw new ConversionUnavailable('Lost sight of the conversion — still running.');
         }
         continue;
       }
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Lost connection')) throw err;
+      if (err instanceof ConversionUnavailable) throw err;
       if (++consecutiveMisses > MAX_POLL_MISSES) {
-        throw new Error('Lost connection to the conversion service — please retry.');
+        throw new ConversionUnavailable('Lost sight of the conversion — still running.');
       }
       continue;
     }
@@ -116,11 +153,18 @@ export async function convertPdfToMarkdown(file: File): Promise<ConvertResult> {
     }
     // status === 'running' (or transient 'unreachable' that slipped an OK) → keep polling
   }
-  throw new Error('PDF conversion timed out (over 25 minutes).');
+  // Not a failure — we simply stopped watching. The job outlives this poll.
+  throw new ConversionUnavailable('Still converting after 25 minutes — stopped watching.');
 }
 
 export function markdownToFile(markdown: string, outputFilename: string): File {
   return new File([markdown], outputFilename, { type: 'text/markdown' });
+}
+
+/** The name the converted book takes: the PDF's, with a .md extension. Matches what the
+ *  learn service reports as `outputFilename`, so a card can be named before it converts. */
+export function markdownNameFor(pdfName: string): string {
+  return `${pdfName.replace(/\.pdf$/i, '')}.md`;
 }
 
 export function isPdfFile(file: File): boolean {
@@ -136,6 +180,12 @@ export function isSupportedIngestFile(file: File): boolean {
 
 export type PreparedIngestFile = {
   file: File;
+  /** Card display name. Defaults to the file's — set it when the card is minted before
+   *  its content exists, so the name never changes under the user mid-conversion. */
+  name?: string;
+  /** The conversion job is still running: this card is a placeholder that persists the
+   *  book's `learnDocId` NOW, and is settled when the job reports done. */
+  converting?: boolean;
   convertedFromPdf?: boolean;
   originalPdfName?: string;
   pageCount?: number;
@@ -143,27 +193,3 @@ export type PreparedIngestFile = {
   /** Set when the PDF matched an existing ingest by content hash (title of the original). */
   duplicateOf?: string;
 };
-
-/** Convert PDFs to .md Files; pass through other supported types unchanged. */
-export async function prepareFilesForIngestion(
-  files: File[],
-): Promise<PreparedIngestFile[]> {
-  const results: PreparedIngestFile[] = [];
-  for (const file of files) {
-    if (isPdfFile(file)) {
-      const { markdown, outputFilename, pageCount, learnDocId, duplicateOf } =
-        await convertPdfToMarkdown(file);
-      results.push({
-        file: markdownToFile(markdown, outputFilename),
-        convertedFromPdf: true,
-        originalPdfName: file.name,
-        pageCount,
-        learnDocId,
-        duplicateOf,
-      });
-    } else {
-      results.push({ file });
-    }
-  }
-  return results;
-}

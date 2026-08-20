@@ -86,14 +86,18 @@ export async function PUT(req: NextRequest) {
             jsonb(d.metadata), ts(d.extractedDate), ts(d.lastUpdated),
           ])
         }
-        // Prune only cards NOT in the client list AND not backing a converted book —
-        // a stale client list can never delete a real course (see the doc comment).
+        // Prune only cards NOT in the client list AND not backing a real book — a stale
+        // client list can never delete a real course (see the doc comment). "Real" means
+        // ANY raw_documents row, not just a 'ready' one: a card is now written the moment
+        // conversion is enqueued, and for the minutes it spends 'converting' it is exactly
+        // the card we most need to keep. Only client-only drafts (learn_doc_id IS NULL) and
+        // cards whose document was deleted are prunable.
         const keys = records.map((r) => r.d.id)
         await c.query(
           `DELETE FROM app_documents
              WHERE NOT (key = ANY($1::text[]))
                AND (learn_doc_id IS NULL
-                    OR learn_doc_id NOT IN (SELECT key FROM raw_documents WHERE status = 'ready'))`,
+                    OR learn_doc_id NOT IN (SELECT key FROM raw_documents))`,
           [keys],
         )
         await c.query('COMMIT')
