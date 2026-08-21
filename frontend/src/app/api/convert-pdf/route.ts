@@ -11,8 +11,11 @@ function uploadFilename(blob: Blob): string {
   return typeof name === 'string' && name.length > 0 ? name : 'document.pdf';
 }
 
+/** What the learn service will convert: a rendered book, or an authored one. */
+const ACCEPTED_SUFFIXES = ['.pdf', '.md', '.markdown'];
+
 /**
- * Proxy PDF upload to the learn service for Markdown conversion.
+ * Proxy a document upload to the learn service for conversion.
  * POST /api/convert-pdf  (multipart field: file)
  */
 export async function POST(req: NextRequest) {
@@ -25,8 +28,11 @@ export async function POST(req: NextRequest) {
     }
 
     const name = uploadFilename(file);
-    if (!name.toLowerCase().endsWith('.pdf')) {
-      return NextResponse.json({ error: 'Only .pdf files are accepted' }, { status: 400 });
+    if (!ACCEPTED_SUFFIXES.some((ext) => name.toLowerCase().endsWith(ext))) {
+      return NextResponse.json(
+        { error: `Only ${ACCEPTED_SUFFIXES.join(', ')} files are accepted` },
+        { status: 400 },
+      );
     }
 
     const learnBase =

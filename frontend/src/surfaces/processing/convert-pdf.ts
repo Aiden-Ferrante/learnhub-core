@@ -161,17 +161,29 @@ export function markdownToFile(markdown: string, outputFilename: string): File {
   return new File([markdown], outputFilename, { type: 'text/markdown' });
 }
 
-/** The name the converted book takes: the PDF's, with a .md extension. Matches what the
- *  learn service reports as `outputFilename`, so a card can be named before it converts. */
-export function markdownNameFor(pdfName: string): string {
-  return `${pdfName.replace(/\.pdf$/i, '')}.md`;
+/** The name the converted book takes: the source's, with a .md extension. Matches what the
+ *  learn service reports as `outputFilename`, so a card can be named before it converts.
+ *  Idempotent — an authored `.md` is already its own output name. */
+export function markdownNameFor(sourceName: string): string {
+  if (MARKDOWN_EXTENSIONS.some((ext) => sourceName.toLowerCase().endsWith(ext))) {
+    return sourceName;
+  }
+  return `${sourceName.replace(/\.pdf$/i, '')}.md`;
 }
 
 export function isPdfFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.pdf');
 }
 
-const SUPPORTED_EXTENSIONS = ['.md', '.csv', '.txt', '.json', '.pdf'];
+const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
+
+/** Every extension the learn service will actually ingest.
+ *
+ *  This list used to read `['.md', '.csv', '.txt', '.json', '.pdf']`, which was text2knowledge
+ *  residue: the three data formats had no ingestion path on either side, and a `.md` drop fell
+ *  through to a client-only card with no `learnDocId` — a row attached to no document. Both
+ *  formats here now go through the same upload → convert → persist pipeline. */
+const SUPPORTED_EXTENSIONS = [...MARKDOWN_EXTENSIONS, '.pdf'];
 
 export function isSupportedIngestFile(file: File): boolean {
   const lower = file.name.toLowerCase();

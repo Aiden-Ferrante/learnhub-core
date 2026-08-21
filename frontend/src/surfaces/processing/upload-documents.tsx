@@ -26,7 +26,7 @@ export function UploadDocuments() {
     const validFiles = Array.from(files).filter((file) => {
       if (!isSupportedIngestFile(file)) {
         setError(
-          "Supported: markdown (.md), CSV (.csv), text (.txt), JSON (.json), and PDF (.pdf, converted to Markdown).",
+          "Supported: PDF (.pdf, converted to Markdown) and Markdown (.md).",
         )
         return false
       }
@@ -36,9 +36,9 @@ export function UploadDocuments() {
   }
 
   /**
-   * Start each file's ingestion and give it a card straight away. For a PDF that means
-   * upload + enqueue only — we do NOT wait out the conversion here. The card (carrying
-   * the learn-service docId) is persisted within one autosave, so the book survives a
+   * Start each file's ingestion and give it a card straight away. That means upload +
+   * enqueue only — we do NOT wait out the conversion here. The card (carrying the
+   * learn-service docId) is persisted within one autosave, so the book survives a
    * reload, a closed tab, or a dropped connection; DocumentProvider settles it when the
    * job reports done.
    */
@@ -46,15 +46,14 @@ export function UploadDocuments() {
     const validFiles = validateFiles(files)
     if (validFiles.length === 0) return
 
-    const plainFiles = validFiles.filter((f) => !isPdfFile(f))
-    const pdfs = validFiles.filter(isPdfFile)
-    if (plainFiles.length > 0) addDocuments(plainFiles.map((file) => ({ file })))
-    if (pdfs.length === 0) return
-
+    // Every supported format goes through the conversion pipeline. There is no
+    // client-only path: a card without a `learnDocId` is attached to no document, so it
+    // can never be read, extracted, or studied.
     setIsConverting(true)
     setError(null)
     try {
-      for (const file of pdfs) {
+      for (const file of validFiles) {
+        const fromPdf = isPdfFile(file)
         try {
           const start = await startPdfConversion(file)
 
@@ -64,14 +63,13 @@ export function UploadDocuments() {
                 file,
                 name: markdownNameFor(file.name),
                 converting: true,
-                convertedFromPdf: true,
-                originalPdfName: file.name,
+                ...(fromPdf ? { convertedFromPdf: true, originalPdfName: file.name } : {}),
                 learnDocId: start.docId,
               },
             ])
             toast({
-              title: "Converting PDF",
-              description: `"${file.name}" is converting in the background — it stays in your library even if you leave this page.`,
+              title: fromPdf ? "Converting PDF" : "Importing Markdown",
+              description: `"${file.name}" is processing in the background — it stays in your library even if you leave this page.`,
             })
             continue
           }
@@ -84,8 +82,7 @@ export function UploadDocuments() {
           addDocuments([
             {
               file: markdownToFile(result.markdown, result.outputFilename),
-              convertedFromPdf: true,
-              originalPdfName: file.name,
+              ...(fromPdf ? { convertedFromPdf: true, originalPdfName: file.name } : {}),
               pageCount: result.pageCount,
               learnDocId: result.learnDocId,
               duplicateOf: result.duplicateOf,
@@ -98,8 +95,8 @@ export function UploadDocuments() {
                   description: `"${file.name}" matches an existing book — linked to its content instead of converting a second copy.`,
                 }
               : {
-                  title: "PDF converted",
-                  description: `"${file.name}" is ready as Markdown.`,
+                  title: fromPdf ? "PDF converted" : "Markdown imported",
+                  description: `"${file.name}" is ready to read.`,
                 },
           )
         } catch (err) {
@@ -164,7 +161,7 @@ export function UploadDocuments() {
           type="file"
           multiple
           className="hidden"
-          accept=".md,.csv,.txt,.json,.pdf"
+          accept=".pdf,.md,.markdown"
           onChange={handleFileSelect}
           disabled={busy}
         />
@@ -190,7 +187,7 @@ export function UploadDocuments() {
           </p>
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full border border-border/30">
             <FileText className="h-3 w-3" />
-            <span>.md, .csv, .txt, .json, .pdf (auto-convert)</span>
+            <span>.pdf (auto-convert), .md</span>
           </div>
         </div>
       </div>

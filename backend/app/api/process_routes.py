@@ -15,9 +15,12 @@ from app.conductor import prepare_upload
 from app.gateways import KINDS, cancel_build, enqueue_build, list_builds
 from app.process.content import chapter_key_of, document_overview, fetch_latest_document, find_by_source_hash, resolve_doc_id
 from app.process.extraction import section_concept_rows
-from app.process.ingestion import source_hash_of
+from app.process.ingestion import MARKDOWN_SUFFIXES, source_hash_of
 
 router = APIRouter()
+
+# What ``/api/convert-pdf`` will take. A rendered book or an authored one.
+ACCEPTED_SUFFIXES = (".pdf", *MARKDOWN_SUFFIXES)
 
 # Map the persistent queue's job status onto the status vocabulary clients poll.
 _CONVERT_STATUS = {"queued": "running", "running": "running", "done": "done",
@@ -31,13 +34,23 @@ _EXTRACT_STATUS = {"queued": "running", "running": "running", "done": "done",
 
 @router.post("/api/convert-pdf")
 async def convert_pdf(file: UploadFile = File(...), force: int = Query(0)) -> JSONResponse:
-    """Start a background PDF->markdown conversion; returns ``{jobId, status:"running"}``.
-    If this exact PDF (by content hash) was already ingested, returns
-    ``{status:"duplicate", docId, ...}`` instead — pass ``?force=1`` to re-ingest anyway."""
+    """Start a background conversion; returns ``{jobId, status:"running"}``.
+
+    Accepts a rendered book (``.pdf``) or an authored one (``.md``); the conductor picks
+    the converter from the extension. If this exact file (by content hash) was already
+    ingested, returns ``{status:"duplicate", docId, ...}`` instead — pass ``?force=1`` to
+    re-ingest anyway.
+
+    The route keeps its ``/api/convert-pdf`` path: it is the documented seam the frontend
+    proxy and the status endpoint are both keyed to, and renaming it would break queued
+    clients for a cosmetic gain."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only .pdf files are accepted")
+    if not file.filename.lower().endswith(ACCEPTED_SUFFIXES):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {', '.join(ACCEPTED_SUFFIXES)} files are accepted",
+        )
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
