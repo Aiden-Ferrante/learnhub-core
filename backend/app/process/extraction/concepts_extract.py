@@ -238,6 +238,63 @@ def match_renamed_concepts(
 # Write path
 # --------------------------------------------------------------------------- #
 
+def merge_by_section(results: list[SectionConcepts]) -> list[SectionConcepts]:
+    """Collapse per-BLOCK results into one result per SECTION, in document order.
+
+    Extraction runs per content block, but ``write_section_concepts`` is idempotent by
+    section: it deletes everything under ``(doc, section_key)`` before inserting. Those
+    two granularities only agree when a section owns exactly one block — which is the
+    usual case for a PDF whose bookmarks line up with its headings, and is why this held
+    for a long time. When several blocks map to one outline node (any book whose chapter
+    has sub-headings under a single TOC entry, and every book whose outline was derived
+    from numbering), each block's write wiped the previous block's concepts and the
+    section kept only whatever the last block happened to produce.
+
+    Observed: a 15-block chapter reported one extracted concept and stored zero — the
+    block that found it was not the last one to write.
+
+    Concepts are deduplicated by name because ``concept_key`` is ``(source, section,
+    name)``: two blocks naming the same idea are one concept, and the first occurrence
+    wins so the earliest (usually the defining) passage is the one kept as its source.
+    """
+    order: list[tuple[str, str]] = []
+    grouped: dict[tuple[str, str], list[SectionConcepts]] = {}
+
+    for sc in results:
+        key = (sc.doc_id, sc.section_key)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(sc)
+
+    merged: list[SectionConcepts] = []
+    for key in order:
+        parts = grouped[key]
+        if len(parts) == 1:
+            merged.append(parts[0])
+            continue
+        seen: set[str] = set()
+        concepts: list = []
+        for part in parts:
+            for c in part.concepts:
+                name = (c.name or "").strip().casefold()
+                if name and name not in seen:
+                    seen.add(name)
+                    concepts.append(c)
+        pages = [p.page_start for p in parts if p.page_start is not None]
+        ends = [p.page_end for p in parts if p.page_end is not None]
+        merged.append(
+            SectionConcepts(
+                doc_id=parts[0].doc_id,
+                section_key=parts[0].section_key,
+                page_start=min(pages) if pages else None,
+                page_end=max(ends) if ends else None,
+                concepts=tuple(concepts),
+            )
+        )
+    return merged
+
+
 def write_section_concepts(sc: SectionConcepts, batch: int = 500) -> None:
     # Re-extraction must be idempotent: clear this section's existing concepts first, else
     # concepts the new run no longer produces (renamed/dropped) linger.
@@ -418,7 +475,12 @@ async def extract_concepts_document(
         return {"error": "no document found"}
 
     skipped: list[dict] = []
-    sections = load_section_blocks(doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped)
+    # coalesce=True: one unit per SECTION, not per block. See scope._coalesce_rows — a
+    # chapter with sub-headings is many blocks, and extracting each separately is one LLM
+    # call per ~90-word fragment.
+    sections = load_section_blocks(
+        doc_id, section_keys=section_keys, scope=scope, skipped_out=skipped, coalesce=True
+    )
     outcomes: list[dict] = [
         {"sectionKey": s["sectionKey"], "heading": s["heading"], "status": "skipped", "reason": s["reason"]}
         for s in skipped
@@ -435,10 +497,13 @@ async def extract_concepts_document(
         on_progress(0, total, None)
 
     sem = asyncio.Semaphore(max(1, concurrency))
-    results: list[SectionConcepts] = []
+    # (document index, result). Blocks finish out of order under concurrency, and
+    # merge_by_section's first-occurrence-wins dedup is only meaningful in reading order —
+    # the earliest passage that names a concept is the one worth keeping as its source.
+    indexed: list[tuple[int, SectionConcepts]] = []
     errors: list[str] = []
 
-    async def run(inp) -> None:
+    async def run(idx: int, inp) -> None:
         nonlocal done
         async with sem:
             sc, err, meta = await asyncio.to_thread(_extract_one_section_concepts, inp, model)
@@ -447,7 +512,7 @@ async def extract_concepts_document(
                 errors.append(f"{inp.section_key}: {err}")
                 outcome.update(status="error", error=str(err)[:300])
             elif sc is not None:
-                results.append(sc)
+                indexed.append((idx, sc))
                 # A zero-concept section now says WHY: nothing returned vs everything gated.
                 outcome.update(status="ok" if sc.concepts else "empty", concepts=len(sc.concepts))
             outcomes.append(outcome)
@@ -456,12 +521,13 @@ async def extract_concepts_document(
             if on_progress:
                 on_progress(done, total, inp.section_key)
 
-    await asyncio.gather(*(run(s) for s in sections))
+    await asyncio.gather(*(run(i, s) for i, s in enumerate(sections)))
     if on_progress:
         on_progress(total, total, "finalizing")
 
+    results = [sc for _, sc in sorted(indexed, key=lambda pair: pair[0])]
     total_concepts = 0
-    for sc in results:
+    for sc in merge_by_section(results):
         write_section_concepts(sc)
         total_concepts += len(sc.concepts)
 

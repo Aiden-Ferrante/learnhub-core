@@ -177,18 +177,83 @@ def section_body_len(markdown: str) -> int:
     return len(parts[1].strip()) if len(parts) > 1 else 0
 
 
+def _coalesce_rows(rows: list[dict]) -> list[dict]:
+    """Merge each section's blocks into one row, in document order.
+
+    A "block" is one heading's text, which can be a couple of sentences. A "section" is a
+    node in the outline, and it owns every block that maps to it. For a PDF whose bookmarks
+    line up with its headings those are usually the same thing — but for any book whose
+    chapter has sub-headings under a single TOC entry, one section is many blocks.
+
+    Concept extraction wants the section: it is one LLM call over material with enough
+    context to be worth a call, which is what ``LEARN_EXTRACT_MAX_CHARS`` (60,000) implies
+    it was built for. Extracting per block instead means one call per sub-heading over a
+    ~90-word fragment — fifteen calls where one would do, each too small to yield much.
+
+    The heading and page range come from the first block, which is the section's own
+    heading; the rest are its sub-headings and stay inline in the markdown where they
+    give the model its structure.
+    """
+    order: list[str] = []
+    groups: dict[str, list[dict]] = {}
+    for r in rows:
+        sk = r.get("sectionKey")
+        if sk not in groups:
+            groups[sk] = []
+            order.append(sk)
+        groups[sk].append(r)
+
+    merged: list[dict] = []
+    for sk in order:
+        parts = groups[sk]
+        if len(parts) == 1:
+            merged.append(parts[0])
+            continue
+        head = dict(parts[0])
+        head["markdown"] = "\n\n".join((p.get("markdown") or "").strip() for p in parts).strip()
+        starts = [p.get("pageStart") for p in parts if p.get("pageStart") is not None]
+        ends = [p.get("pageEnd") for p in parts if p.get("pageEnd") is not None]
+        head["pageStart"] = min(starts) if starts else None
+        head["pageEnd"] = max(ends) if ends else None
+        merged.append(head)
+    return merged
+
+
 def load_section_blocks(
     doc_id: str,
     section_keys: list[str] | None = None,
     scope: str | None = None,
     skipped_out: list[dict] | None = None,
+    coalesce: bool = False,
 ) -> list[SectionExtractInput]:
     """A scope's blocks WITH their markdown, filtered to what's worth processing
-    (drops heading-only stubs and front-matter junk, recording why into ``skipped_out``)."""
+    (drops heading-only stubs and front-matter junk, recording why into ``skipped_out``).
+
+    ``coalesce`` merges each section's blocks into one unit — what concept extraction
+    wants. Off by default because the other callers genuinely want blocks: the audiobook
+    narrates them one at a time, and skeleton/reading-guide work on the heading structure
+    itself. The junk-heading filter runs BEFORE the merge so front matter never gets folded
+    into a real section; the too-short filter runs after, so a section is judged on the
+    material it actually has rather than on its first paragraph.
+    """
     rows = fetch_blocks(doc_id, markdown=True)
     if scope:
         rows = scope_blocks(doc_id, scope, rows=rows)
     wanted = set(section_keys) if section_keys else None
+
+    if coalesce:
+        kept: list[dict] = []
+        for r in rows:
+            if _JUNK_HEADING.search(r.get("heading") or ""):
+                if skipped_out is not None:
+                    sk = r.get("sectionKey")
+                    skipped_out.append(
+                        {"sectionKey": sk, "heading": r.get("heading") or sk, "reason": "junk-heading"}
+                    )
+                continue
+            kept.append(r)
+        rows = _coalesce_rows(kept)
+
     out: list[SectionExtractInput] = []
     for r in rows:
         sk = r.get("sectionKey")
