@@ -48,6 +48,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.process.content.outline import (
+    assign_blocks_by_number,
     assign_blocks_to_outline,
     build_outline_from_bookmarks,
     normalize_outline,
@@ -112,6 +113,7 @@ def assess_bookmarks(raw: list[dict], page_count: int) -> tuple[str, list[str]]:
 
 ROUTE_BOOKMARKS = "bookmarks"
 ROUTE_PAGEMATCHED = "bookmarks-pagematched"
+ROUTE_DERIVED_NUMBERING = "derived-numbering"  # the document numbered its own headings
 ROUTE_DERIVED_HEADINGS = "derived-headings"
 ROUTE_DERIVED_CONTENTS = "derived-contents-pages"
 ROUTE_DERIVED_LLM = "derived-llm"  # declared; strategy is a registered stub
@@ -141,6 +143,7 @@ class TocResolution:
 # --------------------------------------------------------------------------- #
 
 _STRATEGY_ROUTES = {
+    "from-numbered-headings": ROUTE_DERIVED_NUMBERING,
     "from-headings": ROUTE_DERIVED_HEADINGS,
     "from-contents-pages": ROUTE_DERIVED_CONTENTS,
     "from-llm": ROUTE_DERIVED_LLM,
@@ -333,11 +336,16 @@ def resolve_toc(
 
     # stage: reconcile — map blocks onto the canonical outline; on total failure,
     # fall back to page-matching the outline onto the blocks (reverse direction).
-    block_map = (
-        assign_blocks_to_outline(canonical, [(b.order, b.heading, b.page_start) for b in blocks])
-        if canonical
-        else {}
-    )
+    # An outline derived FROM the heading numbering is reconciled BY that numbering — the
+    # title matcher's fuzziness only creates ambiguity where the document had none.
+    block_tuples = [(b.order, b.heading, b.page_start) for b in blocks]
+    if not canonical:
+        block_map = {}
+    elif derived_route == ROUTE_DERIVED_NUMBERING:
+        block_map = assign_blocks_by_number(canonical, block_tuples)
+        decisions.append(f"reconcile: by number prefix ({len(block_map)}/{len(blocks)})")
+    else:
+        block_map = assign_blocks_to_outline(canonical, block_tuples)
     if block_map:
         route = derived_route or ROUTE_BOOKMARKS
         decisions.append(f"reconcile: {len(block_map)}/{len(blocks)} blocks matched")

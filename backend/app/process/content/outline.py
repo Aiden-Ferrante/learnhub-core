@@ -75,6 +75,54 @@ def _lig_collapse(s: str) -> str:
     return s
 
 
+def assign_blocks_by_number(
+    outline: list[dict], blocks: list[tuple]
+) -> dict[int, str]:
+    """Map blocks onto the outline by NUMBER PREFIX — for outlines derived from a
+    document's own heading numbering.
+
+    ``1.1.1.1`` belongs under ``1.1.1``; ``1.1.1.1.2`` under the same, since the outline
+    stops at three levels. A heading with no number folds into the section it appears
+    inside, which is the most recent numbered one.
+
+    This exists because ``assign_blocks_to_outline``'s title matching is actively wrong
+    here. That matcher is a *recovery* tool: PDF bookmarks and body headings often differ
+    in wording, so it matches on number OR normalized title OR ligature-collapsed title,
+    and each match consumes an entry and advances a pointer. Give it a chapter that names
+    its own sub-chapters — a taxonomy listing its six axes, a preface summarizing the
+    parts — and those mentions match the real entries, consume all of them, and every
+    block after the last one folds into whatever entry the pointer stopped on. Observed:
+    67 of 81 blocks collapsed into the final section.
+
+    When the outline came from the numbering, none of that ambiguity exists. The document
+    stated its own hierarchy; read it literally.
+    """
+    by_num: dict[str, str] = {}
+    for e in outline:
+        num = (e.get("numberKey") or "").strip()
+        if num and num not in by_num:
+            by_num[num] = e["sectionKey"]
+    if not by_num:
+        return {}
+
+    out: dict[int, str] = {}
+    current: str | None = None
+    for blk in sorted(blocks, key=lambda b: b[0]):
+        order, heading = blk[0], blk[1]
+        num, _rest = _parse_outline_number(heading)
+        if num:
+            parts = num.split(".")
+            # Longest numeric prefix that is a real node: 1.1.1.1 -> 1.1.1 -> 1.1 -> 1
+            for cut in range(len(parts), 0, -1):
+                key = by_num.get(".".join(parts[:cut]))
+                if key:
+                    current = key
+                    break
+        if current:
+            out[order] = current
+    return out
+
+
 def assign_blocks_to_outline(
     outline: list[dict], blocks: list[tuple]
 ) -> dict[int, str]:
