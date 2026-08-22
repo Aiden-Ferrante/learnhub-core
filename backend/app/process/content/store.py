@@ -14,6 +14,8 @@ page_content table — the raw PDF is served from disk for a page-level view.
 
 from __future__ import annotations
 
+import logging
+
 from psycopg.types.json import Json
 
 from app.process.content.blocks import fetch_blocks
@@ -42,15 +44,30 @@ def _structure_rows(
     """Turn the flat outline entries (each ``{sectionKey, numberKey, title, listDepth, page}``)
     into raw_structure rows: a self-referencing tree (parent_id from the depth stack), a
     per-node page span (start = the entry's page, end = just before the next same-or-shallower
-    entry), and kind (depth 0 = chapter, else section)."""
+    entry), and kind (depth 0 = chapter, else section).
+
+    ⚠ Duplicate sectionKeys are dropped here rather than allowed to reach the INSERT. ``id``
+    is the primary key, so a repeat aborts the statement and takes the ENTIRE conversion with
+    it — the book lands with 0 blocks and an opaque `duplicate key value violates unique
+    constraint "raw_structure_pkey"`, which is where Bishop's PRML sat for two weeks. The
+    outline builders uniquify keys and are the real fix; this is the backstop, because losing
+    one syllabus node is a bad outcome and losing a 758-page book is a much worse one."""
     rows: list[dict] = []
     stack: list[tuple[int, str]] = []  # (depth, id)
+    seen: set[str] = set()
     for i, e in enumerate(outline_entries):
         sk = e.get("sectionKey")
         if not sk:
             continue
         depth = int(e.get("listDepth") or 0)
         node_id = structure_id(doc_id, sk)
+        if node_id in seen:
+            logging.getLogger(__name__).warning(
+                "structure: dropping duplicate sectionKey %r (entry %d, title %r) — an "
+                "outline builder emitted a non-unique key", sk, i, e.get("title"),
+            )
+            continue
+        seen.add(node_id)
         while stack and stack[-1][0] >= depth:
             stack.pop()
         parent_id = stack[-1][1] if stack else None

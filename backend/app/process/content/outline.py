@@ -181,8 +181,20 @@ def assign_blocks_to_outline(
 def normalize_outline(raw_outline: list[dict] | None, blocks: list[SectionBlock]) -> list[dict]:
     """Turn the PDF's embedded bookmarks into TOC entries whose ``sectionKey`` is the REAL
     ``section_content`` block (mapped by page), so a preview selection always lines up with an
-    extractable section. Falls back to a number/slug key when page ranges are unavailable."""
+    extractable section. Falls back to a number/slug key when page ranges are unavailable.
+
+    ⚠ Keys are uniquified here exactly as in ``build_outline_from_bookmarks``. This path did
+    not do it, and both of its key sources can repeat: several bookmarks often land inside one
+    page-matched block, and the fallback slug collides whenever a title recurs — Bishop's PRML
+    has fourteen sections called "Exercises", all slugging to ``toc:exercises``. A repeat makes
+    two entries share a ``structure_id``, and since that column is the primary key the INSERT
+    raises and the WHOLE conversion fails: PRML has sat at 0 blocks since 2026-08-07 with
+    `duplicate key value violates unique constraint "raw_structure_pkey"`.
+
+    A suffixed entry keeps its place in the syllabus tree; dropping it silently is the failure
+    ``_dedup_key`` was written to prevent in the first place."""
     paged = sorted([b for b in blocks if b.page_start is not None], key=lambda b: b.page_start)
+    used: dict[str, int] = {}
 
     def section_for_page(page: int) -> str | None:
         chosen = None
@@ -204,9 +216,13 @@ def normalize_outline(raw_outline: list[dict] | None, blocks: list[SectionBlock]
         if not title:
             continue
         number_key, clean = _parse_outline_number(title)
-        section_key = section_for_page(page) if page > 0 else None
-        if not section_key:
-            section_key = f"toc:{number_key}" if number_key else f"toc:{_slug_key(clean, len(out))}"
+        matched = section_for_page(page) if page > 0 else None
+        # _dedup_key owns the `toc:` prefix, so hand it a bare base either way: a
+        # page-matched key with its prefix stripped, or the number/slug fallback.
+        base = matched[4:] if matched and matched.startswith("toc:") else matched
+        if not base:
+            base = number_key or _slug_key(clean, len(out))
+        section_key = _dedup_key(base, used)
         out.append(
             {
                 "numberKey": number_key,
