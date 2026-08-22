@@ -9,11 +9,17 @@ import { fetchSystemStatus, setQueuePaused, type SystemStatus } from "@/gateways
 import { cn } from "@/kit/lib/utils"
 import { usePolling } from "@/kit/hooks/use-polling"
 
+// Every kind the conductor can run. A kind missing from this map rendered as a blank
+// label on the running strip — which is how an audiobook job could occupy the machine
+// with nothing on screen naming it.
 const KIND_LABEL: Record<BuildKind, string> = {
   build: "Building",
+  extract: "Extracting concepts",
   guides: "Authoring guides",
   skeleton: "Skeleton",
   orient: "Orient",
+  audiobook: "Narrating audiobook",
+  convert: "Converting document",
 }
 
 function gb(bytes?: number | null): string {

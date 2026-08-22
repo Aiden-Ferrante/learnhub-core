@@ -337,11 +337,29 @@ export function ProcessDashboard() {
                     {job?.status === "running" ? (
                       <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        {job.phase === "extract" && job.total
-                          ? `extracting ${job.done}/${job.total}`
-                          : job.phase === "deep"
-                            ? "deep layer"
-                            : "building"}
+                        {job.cancelRequested
+                          ? "stopping…"
+                          : job.phase === "extract" && job.total
+                            ? `extracting ${job.done}/${job.total}`
+                            : job.phase === "deep"
+                              ? "deep layer"
+                              : "building"}
+                        {/* A RUNNING job was uncancellable from here — the X existed only on
+                            the queued branch, so anything already started had to be waited
+                            out or killed in the ledger by hand. The backend has always
+                            supported it: cancel_build sets cancelRequested and the runner
+                            checks it at each section boundary, so finished sections are
+                            kept and no GPU work is thrown away mid-section. */}
+                        {!job.cancelRequested && (
+                          <button
+                            type="button"
+                            className="ml-0.5 hover:text-destructive"
+                            onClick={() => act(() => cancelChapterBuild(docId!, c.key, job.kind), c.key)}
+                            title="Stop this job — sections already finished are kept"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </span>
                     ) : job?.status === "queued" ? (
                       <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">

@@ -111,6 +111,9 @@ export type SectionOutcome = {
 export type ChapterBuildJob = {
   key?: string
   scope: string
+  /** The ledger has always sent this (`_row_to_job`); the type just never named it, so
+   *  callers could not pass it back to cancelChapterBuild and silently cancelled 'build'. */
+  kind?: BuildKind
   status: 'queued' | 'running' | 'done' | 'error' | 'canceled'
   cancelRequested?: boolean | null
   notBefore?: number | null
@@ -129,7 +132,18 @@ export type ChapterBuildJob = {
 
 /** Every artifact the processing queue can produce. "build" = extraction + deep overlay;
  *  the rest regenerate one artifact for one chapter. */
-export type BuildKind = 'build' | 'guides' | 'skeleton' | 'orient'
+/** Every kind the conductor registers a runner for — see conductor/registry.py.
+ *  ⚠ `extract`, `audiobook` and `convert` were missing here, so a running job of one of
+ *  those kinds reached the UI as an unlabelled row and cancelChapterBuild() defaulted its
+ *  kind to 'build' — cancelling nothing, because the key it builds includes the kind. */
+export type BuildKind =
+  | 'build'
+  | 'extract'
+  | 'guides'
+  | 'skeleton'
+  | 'orient'
+  | 'audiobook'
+  | 'convert'
 
 export async function enqueueChapterBuild(
   doc: string,
