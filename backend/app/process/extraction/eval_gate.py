@@ -19,6 +19,7 @@ from typing import Any
 from app.gateways import db
 from app.gateways import ollama_structured_completion
 from app.gateways import ConceptVerdict
+from app.process.content import concept_filter
 
 EVAL_SYSTEM = (
     "You are a strict reviewer of concept-lessons extracted from a textbook. For ONE "
@@ -50,14 +51,20 @@ def _eval_model() -> str | None:
 
 def _sample_concepts(doc_id: str, section_keys: list[str] | None, n: int) -> list[dict[str, Any]]:
     """A deterministic sample of the scope's concepts (md5-ordered, so re-running the
-    eval grades the same rows and scores stay comparable across prompt changes)."""
+    eval grades the same rows and scores stay comparable across prompt changes).
+
+    Goes through ``concept_filter`` because ``ext_concepts`` is book-scoped: sampling it by
+    a version's ids returned nothing, so ``evaluate_extraction_sample`` returned None and
+    the quality gate silently stopped scoring every custom version — which reads as "eval
+    disabled" rather than as a regression.
+    """
+    pred, binds = concept_filter(doc_id, section_keys)
     with db() as conn:
         return conn.execute(
             'SELECT key, name, kind, signal, source, section_key AS "sectionKey" '
-            "FROM ext_concepts WHERE doc_id = %(d)s "
-            "AND (%(ks)s::text[] IS NULL OR section_key = ANY(%(ks)s::text[])) "
-            "ORDER BY md5(key) LIMIT %(n)s",
-            {"d": doc_id, "ks": section_keys, "n": n},
+            f"FROM ext_concepts WHERE {pred} "
+            "ORDER BY md5(key) LIMIT %(_n)s",
+            {**binds, "_n": n},
         ).fetchall()
 
 

@@ -76,6 +76,49 @@ of the material, and its own progress.
   setting it as main would have failed; its PATCH helper then forwarded query
   parameters but not the body, which material edits need.
 
+<!-- v0.15.0 — Say what you did. The audit's first sub-cycle: everywhere the app
+     answered confidently and wrongly instead of admitting it did not know. -->
+- **Passive study was never recorded.** `/api/engagement` passed the whole request
+  body as one argument to a four-parameter function, so every call since it shipped
+  raised a `TypeError` — and the client fires it and forgets, so nothing said so.
+  `study_events` has only ever held graded rows, which quietly emptied the
+  read/listen bars, the by-kind split and the cadence chip.
+- **A re-cut course served no concept cards at all.** The review queue filtered the
+  book's concepts against the *version's* section keys — two keyspaces that never
+  intersect — so a chapter with forty due cards reported "all caught up". The span
+  is translated now, the way the chapter snapshot beside it always did.
+- **Custom versions saw none of their book's concepts or figures.** Five reads keyed
+  `ext_concepts` and `raw_elements` — both book-scoped — by a version id. Skeletons
+  were generated with no concepts to ground them and cached anyway; the quality gate
+  scored nothing and looked disabled; figure lists came back empty while
+  `/api/figure` happily served the bytes. All five now go through the one place that
+  decision lives.
+- **A slug-keyed chapter was one block long.** A scope with no derivable level hit a
+  terminator that fired on the very next block. It now runs to the next real heading.
+  Numbered chapters are unchanged.
+- **`toc:1.2~2` was not inside `toc:1`.** Section keys carry a `~n` suffix whenever a
+  book repeats a heading, and the ancestor check did not know that while the chapter
+  lookup did — so the reader and the concept buckets disagreed about the same key.
+- **A database blip read as "you have studied nothing".** Mastery's two loaders
+  returned an empty dict on any error, rendering a season of study as a brand-new
+  course with a 200. Three tracking endpoints returned a bare dict, so a failure
+  reached the client as success, and a failed review-debt read displayed as
+  "Caught up" — the one wrong answer that talks you out of your reviews. It now
+  says "—", and unknown is a distinct state from zero throughout.
+- **Switching courses could show the previous course's numbers.** Coverage and
+  retention persisted through a switch on failure, and a slow response could land on
+  top of a newer one. Both are checked against the course actually on screen.
+- **Any API path ending `.js`, `.css` or `.map` skipped authentication.** The
+  middleware's static-asset exemption was anchored on the whole path, not the asset
+  directories, and no route does its own check — and the tenancy resolver then failed
+  *open* onto the primary schema. Section and concept keys are model-generated strings
+  that reach `{key:path}` routes, so this was reachable rather than theoretical.
+- **The audiobook endpoint could be walked out of its own directory** — `?doc=` was
+  joined into a path unvalidated, and an absolute segment discards everything before
+  it. Also: signing in could redirect off-site via `?from=`.
+- The cadence chip could report "8/7 days this week": a rolling 604800-second window
+  compared against calendar days spans eight of them unless you study at midnight UTC.
+
 ### Not verified
 - None of the above has been exercised in a browser — `:3001` sits behind a login
   wall, so every interactive flow (opening the menu, creating, switching,
@@ -85,6 +128,14 @@ of the material, and its own progress.
 - Reading position is keyed to the course card, so it is shared across versions;
   a shelf card still shows the book's original section count rather than the
   active version's.
+- v0.15.0's fixes are verified by the test suite, the hub check, a typecheck and
+  by executing the changed logic directly — but **not** yet against a real book in
+  a running app. Every one of those bugs produced a *plausible* value, which is
+  exactly what a fixture suite cannot catch, so the custom-version review queue
+  still needs driving end to end before the version is cut.
+- `test_toc_controller.py` has two failures that pre-date this work (`bcb89f7`):
+  the code emits route `derived-numbering`, the tests expect `derived-headings`.
+  Untouched here — it needs a decision about which is the intended contract.
 
 ## [0.14.0] — 2026-07-26
 

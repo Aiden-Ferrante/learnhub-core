@@ -18,16 +18,29 @@ from dataclasses import dataclass
 from app.process.content.blocks import fetch_blocks
 
 _NUMERIC = re.compile(r"^\d+(?:\.\d+)*$")
+_DEDUP_SUFFIX = re.compile(r"~\d+$")
 _CHAPTER_HEADING = re.compile(r"(?i)^\s*chapter\s+\d+\b")
+
+
+def _numeric_body(sk: str) -> str | None:
+    """The numeric path inside a section key, or None if it isn't a numeric key.
+
+    ``outline._dedup_key`` mints ``~2``/``~3`` suffixes whenever a book repeats a heading,
+    so ``toc:1.2~2`` is an ordinary numeric section. This used to be read as a slug, which
+    put it outside its own chapter — while ``chapters._CHAPTER_OF`` DID understand the
+    suffix, so the two surfaces gave opposite answers for the same key.
+    """
+    body = sk[4:] if sk.startswith("toc:") else sk
+    body = _DEDUP_SUFFIX.sub("", body)
+    return body if _NUMERIC.match(body) else None
 
 
 def is_ancestor_section_key(ancestor: str, child: str) -> bool:
     """True when ``ancestor`` is the same section or a numeric parent of ``child``."""
     if ancestor == child:
         return True
-    a = ancestor[4:] if ancestor.startswith("toc:") else ancestor
-    c = child[4:] if child.startswith("toc:") else child
-    return bool(_NUMERIC.match(a) and _NUMERIC.match(c)) and (c == a or c.startswith(f"{a}."))
+    a, c = _numeric_body(ancestor), _numeric_body(child)
+    return bool(a and c) and (c == a or c.startswith(f"{a}."))
 
 
 def _is_chapter_marker(sk: str, heading: str) -> bool:
@@ -43,8 +56,8 @@ def _section_level_fn(doc_id: str):
     del doc_id  # no longer consulted; see docstring
 
     def level_of(sk: str, heading: str = "") -> int:
-        body = sk[4:] if sk.startswith("toc:") else sk
-        if _NUMERIC.match(body):
+        body = _numeric_body(sk)
+        if body is not None:
             return body.count(".") + 1
         if _is_chapter_marker(sk, heading):
             return 1
@@ -69,20 +82,28 @@ def _blocks_in_scope(rows: list[dict], scope: str, level_of=None) -> list[dict]:
     if start_idx is None:
         return []
     if level_of is None:
-        level_of = lambda sk, h="": (sk[4:].count(".") + 1) if (sk.startswith("toc:") and _NUMERIC.match(sk[4:])) else 99  # noqa: E731
+        level_of = lambda sk, h="": (_numeric_body(sk).count(".") + 1) if _numeric_body(sk) is not None else 99  # noqa: E731
     scope_lvl = level_of(scope, ordered[start_idx].get("heading", ""))
     # A block sitting right after a chapter marker is the chapter title → treat it as a chapter.
     if start_idx > 0:
         prev = ordered[start_idx - 1]
         if _is_chapter_marker(prev.get("sectionKey", ""), prev.get("heading", "")):
             scope_lvl = min(scope_lvl, 1)
+    # A slug scope (`toc:preface`, a user-minted `toc:new-a1b2c3d4`, a chapter on a book with
+    # no outline) has no derivable level, so level_of hands back the 99 sentinel — and a
+    # `<= 99` terminator fires on the very NEXT block, collapsing the whole chapter to one.
+    # For those, run to the next recognisably structural block instead. Numeric and
+    # chapter-marker scopes keep the same-or-shallower rule exactly as before.
+    ends_scope = (
+        (lambda lvl: lvl < 99) if scope_lvl >= 99 else (lambda lvl: lvl <= scope_lvl)
+    )
     end_idx = len(ordered)
     for j in range(start_idx + 1, len(ordered)):
         r = ordered[j]
         sk = r.get("sectionKey", "")
         if sk == scope or is_ancestor_section_key(scope, sk):
             continue
-        if level_of(sk, r.get("heading", "")) <= scope_lvl:
+        if ends_scope(level_of(sk, r.get("heading", ""))):
             end_idx = j
             break
     return ordered[start_idx:end_idx]

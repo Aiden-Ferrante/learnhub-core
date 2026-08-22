@@ -392,7 +392,13 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
                 {"doc": doc},
             ).fetchall()
         if span is not None:
-            concepts = [c for c in concepts if c.get("sectionKey") in span]
+            # `span` holds THIS VERSION's section keys; concepts carry the BOOK's, so the
+            # span is translated rather than the concepts — same rule as _chapter_snapshot
+            # above. Comparing the two keyspaces directly always intersects to nothing on a
+            # re-cut course, which read as "all caught up" on a chapter full of due cards.
+            concept_span = set(source_sections(doc, list(span))) or span
+            concepts = [c for c in concepts if c.get("sectionKey") in concept_span]
+        # Typed rows (skeleton/chapter) follow the VERSION, so they keep the untranslated span.
         typed_rows = [
             r
             for r in typed_rows

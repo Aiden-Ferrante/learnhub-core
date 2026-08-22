@@ -146,16 +146,31 @@ def _slug(scope: str | None) -> str:
     return re.sub(r"[^a-zA-Z0-9]+", "-", scope or "whole").strip("-") or "whole"
 
 
+def _doc_dir(doc_id: str) -> str:
+    """This document's audio directory, with the id proved safe to join.
+
+    ``scope`` is slugified, but ``doc_id`` reaches here straight from the query string —
+    ``resolve_doc_id`` hands back whatever it was given when non-empty — and
+    ``os.path.join`` DISCARDS everything before an absolute segment. So ``?doc=/etc`` built
+    a path outside AUDIO_DIR entirely. Same guard ``figure_path`` already applies: strip to
+    the id charset and refuse if nothing recognisable is left.
+    """
+    safe = re.sub(r"[^A-Za-z0-9_-]", "", doc_id or "")
+    if not safe:
+        raise ValueError(f"unsafe document id: {doc_id!r}")
+    return os.path.join(AUDIO_DIR, safe)
+
+
 # File names keep the historical "__text" suffix so already-generated narrations
 # stay playable after the source dimension was removed.
 
 def audiobook_path(doc_id: str, scope: str | None) -> str:
-    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__text.mp3")
+    return os.path.join(_doc_dir(doc_id), f"{_slug(scope)}__text.mp3")
 
 
 def timeline_path(doc_id: str, scope: str | None) -> str:
     """Sidecar mapping narration chunks to playback times — the read-along data."""
-    return os.path.join(AUDIO_DIR, doc_id, f"{_slug(scope)}__text.timeline.json")
+    return os.path.join(_doc_dir(doc_id), f"{_slug(scope)}__text.timeline.json")
 
 
 def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RATE, chars_per_sec: float = 14.0) -> list[float]:
@@ -175,7 +190,7 @@ _TTS_WORKERS = max(1, int(os.environ.get("AUDIOBOOK_TTS_WORKERS", "2")))
 
 
 def _work_dir(doc_id: str, scope: str | None) -> str:
-    return os.path.join(AUDIO_DIR, doc_id, f".{_slug(scope)}__text.work")
+    return os.path.join(_doc_dir(doc_id), f".{_slug(scope)}__text.work")
 
 
 def _load_manifest(work: str) -> dict | None:
@@ -378,6 +393,10 @@ def audiobook_status(doc_id: str | None, scope: str | None) -> dict:
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"status": "idle", "scope": scope}
+    try:
+        _doc_dir(doc_id)
+    except ValueError as exc:
+        return {"status": "error", "scope": scope, "docId": doc_id, "error": str(exc)}
     # Live queue state (queued / running / error) takes precedence.
     job = _find_audiobook_job(doc_id, scope)
     if job and job.get("status") in ("queued", "running"):
@@ -414,7 +433,10 @@ def audiobook_timeline(doc_id: str | None, scope: str | None) -> dict:
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"error": "no document found"}
-    tl_path = timeline_path(doc_id, scope)
+    try:
+        tl_path = timeline_path(doc_id, scope)
+    except ValueError as exc:
+        return {"error": str(exc)}
     try:
         with open(tl_path) as f:
             return json.load(f)
@@ -444,7 +466,10 @@ def list_audiobooks(doc_id: str | None) -> dict:
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
         return {"docId": None, "audiobooks": []}
-    folder = os.path.join(AUDIO_DIR, doc_id)
+    try:
+        folder = _doc_dir(doc_id)
+    except ValueError as exc:
+        return {"docId": doc_id, "audiobooks": [], "error": str(exc)}
     items = []
     if os.path.isdir(folder):
         for fn in sorted(os.listdir(folder)):

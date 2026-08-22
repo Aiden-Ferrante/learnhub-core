@@ -12,6 +12,7 @@ import re
 import shutil
 from pathlib import Path
 
+from app.process.content.blocks import concept_filter, version_sections_by_source
 from app.process.content.documents import fetch_latest_document, source_id_of
 from app.process.content.scope import is_ancestor_section_key
 from app.process.content.sections import SectionBlock
@@ -133,15 +134,24 @@ def _figures_by_section(doc_id: str, section_keys: set[str]) -> dict[str, list[d
     out: dict[str, list[dict]] = {}
     if not section_keys:
         return out
+    # raw_elements is book-scoped on the same two columns as ext_concepts (doc_id is a
+    # SOURCE id, section_key is the BOOK's), so a version inherits its figures by exactly
+    # the rule concept_filter owns. Keying it by a version's own ids matched nothing, which
+    # emptied every figure list on a custom course while /api/figure kept serving the bytes.
+    pred, binds = concept_filter(doc_id, list(section_keys))
     with db() as conn:
         rows = conn.execute(
             'SELECT section_key AS "sectionKey", "order", page, caption FROM raw_elements '
-            "WHERE doc_id = %(d)s AND type = 'figure' AND section_key = ANY(%(ks)s) "
+            f"WHERE {pred} AND type = 'figure' "
             "AND caption IS NOT NULL AND caption <> '' ORDER BY \"order\"",
-            {"d": doc_id, "ks": list(section_keys)},
+            binds,
         ).fetchall()
+    by_source = version_sections_by_source(doc_id)
     for r in rows:
-        out.setdefault(r["sectionKey"], []).append(r)
+        src = r["sectionKey"]
+        # Unmapped version (concept_filter's book fallback): the book's keys ARE its own.
+        for ver in by_source.get(src) or [src]:
+            out.setdefault(ver, []).append({**r, "sectionKey": ver})
     return out
 
 
@@ -165,19 +175,34 @@ def fetch_elements(
         if not doc_id:
             return {"docId": doc_id, "elements": []}
 
+        # Book-scoped table, version-scoped id — resolved through the one place that
+        # decision lives. Listing by the raw doc_id returned an empty set for every
+        # custom version.
+        pred, binds = concept_filter(doc_id)
         sql = (
             'SELECT "order", type, page, bbox, bbox_origin AS "bboxOrigin", '
             'section_key AS "sectionKey", caption, image_ref AS "imageRef", latex, '
             'table_markdown AS "tableMarkdown", table_data AS "tableData", code, language '
-            "FROM raw_elements WHERE doc_id = %(d)s"
+            f"FROM raw_elements WHERE {pred}"
         )
-        binds: dict = {"d": doc_id}
+        binds = dict(binds)
         if el_type:
             sql += " AND type = %(t)s"
             binds["t"] = el_type
         sql += ' ORDER BY "order"'
         with db() as conn:
             rows = conn.execute(sql, binds).fetchall()
+
+        # The rows carry the BOOK's section keys; `scope` is one of THIS version's. Re-key
+        # onto the version's outline first, so the scope filter compares like with like —
+        # and so the caller reads back the keys it renders its own tree from.
+        by_source = version_sections_by_source(doc_id)
+        rekeyed: list[dict] = []
+        for r in rows:
+            src = r.get("sectionKey")
+            for ver in (by_source.get(src) or [src]) if src else [None]:
+                rekeyed.append({**r, "sectionKey": ver})
+        rows = rekeyed
 
         if scope:
             rows = [r for r in rows if r.get("sectionKey") and is_ancestor_section_key(scope, r["sectionKey"])]

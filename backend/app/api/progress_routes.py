@@ -52,33 +52,57 @@ def api_forecast(doc: str | None = None, days: int = 7) -> JSONResponse:
 
 @router.post("/api/engagement")
 def api_engagement(body: dict = Body(default=None)) -> JSONResponse:
-    data = record_engagement(dict(body or {}))
-    return JSONResponse(data, status_code=400 if data.get("error") else 200)
+    """Append one passive engagement event (read/listen/orient …).
 
+    The wire calls it ``scope`` and the column calls it ``section_key``; they are the same
+    value. This handler used to pass the whole body as one positional argument, which made
+    every call a TypeError — so no passive event was ever written and every read/listen
+    read-model has been rendering an empty set since it shipped.
+    """
+    payload = dict(body or {})
+    kind = str(payload.get("kind") or "").strip()
+    section_key = str(payload.get("scope") or payload.get("sectionKey") or "").strip()
+    if not kind or not section_key:
+        return JSONResponse({"error": "kind and scope are required"}, status_code=400)
+    record_engagement(
+        kind,
+        section_key,
+        doc=str(payload["doc"]) if payload.get("doc") else None,
+        concept_key=str(payload["conceptKey"]) if payload.get("conceptKey") else None,
+    )
+    return JSONResponse({"recorded": True})
+
+
+# These three used to return a bare dict, so FastAPI sent 200 on a DB failure and the
+# client's only failure detector (`res.ok`) passed it through — an exception rendered as
+# "nothing due". They carry a status like every other router now.
 
 @router.get("/api/review-calendar")
-def api_review_calendar(days: int = Query(60, ge=1, le=365)) -> dict[str, Any]:
+def api_review_calendar(days: int = Query(60, ge=1, le=365)) -> JSONResponse:
     """Whole-library review calendar: per-day due counts (per course, per item type) over
     the horizon, plus the overdue pile. Powers the /study planner."""
-    return build_review_calendar(days=days)
+    data = build_review_calendar(days=days)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.get("/api/study-debt")
-def api_study_debt(days: int = Query(7)) -> dict[str, Any]:
+def api_study_debt(days: int = Query(7)) -> JSONResponse:
     """The compact cross-course review-debt rollup (nav badge, morning vault briefing):
     what's due now and what fades within ``days``, per course and in total."""
-    return build_study_debt(days=days)
+    data = build_study_debt(days=days)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.get("/api/study/sessions")
 def api_study_sessions(
     doc: str | None = Query(None),
     days: int = Query(90, ge=1, le=730),
-) -> dict[str, Any]:
+) -> JSONResponse:
     """Working sessions derived from the study-event floor (gap-clustered, newest first),
     merged with the user's manual time blocks, with a summary strip. Optionally scoped
     to one course."""
-    return fetch_sessions(doc, days=days)
+    data = fetch_sessions(doc, days=days)
+    return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
 @router.post("/api/study/manual-session")

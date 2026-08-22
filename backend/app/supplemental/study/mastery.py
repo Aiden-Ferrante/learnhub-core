@@ -18,6 +18,7 @@ averages over their descendant leaf sections.
 
 from __future__ import annotations
 
+import calendar
 import time
 from typing import Any
 
@@ -137,7 +138,11 @@ def compute_activity(doc: str | None = None, now: float | None = None) -> dict[s
     counts: dict[str, int] = {}
     by_kind: dict[str, int] = {}
     active_days: set[str] = set()
-    week_floor = now - 7 * 86400.0
+    # Calendar days, not a rolling 604800-second window. `active_days` holds UTC day
+    # strings, so a seconds offset spans EIGHT distinct days whenever `now` is not exactly
+    # midnight UTC — which rendered as "8/7 days this week". Floor to today's midnight and
+    # reach back six days, so the window is the seven calendar days it claims to be.
+    week_floor = calendar.timegm(time.gmtime(now)[:3] + (0, 0, 0, 0, 0, 0)) - 6 * 86400.0
     for e in events:
         ts = e.get("ts")
         if not ts:
@@ -220,12 +225,15 @@ def _retention_query(doc: str | None) -> tuple[str, dict]:
 
 
 def _retention_by_key(doc: str | None, now: float) -> dict[str, float]:
-    """concept key → modelled recall probability right now (reviewed items only)."""
-    try:
-        with db() as conn:
-            rows = conn.execute(*_retention_query(doc)).fetchall()
-    except Exception:
-        return {}
+    """concept key → modelled recall probability right now (reviewed items only).
+
+    Raises on DB trouble rather than returning {}: an empty retention map is
+    indistinguishable from "nothing has ever been reviewed", and compute_mastery would
+    render a studied course as entirely new with HTTP 200. The caller turns it into an
+    error envelope.
+    """
+    with db() as conn:
+        rows = conn.execute(*_retention_query(doc)).fetchall()
     out: dict[str, float] = {}
     for r in rows:
         ret = srs.retrievability(dict(r), now)
@@ -235,17 +243,18 @@ def _retention_by_key(doc: str | None, now: float) -> dict[str, float]:
 
 
 def _concepts_by_section(doc: str | None) -> dict[str, list[str]]:
-    """sectionKey → its concept keys (one query — the coverage denominators)."""
-    try:
-        with db() as conn:
-            # Coverage is per VERSION: the book's concepts for the sections this version
-            # draws from, re-keyed onto the version's own outline below.
-            pred, binds = concept_filter(doc)
-            rows = conn.execute(
-                f"SELECT section_key AS sk, key FROM ext_concepts WHERE {pred}", binds
-            ).fetchall()
-    except Exception:
-        return {}
+    """sectionKey → its concept keys (one query — the coverage denominators).
+
+    Raises on DB trouble, for the same reason as _retention_by_key: {} here means every
+    coverage denominator is zero, which reads as "this course has no concepts".
+    """
+    with db() as conn:
+        # Coverage is per VERSION: the book's concepts for the sections this version
+        # draws from, re-keyed onto the version's own outline below.
+        pred, binds = concept_filter(doc)
+        rows = conn.execute(
+            f"SELECT section_key AS sk, key FROM ext_concepts WHERE {pred}", binds
+        ).fetchall()
     by_source = version_sections_by_source(doc) if doc else {}
     rows = [
         {"sk": vk, "key": r["key"]}
@@ -335,8 +344,11 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
         return {"bySection": {}, "overall": summarize_memory([], {}), "error": err}
 
     labels, titles, children = collect_sections(forest)
-    section_concepts = _concepts_by_section(doc)
-    retention = _retention_by_key(doc, now)
+    try:
+        section_concepts = _concepts_by_section(doc)
+        retention = _retention_by_key(doc, now)
+    except Exception as exc:  # noqa: BLE001 — a soft error, but never a silent zero
+        return {"bySection": {}, "overall": summarize_memory([], {}), "error": str(exc)}
 
     by_section: dict[str, dict[str, Any]] = {}
     for k in labels:

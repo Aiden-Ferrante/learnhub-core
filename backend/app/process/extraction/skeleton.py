@@ -16,8 +16,10 @@ from app.process.content import resolve_doc_id
 from psycopg.types.json import Json
 
 from app.gateways import db
+from app.process.content import concept_filter
 from app.process.content import fetch_blocks
 from app.process.content import load_section_blocks
+from app.process.content import version_sections_by_source
 from app.gateways import ollama_structured_completion
 from app.gateways import Orient, Skeleton
 
@@ -113,17 +115,31 @@ def _clean(s: object) -> str:
 
 
 def _concepts_by_section(doc_id: str, section_keys: list[str]) -> dict[str, list[str]]:
+    """The concept names grounding each section of the prompt, keyed by THIS version's
+    section keys.
+
+    ``ext_concepts`` is book-scoped: its ``doc_id`` is a source id and its ``section_key``
+    is the book's. Querying it with a version's ids matches nothing at all, which fed the
+    model a bare heading list and cached the ungrounded result as if it were fine — so the
+    read goes through ``concept_filter`` (which resolves both) and the answer is re-keyed
+    onto the version's outline on the way out.
+    """
     out: dict[str, list[str]] = {}
     if not section_keys:
         return out
+    pred, binds = concept_filter(doc_id, section_keys)
     with db() as conn:
         rows = conn.execute(
-            'SELECT section_key AS sk, name FROM ext_concepts '
-            'WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) ORDER BY "order"',
-            {"d": doc_id, "ks": section_keys},
+            f'SELECT section_key AS sk, name FROM ext_concepts WHERE {pred} ORDER BY "order"',
+            binds,
         ).fetchall()
+    by_source = version_sections_by_source(doc_id)
     for r in rows:
-        out.setdefault(r["sk"], []).append(r["name"])
+        src = r["sk"]
+        # An unmapped version (concept_filter's book fallback) has no reverse map; there the
+        # book's keys ARE the version's, so the source key is its own target.
+        for ver in by_source.get(src) or [src]:
+            out.setdefault(ver, []).append(r["name"])
     return out
 
 
@@ -244,11 +260,14 @@ def generate_orient(doc_id: str, scope: str | None, model: str | None = None) ->
     if not sections:
         return None
     keys = [s.section_key for s in sections]
+    # Book-scoped table, version-scoped keys — resolved by concept_filter. No re-keying
+    # needed here: the rows are flattened into one prompt, not indexed by section.
+    pred, binds = concept_filter(doc_id, keys)
     with db() as conn:
         rows = conn.execute(
-            "SELECT name, signal FROM ext_concepts WHERE doc_id = %(d)s AND section_key = ANY(%(ks)s::text[]) "
+            f"SELECT name, signal FROM ext_concepts WHERE {pred} "
             'ORDER BY section_key, "order"',
-            {"d": doc_id, "ks": keys},
+            binds,
         ).fetchall()
     if not rows:
         return {"objectives": [], "watchFor": []}

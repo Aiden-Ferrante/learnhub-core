@@ -62,7 +62,10 @@ def api_file(
     doc_id = resolve_doc_id(doc)
     if not doc_id:
         return JSONResponse({"error": "no document"}, status_code=404)
-    path = audiobook_path(doc_id, scope)
+    try:
+        path = audiobook_path(doc_id, scope)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     if not os.path.exists(path):
         return JSONResponse({"error": "not generated yet"}, status_code=404)
     safe_scope = (scope or "audiobook").replace(":", "-")

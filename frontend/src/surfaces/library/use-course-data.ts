@@ -5,7 +5,7 @@
  *  mastery, due count, and reading position. This replaces the old LearnTab state
  *  machine — each route page mounts it with the courseId from the URL. */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fetchTocTree, findNodeBySectionKey, type LearnTreeNode } from "@/gateways/api/outline"
 import { fetchMastery, type MasteryResponse } from "@/gateways/api/progress"
 import { fetchStudyDebt } from "@/gateways/api/progress"
@@ -70,7 +70,9 @@ export function useCourseData(courseId: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mastery, setMastery] = useState<MasteryResponse | null>(null)
-  const [reviewDue, setReviewDue] = useState(0)
+  // null means "we could not find out", which is NOT the same as zero — a failed fetch
+  // used to render as "Caught up" and quietly talk the user out of their reviews.
+  const [reviewDue, setReviewDue] = useState<number | null>(null)
   const [readingProgress, setReadingProgress] = useState<ReadingProgress>({})
 
   const loadTree = useCallback(async (doc: string) => {
@@ -94,32 +96,50 @@ export function useCourseData(courseId: string) {
     }
   }, [])
 
-  const loadMastery = useCallback(async (doc: string) => {
+  // Both loaders take the doc they were asked about and a liveness check, because these
+  // are course-scoped reads that outlive a course switch. Keeping the previous value on
+  // failure meant course B could render with course A's coverage numbers; applying a slow
+  // response unconditionally meant A's could land on top of B's.
+  const loadMastery = useCallback(async (doc: string, isCurrent: () => boolean) => {
     try {
       const data = await fetchMastery(doc)
-      if (!data.error) setMastery(data)
+      if (!isCurrent()) return
+      setMastery(data.error ? null : data)
     } catch {
-      // mastery is supplementary — a failure here must not break the page
+      if (isCurrent()) setMastery(null)
     }
   }, [])
 
-  const loadDue = useCallback(async (doc: string) => {
+  const loadDue = useCallback(async (doc: string, isCurrent: () => boolean) => {
     try {
       const debt = await fetchStudyDebt()
-      setReviewDue(debt.courses?.find((c) => c.doc === doc)?.dueNow ?? 0)
+      if (!isCurrent()) return
+      // The endpoint answers for the whole library, so a course simply being absent is a
+      // real zero. An error envelope is not — that is "unknown".
+      setReviewDue(debt.error ? null : (debt.courses?.find((c) => c.doc === doc)?.dueNow ?? 0))
     } catch {
-      setReviewDue(0)
+      if (isCurrent()) setReviewDue(null)
     }
   }, [])
+
+  // The doc these reads were started for, as of right now. Every course-scoped response
+  // checks itself against this before it is applied, so a slow answer about the course you
+  // just left can never land on the course you are looking at.
+  const docKeyRef = useRef(docKey)
+  docKeyRef.current = docKey
+  const isCurrentDoc = useCallback((doc: string) => () => docKeyRef.current === doc, [])
 
   // One load path: fires on mount and again when the course flips processing→ready.
   useEffect(() => {
-    if (isLive && docKey) {
-      loadTree(docKey)
-      loadMastery(docKey)
-      loadDue(docKey)
-    }
-  }, [isLive, docKey, loadTree, loadMastery, loadDue])
+    if (!isLive || !docKey) return
+    // Drop the outgoing course's numbers immediately, so nothing stale is ever on screen
+    // next to the new course's title while its own reads are in flight.
+    setMastery(null)
+    setReviewDue(null)
+    loadTree(docKey)
+    loadMastery(docKey, isCurrentDoc(docKey))
+    loadDue(docKey, isCurrentDoc(docKey))
+  }, [isLive, docKey, loadTree, loadMastery, loadDue, isCurrentDoc])
 
   useEffect(() => {
     fetchReadingProgress().then(setReadingProgress)
@@ -136,17 +156,17 @@ export function useCourseData(courseId: string) {
   /** Re-pull mastery + due after study activity (review graded, walk finished, …). */
   const refresh = useCallback(() => {
     if (!docKey) return
-    loadMastery(docKey)
-    loadDue(docKey)
-  }, [docKey, loadMastery, loadDue])
+    loadMastery(docKey, isCurrentDoc(docKey))
+    loadDue(docKey, isCurrentDoc(docKey))
+  }, [docKey, loadMastery, loadDue, isCurrentDoc])
 
   /** Full reload after a transient backend failure. */
   const retry = useCallback(() => {
     if (!docKey) return
     loadTree(docKey)
-    loadMastery(docKey)
-    loadDue(docKey)
-  }, [docKey, loadTree, loadMastery, loadDue])
+    loadMastery(docKey, isCurrentDoc(docKey))
+    loadDue(docKey, isCurrentDoc(docKey))
+  }, [docKey, loadTree, loadMastery, loadDue, isCurrentDoc])
 
   /** Re-read the version set after creating, switching, renaming or deleting one. A
    *  changed main flips docKey, and the load effect above pulls the new course in. */

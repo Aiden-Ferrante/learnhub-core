@@ -9,10 +9,19 @@ import { Input } from "@/kit/ui/input"
 import { Label } from "@/kit/ui/label"
 import { BrandMark } from "@/kit/layout/brand-mark"
 
+// Middleware only ever writes an internal path into `from`, but nothing validated it on
+// the way back out — so a crafted /login?from=https://evil.example rendered the real login
+// form and handed the user to another origin the moment they signed in. Only same-origin
+// paths survive; `//host` is rejected too, since that is protocol-relative and leaves.
+function safeRedirect(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/"
+  return raw
+}
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const from = searchParams.get("from") || "/"
+  const from = safeRedirect(searchParams.get("from"))
 
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")

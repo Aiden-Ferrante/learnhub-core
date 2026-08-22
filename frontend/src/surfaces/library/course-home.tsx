@@ -54,7 +54,8 @@ type CourseHomeProps = {
   onOpenConcept?: (conceptKey: string) => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
-  dueCount?: number
+  /** Reviews due now, or null when the debt read failed — "unknown", never "zero". */
+  dueCount?: number | null
   onReviewAll?: () => void
   onRetry?: () => void
 }
@@ -125,7 +126,7 @@ export function CourseHome({
   onOpenConcept,
   onBackToShelf,
   continueNode,
-  dueCount = 0,
+  dueCount = null,
   onReviewAll,
   onRetry,
 }: CourseHomeProps) {
@@ -277,7 +278,9 @@ export function CourseHome({
               icon={<RotateCcw className="h-4 w-4 text-brand" />}
               title="Review"
               desc="Spaced-repetition cards that have come due — keeps what you learned from fading."
-              badge={dueCount > 0 ? `${dueCount} due` : "Caught up"}
+              // null = the debt read failed. Saying "Caught up" there is the one wrong
+              // answer, because it is the answer that makes someone skip their reviews.
+              badge={dueCount === null ? "—" : dueCount > 0 ? `${dueCount} due` : "Caught up"}
               onClick={onReviewAll}
             />
           </div>

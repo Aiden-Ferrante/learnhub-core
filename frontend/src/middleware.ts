@@ -33,7 +33,15 @@ export default auth((req) => {
 
 export const config = {
   // Gate everything except Next internals and static assets.
+  //
+  // The static-asset lookahead below is anchored on the WHOLE pathname, not just the
+  // asset directories — so it also exempted any API path that happened to end in one of
+  // those extensions (`/api/learn/concept/x.map` ran with no auth at all). Section and
+  // concept keys are user- and LLM-derived strings that reach `{key:path}` routes, so that
+  // was reachable. `/api/:path*` is listed first and unconditionally: an API route is
+  // never a static asset, and no handler does its own auth check.
   matcher: [
+    '/api/:path*',
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|css|js|map|woff2?)$).*)',
   ],
 }
