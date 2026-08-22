@@ -6,9 +6,12 @@ pymupdf4llm>=0.0.17,<1
 python-multipart>=0.0.9,<1
 # Higher-fidelity converter (CPU). pymupdf4llm stays as automatic fallback.
 docling>=2.7,<3
-# Audiobook TTS: Orpheus emits audio tokens (served via Ollama); SNAC decodes them
-# to 24kHz audio (torch comes in via docling). soundfile writes WAV before ffmpeg→MP3.
-snac>=1.2.0
+# Audiobook TTS: Kokoro-82M, in-process on the GPU (torch comes in via docling). It is
+# non-autoregressive, so it renders a chapter ~24x faster than the Orpheus 3B + SNAC
+# pipeline it replaced — see docs/adr/0002-kokoro-replaces-orpheus-tts.md. Pulls misaki
+# for G2P and a spaCy en_core_web_sm model; verified installing clean on aarch64/cu130.
+# soundfile writes WAV before ffmpeg→MP3.
+kokoro>=0.9.4,<1
 soundfile>=0.12
 # LLM calls go straight to the LOCAL Ollama daemon's native /api endpoint via httpx —
 # fully keyless, no framework. pydantic v2 (schema validation) already present via

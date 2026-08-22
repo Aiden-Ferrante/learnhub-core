@@ -1,11 +1,12 @@
 """Audiobook generation: a chapter (or section) → a downloadable MP3 narrated by a
-local Orpheus 3B voice (via Ollama) + SNAC decode.
+local Kokoro-82M voice, in-process on the GPU.
 
 One source: the chapter's raw markdown, cleaned for narration.
 
-Long-running and GPU-bound, so it runs as a background job (mirrors the extraction
-job): ``POST /api/audiobook`` starts it, the client polls ``/status``, then streams /
-downloads the MP3 from ``/file``.
+Still a background job (``POST /api/audiobook`` starts it, the client polls ``/status``,
+then streams the MP3 from ``/file``) — but no longer a *long* one. A chapter renders in
+about six seconds rather than tens of minutes, which is why this module no longer
+checkpoints, resumes, or batches; see docs/adr/0002-kokoro-replaces-orpheus-tts.md.
 """
 
 from __future__ import annotations
@@ -13,18 +14,15 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
 from app.process.content import resolve_doc_id
 from app.process.content import load_section_blocks
-from app.supplemental.media.tts_orpheus import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
+from app.supplemental.media.tts_kokoro import DEFAULT_VOICE, SAMPLE_RATE, VOICES, synthesize
 
 AUDIO_DIR = os.environ.get("AUDIOBOOK_DIR", "/shared/audiobooks")
 _GAP = np.zeros(int(SAMPLE_RATE * 0.35), dtype=np.float32)  # pause between segments
@@ -91,7 +89,11 @@ _SENT = re.compile(r"(?<=[.!?])\s+")
 
 def segment_text(text: str, max_chars: int = 280) -> list[str]:
     """Split into short, TTS-stable chunks (sentence-grouped, bounded length).
-    Orpheus drifts on long passages, so keep each generation small."""
+
+    Originally sized because Orpheus drifted on long passages. Kokoro is a fixed-speaker
+    model carrying no state between calls, so drift is not the reason any more — but the
+    chunking still earns its keep: it is what produces the per-chunk read-along timeline.
+    """
     chunks: list[str] = []
     for para in re.split(r"\n{2,}", text):
         para = para.replace("\n", " ").strip()
@@ -180,33 +182,10 @@ def estimate_weights(segments: list[str], gap_sec: float = _GAP.size / SAMPLE_RA
     return [max(1.0, len(s)) / chars_per_sec + gap_sec for s in segments]
 
 
-# One narration synthesizes at a time: concurrent jobs would interleave and all finish
-# late. Extra jobs queue on this gate and run in POST order. WITHIN a narration, chunks
-# synthesize _TTS_WORKERS at a time — Ollama's OLLAMA_NUM_PARALLEL slots batch the
-# streams, which is nearly free on the bandwidth-bound GPU (~2x audiobook throughput).
-# Keep this in step with OLLAMA_NUM_PARALLEL in deploy/compose/docker-compose.yml.
-_TTS_GATE = threading.Semaphore(1)
-_TTS_WORKERS = max(1, int(os.environ.get("AUDIOBOOK_TTS_WORKERS", "2")))
-
-
-def _work_dir(doc_id: str, scope: str | None) -> str:
-    return os.path.join(_doc_dir(doc_id), f".{_slug(scope)}__text.work")
-
-
-def _load_manifest(work: str) -> dict | None:
-    try:
-        with open(os.path.join(work, "manifest.json")) as f:
-            manifest = json.load(f)
-    except (OSError, ValueError):
-        return None
-    segments = manifest.get("segments")
-    return manifest if isinstance(segments, list) and segments else None
-
-
-def _save_chunk(path: str, wav: np.ndarray) -> None:
-    tmp = f"{path}.tmp.npy"
-    np.save(tmp, wav)
-    os.replace(tmp, path)
+# Neither a gate nor a worker pool any more. Both existed to wring throughput out of
+# Orpheus, whose per-stream cost was high enough that batching paid; Kokoro is flat under
+# concurrency (measured 50.4x / 51.9x / 49.0x at 1 / 4 / 8 streams) because one stream
+# already saturates the GPU, and the queue serializes narrations anyway.
 
 
 def _encode_mp3(wav: np.ndarray, out_path: str) -> None:
@@ -229,9 +208,16 @@ def make_audiobook(doc_id: str | None, scope: str | None,
                    voice: str = DEFAULT_VOICE, on_progress=None) -> dict:
     """Render a chapter to an MP3. Blocking + GPU-bound — call from a worker thread.
 
-    Every synthesized chunk is checkpointed to a work dir, so a job that dies mid-way
-    (service restart, crash) resumes from the last finished chunk on the next request
-    instead of losing hours of GPU time."""
+    Straight through, no checkpoints. This used to write every chunk to a work dir and
+    resume from it, because a crash mid-render lost hours of Orpheus GPU time. Kokoro
+    renders a chapter in about six seconds, so resuming is more machinery than re-rendering
+    is cost — and the checkpoint layer had its own bug (a chunk that synthesized to silence
+    was saved as a valid checkpoint and never retried, so a sentence went missing for good).
+    Deleting it fixed that by construction.
+
+    Synthesis is single-stream on purpose: concurrency is flat for this engine, see
+    tts_kokoro.
+    """
     t0 = time.time()
     doc_id = resolve_doc_id(doc_id)
     if not doc_id:
@@ -239,83 +225,43 @@ def make_audiobook(doc_id: str | None, scope: str | None,
     if voice not in VOICES:
         voice = DEFAULT_VOICE
 
-    # Resume from the checkpointed segment list when one exists — it pins the exact
-    # narration script and the voice, so resumed chunks match the ones already on disk.
-    work = _work_dir(doc_id, scope)
-    manifest = _load_manifest(work)
-    if manifest:
-        segments = manifest["segments"]
-        if manifest.get("voice") in VOICES:
-            voice = manifest["voice"]
-    else:
-        segments = chapter_segments(doc_id, scope)
-        # Drop consecutive duplicates (e.g. a heading that the section body repeats).
-        deduped: list[str] = []
-        for seg in segments:
-            if deduped and seg.strip().lower() == deduped[-1].strip().lower():
-                continue
-            deduped.append(seg)
-        segments = deduped
-        if not segments:
-            return {"docId": doc_id, "scope": scope, "error": "no narratable text in this scope"}
-        os.makedirs(work, exist_ok=True)
-        tmp = os.path.join(work, "manifest.json.tmp")
-        with open(tmp, "w") as f:
-            json.dump({"segments": segments, "voice": voice}, f)
-        os.replace(tmp, os.path.join(work, "manifest.json"))
+    segments = chapter_segments(doc_id, scope)
+    # Drop consecutive duplicates (e.g. a heading that the section body repeats).
+    deduped: list[str] = []
+    for seg in segments:
+        if deduped and seg.strip().lower() == deduped[-1].strip().lower():
+            continue
+        deduped.append(seg)
+    segments = deduped
+    if not segments:
+        return {"docId": doc_id, "scope": scope, "error": "no narratable text in this scope"}
 
     total = len(segments)
+    if on_progress:
+        on_progress(0, total, None)
 
-    if not _TTS_GATE.acquire(blocking=False):
+    # Exact per-chunk playback times (the read-along timeline) fall out of the concat for
+    # free — captured here, while the sample counts are in hand.
+    pieces: list[np.ndarray] = []
+    chunk_times: list[dict] = []
+    silent: list[int] = []
+    cursor = 0
+    for i, seg in enumerate(segments):
+        wav = synthesize(seg, voice=voice)
         if on_progress:
-            on_progress(0, total, "queued — another narration is synthesizing")
-        _TTS_GATE.acquire()
-    try:
-        if on_progress:
-            on_progress(0, total, "resuming from checkpoint" if manifest else None)
-
-        def _load_checkpoint(i: int) -> np.ndarray | None:
-            try:
-                return np.load(os.path.join(work, f"{i:05d}.npy"))
-            except (OSError, ValueError):
-                return None  # missing or unreadable checkpoint → resynthesize
-
-        # Fill phase: synthesize every missing chunk, _TTS_WORKERS at a time. Progress
-        # counts completions (finish order ≠ narration order under concurrency).
-        done_count = 0
-        progress_lock = threading.Lock()
-
-        def _fill(i: int, seg: str) -> None:
-            nonlocal done_count
-            if _load_checkpoint(i) is None:
-                _save_chunk(os.path.join(work, f"{i:05d}.npy"), synthesize(seg, voice=voice))
-            with progress_lock:
-                done_count += 1
-                if on_progress:
-                    on_progress(done_count, total, seg[:60])
-
-        with ThreadPoolExecutor(max_workers=_TTS_WORKERS) as pool:
-            list(pool.map(_fill, range(total), segments))
-
-        # Assembly: read the checkpoints back in narration order. Exact per-chunk
-        # playback times (the read-along timeline) fall out of the concat for free —
-        # capture them here, while the sample counts are in hand.
-        pieces: list[np.ndarray] = []
-        chunk_times: list[dict] = []
-        cursor = 0
-        for i, seg in enumerate(segments):
-            wav = _load_checkpoint(i)
-            if wav is None or not wav.size:
-                continue  # dud chunk (Orpheus emitted no audio) — narration skips it
-            start = cursor / SAMPLE_RATE
-            cursor += wav.size
-            chunk_times.append({"text": seg, "start": round(start, 3),
-                                "end": round(cursor / SAMPLE_RATE, 3)})
-            cursor += _GAP.size
-            pieces.append(wav)
-            pieces.append(_GAP)
-    finally:
-        _TTS_GATE.release()
+            on_progress(i + 1, total, seg[:60])
+        if not wav.size:
+            # Nothing speakable in this segment. Recorded rather than silently skipped —
+            # that silence is precisely what the old checkpoint layer hid.
+            silent.append(i)
+            continue
+        start = cursor / SAMPLE_RATE
+        cursor += wav.size
+        chunk_times.append({"text": seg, "start": round(start, 3),
+                            "end": round(cursor / SAMPLE_RATE, 3)})
+        cursor += _GAP.size
+        pieces.append(wav)
+        pieces.append(_GAP)
 
     if not pieces:
         return {"docId": doc_id, "scope": scope, "error": "synthesis produced no audio"}
@@ -328,9 +274,9 @@ def make_audiobook(doc_id: str | None, scope: str | None,
     with open(tmp_tl, "w") as f:
         json.dump({"exact": True, "chunks": chunk_times}, f)
     os.replace(tmp_tl, tl_path)
-    shutil.rmtree(work, ignore_errors=True)
 
     return {
+        **({"silentSegments": len(silent)} if silent else {}),
         "docId": doc_id,
         "scope": scope,
         "voice": voice,
@@ -411,15 +357,9 @@ def audiobook_status(doc_id: str | None, scope: str | None) -> dict:
     if os.path.exists(path):
         return {"status": "done", "scope": scope, "docId": doc_id,
                 "summary": {"file": path, "exists": True}}
-    # A checkpoint work dir without a finished file means a run died; re-starting resumes.
-    work = _work_dir(doc_id, scope)
-    manifest = _load_manifest(work)
-    if manifest:
-        done = sum(1 for fn in os.listdir(work)
-                   if fn.endswith(".npy") and not fn.endswith(".tmp.npy"))
-        return {"status": "interrupted", "scope": scope, "docId": doc_id,
-                "progress": {"done": done, "total": len(manifest["segments"]), "current": None},
-                "resume": "start this narration again to continue from the checkpoint"}
+    # There is no "interrupted" any more: a died-mid-render narration leaves nothing behind
+    # to resume from, and at ~6s a chapter the answer to a dead run is simply to start it
+    # again. That state used to exist because a lost run cost hours.
     return {"status": "idle", "scope": scope, "docId": doc_id}
 
 

@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.supplemental.media import audiobook_path, audiobook_status, audiobook_timeline, list_audiobooks, start_audiobook
 from app.process.content import resolve_doc_id
-from app.supplemental.media import VOICES
+from app.supplemental.media import DEFAULT_VOICE, VOICES
 
 router = APIRouter()
 
@@ -30,7 +30,9 @@ async def api_audiobook(
 ) -> JSONResponse:
     """Start generating a chapter's audiobook (raw chapter text). body: ``{voice}``."""
     body = body or {}
-    voice = str(body.get("voice") or "tara")
+    # Empty means "the engine's default" — don't name a voice here, or a rename in the
+    # engine turns into a silent fallback at the boundary instead of an obvious error.
+    voice = str(body.get("voice") or DEFAULT_VOICE)
     data = start_audiobook(doc, scope, voice=voice)
     return JSONResponse(data, status_code=503 if data.get("status") == "error" else 200)
 

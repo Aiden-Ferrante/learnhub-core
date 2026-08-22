@@ -6,6 +6,7 @@ imported once at app startup — is where each job kind meets the code that runs
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from app.process.content import resolve_doc_id
@@ -15,7 +16,7 @@ from app.conductor.worker import ensure_worker, register_runner
 from app.process.extraction import author_guides_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
 from app.gateways import set_doc_resolver
-from app.supplemental.media import run_audiobook
+from app.supplemental.media import run_audiobook, warm_tts
 
 
 def _latest_doc_id() -> str | None:
@@ -45,6 +46,10 @@ def install() -> None:
     register_runner("skeleton", _run_skeleton)
     register_runner("orient", _run_orient)
     register_runner("audiobook", run_audiobook)
+    # Load the TTS model off the request path. A fresh container's first narration costs
+    # ~19s against ~5.4s warm — torch/CUDA init plus the model load, paid once per process.
+    # Daemon thread so it never delays startup and never holds shutdown open.
+    threading.Thread(target=warm_tts, name="tts-warm", daemon=True).start()
     # Start the one queue worker with the app — it drains the ledger from here on
     # (enqueue is a pure ledger write; nothing else wakes the worker).
     ensure_worker()

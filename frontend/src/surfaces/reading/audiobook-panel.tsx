@@ -23,10 +23,13 @@ type AudiobookPanelProps = {
   docId?: string
 }
 
-/** Generate a chapter's narration as a downloadable MP3 (local Orpheus TTS). */
+/** Generate a chapter's narration as a downloadable MP3 (local Kokoro TTS). */
 export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
-  const [voice, setVoice] = useState("tara")
-  const [voices, setVoices] = useState<string[]>(["tara"])
+  // af_bella is Kokoro's only A-graded English voice. Both of these are replaced by the
+  // real list as soon as /voices answers; they exist so the picker has something valid
+  // before that lands.
+  const [voice, setVoice] = useState("af_bella")
+  const [voices, setVoices] = useState<string[]>(["af_bella"])
   const [status, setStatus] = useState<AudiobookStatusResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [cacheBust, setCacheBust] = useState(0)
@@ -210,40 +213,66 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
     }
   }, [])
 
+  // Every one of these awaits can REJECT: the proxy returns 503 when the learn service is
+  // down and parseJsonResponse throws on a non-2xx. Unhandled, that left `busy` stuck true
+  // with no message — a spinner that never resolves and no way back except a reload.
   const poll = useCallback(async () => {
-    const st = await getAudiobookStatus(scope, docId)
-    setStatus(st)
-    if (st.status === "running") {
-      pollRef.current = window.setTimeout(poll, 4000)
-    } else {
+    try {
+      const st = await getAudiobookStatus(scope, docId)
+      setStatus(st)
+      if (st.status === "running") {
+        pollRef.current = window.setTimeout(poll, 4000)
+        return
+      }
       setBusy(false)
       if (st.status === "done") setCacheBust(Date.now())
+    } catch (e) {
+      setBusy(false)
+      setStatus({ status: "error", error: e instanceof Error ? e.message : "Lost contact with the narrator" })
     }
   }, [scope, docId])
 
-  // When scope changes, surface any already-generated file or resume a running job.
+  // When scope changes, surface any already-generated file or rejoin a running job.
   useEffect(() => {
     stopPoll()
     setBusy(false)
     setStatus(null)
-    getAudiobookStatus(scope, docId).then((st) => {
-      setStatus(st)
-      if (st.status === "running") {
-        setBusy(true)
-        pollRef.current = window.setTimeout(poll, 2000)
-      } else if (st.status === "done") {
-        setCacheBust(Date.now())
-      }
-    })
-    return stopPoll
+    let current = true
+    getAudiobookStatus(scope, docId)
+      .then((st) => {
+        // A response for the scope we just left must not start a poll for it.
+        if (!current) return
+        setStatus(st)
+        if (st.status === "running") {
+          setBusy(true)
+          pollRef.current = window.setTimeout(poll, 2000)
+        } else if (st.status === "done") {
+          setCacheBust(Date.now())
+        }
+      })
+      .catch(() => {
+        if (current) setStatus({ status: "error", error: "Could not reach the narrator" })
+      })
+    return () => {
+      current = false
+      stopPoll()
+    }
   }, [scope, docId, poll, stopPoll])
 
   const generate = async () => {
     setBusy(true)
-    const started = await startAudiobook(scope, docId, voice)
-    setStatus(started)
-    if (started.status === "error") {
+    try {
+      const started = await startAudiobook(scope, docId, voice)
+      setStatus(started)
+      // Kept for the envelope that returns 200 with an error body; the 503 path throws
+      // instead and is caught below, which is why this guard alone was not enough.
+      if (started.status === "error") {
+        setBusy(false)
+        return
+      }
+    } catch (e) {
       setBusy(false)
+      setStatus({ status: "error", error: e instanceof Error ? e.message : "Could not start narration" })
       return
     }
     stopPoll()
@@ -270,7 +299,7 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
       <div className="flex items-center gap-2">
         <Headphones className="h-4 w-4 text-brand" />
         <span className="text-sm font-medium">Audiobook</span>
-        <span className="text-xs text-muted-foreground">· narrated locally by Orpheus</span>
+        <span className="text-xs text-muted-foreground">· narrated locally by Kokoro</span>
       </div>
 
       <p className="text-xs text-muted-foreground">

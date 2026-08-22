@@ -130,9 +130,14 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_KEEP_ALIVE=30m
-      # NUM_PARALLEL=2 lets audiobook TTS decode two chunks per batch (~2x throughput
-      # on the bandwidth-bound GB10; single-stream Orpheus is only ~75 tok/s ≈ 0.9x
-      # real-time). The old crash was NUM_PARALLEL=4 × a MILLION-token context — with
+      # NUM_PARALLEL=2 is back to serving ordinary LLM concurrency only. It was briefly
+      # raised to 8 as the audiobook throughput knob — Orpheus decode was bandwidth-bound,
+      # so batching amortised the weight read: measured 2 slots 1.13x realtime, 4 slots
+      # 1.72x, 8 slots 2.40x (sublinear, and 12 streams against 8 slots fell BACK to 1.64x).
+      # TTS moved to Kokoro, which is non-autoregressive and flat under concurrency, so that
+      # justification is gone and the extra KV per slot — charged against EVERY model,
+      # including the 50GB coder ones — is no longer worth paying.
+      # The old crash was NUM_PARALLEL=4 × a MILLION-token context — with
       # the 16K context cap below + q8_0 KV, a second slot costs only a few GB of KV
       # per warm model, well inside headroom. MAX_LOADED_MODELS=4 keeps a coder +
       # general + embed + vision model warm without evict-churn: safe on the 121GB

@@ -2,7 +2,9 @@
 import { parseJsonResponse } from './http'
 
 // --------------------------------------------------------------------------- //
-// Audiobook (Orpheus TTS) — generate a chapter's narration as a downloadable MP3.
+// Audiobook (Kokoro TTS) — generate a chapter's narration as a downloadable MP3.
+// Note there is no 'interrupted' status: rendering a chapter takes seconds, so a run
+// that dies has nothing worth resuming and simply reads as 'idle'.
 // --------------------------------------------------------------------------- //
 
 export type AudiobookStatusResponse = {
