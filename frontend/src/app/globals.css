@@ -203,58 +203,112 @@ body {
 /* ── Reading mode (warm paper) ──────────────────────────────────────────────
    Scoped to the book/notes readers only — the dark app chrome is untouched.
    A cream "page on a desk" surface for long reads; serif body for comfort. */
+/* THE warm palette — the one place it is written down. Everything warm in this
+   file now reads from these; there are no hexes below.
+
+   On :root, not on .reading-surface-paper, for two reasons. These are constants
+   — a fixed cream palette that does not vary by theme or context — and the
+   consumers are not reliably nested under the surface class: .read-paper-prose
+   is applied by markdown-reader.tsx, which has three call sites, only one of
+   which is provably inside a .reading-surface-paper container. Scoped tokens
+   would have resolved to nothing at the others and dropped the ramp back to
+   Typography's defaults. It also means the `paper-*` Tailwind utilities work
+   anywhere, which they did not before.
+
+   Ground and ink used to be raw hexes on .reading-surface-paper while the same
+   two values were ALSO declared as triplets immediately below them:
+   `color: #3a332c` and `--paper-ink: 30 14% 20%` are bit-identical, stated
+   twice. That is exactly what the header comment on this file warns about, and
+   it had already gone wrong — see the next paragraph.
+
+   The four marked `was` did not round-trip to the hex their own comment
+   claimed, each off by ~1/255 in a channel. So `paper-*` Tailwind utilities and
+   the prose ramp below were painting two near-identical warms: a card rendered
+   #f0e9db while its documented colour was #efe8da. Re-derived so the triplet
+   and the comment agree; the hex in each comment is now verified. */
+:root {
+  --paper-bg: 39 39% 93%;               /* #f4efe6 */
+  --paper-card: 40 39.6% 89.6%;         /* #efe8da — was 40 40% 90% (#f0e9db) */
+  --paper-border: 38.6 31.1% 82.4%;     /* #e0d6c4 — was 39 31% 82% (#dfd5c3) */
+  --paper-border-th: 39.4 29.1% 78.4%;  /* #d8cdb8 */
+  --paper-border-td: 40 32.5% 83.7%;    /* #e3dac8 */
+  --paper-ink: 30 14% 20%;              /* #3a332c */
+  --paper-ink-strong: 30 17.2% 11.4%;   /* #221d18 — was 30 17% 11% (#211c17) */
+  --paper-ink-soft: 30 13.8% 25.5%;     /* #4a4138 */
+  --paper-muted: 32 16.3% 36.1%;        /* #6b5d4d — was 32 16% 36% (#6a5d4d) */
+  --paper-link: 16.7 64.3% 32.9%;       /* #8a3c1e */
+  --paper-bullet: 34 25% 63%;           /* #b8a489 */
+  --paper-rule-accent: 15 52% 58%;      /* #cc785c */
+  --paper-code-ink: 16.4 56.4% 30.6%;   /* #7a3a22 */
+  --paper-code-bg: 40 37.5% 87.5%;      /* #ebe3d3 */
+  --paper-pre-ink: 27.3 14.7% 14.7%;    /* #2b2520 */
+}
+
+/* The surface itself stays scoped — only the tokens moved to :root. */
 .reading-surface-paper {
-  background-color: #f4efe6;
-  color: #3a332c;
-  /* Paper-surface tokens — cards/rails/notes inside the reader use paper-* utilities
-     instead of raw hexes, so the warm palette lives in ONE place. */
-  --paper-card: 40 40% 90%;        /* #efe8da */
-  --paper-border: 39 31% 82%;      /* #e0d6c4 */
-  --paper-ink: 30 14% 20%;         /* #3a332c */
-  --paper-ink-strong: 30 17% 11%;  /* #221d18 */
-  --paper-muted: 32 16% 36%;       /* #6b5d4d */
+  background-color: hsl(var(--paper-bg));
+  color: hsl(var(--paper-ink));
 }
 
 /* Override the Tailwind Typography palette + font for the paper reader. */
 .read-paper-prose {
-  --tw-prose-body: #3a332c;
-  --tw-prose-headings: #221d18;
-  --tw-prose-lead: #4a4138;
-  --tw-prose-links: #8a3c1e;
-  --tw-prose-bold: #221d18;
-  --tw-prose-counters: #6b5d4d;
-  --tw-prose-bullets: #b8a489;
-  --tw-prose-hr: #e0d6c4;
-  --tw-prose-quotes: #4a4138;
-  --tw-prose-quote-borders: #cc785c;
-  --tw-prose-captions: #6b5d4d;
-  --tw-prose-code: #7a3a22;
-  --tw-prose-pre-code: #2b2520;
-  --tw-prose-pre-bg: #ebe3d3;
-  --tw-prose-th-borders: #d8cdb8;
-  --tw-prose-td-borders: #e3dac8;
+  /* Every value here is a --paper-* token. Five of these sixteen were literal
+     restatements of a token declared on .reading-surface-paper (body=ink,
+     headings/bold=ink-strong, counters/captions=muted, hr=border), which is how
+     the ramp and the utilities drifted apart in the first place. */
+  --tw-prose-body: hsl(var(--paper-ink));
+  --tw-prose-headings: hsl(var(--paper-ink-strong));
+  --tw-prose-lead: hsl(var(--paper-ink-soft));
+  --tw-prose-links: hsl(var(--paper-link));
+  --tw-prose-bold: hsl(var(--paper-ink-strong));
+  --tw-prose-counters: hsl(var(--paper-muted));
+  --tw-prose-bullets: hsl(var(--paper-bullet));
+  --tw-prose-hr: hsl(var(--paper-border));
+  --tw-prose-quotes: hsl(var(--paper-ink-soft));
+  --tw-prose-quote-borders: hsl(var(--paper-rule-accent));
+  --tw-prose-captions: hsl(var(--paper-muted));
+  --tw-prose-code: hsl(var(--paper-code-ink));
+  --tw-prose-pre-code: hsl(var(--paper-pre-ink));
+  --tw-prose-pre-bg: hsl(var(--paper-code-bg));
+  --tw-prose-th-borders: hsl(var(--paper-border-th));
+  --tw-prose-td-borders: hsl(var(--paper-border-td));
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
   line-height: 1.75;
 }
 
 /* Inline code keeps a faint warm chip (Typography doesn't background code by default). */
 .read-paper-prose :where(code):not(:where([class~="not-prose"] *)) {
-  background-color: #ebe3d3;
+  background-color: hsl(var(--paper-code-bg));
 }
 
 /* KaTeX inherits the warm body ink rather than the app foreground. */
 .read-paper-prose .katex {
-  color: #2b2520;
+  color: hsl(var(--paper-pre-ink));
+}
+
+/* Reader highlight vocabulary. On :root because ::highlight() resolves custom
+   properties against the highlighted range's own element, which can be anywhere
+   in the document — a scoped declaration would not reach it. */
+:root {
+  --hl-find: 48 96.6% 76.7%;        /* #fde68a */
+  --hl-find-active: 37.7 92.1% 50.2%; /* #f59e0b */
+  --hl-find-ink: 22.5 16.7% 9.4%;   /* #1c1714 */
+  --hl-user: 43.3 96.4% 56.3%;      /* #fbbf24 — painted at 0.28 alpha */
+  /* The read-along green. This was the one raw CHROMATIC literal left in the
+     file, written `rgb(118 185 0 / …)` in two places — a hue with no name,
+     which is the exact shape of the stale-palette bug the fleet check exists
+     to catch. Named now; still the same colour. */
+  --hl-read: 81.7 100% 36.3%;       /* #76b900 */
 }
 
 /* In-book find highlights (CSS Custom Highlight API) — amber reads on both themes. */
 ::highlight(book-find) {
-  background-color: #fde68a;
-  color: #1c1714;
+  background-color: hsl(var(--hl-find));
+  color: hsl(var(--hl-find-ink));
 }
 ::highlight(book-find-active) {
-  background-color: #f59e0b;
-  color: #1c1714;
+  background-color: hsl(var(--hl-find-active));
+  color: hsl(var(--hl-find-ink));
 }
 
 /* Concept source sentences highlighted in the reader — subtle brand wash + underline,
@@ -268,7 +322,7 @@ body {
 
 /* User highlights / notes — warm amber, distinct from concept (green) and find (yellow). */
 ::highlight(user-highlight) {
-  background-color: rgba(251, 191, 36, 0.28);
+  background-color: hsl(var(--hl-user) / 0.28);
 }
 
 /* Glossary terms — every occurrence of a concept name; subtle dotted underline, hover for def. */
@@ -450,6 +504,16 @@ body {
 /* Restrained syntax highlighting (highlight.js token classes). Calm by design:
    muted comments, one green accent for keywords, everything else near-foreground —
    no rainbow, matching the premium-calm token palette. */
+/* The two literal hues this block used to carry — hsl(45 70% 62%) for strings
+   and hsl(200 55% 65%) for numbers — were invisible to fleet-ui/check.sh, which
+   only knew about hex and rgb(). Since this app writes its whole palette as hsl
+   triplets, a bare hue reads as idiomatic here in a way it never did elsewhere.
+   Same colours, named. */
+.markdown-reader {
+  --hljs-string: 45 70% 62%;
+  --hljs-number: 200 55% 65%;
+}
+
 .markdown-reader .hljs {
   color: hsl(var(--foreground) / 0.9);
   background: transparent;
@@ -468,12 +532,12 @@ body {
 .markdown-reader .hljs-string,
 .markdown-reader .hljs-regexp,
 .markdown-reader .hljs-symbol {
-  color: hsl(45 70% 62%);
+  color: hsl(var(--hljs-string));
 }
 .markdown-reader .hljs-number,
 .markdown-reader .hljs-literal,
 .markdown-reader .hljs-bullet {
-  color: hsl(200 55% 65%);
+  color: hsl(var(--hljs-number));
 }
 .markdown-reader .hljs-title,
 .markdown-reader .hljs-function .hljs-title,
@@ -498,10 +562,10 @@ body {
 /* Read-along: what the audiobook is currently speaking (CSS Custom Highlight API —
    no DOM mutation, so concept underlines/tints keep working underneath). */
 ::highlight(txt2k-read-chunk) {
-  background-color: rgb(118 185 0 / 0.14);
+  background-color: hsl(var(--hl-read) / 0.14);
 }
 ::highlight(txt2k-read-word) {
-  background-color: rgb(118 185 0 / 0.45);
+  background-color: hsl(var(--hl-read) / 0.45);
   color: inherit;
 }
 

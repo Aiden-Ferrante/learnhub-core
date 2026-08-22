@@ -54,7 +54,10 @@ const config: Config = {
           result: "hsl(var(--kind-result))",
           method: "hsl(var(--kind-method))",
         },
-        // Paper reading-surface palette — defined on .reading-surface-paper.
+        // Paper reading-surface palette — defined on :root in globals.css, NOT on
+        // .reading-surface-paper. These are constants, and the consumers are not all
+        // nested under that class, so scoped tokens resolved to nothing at some call
+        // sites. On :root these utilities work anywhere.
         paper: {
           card: "hsl(var(--paper-card))",
           border: "hsl(var(--paper-border))",
