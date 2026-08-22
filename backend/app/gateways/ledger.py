@@ -224,8 +224,15 @@ def cancel_build(doc_id: str | None, scope: str, kind: str = "build") -> dict[st
 
 
 def check_cancel(key: str) -> None:
-    """Raise JobCancelled if this job's cancel flag was set. Called at section and
-    phase boundaries — the coarsest granularity that never wastes finished work."""
+    """Raise JobCancelled if this job's cancel flag was set, or if its row is gone.
+    Called at section and phase boundaries — the coarsest granularity that never wastes
+    finished work.
+
+    ⚠ A missing row means cancelled, not "carry on". Deleting a document cascades its
+    job rows away via the FK, and treating that as no-cancel-requested left the runner
+    grinding on content that no longer exists — holding the single worker thread, so
+    every later job sat queued behind a job whose document was already gone. Restarting
+    did not help: requeue_interrupted() resurrected it."""
     try:
         with db() as conn:
             row = conn.execute(
@@ -233,7 +240,7 @@ def check_cancel(key: str) -> None:
             ).fetchone()
     except Exception:  # noqa: BLE001 — a read hiccup must not kill the job
         return
-    if row and row.get("cancel_requested"):
+    if row is None or row.get("cancel_requested"):
         raise JobCancelled()
 
 

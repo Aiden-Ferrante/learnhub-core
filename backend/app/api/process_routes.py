@@ -167,8 +167,10 @@ def api_build(
 def api_build_cancel(
     doc: str | None = None, scope: str = "", kind: str = "build"
 ) -> JSONResponse:
-    if not scope:
-        return JSONResponse({"error": "scope required"}, status_code=400)
+    """Cancel one job. ``scope`` is part of the job's identity, not a filter — an empty
+    scope names the whole-document job specifically, which is exactly what
+    ``POST /api/extract`` with no scope enqueues. Rejecting it left those jobs
+    uncancellable: the only way to stop one was to edit the ledger by hand."""
     data = cancel_build(doc, scope, kind=kind)
     return JSONResponse(data, status_code=503 if data.get("error") else 200)
 

@@ -12,7 +12,9 @@ services:
       context: ../..
       dockerfile: deploy/app/Dockerfile
     ports:
-      - '3001:3000'
+      # Loopback-only publish: `tailscale serve` fronts this as https on 3001 and
+      # needs the tailnet IP free (see fleet-ui/apps.js on the migration).
+      - '127.0.0.1:3001:3000'
     environment:
       # Postgres is the one datastore (auth + per-user data via schema tenancy).
       - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
@@ -61,6 +63,12 @@ services:
       # revision pass. A fast 8B instruct model keeps one-time background authoring practical
       # (~1 min/concept); the big reasoning default would be ~10 min/concept. Empty = OLLAMA_MODEL.
       - LEARN_QUIZ_AUTHOR_MODEL=gemma4:latest
+      # Concept extraction. Same reasoning as the line above, and it was missing: unset,
+      # this falls through to OLLAMA_MODEL, and the big reasoning default is the wrong
+      # tool for it. Measured on §1 with per-section coalescing: nemotron 3,847s with 12
+      # timeouts and 0 concepts stored; gemma4 160s, 8 concepts, 0 errors. Extraction is
+      # the only LLM workload left in the app, so this default is the one that matters.
+      - LEARN_EXTRACT_MODEL=gemma4:latest
       # PDF->Markdown converter: "docling" (higher fidelity) | "pymupdf" (lightweight fallback)
       - LEARN_CONVERTER=docling
       # Docling's torch/table/layout models run on the GB10 GPU (cu130 wheel in the image).
