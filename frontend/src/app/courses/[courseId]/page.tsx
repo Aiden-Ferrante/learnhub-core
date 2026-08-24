@@ -42,6 +42,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onOpenConcept={(conceptKey) =>
           router.push(`/courses/${courseId}/concepts?concept=${encodeURIComponent(conceptKey)}`)
         }
+        onConceptReviewed={data.refresh}
         onBackToShelf={() => router.push("/courses")}
         continueNode={data.continueNode}
         dueCount={data.reviewDue}

@@ -7,6 +7,8 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Circle,
+  CircleCheckBig,
   Loader2,
   Search,
   Sparkles,
@@ -18,9 +20,24 @@ import { cn } from "@/kit/lib/utils"
 import { ConceptMasteryDot } from "@/surfaces/concepts"
 import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
 import { getExtractionStatus, startExtraction } from "@/gateways/api/pipeline"
-import { type SectionMemory } from "@/gateways/api/progress"
+import { fetchConceptMastery, type SectionMemory } from "@/gateways/api/progress"
+import { submitReviewGrade } from "@/gateways/api/review"
 
 type ExtractState = "running" | "done" | "error"
+
+/** The LOCAL calendar day an epoch-seconds timestamp falls on.
+ *
+ *  Local, not UTC, and the difference is not cosmetic: the backend's heatmap buckets by UTC
+ *  day, so from about 8pm Eastern onward UTC is already tomorrow. Bucketing the tick that
+ *  way would silently un-tick everything reviewed during an evening session — verified
+ *  against a real event at 16:05 UTC that a UTC "today" no longer matched. "Studied today"
+ *  means the user's today; the heatmap's own day-boundary is a separate, known issue. */
+function localDay(seconds: number): string {
+  const d = new Date(seconds * 1000)
+  const month = `${d.getMonth() + 1}`.padStart(2, "0")
+  const day = `${d.getDate()}`.padStart(2, "0")
+  return `${d.getFullYear()}-${month}-${day}`
+}
 
 type SyllabusTreeProps = {
   tree: LearnTreeNode[]
@@ -32,6 +49,9 @@ type SyllabusTreeProps = {
   /** Collapse to top-level chapters only — no drilling into sub-sections. */
   /** Open a concept clicked in the tree (its detail view). Omit to hide concept leaves. */
   onSelectConcept?: (conceptKey: string) => void
+  /** Called after a concept is ticked, so the caller can re-pull due count + mastery.
+   *  Providing it is what turns the per-concept review ticks on. */
+  onConceptReviewed?: () => void
   /** Grow with content (page scrolls) instead of scrolling inside a fixed box —
    *  for the CourseHome outline; sidebars keep the internal ScrollArea. */
   autoHeight?: boolean
@@ -122,6 +142,53 @@ function ExtractButton({
 }
 
 
+/** Mark one concept reviewed today.
+ *
+ *  This records a REAL review at Good (3) — the same grade the review panel's Good button
+ *  writes — so it moves the FSRS schedule, the retention figure and the due count. It is a
+ *  shortcut for self-grading, not a "seen it" marker: the honest reading of a tick is
+ *  "I recalled this", which is exactly what it claims of you in the review panel too. */
+function ReviewTick({
+  done,
+  busy,
+  onTick,
+}: {
+  done: boolean
+  busy: boolean
+  onTick: () => void
+}) {
+  const title = done
+    ? "Reviewed today — click to review again"
+    : "I recalled this — log a review (Good)"
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={done}
+      disabled={busy}
+      onClick={(e) => {
+        e.stopPropagation()
+        onTick()
+      }}
+      className={cn(
+        "shrink-0 rounded p-0.5 transition-opacity",
+        done
+          ? "text-status-mastered opacity-100"
+          : "text-muted-foreground opacity-0 hover:text-brand group-hover/concept:opacity-100 focus:opacity-100",
+      )}
+    >
+      {busy ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : done ? (
+        <CircleCheckBig className="h-3.5 w-3.5" />
+      ) : (
+        <Circle className="h-3.5 w-3.5" />
+      )}
+    </button>
+  )
+}
+
 function nodeMatchesFilter(node: LearnTreeNode, filter: string): boolean {
   const f = filter.toLowerCase()
   if (`${node.label} ${node.title ?? ""}`.toLowerCase().includes(f)) return true
@@ -142,6 +209,9 @@ function TreeRow({
   extractState,
   numbers,
   onSelectConcept,
+  reviewedToday,
+  gradingKey,
+  onTickConcept,
 }: {
   node: LearnTreeNode
   depth: number
@@ -155,6 +225,9 @@ function TreeRow({
   extractState?: Record<string, ExtractState>
   numbers: Map<string, string>
   onSelectConcept?: (conceptKey: string) => void
+  reviewedToday?: Set<string>
+  gradingKey?: string | null
+  onTickConcept?: (conceptKey: string) => void
 }) {
   if (filter && !nodeMatchesFilter(node, filter)) return null
 
@@ -266,21 +339,32 @@ function TreeRow({
           {conceptLeaves.map((c) =>
             filter && !c.name.toLowerCase().includes(filter.toLowerCase()) ? null : (
               <li key={c.key ?? c.name} className="list-none">
-                <button
-                  type="button"
-                  className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-left text-xs text-muted-foreground hover:bg-brand/5 hover:text-foreground"
-                  onClick={() => c.key && onSelectConcept?.(c.key)}
-                  disabled={!c.key}
-                  title={c.kind ? `${c.kind} — open concept` : "open concept"}
-                >
-                  <Sparkles className="h-3 w-3 shrink-0 text-brand/60" />
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {/* A row, not a button: the tick is its own control and a button cannot
+                    nest inside a button. */}
+                <div className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-xs text-muted-foreground hover:bg-brand/5">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+                    onClick={() => c.key && onSelectConcept?.(c.key)}
+                    disabled={!c.key}
+                    title={c.kind ? `${c.kind} — open concept` : "open concept"}
+                  >
+                    <Sparkles className="h-3 w-3 shrink-0 text-brand/60" />
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  </button>
                   {c.kind && (
                     <span className="shrink-0 rounded bg-muted px-1 py-px text-micro opacity-0 transition-opacity group-hover/concept:opacity-100">
                       {c.kind}
                     </span>
                   )}
-                </button>
+                  {onTickConcept && c.key ? (
+                    <ReviewTick
+                      done={reviewedToday?.has(c.key) ?? false}
+                      busy={gradingKey === c.key}
+                      onTick={() => onTickConcept(c.key as string)}
+                    />
+                  ) : null}
+                </div>
               </li>
             ),
           )}
@@ -299,6 +383,9 @@ function TreeRow({
               extractState={extractState}
               numbers={numbers}
               onSelectConcept={onSelectConcept}
+              reviewedToday={reviewedToday}
+              gradingKey={gradingKey}
+              onTickConcept={onTickConcept}
             />
           ))}
         </ul>
@@ -315,11 +402,57 @@ export function SyllabusTree({
   loading,
   docId,
   onSelectConcept,
+  onConceptReviewed,
   autoHeight,
 }: SyllabusTreeProps) {
   const [filter, setFilter] = useState("")
   const [extractState, setExtractState] = useState<Record<string, ExtractState>>({})
+  const [reviewedToday, setReviewedToday] = useState<Set<string>>(() => new Set())
+  const [gradingKey, setGradingKey] = useState<string | null>(null)
   const numbers = useMemo(() => numberSections(tree), [tree])
+
+  // Which concepts already carry a graded event today — so a tick survives a reload, and
+  // so a concept reviewed in the review panel shows as done here too. `lastSeen` is the
+  // event floor's per-concept max timestamp; an error envelope leaves the set empty, which
+  // reads as "not ticked" rather than inventing ticks.
+  const ticksOn = Boolean(onConceptReviewed && docId)
+  useEffect(() => {
+    if (!ticksOn || !docId) return
+    let live = true
+    fetchConceptMastery(docId)
+      .then((data) => {
+        if (!live || data.error) return
+        const today = localDay(Date.now() / 1000)
+        const seen = new Set<string>()
+        for (const [key, m] of Object.entries(data.byConcept ?? {})) {
+          if (m.lastSeen && localDay(m.lastSeen) === today) seen.add(key)
+        }
+        setReviewedToday(seen)
+      })
+      .catch(() => {
+        /* transient — the ticks just start empty */
+      })
+    return () => {
+      live = false
+    }
+  }, [ticksOn, docId])
+
+  const handleTickConcept = useCallback(
+    async (conceptKey: string) => {
+      setGradingKey(conceptKey)
+      try {
+        const res = await submitReviewGrade(conceptKey, 3, docId ?? undefined)
+        if (res.error) return
+        setReviewedToday((prev) => new Set(prev).add(conceptKey))
+        onConceptReviewed?.()
+      } catch {
+        /* leave it unticked — a tick that lied about being recorded is the worse failure */
+      } finally {
+        setGradingKey(null)
+      }
+    },
+    [docId, onConceptReviewed],
+  )
 
   const handleExtract = useCallback(
     async (scope: string) => {
@@ -441,6 +574,9 @@ export function SyllabusTree({
           extractState={extractState}
           numbers={numbers}
           onSelectConcept={onSelectConcept}
+          reviewedToday={reviewedToday}
+          gradingKey={gradingKey}
+          onTickConcept={ticksOn ? handleTickConcept : undefined}
         />
       ))}
     </ul>

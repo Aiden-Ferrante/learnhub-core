@@ -52,6 +52,8 @@ type CourseHomeProps = {
   onVersionsChanged?: () => void
   /** Open one concept's detail (clicked as a leaf in the course outline). */
   onOpenConcept?: (conceptKey: string) => void
+  /** Re-pull due count + mastery after a concept is ticked reviewed in the outline. */
+  onConceptReviewed?: () => void
   onBackToShelf: () => void
   continueNode?: LearnTreeNode | null
   /** Reviews due now, or null when the debt read failed — "unknown", never "zero". */
@@ -124,6 +126,7 @@ export function CourseHome({
   activeVersion,
   onVersionsChanged,
   onOpenConcept,
+  onConceptReviewed,
   onBackToShelf,
   continueNode,
   dueCount = null,
@@ -482,6 +485,7 @@ export function CourseHome({
             loading={loading}
             docId={course.learnDocId}
             onSelectConcept={onOpenConcept}
+            onConceptReviewed={onConceptReviewed}
             autoHeight
           />
         </div>
