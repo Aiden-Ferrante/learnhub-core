@@ -228,9 +228,14 @@ def delete_document(doc_id: str) -> dict[str, Any]:
         target = shared / sub / src
         if target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
-    if not existed and not removed:
-        return {"error": f"document {doc_id} not found", "status": 404}
-    return {"deleted": doc_id, "removed": removed}
+    # ⚠ An absent document is SUCCESS, not 404. DELETE is idempotent: the caller asked for
+    # this document to be gone, and it is gone. Returning an error here made an orphan card
+    # permanently undeletable from the UI — the shelf card lives in `app_documents`, written
+    # by the browser, and the client only prunes it after this call succeeds. So a card whose
+    # document had already been removed failed its own delete with "document … not found",
+    # forever, and the only way out was SQL. The card is the thing the user is pointing at;
+    # whether its backing row still exists is an implementation detail they cannot see.
+    return {"deleted": doc_id, "removed": removed, "alreadyGone": not existed and not removed}
 
 
 def find_by_source_hash(source_hash: str) -> dict | None:
