@@ -127,12 +127,13 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 
 ### process/ingestion/ — PDF in
 
-> Ingestion — PDF in. — [`__init__.py`](backend/app/process/ingestion/__init__.py) is the facade: import this package, not its modules.
+> Ingestion — a document in. — [`__init__.py`](backend/app/process/ingestion/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
 | [`reader.py`](backend/app/process/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
 | [`pdf_convert.py`](backend/app/process/ingestion/pdf_convert.py) | Conversion job driver |
+| [`md_convert.py`](backend/app/process/ingestion/md_convert.py) | Markdown → persisted content: ingestion for books that were authored, not scanned |
 
 ### process/content/ — the book itself
 
@@ -152,10 +153,10 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`toc_tree.py`](backend/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
 | [`find.py`](backend/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
 | [`toc_controller.py`](backend/app/process/content/toc_controller.py) | Staged TOC routing loop (bookmarks / pagematched / none) + decision log (pure) |
-| [`blocks.py`](backend/app/process/content/blocks.py) | _(describe me)_ |
-| [`versions.py`](backend/app/process/content/versions.py) | _(describe me)_ |
-| [`editing.py`](backend/app/process/content/editing.py) | _(describe me)_ |
-| [`outline_edit.py`](backend/app/process/content/outline_edit.py) | _(describe me)_ |
+| [`blocks.py`](backend/app/process/content/blocks.py) | A version's material — the one join that turns a course version into its blocks (owns `concept_filter`) |
+| [`versions.py`](backend/app/process/content/versions.py) | Course versions — the lifecycle of the named paths through a book |
+| [`editing.py`](backend/app/process/content/editing.py) | Editing the material — the book's text, or one course's rewrite of it (owns `stale_sections`) |
+| [`outline_edit.py`](backend/app/process/content/outline_edit.py) | Editing a course's outline — its chapters, their nesting, and what sits in each |
 
 ### process/extraction/ — LLM generation passes
 
@@ -168,7 +169,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`skeleton.py`](backend/app/process/extraction/skeleton.py) | Chapter skeleton essences + orientation |
 | [`reading_guide.py`](backend/app/process/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
-| [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | _(describe me)_ |
+| [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
 
 ### supplemental/study/ — learning state
 
@@ -179,10 +180,10 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`reviews.py`](backend/app/supplemental/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
 | [`mastery.py`](backend/app/supplemental/study/mastery.py) | Event floor + mastery/activity/forecast read models |
 | [`srs.py`](backend/app/supplemental/study/srs.py) | SM-2 schedule primitive |
-| [`sessions.py`](backend/app/supplemental/study/sessions.py) | _(describe me)_ |
-| [`calendar.py`](backend/app/supplemental/study/calendar.py) | _(describe me)_ |
-| [`manual.py`](backend/app/supplemental/study/manual.py) | _(describe me)_ |
-| [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | _(describe me)_ |
+| [`sessions.py`](backend/app/supplemental/study/sessions.py) | Working sessions — derived, never stored |
+| [`calendar.py`](backend/app/supplemental/study/calendar.py) | Cross-course review calendar — when everything comes due |
+| [`manual.py`](backend/app/supplemental/study/manual.py) | Manual study-time blocks — the user's corrections layer over the derived sessions |
+| [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | Which review rows belong to a course version — the retention/coverage split, in SQL |
 
 ### supplemental/media/ — audiobooks
 
@@ -191,7 +192,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | File | Purpose |
 |---|---|
 | [`audiobook.py`](backend/app/supplemental/media/audiobook.py) | Checkpointed TTS job system |
-| [`tts_orpheus.py`](backend/app/supplemental/media/tts_orpheus.py) | Orpheus TTS client |
+| [`tts_kokoro.py`](backend/app/supplemental/media/tts_kokoro.py) | Kokoro-82M text-to-speech, in-process on the GPU |
 
 ### conductor/ — wires job kinds to domain runners + the auto-chain
 

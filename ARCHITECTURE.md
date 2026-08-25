@@ -42,7 +42,7 @@ The facade docstrings are surfaced into MAP.md automatically by `gen_map.py`.
 | `process/content/` | The book itself, in the `raw_` tables: identity/stub + status (`documents.py`), the TOC as a self-referencing tree + the markdown blocks + figures (`store.py` writes `raw_structure`/`raw_content`/`raw_elements`), markdown→section splitting (`sections.py`), page-range assignment (`pages.py`), the canonical bookmark outline (`outline.py`), figure reads (`elements.py`), scope resolution — "what's inside chapter X" (`scope.py`), TOC tree (`toc_tree.py`), chapter units (`chapters.py`), keyword search (`find.py`) |
 | `process/extraction/` | LLM generation passes, into the `ext_` tables: concept extraction (`concepts_extract.py`) + its critic eval gate (`eval_gate.py`), concept reads (`concept_store.py`), the derived chapter briefing over the `ext_briefing` **view** (`guided_reading.py`), skeleton + orient (`skeleton.py`), reading guides (`reading_guide.py`) — each row anchored to a `raw_structure` node by a nullable FK |
 | `supplemental/study/` | Learning state — exactly two graded activities, both FSRS-scheduled: skeleton recall + concept recall through one review queue (`reviews.py`, `srs.py`); memory-state read models — coverage + FSRS-retrievability retention (states new/solid/shaky/fading) — plus activity/cadence/forecast over the append-only `study_events` floor (`mastery.py`); derived sessions + calendar |
-| `supplemental/media/` | Audiobook TTS (own checkpointed generation, dispatched by the queue) |
+| `supplemental/media/` | Audiobook TTS — Kokoro, synthesized straight through and dispatched by the queue (the checkpoint/resume layer was deleted in v0.16.0; see ADR 0002) |
 | `conductor/` | Decides what runs, and wires it (the job rows live in `gateways/ledger`): the one queue worker + runner registry + `JobCtx` (`worker.py`), phase-1 ingest (`ingest.py`), phase-2 extract runner (`build.py`; `build` kind = compat alias), per-document state (`lifecycle.py` — extraction is on-demand per chapter; whole-book auto-chain is opt-in via `LEARN_AUTOCHAIN=1`), and the composition root that registers every job-kind runner and starts the worker (`registry.py`) |
 | `api/` | The HTTP boundary — eight thin routers mirroring the groups: `content` (the book), `process` (convert/extract/build), `concept` (read+curate), `reading`, `study` (doing), `progress` (tracking), `media` (audiobook), `system`. Routers validate, call one facade, shape the envelope — no business logic |
 
@@ -188,5 +188,16 @@ are external contracts; this table is the disambiguator instead.
 - Rebuild the affected image after backend/frontend changes:
   `docker compose -f deploy/compose/docker-compose.yml build learn && ... up -d learn`
   (same for `app`, which serves :3001).
-- Tests: `docker run --rm -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
-  compose-learn:latest sh -c "pip install -q pytest; python -m pytest tests -q"`
+- Tests — **mount `conftest.py` too**. It is not in the image, and without it the
+  `integration` marker is unregistered, so the eight Postgres tests neither skip nor
+  gate: they error out after ~30s each of connection retries (240s of "failures" that
+  read as environment noise). Unit tier:
+  `docker run --rm -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
+  -v $PWD/backend/conftest.py:/app/conftest.py compose-learn:latest
+  sh -c "pip install -q pytest; python -m pytest tests -q"`
+  Both tiers need the compose network and the gate:
+  `docker run --rm --network compose_default -e LEARN_PG_TESTS=1
+  -e "POSTGRES_DSN=host=postgres port=5432 user=learnhub password=learnhub_local dbname=learnhub"
+  -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
+  -v $PWD/backend/conftest.py:/app/conftest.py compose-learn:latest
+  sh -c "pip install -q pytest; python -m pytest tests -q"`

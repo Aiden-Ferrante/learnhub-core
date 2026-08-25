@@ -48,7 +48,7 @@
   },
   {
    "section_key": "toc:it-s-all-about-complexity",
-   "heading": "(It\u2019s All About Complexity)",
+   "heading": "(It’s All About Complexity)",
    "level": 3,
    "number_key": null,
    "order": 5,
@@ -75,7 +75,7 @@
   },
   {
    "section_key": "toc:2.1",
-   "heading": "2.1 Complexity de\ufffdned",
+   "heading": "2.1 Complexity de�ned",
    "level": 3,
    "number_key": "2.1",
    "order": 8,
@@ -120,7 +120,7 @@
   },
   {
    "section_key": "toc:chapter-3-working-code-isn-t-enough",
-   "heading": "Chapter 3 Working Code Isn\u2019t Enough",
+   "heading": "Chapter 3 Working Code Isn’t Enough",
    "level": 1,
    "number_key": null,
    "order": 13,
@@ -201,7 +201,7 @@
   },
   {
    "section_key": "toc:4.2",
-   "heading": "4.2 What\u2019s in an interface?",
+   "heading": "4.2 What’s in an interface?",
    "level": 3,
    "number_key": "4.2",
    "order": 22,
@@ -489,7 +489,7 @@
   },
   {
    "section_key": "toc:chapter-7-di-erent-layer-di-erent-abstraction",
-   "heading": "Chapter 7 Di\ufffderent Layer, Di\ufffderent Abstraction",
+   "heading": "Chapter 7 Di�erent Layer, Di�erent Abstraction",
    "level": 1,
    "number_key": null,
    "order": 54,
@@ -588,7 +588,7 @@
   },
   {
    "section_key": "toc:8.2",
-   "heading": "8.2 Example: con\ufffdguration parameters",
+   "heading": "8.2 Example: con�guration parameters",
    "level": 3,
    "number_key": "8.2",
    "order": 65,
@@ -714,7 +714,7 @@
   },
   {
    "section_key": "toc:9.8",
-   "heading": "9.8 A di\ufffderent opinion: Clean Code",
+   "heading": "9.8 A di�erent opinion: Clean Code",
    "level": 3,
    "number_key": "9.8",
    "order": 79,
@@ -732,7 +732,7 @@
   },
   {
    "section_key": "toc:chapter-10-de-ne-errors-out-of-existence",
-   "heading": "Chapter 10 De\ufffdne Errors Out Of Existence",
+   "heading": "Chapter 10 De�ne Errors Out Of Existence",
    "level": 1,
    "number_key": null,
    "order": 81,
@@ -759,7 +759,7 @@
   },
   {
    "section_key": "toc:10.3",
-   "heading": "10.3 De\ufffdne errors out of existence",
+   "heading": "10.3 De�ne errors out of existence",
    "level": 3,
    "number_key": "10.3",
    "order": 84,
@@ -768,7 +768,7 @@
   },
   {
    "section_key": "toc:10.4",
-   "heading": "10.4 Example: \ufffdle deletion in Windows",
+   "heading": "10.4 Example: �le deletion in Windows",
    "level": 3,
    "number_key": "10.4",
    "order": 85,
@@ -858,7 +858,7 @@
   },
   {
    "section_key": "toc:12.2",
-   "heading": "12.2 I don\u2019t have time to write comments",
+   "heading": "12.2 I don’t have time to write comments",
    "level": 3,
    "number_key": "12.2",
    "order": 95,
@@ -885,7 +885,7 @@
   },
   {
    "section_key": "toc:12.5",
-   "heading": "12.5 Bene\ufffdts of well-written comments",
+   "heading": "12.5 Bene�ts of well-written comments",
    "level": 3,
    "number_key": "12.5",
    "order": 98,
@@ -894,7 +894,7 @@
   },
   {
    "section_key": "toc:12.6",
-   "heading": "12.6 A di\ufffderent opinion: comments are failures",
+   "heading": "12.6 A di�erent opinion: comments are failures",
    "level": 3,
    "number_key": "12.6",
    "order": 99,
@@ -903,7 +903,7 @@
   },
   {
    "section_key": "toc:chapter-13-comments-should-describe-things-that-",
-   "heading": "Chapter 13 Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+   "heading": "Chapter 13 Comments Should Describe Things that Aren’t Obvious from the Code",
    "level": 2,
    "number_key": null,
    "order": 100,
@@ -921,7 +921,7 @@
   },
   {
    "section_key": "toc:13.2",
-   "heading": "13.2 Don\u2019t repeat the code",
+   "heading": "13.2 Don’t repeat the code",
    "level": 3,
    "number_key": "13.2",
    "order": 102,
@@ -1083,7 +1083,7 @@
   },
   {
    "section_key": "toc:14.6",
-   "heading": "14.6 A di\ufffderent opinion: Go style guide",
+   "heading": "14.6 A di�erent opinion: Go style guide",
    "level": 3,
    "number_key": "14.6",
    "order": 120,
@@ -1128,7 +1128,7 @@
   },
   {
    "section_key": "toc:15.2",
-   "heading": "15.2 Write the comments \ufffdrst",
+   "heading": "15.2 Write the comments �rst",
    "level": 3,
    "number_key": "15.2",
    "order": 125,
@@ -1227,7 +1227,7 @@
   },
   {
    "section_key": "toc:16.5",
-   "heading": "16.5 Maintaining comments: check the di\ufffds",
+   "heading": "16.5 Maintaining comments: check the di�s",
    "level": 3,
    "number_key": "16.5",
    "order": 136,
@@ -1443,7 +1443,7 @@
   },
   {
    "section_key": "toc:20.4",
-   "heading": "20.4 An example: RAMCloud Bu\ufffders",
+   "heading": "20.4 An example: RAMCloud Bu�ers",
    "level": 3,
    "number_key": "20.4",
    "order": 160,
@@ -1624,7 +1624,7 @@
     },
     {
      "level": 1,
-     "title": "3: Working Code Isn\u2019t Enough",
+     "title": "3: Working Code Isn’t Enough",
      "page": 27
     },
     {
@@ -1664,7 +1664,7 @@
     },
     {
      "level": 2,
-     "title": "4.2 What\u2019s in an interface?",
+     "title": "4.2 What’s in an interface?",
      "page": 36
     },
     {
@@ -1984,7 +1984,7 @@
     },
     {
      "level": 2,
-     "title": "12.2 I don\u2019t have time to write comments",
+     "title": "12.2 I don’t have time to write comments",
      "page": 116
     },
     {
@@ -2009,7 +2009,7 @@
     },
     {
      "level": 1,
-     "title": "13: Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+     "title": "13: Comments Should Describe Things that Aren’t Obvious from the Code",
      "page": 121
     },
     {
@@ -2019,7 +2019,7 @@
     },
     {
      "level": 2,
-     "title": "13.2 Don\u2019t repeat the code",
+     "title": "13.2 Don’t repeat the code",
      "page": 123
     },
     {
@@ -2431,7 +2431,7 @@
      },
      {
       "numberKey": "3",
-      "title": "Working Code Isn\u2019t Enough",
+      "title": "Working Code Isn’t Enough",
       "sectionKey": "toc:3",
       "listDepth": 0,
       "page": 27
@@ -2487,7 +2487,7 @@
      },
      {
       "numberKey": "4.2",
-      "title": "What\u2019s in an interface?",
+      "title": "What’s in an interface?",
       "sectionKey": "toc:4.2",
       "listDepth": 1,
       "page": 36
@@ -2935,7 +2935,7 @@
      },
      {
       "numberKey": "12.2",
-      "title": "I don\u2019t have time to write comments",
+      "title": "I don’t have time to write comments",
       "sectionKey": "toc:12.2",
       "listDepth": 1,
       "page": 116
@@ -2970,7 +2970,7 @@
      },
      {
       "numberKey": "13",
-      "title": "Comments Should Describe Things that Aren\u2019t Obvious from the Code",
+      "title": "Comments Should Describe Things that Aren’t Obvious from the Code",
       "sectionKey": "toc:13",
       "listDepth": 0,
       "page": 121
@@ -2984,7 +2984,7 @@
      },
      {
       "numberKey": "13.2",
-      "title": "Don\u2019t repeat the code",
+      "title": "Don’t repeat the code",
       "sectionKey": "toc:13.2",
       "listDepth": 1,
       "page": 123
@@ -4767,7 +4767,7 @@
      {
       "numberKey": null,
       "title": "Zq1 xylophone",
-      "sectionKey": "toc:john-ousterhout-stanford-university",
+      "sectionKey": "toc:john-ousterhout-stanford-university~2",
       "listDepth": 0,
       "page": 3
      },
@@ -4809,7 +4809,7 @@
      {
       "numberKey": null,
       "title": "Zq7 xylophone",
-      "sectionKey": "toc:2.1",
+      "sectionKey": "toc:2.1~2",
       "listDepth": 1,
       "page": 19
      },
@@ -4851,7 +4851,7 @@
      {
       "numberKey": null,
       "title": "Zq13 xylophone",
-      "sectionKey": "toc:3.1",
+      "sectionKey": "toc:3.1~2",
       "listDepth": 1,
       "page": 27
      },
@@ -4893,7 +4893,7 @@
      {
       "numberKey": null,
       "title": "Zq19 xylophone",
-      "sectionKey": "toc:4.1",
+      "sectionKey": "toc:4.1~2",
       "listDepth": 1,
       "page": 34
      },
@@ -4907,7 +4907,7 @@
      {
       "numberKey": null,
       "title": "Zq21 xylophone",
-      "sectionKey": "toc:4.3",
+      "sectionKey": "toc:4.3~2",
       "listDepth": 1,
       "page": 36
      },
@@ -4956,7 +4956,7 @@
      {
       "numberKey": null,
       "title": "Zq28 xylophone",
-      "sectionKey": "toc:5.1",
+      "sectionKey": "toc:5.1~2",
       "listDepth": 1,
       "page": 44
      },
@@ -5012,7 +5012,7 @@
      {
       "numberKey": null,
       "title": "Zq36 xylophone",
-      "sectionKey": "toc:5.9",
+      "sectionKey": "toc:5.9~2",
       "listDepth": 1,
       "page": 52
      },
@@ -5033,7 +5033,7 @@
      {
       "numberKey": null,
       "title": "Zq39 xylophone",
-      "sectionKey": "toc:6.1",
+      "sectionKey": "toc:6.1~2",
       "listDepth": 1,
       "page": 54
      },
@@ -5152,7 +5152,7 @@
      {
       "numberKey": null,
       "title": "Zq56 xylophone",
-      "sectionKey": "toc:8.1",
+      "sectionKey": "toc:8.1~2",
       "listDepth": 1,
       "page": 77
      },
@@ -5194,7 +5194,7 @@
      {
       "numberKey": null,
       "title": "Zq62 xylophone",
-      "sectionKey": "toc:9.2",
+      "sectionKey": "toc:9.2~2",
       "listDepth": 1,
       "page": 83
      },
@@ -5208,7 +5208,7 @@
      {
       "numberKey": null,
       "title": "Zq64 xylophone",
-      "sectionKey": "toc:9.4",
+      "sectionKey": "toc:9.4~2",
       "listDepth": 1,
       "page": 84
      },
@@ -5257,7 +5257,7 @@
      {
       "numberKey": null,
       "title": "Zq71 xylophone",
-      "sectionKey": "toc:10.1",
+      "sectionKey": "toc:10.1~2",
       "listDepth": 1,
       "page": 95
      },
@@ -5362,7 +5362,7 @@
      {
       "numberKey": null,
       "title": "Zq86 xylophone",
-      "sectionKey": "toc:12.4",
+      "sectionKey": "toc:12.4~2",
       "listDepth": 1,
       "page": 117
      },
@@ -5446,7 +5446,7 @@
      {
       "numberKey": null,
       "title": "Zq98 xylophone",
-      "sectionKey": "toc:13.9",
+      "sectionKey": "toc:13.9~2",
       "listDepth": 1,
       "page": 140
      },
@@ -5460,7 +5460,7 @@
      {
       "numberKey": null,
       "title": "Zq100 xylophone",
-      "sectionKey": "toc:14.1",
+      "sectionKey": "toc:14.1~2",
       "listDepth": 1,
       "page": 142
      },
@@ -5516,7 +5516,7 @@
      {
       "numberKey": null,
       "title": "Zq108 xylophone",
-      "sectionKey": "toc:15.1",
+      "sectionKey": "toc:15.1~2",
       "listDepth": 1,
       "page": 152
      },
@@ -5551,7 +5551,7 @@
      {
       "numberKey": null,
       "title": "Zq113 xylophone",
-      "sectionKey": "toc:15.6",
+      "sectionKey": "toc:15.6~2",
       "listDepth": 1,
       "page": 156
      },
@@ -5565,7 +5565,7 @@
      {
       "numberKey": null,
       "title": "Zq115 xylophone",
-      "sectionKey": "toc:16.1",
+      "sectionKey": "toc:16.1~2",
       "listDepth": 1,
       "page": 157
      },
@@ -5600,7 +5600,7 @@
      {
       "numberKey": null,
       "title": "Zq120 xylophone",
-      "sectionKey": "toc:16.6",
+      "sectionKey": "toc:16.6~2",
       "listDepth": 1,
       "page": 162
      },
@@ -5614,7 +5614,7 @@
      {
       "numberKey": null,
       "title": "Zq122 xylophone",
-      "sectionKey": "toc:17.1",
+      "sectionKey": "toc:17.1~2",
       "listDepth": 1,
       "page": 164
      },
@@ -5635,7 +5635,7 @@
      {
       "numberKey": null,
       "title": "Zq125 xylophone",
-      "sectionKey": "toc:17.4",
+      "sectionKey": "toc:17.4~2",
       "listDepth": 1,
       "page": 167
      },
@@ -5649,7 +5649,7 @@
      {
       "numberKey": null,
       "title": "Zq127 xylophone",
-      "sectionKey": "toc:18.1",
+      "sectionKey": "toc:18.1~2",
       "listDepth": 1,
       "page": 169
      },
@@ -5677,7 +5677,7 @@
      {
       "numberKey": null,
       "title": "Zq131 xylophone",
-      "sectionKey": "toc:19.1",
+      "sectionKey": "toc:19.1~2",
       "listDepth": 1,
       "page": 176
      },
@@ -5719,7 +5719,7 @@
      {
       "numberKey": null,
       "title": "Zq137 xylophone",
-      "sectionKey": "toc:19.7",
+      "sectionKey": "toc:19.7~2",
       "listDepth": 1,
       "page": 182
      },
@@ -5733,7 +5733,7 @@
      {
       "numberKey": null,
       "title": "Zq139 xylophone",
-      "sectionKey": "toc:20.1",
+      "sectionKey": "toc:20.1~2",
       "listDepth": 1,
       "page": 183
      },
@@ -5775,7 +5775,7 @@
      {
       "numberKey": null,
       "title": "Zq145 xylophone",
-      "sectionKey": "toc:21.1",
+      "sectionKey": "toc:21.1~2",
       "listDepth": 1,
       "page": 194
      },
@@ -5796,7 +5796,7 @@
      {
       "numberKey": null,
       "title": "Zq148 xylophone",
-      "sectionKey": "toc:21.4",
+      "sectionKey": "toc:21.4~2",
       "listDepth": 1,
       "page": 196
      },
@@ -5845,7 +5845,7 @@
      {
       "numberKey": null,
       "title": "Zq155 xylophone",
-      "sectionKey": "toc:about-the-author",
+      "sectionKey": "toc:about-the-author~2",
       "listDepth": 0,
       "page": 210
      }
@@ -6026,7 +6026,8 @@
      "171": "toc:summary-of-red-flags",
      "172": "toc:about-the-author"
     },
-    "route_hint": "pagematched-or-none"
+    "route_hint": "pagematched-or-none",
+    "_note": "outline_entries regenerated 2026-08-25: the page-matched path now uniquifies duplicate section keys (commit 6a54ae6). The frozen pre-controller output contained 28 keys twice over; the second occurrence of each now carries a ~2 suffix. Verified as the ONLY divergence — applying the dedup rule to the old frozen entries reproduces current output exactly, and block_map is byte-identical."
    }
   }
  }
