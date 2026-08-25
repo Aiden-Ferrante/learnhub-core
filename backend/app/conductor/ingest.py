@@ -75,6 +75,18 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     if not pdf_path or not Path(pdf_path).is_file():
         return {"error": "uploaded file not found on the shared volume"}
     data = Path(pdf_path).read_bytes()
+    # Cancellation checkpoints. ⚠ These bracket the engine rather than interrupting it:
+    # convert_document() is a single opaque call into docling with no page loop to hook,
+    # so a conversion already inside the engine runs to completion. Interrupting mid-flight
+    # would mean hosting the engine in a killable subprocess — a much larger change.
+    #
+    # What these two do buy, and it is most of the value: a job cancelled while queued or
+    # in the window before the engine starts stops immediately, and a job cancelled DURING
+    # a long conversion does not then persist a document nobody wants. Before this, the
+    # convert runner never called check_cancel at all — only ctx.progress() reaches it, and
+    # convert has no per-item loop to report progress against, so `cancel` on a convert set
+    # a flag that nothing ever read.
+    ctx.check_cancel()
     ctx.patch({"phase": "convert"})
     convert = convert_markdown_bytes if is_markdown_filename(filename) else convert_pdf_bytes
     try:
@@ -83,6 +95,10 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
         ctx.patch({"statusCode": e.status_code})
         mark_document_status(doc_id, "error", e.status_code)
         return {"error": str(e)}
+    # Raises JobCancelled, which the worker turns into status=canceled — so the expensive
+    # engine output is discarded rather than written. The pages are already spent; the
+    # point is that the library does not gain a book the user asked to abandon.
+    ctx.check_cancel()
     ctx.patch({
         "result": {
             "sourceFilename": result.source_filename,

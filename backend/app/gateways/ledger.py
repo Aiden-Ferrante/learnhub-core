@@ -323,9 +323,20 @@ def next_job() -> dict[str, Any] | None:
 
 
 def requeue_interrupted() -> None:
-    """Recover jobs a restart left as "running" — mark them queued so they retry."""
+    """Recover jobs a restart left as "running" — mark them queued so they retry.
+
+    ⚠ A job whose cancel was requested is NOT retried; it is settled as canceled. Without
+    this, restarting the service was the only way to stop work the engine cannot interrupt
+    (a docling convert has no per-page loop, so check_cancel is never reached mid-run) — and
+    the restart promptly requeued the very job you were trying to kill, from the top. Cancel
+    then restart now actually stops it, which is the sequence a user reaches for."""
     try:
         with db() as conn:
+            conn.execute(
+                f"UPDATE {BUILDS} SET status = 'canceled', finished_at = %(t)s, "
+                "cancel_requested = NULL WHERE status = 'running' AND cancel_requested",
+                {"t": int(time.time())},
+            )
             conn.execute(f"UPDATE {BUILDS} SET status = 'queued' WHERE status = 'running'")
     except Exception:  # noqa: BLE001
         pass
