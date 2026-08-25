@@ -7,9 +7,49 @@ commit.
 
 ## [Unreleased]
 
+Two open cycles, both records without tags: [v0.17.0 — Delete means delete] and
+[v0.18.0 — Jobs that admit failure]. Landed so far: a `DELETE` of an
+already-absent document succeeds instead of 404ing (which had made an orphan
+shelf card permanently undeletable), and cancel finally reaches the convert
+runner — including the case where a restart used to requeue the very job you
+cancelled.
+
+## [0.16.0] — 2026-08-25
+
+Audiobooks stopped being too slow to use.
+
+### Changed
+- **Narration is Kokoro-82M, not Orpheus** — the same chapter renders in **5.6s
+  instead of 132.7s**, about 50× realtime. Tuning the old stack (2 → 8 Ollama
+  slots, and `AUDIOBOOK_TTS_WORKERS`, which had been defaulting to 2 while the
+  server offered more) had already taken a one-hour chapter from ~53 to ~25
+  minutes, and that lever was spent: scaling is sublinear and oversubscription
+  reverses it. The rest of the cost was structural. Orpheus is a 3B
+  autoregressive LLM emitting seven audio tokens per frame, so every frame of
+  audio pays a full transformer decode on a bandwidth-bound chip; SNAC decode was
+  only 7% of wall time. Concurrency hides that latency, it does not reduce the
+  work. Full numbers and the alternatives considered are in
+  [ADR 0002](docs/adr/0002-kokoro-replaces-orpheus-tts.md).
+
+### Removed
+- **The checkpoint/resume subsystem.** A chapter that renders in six seconds does
+  not need to survive an interruption, so the layer was pure cost — and it had a
+  bug of its own: a chunk that synthesized to silence was saved as a valid
+  checkpoint and never retried, so a sentence went missing for good.
+
+### Fixed
+- The Kokoro weights and spaCy's `en_core_web_sm` were both fetched **on first
+  use, mid-render** — a runtime network dependency in a keyless-local system, and
+  about 15s on the first narration. Both are baked into the image now, with a
+  startup warm-up.
+
+## [0.15.0] — 2026-08-25
+
 One arc: a textbook's own table of contents is not always the best course, so a
 book can now carry several of your own — each with its own outline, its own cut
-of the material, and its own progress.
+of the material, and its own progress. Released alongside it: everything else
+that had accumulated unreleased since v0.14.0 — the ingest and TOC work of
+2026-08-20, the fleet look, and the audit's first repair pass.
 
 ### Added
 - **Custom course versions** — several named courses over one book, with the
@@ -50,8 +90,48 @@ of the material, and its own progress.
   block. The page is not a preview of the course; it is the course, with
   handles. The outline editor shows the numbers the syllabus will actually
   render, live, as rows move.
+- **Authored markdown is a real upload format**, not just rendered PDFs. The
+  upload UI had advertised `.md` and a drop even minted a card, so markdown
+  *looked* supported — but non-PDF files went to pure client state: no backend
+  row, no structure, no concepts. An inert card. The conductor now picks a
+  converter by file extension and is otherwise format-blind, so there is no new
+  job kind and jobs queued before this still run. Markdown gets the `light` math
+  profile deliberately: the `full` heuristics exist to repair pymupdf extraction
+  damage and would actively corrupt clean source, rewriting `≤` into a literal
+  `\leq` outside any equation. A file with no heading at all now fails loudly
+  rather than ingesting to zero blocks and reporting success.
+- **The fleet look and the app switcher** — Learn Hub adopts the shared palette,
+  follows the OS theme, carries the fleet header's switcher to the other apps,
+  and exposes a `{ok, checks, freshness}` health endpoint probed where it can
+  actually fail.
 
 ### Changed
+- **A book that numbers its own headings has already written its table of
+  contents down** — `# 1`, `## 1.1`, `### 1.1.2` — so a new
+  `from-numbered-headings` strategy reads it and does nothing else: no font
+  clustering, no page heuristics, no guessing levels from `#` depth. It runs
+  ahead of every other derive strategy, because they are all recovery passes for
+  documents that did not state their structure. The old text pass clamped every
+  heading to three levels and promoted all of them, returning 81 entries where
+  the author wrote seven chapters — correct when levels are guesses, wrong when
+  they are stated. Reconcile follows the same rule and maps blocks by number
+  prefix; the previous title-matching pointer let one chapter that named its own
+  sub-chapters burn every entry, collapsing 67 of 81 blocks into the final
+  section, which then fed extraction 558 characters of the wrong chapter. A
+  heading numbered deeper than three levels is treated as content, not
+  structure: still stored, still read, still extracted from — just not a node in
+  the syllabus.
+- **Extraction runs per section, not per content block.** `write_section_concepts`
+  is idempotent per *section* — it deletes everything under `(doc, section_key)`
+  before inserting — but the orchestrator called it once per *block*, so on a
+  multi-block section each write wiped the one before it. A 15-block chapter
+  reported one extracted concept and stored zero, because the block that found it
+  was not the last to write. Results now collapse into one write per section,
+  deduplicated by name and sorted by document index (they had been appended in
+  async completion order, which would have made first-occurrence-wins
+  nondeterministic). The larger cost was one LLM call per block; a section's
+  blocks are now merged into one unit, which is what the 60,000-character
+  extraction valve always implied.
 - `raw_documents` used to mean both the book and the course. Those split:
   `sources` is the book, `raw_documents` is a course **version** over it, and a
   new mapping table records which of the book's blocks a version keeps and where.
@@ -63,6 +143,21 @@ of the material, and its own progress.
   book's text.
 
 ### Fixed
+- **A book got its card at second zero, not 19 minutes later.** The course card
+  was minted only after the browser polled a conversion to completion — 19
+  minutes for a 410-page book — so any reload, closed tab, or 15-second blip in
+  that window lost the card for good while the learn service finished the book
+  anyway. The result was a course that existed in `raw_documents` and nowhere on
+  the shelf, with nothing to reconcile the two. The conversion endpoint had
+  always returned the id at second zero and thrown it away. Losing the tab now
+  only delays the flip.
+- **A duplicate heading could kill a whole conversion.** Section keys are unique
+  per document by construction (`raw_structure.id` is `doc_id::section_key`), and
+  the page-matched path did not uniquify them, so a book that repeats a heading
+  collided on insert and took the entire conversion down with it.
+- **A running job could not be stopped**, and the UI would not name the kind that
+  was running. Whole-document jobs are cancellable, and a deleted document's jobs
+  stop with it.
 - The version switch only half-propagated — the syllabus and mastery followed it
   while the reader, concepts, heatmap, audiobook and skeleton practice read the
   card's stored id and stayed on the book. The course hook now returns a course
@@ -128,14 +223,25 @@ of the material, and its own progress.
 - Reading position is keyed to the course card, so it is shared across versions;
   a shelf card still shows the book's original section count rather than the
   active version's.
-- v0.15.0's fixes are verified by the test suite, the hub check, a typecheck and
-  by executing the changed logic directly — but **not** yet against a real book in
-  a running app. Every one of those bugs produced a *plausible* value, which is
-  exactly what a fixture suite cannot catch, so the custom-version review queue
-  still needs driving end to end before the version is cut.
-- `test_toc_controller.py` has two failures that pre-date this work (`bcb89f7`):
-  the code emits route `derived-numbering`, the tests expect `derived-headings`.
-  Untouched here — it needs a decision about which is the intended contract.
+- The custom-version review queue **was** driven end to end against a real
+  converted book before this version was cut (2026-08-25): a re-cut course serves
+  the same 54 cards as its Default, inherits 605 concepts with no extraction run,
+  and after distilling four blocks reports 588 concepts and 37 cards rather than
+  collapsing to zero — while the book keeps all 291 of its blocks. Figures
+  inherit too (1,144 on a book that has them). Study state was byte-identical
+  before and after.
+- `test_toc_controller.py` was red and had been since `bcb89f7`; it is green now.
+  The code's `derived-numbering` was the intended contract and the tests were
+  stale — and a third failure, added later by the duplicate-key fix, was pinning
+  the very defect that fix removed. Repairing them surfaced a real finding that
+  is recorded as a strict xfail rather than quietly fixed: a book whose chapters
+  read "Chapter 2 …" carries no `number_key` on them, so the numbered route skips
+  them and builds an outline with no chapters at all. Not live-affecting — both
+  library books on that route number their chapters plainly.
+- The documented test command never mounted `backend/conftest.py`, which is not
+  in the image, so the `integration` marker went unregistered and the eight
+  Postgres tests errored instead of skipping — about 240 seconds of noise that
+  read as environment trouble rather than as a broken gate.
 
 ## [0.14.0] — 2026-07-26
 
