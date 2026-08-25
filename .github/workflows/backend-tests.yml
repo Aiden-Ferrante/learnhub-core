@@ -4,6 +4,12 @@ name: backend tests
 # The latter walk grade/queue round-trips against an actual pgvector Postgres seeded from
 # deploy/postgres/init/01-schema.sql — catching server-side binding quirks and schema drift
 # that DB-fixtured unit tests can't (see docs/testing.md).
+#
+# The grounding check rides in here too (test_grounding_pg.py), and the shape is deliberate:
+# CI seeds its own corpus containing one of every verdict INCLUDING an invented quote, so
+# the check is proven able to fail. Running scripts/check_grounding.py here instead would go
+# green forever — CI's database holds no concepts, and a check over an empty corpus proves
+# nothing. That script is for a real library and exits non-zero on an empty one.
 
 on:
   push:
@@ -48,7 +54,7 @@ jobs:
           PGPASSWORD: learnhub_local
         run: psql -h localhost -U learnhub -d learnhub -f deploy/postgres/init/01-schema.sql
 
-      - name: Unit + integration tests
+      - name: Unit + integration tests (incl. the grounding gate)
         working-directory: backend
         env:
           LEARN_PG_TESTS: '1'

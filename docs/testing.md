@@ -30,6 +30,25 @@ that regressed (seed a due review → queue serves it → grade → **re-grade t
 catch that whole class: server-side binding, and drift between `deploy/postgres/init/01-schema.sql`
 and the code's SQL.
 
+## The grounding check
+
+`app/process/extraction/grounding.py` answers one question: does a concept's
+`source_sentence` actually appear in the section it claims to come from? The extraction gate
+only checks the field is non-empty, so an invented quote passes it — this is the check that
+does not.
+
+It lives in two places on purpose:
+
+- **CI** — `tests/test_grounding_pg.py` seeds a corpus containing one of every verdict,
+  including an invented quote, and asserts the check catches it. A check that cannot fail is
+  worth nothing, so CI proves it can.
+- **A real library** — `scripts/check_grounding.py`, run against your own database. This is
+  the one that tells you something new; the CI test only guards the checker.
+
+The script is deliberately **not** a CI step. CI's Postgres is seeded from the schema and
+holds no concepts, so running it there would be green forever. It treats an empty corpus as
+absent information and exits non-zero, the same rule the study surfaces follow.
+
 ## CI
 
 `.github/workflows/backend-tests.yml` runs both tiers on backend/schema changes: a

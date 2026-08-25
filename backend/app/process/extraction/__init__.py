@@ -17,6 +17,7 @@ from app.process.extraction.concept_store import (
     update_concept,
 )
 from app.process.extraction.concepts_extract import extract_concepts_document, repair_model_text
+from app.process.extraction.grounding import classify_grounding, summarize_grounding
 from app.process.extraction.guided_reading import fetch_guided_reading
 from app.process.extraction.eval_gate import eval_enabled, evaluate_extraction_sample
 from app.process.extraction.reading_guide import author_guides_sync, fetch_reading_guide, guide_status

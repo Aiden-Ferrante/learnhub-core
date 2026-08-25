@@ -170,6 +170,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`reading_guide.py`](backend/app/process/extraction/reading_guide.py) | Per-section "what to look for" guides |
 | [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
 | [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
+| [`grounding.py`](backend/app/process/extraction/grounding.py) | Does a concept's `source_sentence` actually appear in its own section — the check the extraction gate only implies |
 
 ### supplemental/study/ — learning state
 
