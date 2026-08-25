@@ -16,7 +16,10 @@ cancelled.
 
 ## [0.16.0] — 2026-08-25
 
-Audiobooks stopped being too slow to use.
+Audiobooks stopped being too slow to use. The speedup is the headline, but the
+check that mattered was the other one: a 82M-parameter model had to still sound
+right reading textbook prose thick with symbols, and that was auditioned by ear
+before the version was cut, not after.
 
 ### Changed
 - **Narration is Kokoro-82M, not Orpheus** — the same chapter renders in **5.6s
