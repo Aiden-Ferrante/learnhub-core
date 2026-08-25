@@ -48,6 +48,95 @@ def _norm_part(s: object) -> str:
     return re.sub(r"\s+", " ", str(s or "")).strip()
 
 
+# ---- repairing what JSON and the tokenizer do to copied text ------------------------- #
+#
+# `source_sentence` is the one field whose whole value is being VERBATIM, and two things in
+# the pipeline quietly stop it from being so. Both are invisible after `_norm_part` has run,
+# which is why they survived 1,463 concepts unnoticed.
+#
+# 1. **JSON eats LaTeX backslashes.** Generation is grammar-constrained to the schema
+#    (`gateways/llm.py`), so the model must emit *syntactically valid* JSON — and `\t` IS
+#    valid JSON. A model copying `$\text{and}$` emits `\text{and}`, `json.loads` decodes the
+#    `\t` to a TAB exactly as the spec says, and `\text{` becomes TAB + `ext{`. The grammar
+#    cannot help: it has no way to know the model meant a backslash. Then `_norm_part`
+#    collapses the tab into a space and the last trace is gone — stored as ` ext{and}`.
+#    Only t/b/f collide this way in practice (\text \times \theta, \beta \binom \bf,
+#    \frac \forall); \n and \r are deliberately NOT repaired, because a newline in copied
+#    prose is plausible and a `\newline` is not.
+# 2. **Byte-fallback tokens leak as literal text.** A character the model only knows as
+#    byte-fallback tokens can detokenize to the literal string `<0xE2><0x84><0x92>` instead
+#    of `ℒ`. That sequence is never real prose, so decoding it back is unambiguous.
+#
+# Where the section's own markdown is available it is used as ground truth: a repair is kept
+# only if it makes the quote match the text it claims to come from. That is the same rule the
+# rest of this file lives by — check the value against the thing it describes, rather than
+# trusting that it looks right.
+
+_BYTE_FALLBACK = re.compile(r"(?:<0x([0-9A-Fa-f]{2})>)+")
+# The JSON escapes that a LaTeX macro can be mistaken for. See note above for the omissions.
+_LOST_BACKSLASH = {"\t": "t", "\b": "b", "\f": "f"}
+
+
+def _decode_byte_fallback(s: str) -> str:
+    """`<0xE2><0x84><0x92>` -> `ℒ`. Runs are decoded together; UTF-8 is multi-byte."""
+    def sub(m: re.Match[str]) -> str:
+        raw = bytes(int(h, 16) for h in re.findall(r"<0x([0-9A-Fa-f]{2})>", m.group(0)))
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return m.group(0)          # not actually UTF-8 — leave it visible, don't guess
+    return _BYTE_FALLBACK.sub(sub, s)
+
+
+# Newline and carriage return collide with real macros too (\not \nabla \neq, \rho \right),
+# but a newline followed by a letter is just a wrapped line, which is why they are only ever
+# tried when the section text is available to confirm the result.
+_LOST_BACKSLASH_RISKY = {"\n": "n", "\r": "r"}
+
+
+def _restore_backslashes(s: str, *, risky: bool = False) -> str:
+    """TAB/BS/FF immediately followed by a letter -> the backslash the model meant.
+
+    The trailing-letter condition matters: a bare tab between words is whitespace, while a
+    tab welded to `ext{` is the tail of `\text{`.
+
+    ``risky`` additionally tries newline and carriage return. Only pass it where the repair
+    can be checked against the source text — unconditionally rewriting a wrapped line into
+    a `\n` macro would corrupt far more than it fixed.
+    """
+    table = {**_LOST_BACKSLASH, **_LOST_BACKSLASH_RISKY} if risky else _LOST_BACKSLASH
+    for ctrl, letter in table.items():
+        # lambda, not a replacement string: "\\" + letter would be re-read by re.sub as the
+        # very escape we are trying to undo, silently putting the control character back.
+        s = re.sub(re.escape(ctrl) + r"(?=[A-Za-z])", lambda _m, l=letter: "\\" + l, s)
+    return s
+
+
+def repair_model_text(value: object, source_text: str | None = None) -> str:
+    """Undo JSON/tokenizer damage to text the model was asked to copy verbatim.
+
+    ``source_text`` is the section's markdown. When given, a backslash repair is kept only
+    if it makes the quote findable in that text and the unrepaired form was not — so a
+    genuine tab is never rewritten into a macro on a hunch.
+    """
+    s = _decode_byte_fallback(str(value or ""))
+    candidates = {**_LOST_BACKSLASH, **_LOST_BACKSLASH_RISKY} if source_text else _LOST_BACKSLASH
+    if not any(c in s for c in candidates):
+        return s
+    if source_text is None:
+        return _restore_backslashes(s)
+    squash = lambda t: re.sub(r"\s+", " ", t).strip()          # noqa: E731
+    hay = squash(source_text)
+    if squash(s) in hay:
+        return s                                    # already matches — do not touch it
+    # Prefer the smallest repair that makes the quote findable; fall back to the safe set.
+    for risky in (False, True):
+        cand = _restore_backslashes(s, risky=risky)
+        if cand != s and squash(cand) in hay:
+            return cand
+    return _restore_backslashes(s)
+
+
 def normalize_entity(name: object) -> str:
     return clean_heading_markup(str(name or "")).strip()
 
@@ -148,7 +237,8 @@ def normalize_concept_name(name: object) -> str:
     return normalize_entity(name)
 
 
-def parse_concepts_response(obj: object, stats: dict | None = None) -> list[ExtractedConcept]:
+def parse_concepts_response(obj: object, stats: dict | None = None,
+                            source_text: str | None = None) -> list[ExtractedConcept]:
     """Validate the model's structured output into concepts (drop malformed).
 
     ``stats`` (optional dict) is updated with drop accounting — ``raw`` (items the model
@@ -168,12 +258,12 @@ def parse_concepts_response(obj: object, stats: dict | None = None) -> list[Extr
                 stats["malformed"] = stats.get("malformed", 0) + 1
             continue
         name = normalize_concept_name(c.get("name"))
-        signal = _norm_part(c.get("signal"))
+        signal = _norm_part(repair_model_text(c.get("signal"), source_text))
         if not name or not signal:
             if stats is not None:
                 stats["malformed"] = stats.get("malformed", 0) + 1
             continue
-        source = _norm_part(c.get("source_sentence"))
+        source = _norm_part(repair_model_text(c.get("source_sentence"), source_text))
         if _REQUIRE_SOURCE and not source:
             if stats is not None:
                 stats["gated"] = stats.get("gated", 0) + 1
@@ -442,7 +532,7 @@ def _extract_one_section_concepts(
             if len(parts) == 1:
                 return None, last_err, meta
             continue  # a failed chunk shouldn't sink the section's other chunks
-        for c in parse_concepts_response(obj, stats=meta):
+        for c in parse_concepts_response(obj, stats=meta, source_text=piece.markdown):
             if c.name.lower() in seen_names:
                 continue
             seen_names.add(c.name.lower())

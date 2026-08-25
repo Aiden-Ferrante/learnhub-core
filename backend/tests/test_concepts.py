@@ -100,3 +100,83 @@ def test_eval_summarize_verdicts():
     assert r["sampled"] == 3 and r["graded"] == 2 and r["passed"] == 1
     assert r["score"] == 0.5
     assert r["failures"][0]["name"] == "b" and r["failures"][0]["informative"] is False
+
+
+# --------------------------------------------------------------------------- #
+# Repairing what JSON and the tokenizer do to text the model was told to COPY.
+# Both failures are invisible once _norm_part has collapsed whitespace, which is
+# how they survived 1,463 stored concepts unnoticed (v0.20.0).
+# --------------------------------------------------------------------------- #
+
+import json as _json
+
+from app.process.extraction.concepts_extract import repair_model_text
+
+
+def test_json_escape_eats_a_latex_backslash_and_the_repair_puts_it_back():
+    """The exact chain that corrupted production data.
+
+    Generation is grammar-constrained, so the model emits *valid* JSON — and `\\t` is valid
+    JSON. `\\text{` decodes to TAB + `ext{` entirely per spec; nothing is malformed and
+    nothing raises.
+    """
+    raw = r'{"s": "$P(a \text{ and } b)$"}'
+    decoded = _json.loads(raw)["s"]
+    assert decoded == "$P(a \text{ and } b)$"          # TAB, not a backslash
+    assert repair_model_text(decoded) == r"$P(a \text{ and } b)$"
+
+
+def test_repair_covers_the_three_colliding_escapes_only():
+    """t/b/f collide with real macros (\\text \\beta \\frac). \\n and \\r are left alone —
+    a newline in copied prose is plausible, a `\\newline` is not."""
+    assert repair_model_text("\theta and \binom and \frac") == r"\theta and \binom and \frac"
+    assert repair_model_text("line one\nline two") == "line one\nline two"
+
+
+def test_a_real_tab_between_words_is_not_rewritten():
+    """The trailing-letter condition: a tab welded to `ext{` is a lost macro; a tab used as
+    whitespace is whitespace. Without this, indentation would become `\\t` macros."""
+    assert repair_model_text("col one\t col two") == "col one\t col two"
+
+
+def test_source_text_decides_when_the_repair_is_ambiguous():
+    """Given the section's own markdown, a repair is kept only if it makes the quote
+    findable — the same rule the rest of extraction lives by."""
+    damaged = "the \tension of the rope"                  # TAB + "ension" — looks like \tension
+    assert repair_model_text(damaged, source_text="We measure the \tension of the rope.") == damaged
+    assert repair_model_text(damaged, source_text=r"We measure the \tension here.") == r"the \tension of the rope"
+
+
+def test_byte_fallback_tokens_decode_back_to_the_character():
+    """A character the model knows only as byte-fallback tokens can detokenize to literal
+    `<0xE2><0x84><0x92>`. That is never real prose, so decoding is unambiguous."""
+    assert repair_model_text("<0xE2><0x84><0x92>(V, W) is a vector space") == "ℒ(V, W) is a vector space"
+    assert repair_model_text("<0xZZ> stays") == "<0xZZ> stays"
+
+
+def test_undecodable_byte_run_is_left_visible_rather_than_guessed():
+    assert repair_model_text("<0xFF><0xFE>") == "<0xFF><0xFE>"
+
+
+def test_parse_repairs_the_stored_field_not_just_the_helper():
+    from app.process.extraction.concepts_extract import parse_concepts_response
+    obj = {"concepts": [{"name": "Tensor product", "kind": "definition",
+                         "signal": "A construction on two spaces.",
+                         "source_sentence": "written $V \totimes W$ here"}]}
+    got = parse_concepts_response(obj)
+    assert got and got[0].source == r"written $V \totimes W$ here"
+
+
+def test_newline_repair_needs_ground_truth():
+    r"""\n collides with \not, \nabla, \neq — but an unverified newline+letter is just a
+    wrapped line. Without source text the repair must not fire; with it, it may."""
+    damaged = "holds when $x \not\to y$ here"          # newline + "ot", tab + "o"
+    assert "\\not" not in repair_model_text(damaged)   # no ground truth -> left alone
+    fixed = repair_model_text(damaged, source_text=r"It holds when $x \not\to y$ here.")
+    assert fixed == r"holds when $x \not\to y$ here"
+
+
+def test_a_wrapped_line_is_not_turned_into_a_macro():
+    """The regression the risky set could cause: prose that legitimately wraps."""
+    prose = "the first half\nof the sentence"
+    assert repair_model_text(prose, source_text="the first half of the sentence") == prose
