@@ -199,10 +199,65 @@ worth keeping. Generation is LLM; doing is not.
 
 Steps 1-3 are the user's stated priority ("creating"); 4 is what makes it stick.
 
-## Open question
+## The answer to the open question — production fluency (decided 2026-08-25)
 
-**Should a practice grade feed anything the concept loop already measures?** Retention is
-safe by construction (above), so today a practice grade would move the activity heatmap
-and sessions but nothing else — problems would have no progress signal of their own. The
-three-question model is coverage / retention / state; production fluency is arguably a
-fourth. Adding a signal is a real decision and is deliberately not taken here.
+The question this section used to leave open: *should a practice grade feed anything the
+concept loop already measures?* **Yes, and it must be its own number.**
+
+The reason is the whole point of the feature. Steps 1–4 above build an *activity*; what is
+actually wanted is a way to **audit your own understanding**, which is a *measure*. Without
+one, a practice grade moves the activity heatmap and nothing else — you would have built a
+question pool that can only tell you that you answered questions. `mastery.py:3` states the
+three-question model: *what should I do?* (forecast) · *what's the state of my memory?*
+(coverage + retention) · *what have I done?* (activity). Competency asks a fourth — **can I
+use it?** — and no existing number can answer it, because coverage and retention are both
+computed over `ext_concepts`.
+
+Charted as **Competency** (`0ee146aab681`), the fourth sub-group under *Make learning more
+efficient*; the other three all measure recall.
+
+### It is the same function over a different denominator
+
+`summarize_memory(concept_keys, retention)` (`mastery.py:271`) is **pure**: a list of keys
+plus a retention map in, a summary out. And `_retention_by_key` reads `concept_reviews`
+through `review_scope(doc)` with **no `item_type` filter**, so `prac-` rows already land in
+the retention map — they are inert today only because `summarize_memory` is handed keys
+drawn from `ext_concepts`.
+
+So production fluency is that same call with a different key list:
+
+- **denominator** — the section's `ext_practice` rows `WHERE kind = 'problem'`, read
+  through `concept_filter()`, mirroring `_concepts_by_section` exactly (which is also what
+  makes it inherit correctly across a re-cut version)
+- **numerator** — those of them with a `prac-` review row
+- **fluency** — mean FSRS retrievability over the attempted ones, the same engine as
+  retention, so "fading" means one thing in both places
+
+No new scheduler, no second memory model, no new query shape. One key-list builder and one
+extra call.
+
+### Three rules it must not break
+
+1. **Never averaged into retention.** It is a separate axis on the surface, always. The
+   season-long waypoint on `0d6a42ad415a` rests on retention meaning one thing; folding
+   production evidence into it destroys the only number that waypoint can be read off.
+2. **Zero items means unknown, not zero fluency.** Coverage's denominator is safe because
+   concepts exist the moment extraction runs. Practice items are generated on demand, so a
+   section with no items has *no information*, and rendering that as 0% is exactly the
+   failure the honesty arc exists to kill — an absent measurement displayed as a bad score.
+   Unknown is a distinct state from zero throughout, per v0.15.0.
+3. **Do not reuse the retention thresholds.** `RETENTION_SOLID = 0.9` is FSRS's scheduling
+   target for twenty-second concept cards. A ten-minute derivation answered correctly once
+   is not "solid", and saying so would be the same confident-wrong-answer this codebase has
+   been repairing. Either calibrate separate thresholds or name the states differently —
+   decide when there is real data, and until then report the raw fraction rather than a
+   flattering word.
+
+### What this changes upstream
+
+Step 4 is designed around it rather than bolted onto it: the `_TypedItem` entry keeps its
+`prac-` prefix and `event_kind="practice"` as specified, and the read model gains its key
+list next to `_concepts_by_section`. The falsifier on the Competency node is the thing to
+watch — *every practice item is answerable by restating a concept's definition* — because a
+fluency number computed over recall-in-disguise items is worse than no number at all: it
+would report production skill the pool never tested.
