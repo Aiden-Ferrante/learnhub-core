@@ -50,12 +50,16 @@ not add to it mid-build.
 
 ## Carries forward
 
-- **Four documents have no card, so they cannot be deleted from the Processing tab at all.**
-  (v0.17.0.) `Axler-Measure-Integration`, `Durrett-Probability`, and two stuck at
-  `converting`. The tab lists `app_documents`, so a document with no card is unreachable from
-  it — the orphan problem from the other direction, and not in v0.17.0's finding list.
-- **One orphaned ingest directory** from 2026-07-17 with no source row, a 3.6 MB PDF left by a
-  delete that predates this work. Harmless, and evidence that B2/B6 were real.
+- **Two documents have no card, so they cannot be deleted from the Processing tab at all.**
+  (v0.17.0.) `Axler-Measure-Integration` and `Durrett-Probability`. The tab lists
+  `app_documents`, so a document with no card is unreachable from it — the orphan problem from
+  the other direction, and not in v0.17.0's finding list. (The two `converting` zombies that
+  were also in this state were deleted 2026-08-26 via the API.)
+- **333 MB of orphaned files, from deletes that predate v0.17.0.** One ingest directory
+  (3.5 MB, 2026-07-17) and four audiobook directories (121 MB, 178 MB, 26 MB, 5.7 MB), none
+  with a source row. Nothing creates these any more — the delete path removes both trees now —
+  so this is a one-off sweep, not a recurring leak. Worth a `scripts/` reaper that lists
+  orphans and removes them on `--apply`, in the shape of the other two scripts.
 - **A browser check that cannot fail is not a check.** (v0.17.0.) A card deleted from the
   Processing tab stays deleted whether or not the backend was called, because a card with no
   `learnDocId` is pruned client-side. Verifying it required arranging for a specific number to
