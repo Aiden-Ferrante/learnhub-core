@@ -14,6 +14,11 @@ not add to it mid-build.
 
 ## Pruned
 
+- **Splitter findings D3–D6** (v0.18.0, 2026-08-26). Fenced code (D1) and setext headings
+  (D2) were built because a real book exercised them — 11 of 12 books contain fenced code,
+  and the splitter demonstrably turned a Python comment into a chapter. Nothing in the
+  library exercised D3–D6, and writing splitter rules against imagined markdown is how the
+  fenced-code bug got missed in the first place. Cut at the moment it was cut.
 - **Real mid-flight convert cancel** (v0.18.0, 2026-08-25). Docling is a single opaque
   call with no page loop to hook, so interrupting a conversion already inside the engine
   means hosting it in a killable subprocess. Cut as a design change, not a bug fix. What
@@ -40,6 +45,16 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **An honesty fix that stops the queue is worse than the dishonesty it replaced.**
+  (v0.18.0.) Making `requeue_interrupted` raise instead of `pass` is right at the gateway,
+  and it would have killed the worker on the first failed recovery because the call sits
+  outside the loop — the queue silently draining nothing. Caught by running it, not reading
+  it. When a fix converts silence into an exception, check what catches it.
+- **`run_convert`'s failure paths are unexercised.** A fault-injection hook for the converter
+  would make v0.18.0's criterion 2 checkable rather than argued from reading.
+- **The ledger key includes `kind`, and `build`/`extract` are runner aliases but not key
+  aliases.** Nothing is broken; the asymmetry cost twenty minutes of debugging a cancel that
+  reported "no job" for a running job, and will again.
 - **A probe that runs beside the service can only measure a cold path.** (v0.16.0.) Every
   measurement bug in that cycle had one shape — a one-time cost inside a timed region — and
   the worst one invalidated a *fix* rather than a number: `docker exec python -c` spawns a

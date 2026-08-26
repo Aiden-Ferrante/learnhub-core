@@ -176,12 +176,29 @@ def generate_skeleton(doc_id: str, scope: str | None, model: str | None = None) 
     return out
 
 
+def _has_any_essence(sections: list[dict]) -> bool:
+    """Did the model actually say anything?
+
+    A skeleton is the section list plus a one-line essence each. The section list comes from
+    the outline and always exists; the essences come from the model. When the call fails or
+    returns nothing matching, every essence is the empty string and the result LOOKS like a
+    well-formed skeleton — right shape, right order, right headings, no content (finding C4).
+    """
+    return any((s.get("essence") or "").strip() for s in sections)
+
+
 def refresh_skeleton(doc_id: str, scope: str | None) -> dict:
     """Generate the skeleton NOW and write the cache (the build queue's runner; also used
     by explicit ``regenerate`` requests). Returns a small receipt."""
     sections = generate_skeleton(doc_id, scope)
     if not sections:
         return {"sections": 0, "error": "no sections in this scope"}
+    if not _has_any_essence(sections):
+        # Do not cache it. Writing this row stamps it with the current prompt version, which
+        # is exactly what the lazy-regenerate check keys on — so a single failed model call
+        # would be remembered as this chapter's real, permanently empty skeleton, and the
+        # only way back would be bumping SKELETON_PROMPT_VERSION for everyone.
+        return {"sections": len(sections), "error": "the model returned no essences"}
     with db() as conn:
         conn.execute(
             "INSERT INTO ext_skeleton (key, doc_id, structure_id, scope, sections, prompt_version, created_at) "

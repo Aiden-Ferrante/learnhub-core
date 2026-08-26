@@ -303,7 +303,11 @@ CREATE TABLE chapter_builds (
   doc_id text NOT NULL REFERENCES raw_documents(key) ON DELETE CASCADE,
   scope text, phase text, status text, done int, total int,
   error text, requested_at bigint, started_at bigint, finished_at bigint, not_before bigint,
-  kind text, payload jsonb, cancel_requested boolean);
+  kind text, payload jsonb, cancel_requested boolean,
+  -- Times this job has been handed to a runner. Incremented on RECOVERY, not on claim: a
+  -- job that runs and fails cleanly is settled as error and never requeued, so counting
+  -- claims would cap the wrong thing. Bounds the crash-requeue-crash loop (C5).
+  attempts int NOT NULL DEFAULT 0);
 CREATE INDEX ON chapter_builds (doc_id);
 
 CREATE TABLE learn_meta (key text PRIMARY KEY, paused boolean);

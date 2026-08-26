@@ -22,6 +22,7 @@ row.)
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from typing import Any
 
@@ -34,10 +35,21 @@ META = "learn_meta"
 
 # camelCase job field -> chapter_builds column. Everything NOT here (receipt, sectionKeys,
 # extraction outcomes, …) is schemaless and lives in the ``payload`` jsonb column.
+# The fields whose loss changes what the system BELIEVES, as opposed to what it displays.
+# A dropped `done`/`error`/`canceled` is a job that never finishes as far as every surface
+# above it is concerned.
+log = logging.getLogger(__name__)
+
+# Interrupted-retry cap. Three is enough to ride out a restart or two and few
+# enough that a genuinely poisonous job stops blocking the queue within an hour.
+MAX_ATTEMPTS = 3
+
+_TERMINAL_KEYS = {"status", "finishedAt", "error", "cancelRequested"}
+
 _CONTROL_COLS: dict[str, str] = {
     "docId": "doc_id", "scope": "scope", "kind": "kind", "status": "status",
     "phase": "phase", "done": "done", "total": "total", "error": "error",
-    "cancelRequested": "cancel_requested", "notBefore": "not_before",
+    "cancelRequested": "cancel_requested", "notBefore": "not_before", "attempts": "attempts",
     "requestedAt": "requested_at", "startedAt": "started_at", "finishedAt": "finished_at",
 }
 
@@ -141,7 +153,13 @@ def update_job(key: str, patch: dict[str, Any]) -> None:
                     "|| %(extra)s::jsonb WHERE key = %(key)s",
                     {"key": key, "extra": Json(extra)},
                 )
-    except Exception:  # noqa: BLE001 — progress writes are best-effort
+    except Exception:
+        # Progress is best-effort; a status is not. Losing "done" or "error" leaves a
+        # finished job displayed as running forever, and losing "canceled" is worse — the
+        # next restart requeues it. Terminal writes raise so the worker can see them and
+        # log; cosmetic ones stay quiet (finding C1).
+        if _TERMINAL_KEYS & set(patch):
+            raise
         pass
 
 
@@ -213,6 +231,18 @@ def cancel_build(doc_id: str | None, scope: str, kind: str = "build") -> dict[st
             f"SELECT key, status FROM {BUILDS} WHERE key = %(k)s", {"k": key}
         ).fetchone()
         if not job:
+            # "no job" is true of this KEY, and the key includes the kind — so a request that
+            # names the wrong kind gets told the job does not exist while it is running two
+            # feet away. Say which, since the two call for opposite responses: retry with the
+            # right kind, versus stop looking.
+            others = [r["kind"] for r in conn.execute(
+                f"SELECT DISTINCT kind FROM {BUILDS} WHERE doc_id = %(d)s "
+                "AND status IN ('queued', 'running')",
+                {"d": doc_id},
+            ).fetchall() if r.get("kind")]
+            if others:
+                return {"cancelled": False, "reason": "no job of that kind",
+                        "runningKinds": sorted(others)}
             return {"cancelled": False, "reason": "no job"}
         if job.get("status") == "queued":
             conn.execute(f"DELETE FROM {BUILDS} WHERE key = %(k)s", {"k": key})
@@ -310,13 +340,27 @@ def queue_summary() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 def next_job() -> dict[str, Any] | None:
-    """The oldest queued row whose ``notBefore`` has passed, or None."""
+    """Claim the oldest queued row whose ``notBefore`` has passed, or None.
+
+    **Claims, not just selects** — the UPDATE and the SELECT are one statement, so a row
+    cannot be handed out twice. It used to be a bare SELECT, with the worker marking the row
+    `running` afterwards through `update_job`, which swallowed every error it met: lose that
+    write and the row stays `queued`, the next poll hands out the same job, and the same
+    conversion runs twice with nothing anywhere saying so (finding C1).
+
+    `FOR UPDATE SKIP LOCKED` is what makes the claim safe if a second worker ever exists.
+    There is one worker today; writing the query as though there might not be costs nothing
+    and removes the failure mode rather than narrowing it.
+    """
     now = int(time.time())
     with db() as conn:
         row = conn.execute(
-            f"SELECT * FROM {BUILDS} WHERE status = 'queued' "
-            "AND (not_before IS NULL OR not_before <= %(now)s) "
-            "ORDER BY requested_at LIMIT 1",
+            f"UPDATE {BUILDS} SET status = 'running', started_at = %(now)s, error = NULL "
+            "WHERE key = ("
+            f"  SELECT key FROM {BUILDS} WHERE status = 'queued' "
+            "  AND (not_before IS NULL OR not_before <= %(now)s) "
+            "  ORDER BY requested_at LIMIT 1 FOR UPDATE SKIP LOCKED"
+            ") RETURNING *",
             {"now": now},
         ).fetchone()
     return _row_to_job(row) if row else None
@@ -337,6 +381,25 @@ def requeue_interrupted() -> None:
                 "cancel_requested = NULL WHERE status = 'running' AND cancel_requested",
                 {"t": int(time.time())},
             )
-            conn.execute(f"UPDATE {BUILDS} SET status = 'queued' WHERE status = 'running'")
-    except Exception:  # noqa: BLE001
-        pass
+            # C5: cap the retries and back them off. Without this, a job that crashes the
+            # worker is requeued, crashes it again, and is requeued again — and the worker is
+            # single-threaded, so every other job waits behind it forever. The backoff needs
+            # no new machinery: `not_before` already exists and `next_job` already honours it.
+            conn.execute(
+                f"UPDATE {BUILDS} SET status = 'error', finished_at = %(t)s, "
+                "error = 'abandoned after ' || attempts || ' interrupted attempts' "
+                f"WHERE status = 'running' AND attempts >= %(cap)s",
+                {"t": int(time.time()), "cap": MAX_ATTEMPTS},
+            )
+            conn.execute(
+                f"UPDATE {BUILDS} SET status = 'queued', attempts = attempts + 1, "
+                "not_before = %(t)s + (60 * power(2, least(attempts, 6)))::bigint "
+                "WHERE status = 'running'",
+                {"t": int(time.time())},
+            )
+    except Exception:
+        # Not swallowed. This runs once at startup, and if it fails every job a restart
+        # interrupted stays `running` forever — the queue looks busy and drains nothing.
+        # A worker that cannot recover its own ledger should say so, not start quietly.
+        log.exception("requeue_interrupted failed — interrupted jobs may be stuck 'running'")
+        raise

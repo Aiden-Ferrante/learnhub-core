@@ -30,3 +30,46 @@ def test_build_and_extract_share_one_key():
 def test_kinds_registry_shape():
     assert "build" in KINDS
     assert {"guides", "skeleton", "orient"} <= set(KINDS)
+
+
+# --------------------------------------------------------------------------- #
+# C3 (v0.18.0) — an extraction where every section failed is a failed extraction
+# --------------------------------------------------------------------------- #
+
+def test_an_extraction_with_every_section_failed_reports_failure(monkeypatch):
+    """`extract_concepts_document` sets `error` only when the RUN could not start, and
+    reports per-section outcomes otherwise. So a chapter whose every section timed out or
+    came back ungrounded arrived here as a clean `done` with zero concepts — identical, on
+    every surface above, to a chapter that genuinely teaches nothing."""
+    from app.conductor import build as b
+
+    monkeypatch.setattr(b, "_scope_keys", lambda *_a, **_k: ["toc:1", "toc:2"])
+    monkeypatch.setattr(b, "concept_count", lambda *_a, **_k: 0)
+    monkeypatch.setattr(b.asyncio, "run", lambda _c: {
+        "sections": 2, "errors": 2, "extracted": 0, "concepts": 0, "outcomes": []})
+
+    class Ctx:
+        phase = None
+        def patch(self, _f): pass
+        def progress(self, *_a, **_k): pass
+
+    out = b.run_extract({"docId": "d", "scope": "toc:1"}, Ctx())
+    assert out and "every section failed" in out["error"]
+
+
+def test_a_partly_failed_extraction_still_succeeds(monkeypatch):
+    """The boundary that keeps the rule useful: some sections failing is normal and must
+    not throw away the ones that worked."""
+    from app.conductor import build as b
+
+    monkeypatch.setattr(b, "_scope_keys", lambda *_a, **_k: ["toc:1", "toc:2"])
+    monkeypatch.setattr(b, "concept_count", lambda *_a, **_k: 0)
+    monkeypatch.setattr(b.asyncio, "run", lambda _c: {
+        "sections": 3, "errors": 1, "extracted": 2, "concepts": 7, "outcomes": []})
+
+    class Ctx:
+        phase = None
+        def patch(self, _f): pass
+        def progress(self, *_a, **_k): pass
+
+    assert b.run_extract({"docId": "d", "scope": "toc:1"}, Ctx()) is None

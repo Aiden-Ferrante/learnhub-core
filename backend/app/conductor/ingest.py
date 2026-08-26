@@ -18,6 +18,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.gateways import JobCancelled
 from app.process.ingestion import (
     PdfConvertError,
     convert_markdown_bytes,
@@ -73,6 +74,12 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     pdf_path = job.get("pdfPath")
     filename = job.get("filename") or "document.pdf"
     if not pdf_path or not Path(pdf_path).is_file():
+        # ⚠ Mark before returning. This exit used to leave the stub row at `converting`
+        # forever: a document permanently mid-flight, invisible to the shelf (which lists
+        # `ready` only), visible in the Process tab, and still holding its content hash so
+        # re-uploading the same book deduped onto the corpse. Two such rows were sitting in
+        # the dev library, from 2026-07-22 and 2026-08-22 (finding C2).
+        mark_document_status(doc_id, "error", 404)
         return {"error": "uploaded file not found on the shared volume"}
     data = Path(pdf_path).read_bytes()
     # Cancellation checkpoints. ⚠ These bracket the engine rather than interrupting it:
@@ -86,19 +93,36 @@ def run_convert(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     # convert runner never called check_cancel at all — only ctx.progress() reaches it, and
     # convert has no per-item loop to report progress against, so `cancel` on a convert set
     # a flag that nothing ever read.
-    ctx.check_cancel()
-    ctx.patch({"phase": "convert"})
-    convert = convert_markdown_bytes if is_markdown_filename(filename) else convert_pdf_bytes
+    # Every exit from here on marks the document, including the two that are not failures
+    # of the converter: a cancel, and an exception nobody anticipated. A document left at
+    # `converting` is the worst of the three outcomes because nothing ever revisits it —
+    # there is no timeout, and the next restart requeues the job rather than settling the row.
     try:
+        ctx.check_cancel()
+        ctx.patch({"phase": "convert"})
+        convert = convert_markdown_bytes if is_markdown_filename(filename) else convert_pdf_bytes
         result = convert(data, filename, doc_id=doc_id)
     except PdfConvertError as e:
         ctx.patch({"statusCode": e.status_code})
         mark_document_status(doc_id, "error", e.status_code)
         return {"error": str(e)}
+    except JobCancelled:
+        # Cancelled BEFORE the engine ran, so there is nothing to keep. The stub is marked
+        # error rather than deleted: the row is what the Process tab shows you, and a book
+        # that vanishes on cancel is harder to reason about than one that says it stopped.
+        mark_document_status(doc_id, "error", 499)
+        raise
+    except Exception:
+        mark_document_status(doc_id, "error", 500)
+        raise
     # Raises JobCancelled, which the worker turns into status=canceled — so the expensive
     # engine output is discarded rather than written. The pages are already spent; the
     # point is that the library does not gain a book the user asked to abandon.
-    ctx.check_cancel()
+    try:
+        ctx.check_cancel()
+    except JobCancelled:
+        mark_document_status(doc_id, "error", 499)
+        raise
     ctx.patch({
         "result": {
             "sourceFilename": result.source_filename,

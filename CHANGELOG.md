@@ -7,12 +7,42 @@ commit.
 
 ## [Unreleased]
 
-Two open cycles, both records without tags: [v0.17.0 — Delete means delete] and
-[v0.18.0 — Jobs that admit failure]. Landed so far: a `DELETE` of an
-already-absent document succeeds instead of 404ing (which had made an orphan
-shelf card permanently undeletable), and cancel finally reaches the convert
-runner — including the case where a restart used to requeue the very job you
-cancelled.
+## [0.18.0] — 2026-08-26
+
+The background queue stopped reporting work it did not do.
+
+### Fixed
+- **The same job could run twice.** Claiming a job was a separate write from
+  selecting it, and that write swallowed its own failures — lose it and the row
+  stayed queued for the next poll to hand out again, running the same conversion
+  a second time with nothing anywhere saying so. Selecting and claiming are now
+  one statement.
+- **A conversion that failed could leave a book stuck "converting" forever.**
+  Three exits from the converter never marked the document: a missing file, a
+  cancel, and any unanticipated error. Such a book is invisible on the shelf,
+  permanently mid-flight, and still holds its content hash — so re-uploading it
+  deduped onto the corpse. Two of these were sitting in the library.
+- **An extraction where every section failed reported success.** A chapter whose
+  every section timed out looked exactly like a chapter that teaches nothing.
+  Partial failure still succeeds.
+- **A failed skeleton was remembered as a real one.** When the model call failed,
+  every essence came back empty and the result was cached with the current prompt
+  version — which is what the regenerate check keys on, so one bad call became
+  that chapter's permanent skeleton.
+- **A code comment could become a chapter.** A `#` inside a fenced code block was
+  read as a heading, chopping the block mid-listing and feeding extraction half a
+  code sample under a heading the author never wrote. 11 of 12 books in the
+  library contain fenced code.
+- **Titles underlined with `===` or `---` were lost.** Setext headings had no
+  handling at all, so the title became body text of the section before it and a
+  real chapter vanished from the outline.
+- Cancelling now says *which* kind of nothing it found: a request naming the wrong
+  job kind used to be told the job did not exist while it was running.
+
+### Changed
+- Interrupted jobs get an attempt cap and an exponential backoff, and are settled
+  as errors rather than retried forever. The worker runs one job at a time, so an
+  uncapped retry loop does not just retry one job — it stops every other job.
 
 ## [0.16.0] — 2026-08-25
 

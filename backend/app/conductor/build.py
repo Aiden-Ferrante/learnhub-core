@@ -54,6 +54,21 @@ def run_extract(job: dict[str, Any], ctx) -> dict[str, Any] | None:
     )
     if res.get("error"):
         return {"error": str(res["error"])}
+    # An extraction where EVERY section failed is a failed extraction, whatever the absence
+    # of a top-level error says. `extract_concepts_document` reports per-section outcomes and
+    # only sets `error` when the run itself could not start, so a chapter whose every section
+    # timed out or came back ungrounded landed here as a clean `done` with zero concepts —
+    # indistinguishable, on every surface above, from a chapter that genuinely teaches
+    # nothing (finding C3).
+    sections = res.get("sections") or 0
+    errors = res.get("errors") or 0
+    if sections and errors >= sections:
+        ctx.patch({
+            "outcomes": (res.get("outcomes") or [])[:200],
+            "summary": {k: res.get(k) for k in
+                        ("sections", "extracted", "concepts", "seconds", "errors")},
+        })
+        return {"error": f"every section failed ({errors}/{sections})"}
     # Persist the per-section report + a summary the /api/extract/status poller reads.
     ctx.patch({
         "outcomes": (res.get("outcomes") or [])[:200],

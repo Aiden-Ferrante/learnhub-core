@@ -9,6 +9,7 @@ enqueue/cancel/list) lives in ``gateways/ledger`` and knows nothing about runnin
 from __future__ import annotations
 
 import threading
+import logging
 import time
 from typing import Any, Callable
 
@@ -18,6 +19,8 @@ _worker_lock = threading.Lock()
 _worker_started = False
 
 # kind -> runner(job, ctx) -> receipt | None. Registered by conductor/registry.py.
+log = logging.getLogger(__name__)
+
 _RUNNERS: dict[str, Callable[[dict[str, Any], "JobCtx"], dict[str, Any] | None]] = {}
 
 
@@ -59,7 +62,17 @@ def ensure_worker() -> None:
 
 
 def _worker_loop() -> None:
-    requeue_interrupted()
+    # The gateway raises when recovery fails (C1 — it used to `pass`, leaving interrupted
+    # jobs stuck `running` forever with nobody told). Reporting is its job; deciding is this
+    # one's. A failed recovery must not stop the worker starting — new jobs can still run —
+    # but it must be loud, because the queue will look busy and drain nothing.
+    #
+    # This call sits OUTSIDE the loop, so an uncaught raise here kills the worker thread for
+    # the life of the process. Caught deliberately, not incidentally.
+    try:
+        requeue_interrupted()
+    except Exception:  # noqa: BLE001
+        log.exception("job recovery failed at startup — interrupted jobs may be stuck")
     while True:
         try:
             if queue_paused():
@@ -71,6 +84,10 @@ def _worker_loop() -> None:
                 continue
             _dispatch(job)
         except Exception:  # noqa: BLE001 — the worker must never die
+            # It must not die, but it must also not be silent: a terminal ledger write now
+            # raises instead of being swallowed (C1), and that is the one exception here
+            # worth reading in the logs rather than sleeping past.
+            log.exception("worker loop error")
             time.sleep(20)
 
 
@@ -85,7 +102,9 @@ def _dispatch(job: dict[str, Any]) -> None:
         update_job(key, {"status": "error", "finishedAt": int(time.time()),
                          "error": f"unknown kind {kind!r}"})
         return
-    update_job(key, {"status": "running", "startedAt": int(time.time()), "error": None})
+    # `next_job` already claimed this row as running in the statement that selected it, so
+    # there is deliberately no "mark it running" write here. There used to be, and losing it
+    # left the row queued for the next poll to hand out again — the same job twice (C1).
     try:
         receipt = runner(job, JobCtx(key, kind))
         if isinstance(receipt, dict) and receipt.get("error"):
