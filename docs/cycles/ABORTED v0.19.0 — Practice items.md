@@ -1,4 +1,4 @@
-# v0.19.0 — Practice items
+# ABORTED — Practice items (was v0.19.0)
 
 Sub-cycle plan under [[0.) Development Protocol 1.0]]
 Drafted 2026-08-22 · version claimed 2026-08-25 — see Slotting
@@ -300,3 +300,40 @@ Sequencing note carried from Slotting: steps 1–3 write nothing into `concept_r
 `study_events`, so they are safe to build while [[v0.17.0 — Delete means delete]] and
 [[v0.18.0 — Jobs that admit failure]] are open. **Step 4 is not** — it adds a writer to the
 measurement layer those cycles are repairing, and should wait for them to tag.
+
+---
+
+## Retro — aborted 2026-08-26
+
+**No version was cut.** Per the protocol a cycle passes all four phases or cuts nothing, and
+this one is being deliberately re-planned rather than finished. The record is renamed out of
+the version namespace so `repo.cycle_records()` stops counting it as open, and kept rather
+than deleted because both spikes cost real time and answered real questions.
+
+**What was actually established, and is worth not re-running:**
+
+1. **Retrieval-question generation works.** 26 questions from a real chapter in 280s, about
+   three quarters usable as-is. `ext_guides` went from 0 rows — the feature had never been run.
+2. **Problem authoring works too**, and the worked solutions are correct: a truth table for
+   (P → Q) ↔ (¬Q → ¬P) checked by hand, Cypher from DDIA, row-counting from *Learning SQL*.
+3. **Both failure modes are the same shape and both are detectable.** Step 1 produced
+   "According to the text…" in 23% of questions; step 2 produced "as shown in step 3 of
+   Table 2‑1" on procedural sections. Both reference the book's furniture rather than its
+   subject, and both are prompt-forbiddable.
+4. **The degeneration is a property of the SECTION, not the book.** *Learning SQL*'s setup
+   chapter produced recall; its union-operator section produced real problems.
+5. **The refusal path is untested.** The model found something to work in every section it was
+   given, including two narrative ones. That was better than expected and leaves open whether a
+   genuinely contentless section yields an invented task.
+
+**What was never decided.** Whether production fluency belongs in the three-question model as
+a fourth number — the design is written up in `docs/practice-items-spec.md` and is the part
+most worth re-reading before restarting, since it is what makes the pool a *measure* rather
+than an activity.
+
+**What landed anyway.** The `repair_model_text` gap this cycle found — v0.20.0's fix reached
+concept extraction and not the reading-guide path — was fixed and is in `main`. Aborting the
+cycle does not un-ship it.
+
+`scripts/spike_problem_items.py` is kept as the reproduction: it writes nothing and can be
+re-run against any section.

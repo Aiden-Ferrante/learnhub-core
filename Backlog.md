@@ -14,6 +14,11 @@ not add to it mid-build.
 
 ## Pruned
 
+- **v0.19.0 Practice items and v0.20.0 Show your work — both cycles aborted 2026-08-26**,
+  to be re-planned with more care. No versions cut. Both records are kept, renamed out of the
+  version namespace, and carry retros; the two spikes are the part worth not re-running.
+  v0.20.0's *code* shipped regardless — the grounding check, its CI test and the encoding
+  repair are in `main`, and aborting the cycle withdraws the version, not the work.
 - **Splitter findings D3–D6** (v0.18.0, 2026-08-26). Fenced code (D1) and setext headings
   (D2) were built because a real book exercised them — 11 of 12 books contain fenced code,
   and the splitter demonstrably turned a Python comment into a chapter. Nothing in the
@@ -45,6 +50,22 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Question generation works; the prompt is the remaining work.** (Aborted v0.19.0.) Both
+  spikes passed: retrieval questions ~75% usable, and problem authoring produces genuine
+  work with worked solutions that check out by hand. Both failure modes are the same shape —
+  "According to the text…" (23% of questions) and "as shown in step 3 of Table 2-1" on
+  procedural sections — a reference to the book's furniture rather than its subject, and both
+  prompt-forbiddable. The degeneration is a property of the SECTION, not the book.
+- **The model never refused.** (Aborted v0.19.0.) It found something to work in every section
+  it was given, including two narrative ones. Better than expected, but it means a genuinely
+  contentless section might yet get an invented task, and nothing tests that.
+- **Nobody has read a chapter of concepts against its source.** (Aborted v0.20.0.) The
+  mechanical check proves the QUOTE is real — 1,463 of 1,463 trace. It says nothing about
+  whether the *signal* the learner reads follows from that quote, and a real sentence with a
+  wrong gloss passes every check in this repo. No script can close this one.
+- **Four `signal` values still carry `\not`/`\nabla` encoding collisions.** (Aborted v0.20.0.)
+  Unverifiable — `signal` is authored text, so the section markdown is not ground truth for
+  it. They clear on re-extraction.
 - **An honesty fix that stops the queue is worse than the dishonesty it replaced.**
   (v0.18.0.) Making `requeue_interrupted` raise instead of `pass` is right at the gateway,
   and it would have killed the worker on the first failed recovery because the call sits

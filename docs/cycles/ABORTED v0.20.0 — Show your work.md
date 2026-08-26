@@ -1,4 +1,4 @@
-# v0.20.0 — Show your work
+# ABORTED — Show your work (was v0.20.0)
 
 Sub-cycle plan under [[0.) Development Protocol 1.0]]
 Opened 2026-08-25
@@ -196,3 +196,34 @@ those sections, since the parse path is now fixed. Recorded rather than guessed 
 _Filled in at the gate._
 
 Open — the record carries no tag, which is what "open" means.
+
+---
+
+## Retro — aborted 2026-08-26
+
+**No version was cut**, and this one needs an unusually clear note because **most of its work
+shipped anyway.** Aborting the cycle withdraws the version, not the code.
+
+Already in `main` and staying there:
+
+- `app/process/extraction/grounding.py` — the check the extraction gate only implied. It
+  classifies rather than passes/fails, because how a quote fails to match is the useful answer.
+- `scripts/check_grounding.py` — the CLI over it, for a real library.
+- `tests/test_grounding_pg.py` — CI's version, seeded with one of every verdict **including an
+  invented quote**, so the check is proven able to fail. Demonstrated by sabotage, not assumed.
+- `repair_model_text` — the JSON/tokenizer damage fix, plus the backfill script.
+
+**The measurement stands and is the reason to restart this carefully.** 1,463 of 1,463
+concepts trace to their own section; zero invented, zero misattributed. The `Grounding` node
+keeps its `proxy` sounding, which is honest: that number was produced by normalized string
+matching, and the node's waypoint asks for a chapter **read**.
+
+**The one criterion never met, and the whole point of the cycle:** nobody has read a chapter of
+concepts against its source. The mechanical check proves the *quote* is real. It says nothing
+about whether the **signal** — the explanation actually shown to the learner — follows from
+that quote, and a real sentence with a wrong gloss passes every check in this repo. That is
+what a re-plan should be built around, because it is the part no script can do.
+
+**Carried forward:** the encoding damage is not fully gone. Four `signal` values still carry
+`\not`/`\nabla` collisions that cannot be verified — `signal` is authored text, so the section
+markdown is not ground truth for it. They clear on re-extraction.

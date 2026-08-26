@@ -3,6 +3,12 @@
 Super-cycle · learn-hub `v0.17.0 → v0.20.0`
 Drafted 2026-08-26. Fossilised on Build gate — corrections go to ADRs, never back-edits.
 
+> **Amendment, 2026-08-26.** The arc was cut short by decision, not by failure. **v0.18.0
+> cut.** **v0.19.0 and v0.20.0 were aborted** to be re-planned with more care; their records
+> are renamed out of the version namespace and carry retros. v0.17.0 remains open. The
+> measuring stick below is left as drafted rather than rewritten — a goal prompt that edits
+> itself to match the outcome measures nothing.
+
 Addresses **Make learning more efficient** (`0d6a42ad415a`) and, through its cycles,
 **Competency** (`0ee146aab681`) and **Grounding** (`c7bbd44951fe`).
 
