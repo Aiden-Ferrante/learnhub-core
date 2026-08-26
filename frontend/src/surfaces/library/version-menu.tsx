@@ -54,6 +54,9 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
   const [error, setError] = useState<string | null>(null)
+  // Which version's delete button is armed. Reset on close — an armed button that
+  // survived the menu closing would fire on a click meant for something else.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
 
   // A book that only has its Default has nothing to switch between — but the button still
   // shows, because creating the second one is the whole point of it being there.
@@ -94,7 +97,7 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -137,10 +140,33 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
               {v.origin === "custom" && (
                 <button
                   type="button"
-                  aria-label={`Delete ${v.name}`}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground/60 hover:text-destructive"
+                  aria-label={
+                    pendingDelete === v.docId
+                      ? `Confirm deleting ${v.name}`
+                      : `Delete ${v.name}`
+                  }
+                  title={
+                    pendingDelete === v.docId
+                      ? "Click again to delete this course — its outline and its progress go with it"
+                      : `Delete ${v.name}`
+                  }
+                  className={`shrink-0 rounded p-0.5 ${
+                    pendingDelete === v.docId
+                      ? "bg-destructive/15 text-destructive"
+                      : "text-muted-foreground/60 hover:text-destructive"
+                  }`}
                   onClick={(e) => {
                     e.stopPropagation()
+                    // Two clicks, not one. Deleting a version destroys that course's outline
+                    // and everything you have studied against it, and it sat behind a single
+                    // unguarded click in a dropdown — next to the row that merely SWITCHES
+                    // course (finding F4). A dialog would be heavier than the surrounding
+                    // menu; arming the button is enough to make it deliberate.
+                    if (pendingDelete !== v.docId) {
+                      setPendingDelete(v.docId)
+                      return
+                    }
+                    setPendingDelete(null)
                     void run(() => deleteVersion(v.docId))
                   }}
                 >

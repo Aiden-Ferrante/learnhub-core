@@ -83,7 +83,13 @@ CREATE TABLE raw_documents (
   key             text PRIMARY KEY,
   source_id       text NOT NULL REFERENCES sources(key) ON DELETE CASCADE,
   name            text NOT NULL DEFAULT 'Default',  -- the version's name
-  origin          text NOT NULL DEFAULT 'default',  -- default (TOC-derived) | custom
+  -- CHECK, not convention: `origin = 'default'` is what `delete_version` refuses to
+  -- delete and what the main-version fallback picks. A typo storing 'Default' or 'defualt'
+  -- makes a book's canonical version deletable and leaves the fallback with nothing to
+  -- choose, and the first visible symptom is a book losing every concept anchored to its
+  -- tree (finding B7).
+  origin          text NOT NULL DEFAULT 'default'
+                    CHECK (origin IN ('default', 'custom')),  -- TOC-derived | user's cut
   is_main         boolean NOT NULL DEFAULT true,    -- the version the course card opens
   status          text NOT NULL DEFAULT 'ready',   -- converting | ready | error
   status_code     int,                             -- http status of a convert failure

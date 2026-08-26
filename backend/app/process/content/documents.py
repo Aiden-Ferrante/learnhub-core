@@ -12,7 +12,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app.gateways import db
 
@@ -185,16 +185,44 @@ _STUDY_CASCADE: tuple[tuple[str, str], ...] = (
 )
 
 
-def delete_document(doc_id: str) -> dict[str, Any]:
+def _existing_tables(conn, names: tuple[str, ...]) -> set[str]:
+    """Which of these tables exist in the current schema, asked ONCE and up front.
+
+    The old shape was ``except Exception: continue`` around each DELETE. Inside a
+    transaction that is worse than useless: the first failure poisons the transaction, so
+    every later statement fails too and the `continue` hides all of them — a delete that
+    removed nothing would report success. Ask the catalogue instead, and let a real error
+    be a real error.
+    """
+    # unnest() belongs in FROM, not WHERE — Postgres refuses a set-returning function there,
+    # and the refusal is a hard error rather than an empty result, so this would have failed
+    # every delete. `to_regclass` resolves against the search_path, which the tenancy
+    # middleware has already set to the caller's schema.
+    rows = conn.execute(
+        "SELECT t FROM unnest(%(n)s::text[]) AS t WHERE to_regclass(t) IS NOT NULL",
+        {"n": list(names)},
+    ).fetchall()
+    return {r["t"] for r in rows}
+
+
+def delete_document(doc_id: str, *, on_deleted: Callable[[list[str]], None] | None = None
+                    ) -> dict[str, Any]:
     """Delete a course outright — the whole book, meaning the source row and EVERY version
     of it: raw_/ext_ tables + the job ledger cascade from the FK, the un-FK'd study tables
     are pruned per version explicitly, and the on-disk artifacts (original PDF + figures,
     both keyed by the source) are removed. Deleting one version of a book without deleting
     the book is a different operation. Irreversible. ``{error}`` on invalid/unknown id,
-    else ``{deleted, removed}``."""
+    else ``{deleted, removed}``.
+
+    ``on_deleted`` receives every version id once the database work has COMMITTED, for
+    artifacts this package may not reach itself — audiobooks live in `supplemental/media`
+    and `content` may not import it. Injected rather than imported so the layering holds;
+    the `api` layer composes the two. It runs after the commit because a callback that
+    deletes files during a transaction destroys them even when the transaction rolls back.
+    """
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", doc_id or ""):
         return {"error": "invalid doc id", "status": 400}
-    with db() as conn:
+    with db() as conn, conn.transaction():
         src = (conn.execute(
             f"SELECT source_id FROM {DOCUMENTS} WHERE key = %(d)s", {"d": doc_id}
         ).fetchone() or {}).get("source_id") or doc_id
@@ -208,13 +236,13 @@ def delete_document(doc_id: str) -> dict[str, Any]:
             f"SELECT 1 FROM {SOURCES} WHERE key = %(s)s", {"s": src}
         ).fetchone() is not None
         removed: dict[str, int] = {}
+        present = _existing_tables(conn, tuple(t for t, _ in _STUDY_CASCADE))
         for coll, field in _STUDY_CASCADE:
-            try:
-                n = conn.execute(
-                    f"DELETE FROM {coll} WHERE {field} = ANY(%(v)s)", {"v": versions}
-                ).rowcount
-            except Exception:  # noqa: BLE001 — table may not exist in this schema
+            if coll not in present:
                 continue
+            n = conn.execute(
+                f"DELETE FROM {coll} WHERE {field} = ANY(%(v)s)", {"v": versions}
+            ).rowcount
             if n:
                 removed[coll] = n
         if existed:
@@ -223,11 +251,16 @@ def delete_document(doc_id: str) -> dict[str, Any]:
             conn.execute(f"DELETE FROM {SOURCES} WHERE key = %(s)s", {"s": src})
             removed["sources"] = 1
             removed["raw_documents"] = len(versions)
+    # Files come off disk only after the transaction has committed. The other order — which
+    # the audit flagged as B6 — destroys a book's PDF and figures even when the database work
+    # rolls back, leaving rows pointing at nothing and no way to tell what happened.
     shared = Path(os.environ.get("SHARED_DIR", "/shared"))
     for sub in ("ingest", "figures"):
         target = shared / sub / src
         if target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
+    if on_deleted and versions:
+        on_deleted(versions)
     # ⚠ An absent document is SUCCESS, not 404. DELETE is idempotent: the caller asked for
     # this document to be gone, and it is gone. Returning an error here made an orphan card
     # permanently undeletable from the UI — the shelf card lives in `app_documents`, written

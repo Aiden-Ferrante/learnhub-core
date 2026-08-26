@@ -35,6 +35,7 @@ import { GroupSidebar } from "@/surfaces/library/group-sidebar"
 import { TodayStrip } from "@/surfaces/library/today-strip"
 import { countSections, type LearnTreeNode } from "@/gateways/api/outline"
 import { deleteLearnDocument } from "@/gateways/api/pipeline"
+import { fetchVersions } from "@/gateways/api/versions"
 import { fetchStudyDebt, type MasteryResponse } from "@/gateways/api/progress"
 import { fetchReadingProgress, type ReadingProgress } from "@/surfaces/reading"
 import { coverGradient, coverMonogram } from "@/surfaces/library/cover"
@@ -275,6 +276,25 @@ export function CourseShelf({
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // The book's OTHER courses, loaded when the dialog opens so it can name what it destroys.
+  // Empty on failure rather than blocking the delete: an unavailable list is a reason to say
+  // less, not a reason to stop the user removing a book.
+  const [deleteSiblings, setDeleteSiblings] = useState<string[]>([])
+
+  useEffect(() => {
+    const learnDocId = deleteTarget?.learnDocId
+    if (!learnDocId) { setDeleteSiblings([]); return }
+    let live = true
+    void fetchVersions(learnDocId)
+      .then((r) => {
+        if (!live) return
+        setDeleteSiblings(
+          (r.versions ?? []).filter((v) => v.docId !== learnDocId).map((v) => v.name),
+        )
+      })
+      .catch(() => { if (live) setDeleteSiblings([]) })
+    return () => { live = false }
+  }, [deleteTarget?.learnDocId])
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
@@ -661,6 +681,16 @@ export function CourseShelf({
               book, sections, figures, extracted concepts, and your review
               history for it.
             </p>
+            {/* F5: deleting a book takes EVERY course cut from it, not just the one on the
+                card. The card shows one name, so without this the dialog silently understates
+                what it is about to destroy — name the siblings rather than describing them. */}
+            {deleteSiblings.length > 0 && (
+              <p className="text-destructive">
+                This book carries {deleteSiblings.length + 1} courses and all of them go:{" "}
+                <strong>{deleteSiblings.join(", ")}</strong> — each with its own outline and its
+                own progress.
+              </p>
+            )}
             <p>The original PDF on your computer is not touched.</p>
             {deleteError && <p className="text-destructive">{deleteError}</p>}
           </div>

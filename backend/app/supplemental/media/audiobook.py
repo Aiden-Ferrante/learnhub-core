@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import re
 import subprocess
 import tempfile
@@ -400,6 +401,26 @@ def audiobook_timeline(doc_id: str | None, scope: str | None) -> dict:
         }
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
+
+
+def remove_audiobooks(doc_ids: list[str]) -> int:
+    """Delete every rendition belonging to these documents. Returns directories removed.
+
+    Deleting a book has to remove its audio, and `process/content` may not import this
+    package — the layering forbids it — so this is exported and composed at the `api` layer
+    instead. Each document owns one directory under AUDIO_DIR; the id is validated the same
+    way `audiobook_path` validates it, so a caller cannot walk out of the tree.
+    """
+    removed = 0
+    for doc_id in doc_ids:
+        safe = os.path.basename(str(doc_id or "").strip())
+        if not safe or safe in (".", ".."):
+            continue
+        target = os.path.join(AUDIO_DIR, safe)
+        if os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)
+            removed += 1
+    return removed
 
 
 def list_audiobooks(doc_id: str | None) -> dict:

@@ -42,6 +42,7 @@ from app.process.content import (
     stale_sections,
     unplaced_blocks,
 )
+from app.supplemental.media import remove_audiobooks
 from app.process.extraction import concept_counts_by_doc
 
 router = APIRouter()
@@ -63,10 +64,16 @@ def api_list_documents() -> JSONResponse:
 
 @router.delete("/api/document")
 def api_delete_document(doc: str = Query(...)) -> JSONResponse:
-    """Delete a course outright: document row, every learn table keyed by it, and its
-    on-disk artifacts. Irreversible."""
+    """Delete a course outright: document row, every learn table keyed by it, its on-disk
+    artifacts, and its audiobooks. Irreversible.
+
+    The audiobooks are why this handler is not a pure pass-through. They live in
+    `supplemental/media` and `process/content` may not import it — the layering forbids a
+    sideways dependency — so `delete_document` takes a callback and the composition happens
+    here, at the one layer allowed to know about both (finding B5).
+    """
     try:
-        data = delete_document(doc)
+        data = delete_document(doc, on_deleted=remove_audiobooks)
         return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": str(exc)}, status_code=503)

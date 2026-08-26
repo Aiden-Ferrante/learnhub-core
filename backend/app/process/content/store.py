@@ -202,6 +202,16 @@ def persist_document(
         conn.execute("DELETE FROM raw_content WHERE doc_id = %(d)s", {"d": doc_id})
         conn.execute("DELETE FROM raw_elements WHERE doc_id = %(d)s", {"d": doc_id})
         conn.execute("DELETE FROM raw_structure WHERE doc_id = %(d)s", {"d": doc_id})
+        # Concepts anchored to a node went with the tree above (`ext_concepts.structure_id`
+        # cascades). The ones anchored to NOTHING did not, and the schema allows that
+        # deliberately — a concept can be finer-grained than the TOC. After a re-convert
+        # their `section_key` names a section that may no longer exist, so they would sit in
+        # the table unreachable by every scope query while still counting toward coverage
+        # denominators (finding B4).
+        conn.execute(
+            "DELETE FROM ext_concepts WHERE doc_id = %(d)s AND structure_id IS NULL",
+            {"d": doc_id},
+        )
         if struct_rows:
             conn.cursor().executemany(
                 'INSERT INTO raw_structure (id, doc_id, parent_id, section_key, kind, number_label, '

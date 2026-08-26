@@ -23,7 +23,7 @@ import uuid
 from typing import Any
 
 from app.gateways import db
-from app.process.content.documents import source_id_of
+from app.process.content.documents import _existing_tables, source_id_of
 
 _SAFE_ID = re.compile(r"[0-9a-fA-F-]{8,64}")
 
@@ -166,14 +166,20 @@ def delete_version(doc_id: str) -> dict[str, Any]:
         removed: dict[str, int] = {}
         # Study rows are keyed by version and carry no FK yet, so prune them explicitly —
         # same contract as delete_document.
-        for table, field in (("concept_reviews", "doc_id"), ("study_events", "doc"),
-                             ("chapter_progress", "doc_id")):
-            try:
-                n = conn.execute(
-                    f"DELETE FROM {table} WHERE {field} = %(d)s", {"d": doc_id}
-                ).rowcount
-            except Exception:  # noqa: BLE001 — table may not exist in this schema
+        #
+        # ⚠ This block used to be `except Exception: continue`, and this function runs
+        # INSIDE a transaction: the first failure poisons it, so every later statement fails
+        # too and the `continue` swallows all of them. A version delete that removed nothing
+        # would have reported success. Ask the catalogue up front instead (B8).
+        tables = (("concept_reviews", "doc_id"), ("study_events", "doc"),
+                  ("chapter_progress", "doc_id"))
+        present = _existing_tables(conn, tuple(t for t, _ in tables))
+        for table, field in tables:
+            if table not in present:
                 continue
+            n = conn.execute(
+                f"DELETE FROM {table} WHERE {field} = %(d)s", {"d": doc_id}
+            ).rowcount
             if n:
                 removed[table] = n
         conn.execute("DELETE FROM raw_documents WHERE key = %(d)s", {"d": doc_id})

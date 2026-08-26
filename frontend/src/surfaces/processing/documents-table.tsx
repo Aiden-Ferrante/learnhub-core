@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/kit/ui/alert-dialog"
+import { deleteLearnDocument } from "@/gateways/api/pipeline"
 import { downloadDocument } from "@/kit/lib/utils"
 import { toast } from "@/kit/hooks/use-toast"
 
@@ -25,6 +26,7 @@ export function DocumentsTable() {
   // Delete confirmation dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'single' | 'multiple', docId?: string, docName?: string } | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   // Use shift-select hook for document selection
   const {
@@ -48,26 +50,62 @@ export function DocumentsTable() {
     setShowDeleteDialog(true)
   }
   
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) return
-    
-    if (deleteTarget.type === 'multiple') {
-      deleteDocuments(selectedDocuments)
-      setSelectedDocuments([])
+  // Delete the BOOK, then drop the card — never the other way round, and never the card
+  // alone. This used to be a one-line array filter that toasted success: the row vanished,
+  // the book stayed on disk with all its rows, and nothing anywhere said so. The shelf
+  // (course-shelf.tsx) has always done it correctly; this surface never adopted the pattern
+  // (finding B1).
+  //
+  // A card whose document is already gone still prunes: the backend answers 200 with
+  // `alreadyGone` rather than 404 (v0.17.0), which is what makes an orphan card deletable
+  // instead of stuck forever.
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || deleteBusy) return
+    const ids = deleteTarget.type === 'multiple'
+      ? selectedDocuments
+      : deleteTarget.docId ? [deleteTarget.docId] : []
+    if (ids.length === 0) return
+
+    setDeleteBusy(true)
+    const deleted: string[] = []
+    const failed: string[] = []
+    for (const id of ids) {
+      const learnDocId = documents.find((d) => d.id === id)?.learnDocId
+      if (!learnDocId) { deleted.push(id); continue }   // never reached the backend at all
+      try {
+        const res = await deleteLearnDocument(learnDocId)
+        if (res.error) throw new Error(res.error)
+        deleted.push(id)
+      } catch {
+        failed.push(id)
+      }
+    }
+
+    // Only the ones that actually went. A card left behind is the honest outcome for a
+    // delete that failed — it is the thing you point at to try again.
+    if (deleted.length > 0) deleteDocuments(deleted)
+    if (deleteTarget.type === 'multiple') setSelectedDocuments(failed)
+
+    if (failed.length === 0) {
       toast({
-        title: "Documents Deleted",
-        description: `Successfully deleted ${selectedDocuments.length} document(s).`,
+        title: deleted.length === 1 ? "Document deleted" : "Documents deleted",
+        description: deleteTarget.type === 'single'
+          ? `"${deleteTarget.docName}" has been deleted.`
+          : `Deleted ${deleted.length} document(s).`,
         duration: 3000,
       })
-    } else if (deleteTarget.type === 'single' && deleteTarget.docId) {
-      deleteDocuments([deleteTarget.docId])
+    } else {
       toast({
-        title: "Document Deleted",
-        description: `"${deleteTarget.docName}" has been deleted.`,
-        duration: 3000,
+        title: "Delete failed",
+        variant: "destructive",
+        description: deleted.length > 0
+          ? `Deleted ${deleted.length}, but ${failed.length} could not be removed and are still selected.`
+          : `Could not delete ${failed.length} document(s). Nothing was removed.`,
+        duration: 6000,
       })
     }
-    
+
+    setDeleteBusy(false)
     setShowDeleteDialog(false)
     setDeleteTarget(null)
   }
