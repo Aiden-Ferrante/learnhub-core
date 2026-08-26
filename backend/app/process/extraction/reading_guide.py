@@ -14,6 +14,7 @@ import os
 from typing import Any
 
 from app.process.content import resolve_doc_id
+from app.process.extraction.concepts_extract import repair_model_text
 from psycopg.types.json import Json
 
 from app.gateways import db
@@ -76,10 +77,15 @@ def author_reading_guide(section: dict[str, Any], model: str | None = None) -> d
     )
     if err or not obj:
         return None
-    focus = (obj.get("focus") or "").strip()
+    # Same JSON/tokenizer damage as concept extraction, same repair. v0.20.0 wired
+    # `repair_model_text` into `parse_concepts_response` and stopped there, so this path kept
+    # producing `Γ <0xE2><0x8A><0xA8> φ` — the fix reached one consumer of the problem rather
+    # than the problem. The section text is ground truth for a quote and not for an authored
+    # question, so it is passed for neither: both are the model's own words here.
+    focus = repair_model_text(obj.get("focus")).strip()
     checks = []
     for c in obj.get("checks") or []:
-        q, a = (c.get("q") or "").strip(), (c.get("a") or "").strip()
+        q, a = repair_model_text(c.get("q")).strip(), repair_model_text(c.get("a")).strip()
         if q and a:
             checks.append({"q": q, "a": a})
     if not focus and not checks:

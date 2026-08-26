@@ -180,3 +180,18 @@ def test_a_wrapped_line_is_not_turned_into_a_macro():
     """The regression the risky set could cause: prose that legitimately wraps."""
     prose = "the first half\nof the sentence"
     assert repair_model_text(prose, source_text="the first half of the sentence") == prose
+
+
+def test_reading_guides_get_the_same_repair_as_concepts():
+    """v0.20.0 wired `repair_model_text` into concept extraction and stopped there, so the
+    reading-guide path kept storing `Γ <0xE2><0x8A><0xA8> φ`. The v0.19.0 spike surfaced it
+    in real output: 2 of 26 generated questions carried mojibake. A fix that reaches one
+    consumer of a shared problem is not a fix."""
+    import app.process.extraction.reading_guide as rg
+    assert rg.repair_model_text is repair_model_text
+    src = getattr(rg, "_validate", None) or rg
+    import inspect
+    body = inspect.getsource(rg)
+    assert "repair_model_text(c.get(\"q\"))" in body and "repair_model_text(c.get(\"a\"))" in body, \
+        "both halves of a check must be repaired, not just the question"
+    assert repair_model_text("<0xE2><0x8A><0xA8> holds") == "⊨ holds"
