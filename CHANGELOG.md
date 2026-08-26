@@ -7,6 +7,37 @@ commit.
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-08-26
+
+Deleting a book now removes the book.
+
+### Fixed
+- **Deleting from the Processing tab did nothing.** It removed the row from the
+  screen and toasted success; the book stayed on disk with every row intact. It
+  calls the backend now, and a card whose delete failed stays on screen and stays
+  selected — that card is what you point at to try again.
+- **A half-finished delete could leave a book in pieces.** The whole removal runs
+  in one transaction, and files come off disk only after it commits — the other
+  order destroys a book's PDF and figures even when the database work rolls back.
+- **Audiobooks were never removed** with the book they narrate.
+- **A re-convert could strand concepts** anchored to no outline node: they survived
+  naming a section that no longer existed, unreachable by every scope query while
+  still counting toward coverage.
+- **Errors during a delete were swallowed.** The removal runs inside a transaction,
+  where the first failure poisons everything after it — so a delete that removed
+  nothing reported success.
+
+### Added
+- `origin` is constrained at the database. It decides which version cannot be
+  deleted and which one the main-version fallback picks, and one typo would have
+  made a book's canonical version deletable.
+- Deleting a course takes two deliberate clicks. It destroys that course's outline
+  and everything studied against it, and sat behind one unguarded click next to
+  the row that merely *switches* course.
+- The shelf's delete dialog names the sibling courses it will destroy. Deleting a
+  book takes every course cut from it; the card shows one name.
+- Tests for the delete paths, which had none.
+
 ## [0.18.0] — 2026-08-26
 
 The background queue stopped reporting work it did not do.

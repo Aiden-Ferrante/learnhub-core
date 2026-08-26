@@ -50,6 +50,16 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Four documents have no card, so they cannot be deleted from the Processing tab at all.**
+  (v0.17.0.) `Axler-Measure-Integration`, `Durrett-Probability`, and two stuck at
+  `converting`. The tab lists `app_documents`, so a document with no card is unreachable from
+  it — the orphan problem from the other direction, and not in v0.17.0's finding list.
+- **One orphaned ingest directory** from 2026-07-17 with no source row, a 3.6 MB PDF left by a
+  delete that predates this work. Harmless, and evidence that B2/B6 were real.
+- **A browser check that cannot fail is not a check.** (v0.17.0.) A card deleted from the
+  Processing tab stays deleted whether or not the backend was called, because a card with no
+  `learnDocId` is pruned client-side. Verifying it required arranging for a specific number to
+  move. Applies to every future criterion with a browser half.
 - **Question generation works; the prompt is the remaining work.** (Aborted v0.19.0.) Both
   spikes passed: retrieval questions ~75% usable, and problem authoring produces genuine
   work with worked solutions that check out by hand. Both failure modes are the same shape —
