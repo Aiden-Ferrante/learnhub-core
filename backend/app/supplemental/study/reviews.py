@@ -100,6 +100,7 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
 
 SKELETON_KEY_PREFIX = "skel-"
 CHAPTER_KEY_PREFIX = "chap-"
+PRACTICE_KEY_PREFIX = "prac-"
 
 
 def _typed_key(prefix: str, *parts: object) -> str:
@@ -117,6 +118,12 @@ def skeleton_review_key(doc_id: str, section_key: str) -> str:
 def chapter_review_key(doc_id: str, scope: str) -> str:
     """Chapter-resurface row key (reading a chapter seeds it into the decay cycle)."""
     return _typed_key(CHAPTER_KEY_PREFIX, doc_id, "chap", scope)
+
+
+def practice_review_key(item_key: str) -> str:
+    """Practice-item row key. Item keys are stable uuids (never content-derived), so no
+    rename carry-over machinery is ever needed — deleting the item cascades the row."""
+    return _typed_key(PRACTICE_KEY_PREFIX, item_key)
 
 
 def clean_skeleton_children(children: object) -> list[dict[str, str]]:
@@ -149,6 +156,29 @@ def _resolve_chapter(body: dict, key: str) -> tuple[str, dict]:
     return key, {}  # only ever re-graded from the queue; identity comes from the row
 
 
+def _resolve_practice(body: dict, key: str) -> tuple[str, dict]:
+    """A practice grade carries the ITEM key; identity (book doc + section) comes from
+    the item row itself, so the review row follows the BOOK like concept cards do."""
+    item_key = str(body.get("practiceKey") or "").strip()
+    if item_key:
+        with db() as conn:
+            item = conn.execute(
+                'SELECT doc_id AS "docId", section_key AS "sectionKey", prompt '
+                "FROM ext_practice WHERE key = %(k)s",
+                {"k": item_key},
+            ).fetchone()
+        if not item:
+            raise ValueError(f"unknown practice item {item_key}")
+        return practice_review_key(item_key), {
+            "docId": item["docId"],
+            "sectionKey": item["sectionKey"],
+            "heading": (item.get("prompt") or "")[:120] or None,
+        }
+    if key.startswith(PRACTICE_KEY_PREFIX):  # queue re-grade → identity from the row
+        return key, {}
+    raise ValueError("practiceKey is required for a practice grade")
+
+
 def _extra_skeleton(body: dict, info: dict) -> dict:
     return {
         "heading": str(body.get("heading") or "").strip() or None,
@@ -159,6 +189,14 @@ def _extra_skeleton(body: dict, info: dict) -> dict:
 
 def _extra_chapter(body: dict, info: dict) -> dict:
     return {}
+
+
+def _extra_practice(body: dict, info: dict) -> dict:
+    # heading = truncated prompt, for the calendar's item name. children stays None —
+    # the reveal reads answer/rubric LIVE from ext_practice, never a snapshot (the
+    # deliberate asymmetry with skeleton items: a book's structure is static, an item's
+    # worked solution is editable).
+    return {"heading": (info.get("heading") or "").strip() or None}
 
 
 def _name_structure(row: dict) -> str:
@@ -179,6 +217,9 @@ class _TypedItem:
     card_name: Callable[[dict], str]
     card_signal: Callable[[dict], str]
     card_extra: Callable[[dict], dict]                 # card fields beyond the common envelope
+    # study_events doc attribution: None = the review row's doc. Practice rows follow the
+    # BOOK (shared memory, like concepts) while the event belongs to the VERSION studied.
+    event_doc: Callable[[dict, dict], str | None] | None = None
 
 
 _TYPED: dict[str, _TypedItem] = {
@@ -197,6 +238,15 @@ _TYPED: dict[str, _TypedItem] = {
         resolve=_resolve_chapter, extra=_extra_chapter,
         card_name=_name_structure, card_signal=lambda r: "",
         card_extra=lambda r: {"children": r.get("children") or []},
+    ),
+    "practice": _TypedItem(
+        item_type="practice", prefix=PRACTICE_KEY_PREFIX, body_flag="practice",
+        event_kind="practice", card_kind="practice",
+        lookup_cols=', doc_id AS "docId", section_key AS "sectionKey", heading',
+        resolve=_resolve_practice, extra=_extra_practice,
+        card_name=_name_structure, card_signal=lambda r: "",
+        card_extra=lambda r: {},
+        event_doc=lambda body, info: str(body.get("doc") or "").strip() or info.get("docId"),
     ),
 }
 
@@ -259,7 +309,8 @@ def _grade_typed_item(spec: _TypedItem, body: dict, concept_key: str, grade: int
         return {"error": str(exc)}, 500
 
     # Append to the mastery floor (best-effort; never breaks the grade flow).
-    record_grade_event(section_key, correct=(grade >= 3), doc=doc_id, kind=spec.event_kind)
+    event_doc = spec.event_doc(body, info) if spec.event_doc else doc_id
+    record_grade_event(section_key, correct=(grade >= 3), doc=event_doc, kind=spec.event_kind)
     return {
         "conceptKey": key,
         "due": next_state["due"],
@@ -349,11 +400,19 @@ def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
     }
 
 
-def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str, Any]:
+def build_review_queue(
+    doc: str | None, scope: str, limit: int = 40, session: str = "concepts"
+) -> dict[str, Any]:
     """Cards to review now for ONE chapter/section scope: due cards (earliest first)
     then the scope's new (unseen) concept cards. Studying is deliberately
-    chapter-scoped — the course-wide session was retired 2026-07-15."""
+    chapter-scoped — the course-wide session was retired 2026-07-15.
+
+    ``session="practice"`` returns ONLY practice-item cards — a separate session, never a
+    mixed queue: a ten-minute derivation must not land mid-run of twenty-second concept
+    cards. The default session excludes practice symmetrically."""
     now = time.time()
+    if session == "practice":
+        return _build_practice_queue(doc, scope, limit, now)
     try:
         # A chapter scope spans ALL its sub-sections (the reader's reading-order span) —
         # exact-key matching misses everything under a chapter node.
@@ -377,7 +436,7 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
             for r in conn.execute(
                 "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
                 "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
-                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter'))",
+                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter', 'practice'))",
                 {"doc": source_id_of(doc) if doc else None},
             ).fetchall():
                 reviews[r["key"]] = r
@@ -431,6 +490,74 @@ def build_review_queue(doc: str | None, scope: str, limit: int = 40) -> dict[str
     queue = (due + new)[:limit]
     return {
         "cards": queue,
+        "counts": {"due": len(due), "new": len(new), "later": later},
+    }
+
+
+def _practice_card(item: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
+    """A practice queue card. answer/rubric/payload are read LIVE from ext_practice at
+    queue-build time — nothing is ever snapshotted into the review row."""
+    return {
+        "itemType": "practice",
+        "conceptKey": practice_review_key(item["key"]),
+        "practiceKey": item["key"],
+        "name": (item.get("prompt") or "")[:120],
+        "kind": "practice",
+        "practiceKind": item.get("kind"),
+        "prompt": item.get("prompt"),
+        "answer": item.get("answer"),
+        "rubric": item.get("rubric"),
+        "payload": item.get("payload"),
+        "sectionKey": item.get("sectionKey"),
+        "docId": item.get("docId"),
+        "state": state,
+        "due": due,
+    }
+
+
+def _build_practice_queue(doc: str | None, scope: str, limit: int, now: float) -> dict[str, Any]:
+    """The separate practice session's queue: the scope's due practice items (earliest
+    first), then unseeded ones as new cards. Items follow the BOOK through concept_filter,
+    exactly like concept cards — every cut of a book shares one practice memory."""
+    try:
+        span = scope_section_keys(doc, scope)
+        pred, binds = concept_filter(doc, list(span) if span is not None else None)
+        with db() as conn:
+            items = conn.execute(
+                'SELECT key, kind, prompt, answer, rubric, payload, section_key AS "sectionKey", '
+                'doc_id AS "docId" '
+                f'FROM ext_practice WHERE {pred} ORDER BY section_key, "order"',
+                binds,
+            ).fetchall()
+            reviews = {
+                r["key"]: r
+                for r in conn.execute(
+                    "SELECT key, extract(epoch from due)::float8 AS due, state "
+                    "FROM concept_reviews WHERE item_type = 'practice' "
+                    "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
+                    {"doc": source_id_of(doc) if doc else None},
+                ).fetchall()
+            }
+        if doc:
+            for it in items:
+                it["docId"] = doc  # keep links pointing at the version being studied
+    except Exception as exc:  # noqa: BLE001
+        return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)}
+
+    due: list[dict[str, Any]] = []
+    new: list[dict[str, Any]] = []
+    later = 0
+    for it in items:
+        r = reviews.get(practice_review_key(it["key"]))
+        if r is None:
+            new.append(_practice_card(it, "new", None))
+        elif float(r.get("due", 0)) <= now:
+            due.append(_practice_card(it, r.get("state", "review"), r.get("due")))
+        else:
+            later += 1
+    due.sort(key=lambda x: x.get("due") or 0)
+    return {
+        "cards": (due + new)[:limit],
         "counts": {"due": len(due), "new": len(new), "later": later},
     }
 

@@ -268,6 +268,57 @@ def _concepts_by_section(doc: str | None) -> dict[str, list[str]]:
     return out
 
 
+def _practice_keys_by_section(doc: str | None) -> dict[str, list[str]]:
+    """sectionKey → the section's practice REVIEW keys — production fluency's denominators.
+
+    Only ``kind IN ('problem','code')`` counts: retrieval/MCQ/ordering items are
+    recognition, and folding them in is exactly the Competency falsifier ("recall wearing
+    a problem's clothes") firing inside the measure itself. Mirrors _concepts_by_section:
+    book-owned rows read through concept_filter, re-keyed onto the version's outline."""
+    from app.supplemental.study.reviews import practice_review_key  # call-time: avoids a cycle
+
+    with db() as conn:
+        pred, binds = concept_filter(doc)
+        rows = conn.execute(
+            "SELECT section_key AS sk, key FROM ext_practice "
+            f"WHERE {pred} AND kind IN ('problem', 'code')",
+            binds,
+        ).fetchall()
+    by_source = version_sections_by_source(doc) if doc else {}
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        if not r.get("sk"):
+            continue
+        for vk in by_source.get(r["sk"], [r["sk"]]):
+            out.setdefault(vk, []).append(practice_review_key(r["key"]))
+    return out
+
+
+def summarize_fluency(review_keys: list[str], retention: dict[str, float]) -> dict[str, Any]:
+    """Pure: one unit's PRODUCTION FLUENCY from its practice review keys + the retention
+    map — the same FSRS engine as retention, over a different denominator (worked
+    problems, not concepts). Three rules, enforced here and honored by every surface:
+
+    1. NEVER averaged into retention — it is a separate axis, always.
+    2. Zero items = UNKNOWN, not zero. Items are generated on demand, so a section with
+       none carries no information; rendering that as 0% is the failure the honesty arc
+       exists to kill.
+    3. No solid/shaky adjectives — RETENTION_SOLID is calibrated for twenty-second cards,
+       not ten-minute derivations. The raw number is reported without a flattering word.
+    """
+    items = len(review_keys)
+    attempted = [retention[k] for k in review_keys if k in retention]
+    n = len(attempted)
+    if items == 0:
+        return {"items": 0, "attempted": 0, "fluency": None, "state": "unknown"}
+    return {
+        "items": items,
+        "attempted": n,
+        "fluency": (sum(attempted) / n) if n else None,
+        "state": "measured" if n else "unattempted",
+    }
+
+
 def summarize_memory(concept_keys: list[str], retention: dict[str, float]) -> dict[str, Any]:
     """Pure: one unit's memory summary from its concept keys + the retention map.
 
@@ -349,17 +400,28 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
         retention = _retention_by_key(doc, now)
     except Exception as exc:  # noqa: BLE001 — a soft error, but never a silent zero
         return {"bySection": {}, "overall": summarize_memory([], {}), "error": str(exc)}
+    try:
+        section_practice = _practice_keys_by_section(doc)
+    except Exception:  # noqa: BLE001 — fluency is the fourth number, never the reason
+        section_practice = {}  # coverage/retention fail to render
 
     by_section: dict[str, dict[str, Any]] = {}
     for k in labels:
         leaves = descendant_leaves(k, children)
         keys: list[str] = []
+        pkeys: list[str] = []
         for lk in leaves:
             keys.extend(section_concepts.get(lk, []))
+            pkeys.extend(section_practice.get(lk, []))
         by_section[k] = summarize_memory(keys, retention)
+        # A separate axis beside coverage/retention — never averaged into either.
+        by_section[k]["fluency"] = summarize_fluency(pkeys, retention)
 
     all_keys = [key for keys in section_concepts.values() for key in keys]
     overall = summarize_memory(all_keys, retention)
+    overall["fluency"] = summarize_fluency(
+        [key for keys in section_practice.values() for key in keys], retention
+    )
 
     # The map's attention hook: studied sections with the weakest retention first.
     studied = [

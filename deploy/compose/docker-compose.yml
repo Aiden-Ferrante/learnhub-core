@@ -69,6 +69,11 @@ services:
       # timeouts and 0 concepts stored; gemma4 160s, 8 concepts, 0 errors. Extraction is
       # the only LLM workload left in the app, so this default is the one that matters.
       - LEARN_EXTRACT_MODEL=gemma4:latest
+      # Practice-item authoring (v0.19.0). Deliberately the BIG model, against the grain of
+      # the two lines above: the worked solution is what self-grading checks against, so it
+      # must be CORRECT, and authoring is a one-time background job where minutes are fine.
+      # The step-2 spike hand-verified nemotron's solutions; gemma is the fallback if too slow.
+      - LEARN_PRACTICE_MODEL=nemotron-3-nano:30b
       # PDF->Markdown converter: "docling" (higher fidelity) | "pymupdf" (lightweight fallback)
       - LEARN_CONVERTER=docling
       # Docling's torch/table/layout models run on the GB10 GPU (cu130 wheel in the image).

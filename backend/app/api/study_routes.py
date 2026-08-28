@@ -68,9 +68,11 @@ def api_review_queue(
     doc: str | None = Query(None),
     scope: str = Query(..., min_length=1),
     limit: int = Query(40, ge=1, le=200),
+    session: str = Query("concepts"),
 ) -> JSONResponse:
-    """Concepts to review now for one chapter/section scope (studying is chapter-scoped)."""
-    return JSONResponse(build_review_queue(doc, scope, limit))
+    """Concepts to review now for one chapter/section scope (studying is chapter-scoped).
+    ``session=practice`` returns the separate practice-item queue instead."""
+    return JSONResponse(build_review_queue(doc, scope, limit, session=session))
 
 
 @router.post("/api/review/grade")

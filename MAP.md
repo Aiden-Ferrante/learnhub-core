@@ -171,6 +171,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
 | [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
 | [`grounding.py`](backend/app/process/extraction/grounding.py) | Does a concept's `source_sentence` actually appear in its own section — the check the extraction gate only implies |
+| [`practice.py`](backend/app/process/extraction/practice.py) | Practice-item pool: per-section LLM authoring (retrieve + problem) with furniture-tell filtering + refusal receipts, `concept_filter` reads, regenerate-preserves-edits, CRUD |
 
 ### supplemental/study/ — learning state
 
@@ -221,6 +222,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`media_routes.py`](backend/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
 | [`process_routes.py`](backend/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
 | [`progress_routes.py`](backend/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
+| [`practice_routes.py`](backend/app/api/practice_routes.py) | Practice items: pool read, prepare enqueue + status poll, item CRUD (grading stays on /api/review/grade) |
 
 <!-- GEN:backend END -->
 

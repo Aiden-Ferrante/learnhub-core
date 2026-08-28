@@ -14,7 +14,7 @@ from typing import Any
 
 from app.gateways import db
 
-_TYPES = ("concept", "skeleton", "figure", "chapter")
+_TYPES = ("concept", "skeleton", "figure", "chapter", "practice")
 
 # Per-bucket cap on the ITEM list (counts stay exact). A day with more than this many
 # reviews sends the first slice plus ``itemsTruncated`` so the UI can say "+N more"

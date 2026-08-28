@@ -6,6 +6,18 @@ export type MemoryState = 'new' | 'solid' | 'shaky' | 'fading'
 
 /** One unit's memory summary: how much is touched (coverage) and how well it holds
  *  right now (mean FSRS retrievability over reviewed concepts; null = nothing reviewed). */
+/** PRODUCTION FLUENCY — the fourth measure ("can I use it?"), same FSRS engine over a
+ *  different denominator: the unit's worked-problem items (kind problem/code only).
+ *  A SEPARATE axis: never averaged into retention, and `unknown` (no items generated)
+ *  is a distinct state from a low score — render it as absence, never as 0%. */
+export type FluencySummary = {
+  items: number
+  attempted: number
+  /** Mean FSRS retrievability over attempted items; null when unknown/unattempted. */
+  fluency: number | null
+  state: 'unknown' | 'unattempted' | 'measured'
+}
+
 export type SectionMemory = {
   total: number
   reviewed: number
@@ -13,6 +25,7 @@ export type SectionMemory = {
   retention: number | null
   state: MemoryState
   fading: number
+  fluency?: FluencySummary
 }
 
 export type FadingSection = SectionMemory & {

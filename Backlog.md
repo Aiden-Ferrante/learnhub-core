@@ -19,6 +19,10 @@ not add to it mid-build.
   version namespace, and carry retros; the two spikes are the part worth not re-running.
   v0.20.0's *code* shipped regardless — the grounding check, its CI test and the encoding
   repair are in `main`, and aborting the cycle withdraws the version, not the work.
+  **Re-planned 2026-08-28** as a four-phase arc with widened scope (games, exams, code
+  runner — user decision): [[v0.19.0 — Practice items, the pool]] is built; v0.19.1
+  games → v0.19.2 exams → v0.19.3 sandbox runner are next. The spec carries the
+  amendments.
 - **Splitter findings D3–D6** (v0.18.0, 2026-08-26). Fenced code (D1) and setext headings
   (D2) were built because a real book exercised them — 11 of 12 books contain fenced code,
   and the splitter demonstrably turned a Python comment into a chapter. Nothing in the
@@ -46,7 +50,9 @@ not add to it mid-build.
   are different contracts, which is what makes this an ADR rather than a fix.
 - **Should a practice grade feed a progress signal of its own?** (2026-08-22, from
   `docs/practice-items-spec.md`.) The three-question model is coverage / retention / state;
-  production fluency would be a fourth. See the Competency chart node.
+  production fluency would be a fourth. See the Competency chart node. **Resolved in
+  v0.19.0**: yes, as its own number — `summarize_fluency` over `kind IN ('problem','code')`,
+  never averaged into retention, unknown ≠ zero, no solid/shaky adjectives.
 
 ## Carries forward
 

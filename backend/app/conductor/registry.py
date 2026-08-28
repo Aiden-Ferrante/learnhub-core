@@ -13,7 +13,7 @@ from app.process.content import resolve_doc_id
 from app.conductor.build import run_extract
 from app.conductor.ingest import run_convert
 from app.conductor.worker import ensure_worker, register_runner
-from app.process.extraction import author_guides_sync
+from app.process.extraction import author_guides_sync, author_practice_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
 from app.gateways import set_doc_resolver
 from app.supplemental.media import run_audiobook, warm_tts
@@ -27,6 +27,17 @@ def _latest_doc_id() -> str | None:
 
 def _run_guides(job: dict[str, Any], ctx) -> dict[str, Any]:
     return author_guides_sync(job["docId"], job["scope"], on_progress=ctx.progress)
+
+
+def _run_practice(job: dict[str, Any], ctx) -> dict[str, Any]:
+    return author_practice_sync(
+        job["docId"],
+        job["scope"],
+        on_progress=ctx.progress,
+        kinds=job.get("kinds") or None,
+        model=job.get("model") or None,
+        regenerate=bool(job.get("regenerate")),
+    )
 
 
 def _run_skeleton(job: dict[str, Any], ctx) -> dict[str, Any]:
@@ -43,6 +54,7 @@ def install() -> None:
     register_runner("build", run_extract)  # compat alias — deep overlay retired
     register_runner("extract", run_extract)
     register_runner("guides", _run_guides)
+    register_runner("practice", _run_practice)
     register_runner("skeleton", _run_skeleton)
     register_runner("orient", _run_orient)
     register_runner("audiobook", run_audiobook)

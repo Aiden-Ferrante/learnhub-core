@@ -7,8 +7,11 @@
  * **Material** is its words: the text of each block, fixed in the book or rewritten for
  * this course alone.
  *
- * They share one page because they are the same job seen from two distances, and because
- * restructuring usually reveals something that needs rewriting.
+ * **Practice** is its questions: the generated-then-polished item pool the practice
+ * session and exams draw from.
+ *
+ * They share one page because they are the same job seen from different distances, and
+ * because restructuring usually reveals something that needs rewriting.
  */
 
 import { useCallback, useEffect, useState } from "react"
@@ -19,6 +22,7 @@ import type { LearnTreeNode } from "@/gateways/api/outline"
 import type { OutlineSection } from "@/gateways/api/editing"
 import { MaterialEditor } from "@/surfaces/authoring/material-editor"
 import { OutlineEditor } from "@/surfaces/authoring/outline-editor"
+import { PracticeEditor } from "@/surfaces/authoring/practice-editor"
 
 type CourseEditorProps = {
   courseTitle: string
@@ -32,7 +36,7 @@ type CourseEditorProps = {
   onChanged: () => void
 }
 
-type Tab = "outline" | "material"
+type Tab = "outline" | "material" | "practice"
 
 export function CourseEditor({
   courseTitle,
@@ -85,7 +89,7 @@ export function CourseEditor({
           </p>
         </div>
         <div className="ml-auto flex gap-1">
-          {(["outline", "material"] as Tab[]).map((t) => (
+          {(["outline", "material", "practice"] as Tab[]).map((t) => (
             <Button
               key={t}
               type="button"
@@ -111,8 +115,10 @@ export function CourseEditor({
             onChanged()
           }}
         />
-      ) : (
+      ) : tab === "material" ? (
         <MaterialEditor docId={docId} tree={tree} loading={loading} />
+      ) : (
+        <PracticeEditor docId={docId} tree={tree} loading={loading} />
       )}
     </div>
   )

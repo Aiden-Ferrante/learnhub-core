@@ -19,10 +19,19 @@ export type ReviewCard = {
   pageEnd?: number | null
   /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
    *  seeded by the chapter walk's self-grades. 'chapter' = a chapter-resurface card
-   *  (recall what the chapter covered), seeded by reading. Absent/'concept' = a concept card. */
-  itemType?: 'concept' | 'skeleton' | 'chapter'
+   *  (recall what the chapter covered), seeded by reading. 'practice' = a practice-item
+   *  card from the separate practice session. Absent/'concept' = a concept card. */
+  itemType?: 'concept' | 'skeleton' | 'chapter' | 'practice'
   /** Skeleton/chapter cards only: the true structure snapshot for the reveal. */
   children?: { heading: string; essence?: string }[]
+  /** Practice cards only — the item's fields, read LIVE from the pool at queue time
+   *  (never snapshotted into the review row, so edits always show). */
+  practiceKey?: string
+  practiceKind?: 'retrieve' | 'problem' | 'mcq' | 'order' | 'code'
+  prompt?: string
+  answer?: string
+  rubric?: string | null
+  payload?: Record<string, unknown> | null
 }
 
 export type ReviewQueueResponse = {
@@ -48,9 +57,11 @@ export async function fetchReviewQueue(
   docId: string | undefined,
   scope: string,
   limit = 40,
+  session: 'concepts' | 'practice' = 'concepts',
 ): Promise<ReviewQueueResponse> {
   const params = new URLSearchParams({ scope, limit: String(limit) })
   if (docId) params.set('doc', docId)
+  if (session !== 'concepts') params.set('session', session)
   const res = await fetch(`/api/learn/review/queue?${params}`, { cache: 'no-store' })
   return parseJsonResponse<ReviewQueueResponse>(res)
 }
@@ -64,6 +75,23 @@ export async function submitReviewGrade(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
+  })
+  return parseJsonResponse<ReviewGradeResponse>(res)
+}
+
+// Seed-or-advance a PRACTICE item's spaced-repetition state. The practice session's
+// separate queue grades through this on every self-grade; the item key (not the review-row
+// key) addresses it, so first grades and re-grades are the same call. `doc` attributes the
+// study event to the VERSION being studied while the review row follows the book.
+export async function submitPracticeReviewGrade(
+  practiceKey: string,
+  grade: ReviewGrade,
+  docId?: string,
+): Promise<ReviewGradeResponse> {
+  const res = await fetch('/api/learn/review/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ practice: true, practiceKey, grade, doc: docId ?? null }),
   })
   return parseJsonResponse<ReviewGradeResponse>(res)
 }

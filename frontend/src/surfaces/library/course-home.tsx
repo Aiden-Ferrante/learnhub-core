@@ -6,6 +6,7 @@ import {
   BookMarked,
   BookOpen,
   ChevronLeft,
+  Dumbbell,
   Flame,
   GraduationCap,
   ListTree,
@@ -43,6 +44,8 @@ type CourseHomeProps = {
   onViewConcepts: () => void
   /** Course-level structure drill (chapters → sections → concepts). */
   onSkeletonPractice?: () => void
+  /** The practice session — work generated problems, self-graded on its own FSRS clock. */
+  onPractice?: () => void
   /** Edit the words this course is built from. */
   onEditMaterial?: () => void
   /** The courses cut from this book, and which one is open. Omitted = no picker. */
@@ -120,6 +123,7 @@ export function CourseHome({
   onDeepRead,
   onViewConcepts,
   onSkeletonPractice,
+  onPractice,
   onEditMaterial,
   bookKey,
   versions,
@@ -217,7 +221,7 @@ export function CourseHome({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
           <StatTile label="Sections" value={sectionsTotal} />
           <StatTile label="Concepts" value={conceptCount ?? "—"} />
           <StatTile
@@ -227,6 +231,18 @@ export function CourseHome({
           <StatTile
             label="Retention"
             value={overall?.retention != null ? `${Math.round(overall.retention * 100)}%` : "—"}
+          />
+          {/* The fourth measure — can you USE it? Unknown (no items) renders as absence,
+              never 0%: an absent measurement shown as a bad score is the lie the honesty
+              arc exists to kill. Raw number, no solid/shaky words — those thresholds are
+              calibrated for twenty-second cards, not worked problems. */}
+          <StatTile
+            label="Fluency"
+            value={
+              overall?.fluency?.fluency != null
+                ? `${Math.round(overall.fluency.fluency * 100)}%`
+                : "—"
+            }
           />
         </div>
 
@@ -456,6 +472,18 @@ export function CourseHome({
                 >
                   <ListTree className="h-3.5 w-3.5" />
                   Skeleton practice
+                </Button>
+              )}
+              {onPractice && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={onPractice}
+                >
+                  <Dumbbell className="h-3.5 w-3.5" />
+                  Practice
                 </Button>
               )}
               {onEditMaterial && (

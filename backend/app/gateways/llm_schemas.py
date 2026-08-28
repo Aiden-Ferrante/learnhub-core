@@ -53,6 +53,35 @@ class ReadingGuide(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# practice.py — the practice-item authors (one model per item kind's schema)
+# --------------------------------------------------------------------------- #
+
+
+class RetrieveItem(BaseModel):
+    """A knowledge-retrieval question with its model answer (kind='retrieve')."""
+
+    q: str
+    a: str
+
+
+class RetrieveSet(BaseModel):
+    questions: List[RetrieveItem]
+
+
+class ProblemItem(BaseModel):
+    """A worked problem (kind='problem'): task → worked solution → self-grade rubric.
+    Validated by the v0.19.0 step-2 spike (scripts/spike_problem_items.py)."""
+
+    prompt: str
+    answer: str
+    rubric: str
+
+
+class ProblemSet(BaseModel):
+    problems: List[ProblemItem]
+
+
+# --------------------------------------------------------------------------- #
 # skeleton.py — SKELETON_SCHEMA / ORIENT_SCHEMA
 # --------------------------------------------------------------------------- #
 

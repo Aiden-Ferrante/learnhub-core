@@ -7,6 +7,22 @@ commit.
 
 ## [Unreleased]
 
+### Added — v0.19.0 cycle: Practice items, the pool
+- **Generated practice items.** One `ext_practice` pool per book (kinds `retrieve` +
+  `problem`; `mcq`/`order`/`code` reserved for the next phases), authored per section by
+  the new ledgered `practice` job with furniture-tell filtering and a
+  `{authored, dropped, refused, total}` receipt. Requires the
+  `2026-08-28-practice-items.sql` migration (manual) and an image rebuild.
+- **Practice tab** in the course editor: generate → read → polish. Regeneration rewrites
+  only untouched items (`edited_at IS NULL`); an edited item is yours forever.
+- **A separate practice session** at `/courses/[id]/practice`: prompt → work → reveal
+  worked solution + rubric → 4-button self-grade, FSRS-scheduled as `prac-` items on the
+  same engine but never mixed into the concept queue.
+- **Production fluency** — the fourth measure ("can I use it?"): mean FSRS
+  retrievability over attempted worked problems, per section and overall, shown as a
+  fifth stat tile. Never averaged into retention; no items reads as unknown (—), never
+  0%; no solid/shaky adjectives.
+
 ## [0.17.0] — 2026-08-26
 
 Deleting a book now removes the book.

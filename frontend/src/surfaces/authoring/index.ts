@@ -7,6 +7,8 @@
  *  each save targeting either the BOOK (a fix every course cut from it inherits) or
  *  THIS course (copy-on-write). Editing invalidates what was extracted from the
  *  text, so the editor also surfaces which chapters are waiting on a rebuild.
- *  Depends on: gateways/, kit/. */
+ *  PRACTICE: the generated-then-polished item pool — regeneration rewrites only
+ *  untouched items, so polish is permanent.
+ *  Depends on: reading (the one markdown renderer), gateways/, kit/. */
 
 export { CourseEditor } from "@/surfaces/authoring/course-editor"

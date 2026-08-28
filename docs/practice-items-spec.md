@@ -1,8 +1,15 @@
-# Practice items — design note (2026-08-22)
+# Practice items — design note (2026-08-22, amended 2026-08-28)
 
-**Status: design settled, nothing built.** Decisions taken this session: one item pool,
-self-graded verification only, FSRS-scheduled in its own session. One question left open
-at the bottom.
+**Status: Phase 1 built (v0.19.0).** Decisions taken 2026-08-22: one item pool,
+self-graded verification only, FSRS-scheduled in its own session.
+
+**Amended 2026-08-28 (user decision, re-planning the aborted cycle):** the scope grew —
+MCQ, step-ordering, and Match-style games are IN (as *drill-only activities*), a local
+sandbox code runner is IN (kind `code`, executed against tests), and exams get a stored
+sitting. The 2026-08-22 non-goals section below is rewritten accordingly; what survives
+unchanged: **no LLM in the graded loop**, fixed pool + regenerate (no generate-on-demand),
+and no auto-grading of open answers. Delivery is phased: v0.19.0 the pool (retrieve +
+problem, built) → v0.19.1 games → v0.19.2 exams → v0.19.3 the code runner.
 
 Goal: quizzes, exams, and practice problems — in two categories the user named.
 **(1) Knowledge retrieval**: concepts, definitions, summaries. **(2) Problems**: derive
@@ -61,14 +68,26 @@ ext_practice
   doc_id       text NOT NULL REFERENCES sources(key) ON DELETE CASCADE
   structure_id text REFERENCES raw_structure(id) ON DELETE CASCADE
   section_key  text
-  kind         text                      -- 'retrieve' | 'problem'
+  kind         text                      -- 'retrieve'|'problem'|'mcq'|'order'|'code'
   prompt       text                      -- the question / task
   answer       text                      -- the worked solution, markdown
   rubric       text                      -- optional: what a good answer must contain
+  payload      jsonb                     -- per-kind check data (2026-08-28); NULL for retrieve/problem
   "order"      int
   created_at   timestamptz
   edited_at    timestamptz               -- NULL = generated, untouched, regenerable
 ```
+
+**`kind` stays the how-the-answer-is-checked axis and grows values** (2026-08-28): `mcq`
+(choice-checked, `payload {"choices":[...],"answerIndex":0}` — stored with the correct
+answer first, shuffled at render, distractors authored at generation time never play
+time), `order` (sequence-checked, `payload {"steps":[...]}` in correct order), `code`
+(executed against tests, `payload {"language","starter","tests":[...],"timeoutMs"}`).
+These are rows 2–4 of the table above finally being built. **`payload` over per-mode
+columns**: authoring, editing, regeneration, assembly and `concept_filter` reads are
+identical for all five kinds — nullable per-mode columns would each be NULL for 4 of 5
+kinds and cost a migration per future mode; only the kind's own player reads its payload
+(precedent: `chapter_builds.payload`).
 
 Modelled on `ext_concepts` (`01-schema.sql:193-204`) and `ext_guides`.
 
@@ -107,6 +126,14 @@ concepts (name + signal + source sentence); problem items are grounded in the se
 markdown, because a concept row is too thin to derive a task from. Both must refuse rather
 than invent — the `LEARN_REQUIRE_SOURCE` gate in `parse_concepts_response`
 (`concepts_extract.py:151-185`) is the precedent for dropping ungrounded output.
+
+**Prompt hardening + deterministic post-filter (2026-08-28, from the spike findings).**
+Both observed failure modes are the same shape — a reference to the book's FURNITURE
+("According to the text…", "as shown in step 3 of Table 2-1") instead of its subject —
+so the prompts ban the construction explicitly AND `practice.py` drops any prompt matching
+the `_FURNITURE_TELLS` regexes as a backstop. Refusal (an empty list) is treated as
+success. The job receipt is `{authored, dropped, refused, total}` so prompt drift is
+visible in the Process tab rather than silently truncated.
 
 **Model:** `gemma4` is sufficient for prose retrieval questions (measured 2026-08-20).
 Problems may want more; add `LEARN_PRACTICE_MODEL` following the
@@ -180,11 +207,32 @@ v1 stores none of them; all three are queries. **Exam is the one that may later 
 stored row** (a fixed set you sit twice and compare), and that is the only reason to
 revisit this.
 
-## Explicitly out of scope
+**Revisited 2026-08-28 — the escape hatch is invoked.** Comprehensive per-chapter and
+multi-chapter exams (v0.19.2) store a SITTING (`exam_sessions`): the item set must freeze
+at start (a mid-exam regeneration must not shift it), answers must survive a reload, and
+resit comparison needs two persisted rows. Quiz and per-section practice remain queries.
+Every exam grade writes through the same `prac-` engine (`event_kind="exam"`), so exams
+feed production fluency through one deterministic path.
 
-No code execution. No step ordering. No MCQ. No auto-grading, and **no LLM in the graded
-loop** — `reviews.py:1` declares itself keyless and deterministic, and that property is
-worth keeping. Generation is LLM; doing is not.
+## Scope boundary (rewritten 2026-08-28)
+
+The 2026-08-22 exclusions (no MCQ, no step ordering, no code execution) were REOPENED by
+user decision on 2026-08-28 — all three are in scope, phased. What still holds, and is
+non-negotiable:
+
+- **No LLM in the graded loop** — `reviews.py:1` declares itself keyless and
+  deterministic, and that property is kept. Generation is LLM; doing is not. The code
+  runner (v0.19.3) is likewise never on the grading critical path: execution results
+  *inform* a self-grade in the session, and an exam's code item degrades to self-graded
+  when the runner is down.
+- **Fixed pool + regenerate**, not generate-on-demand: a curated per-section set;
+  regeneration replaces only `edited_at IS NULL` rows.
+- **No auto-grading of open answers**, and MCQ distractors are authored and stored —
+  never generated at play time.
+- **Games are activities, not measures** (Match / MCQ play / step-ordering play):
+  drill-only, they write engagement events (`kind='game'`) and never touch
+  `concept_reviews`. The measures are production fluency and exam scores — both flow
+  through the one deterministic `prac-` engine. An activity is not a measure.
 
 ## Sequencing
 
@@ -226,9 +274,11 @@ drawn from `ext_concepts`.
 
 So production fluency is that same call with a different key list:
 
-- **denominator** — the section's `ext_practice` rows `WHERE kind = 'problem'`, read
-  through `concept_filter()`, mirroring `_concepts_by_section` exactly (which is also what
-  makes it inherit correctly across a re-cut version)
+- **denominator** — the section's `ext_practice` rows `WHERE kind IN ('problem','code')`,
+  read through `concept_filter()`, mirroring `_concepts_by_section` exactly (which is also
+  what makes it inherit correctly across a re-cut version). MCQ/order/retrieve are
+  deliberately EXCLUDED: they are recognition, and counting them is the Competency
+  falsifier ("recall wearing a problem's clothes") firing inside the measure itself
 - **numerator** — those of them with a `prac-` review row
 - **fluency** — mean FSRS retrievability over the attempted ones, the same engine as
   retention, so "fading" means one thing in both places
@@ -261,3 +311,26 @@ list next to `_concepts_by_section`. The falsifier on the Competency node is the
 watch — *every practice item is answerable by restating a concept's definition* — because a
 fluency number computed over recall-in-disguise items is worse than no number at all: it
 would report production skill the pool never tested.
+
+## The sandbox runner (v0.19.3 — designed 2026-08-28, not yet built)
+
+`code` items are the one kind whose check executes. The runner is a **separate compose
+service** (`deploy/services/runner/`), not in-process — the `learn` container holds the
+GPU, docling, and the DB DSN, so a sandbox escape there lands in the most privileged
+place; a tiny FastAPI service costs one Dockerfile and ~150 lines.
+
+- **API**: `POST /run {language, code, tests[], timeoutMs}` →
+  `{ok, results[{name,passed,error}], stdout, stderr, timedOut, oom}`; `GET /healthz`.
+- **Adapter per language** (`prepare(workdir, code, tests) -> argv`); Python first.
+- **Per-execution**: fresh tmpfs workdir, `python -I`, empty env, rlimits (CPU, AS 512MB,
+  FSIZE, NOFILE, NPROC), wall-clock 2× CPU with killpg, output capped 64KB.
+- **Container posture**: `read_only` rootfs, unprivileged user, `cap_drop: ALL`,
+  `no-new-privileges`, `pids_limit`, `mem_limit`, and a dedicated `internal: true`
+  network — submitted code has NO route to the internet; only `learn` can reach it.
+- **Determinism boundary**: `reviews.py`/`grade_review` never import the runner. Session:
+  per-test results inform the 1–4 self-grade. Exam: the objective score is the server-side
+  re-run on submit; runner down → the item degrades to self-graded and the exam completes.
+- **Authoring-time quality gate**: generation runs each candidate solution against its own
+  tests and DISCARDS failures (receipt `execFailed`) — the automated analogue of the
+  spike's hand-checked truth table; a plausible problem with a wrong solution is worse
+  than none.

@@ -34,6 +34,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onDeepRead={() => openChapter(data.continueSectionKey ?? null)}
         onViewConcepts={() => router.push(`/courses/${courseId}/concepts`)}
         onSkeletonPractice={() => router.push(`/courses/${courseId}/skeleton`)}
+        onPractice={() => router.push(`/courses/${courseId}/practice`)}
         onEditMaterial={() => router.push(`/courses/${courseId}/edit`)}
         bookKey={data.bookKey}
         versions={data.versions}

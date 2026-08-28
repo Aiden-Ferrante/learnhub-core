@@ -20,12 +20,26 @@ from app.process.extraction.concepts_extract import extract_concepts_document, r
 from app.process.extraction.grounding import classify_grounding, summarize_grounding
 from app.process.extraction.guided_reading import fetch_guided_reading
 from app.process.extraction.eval_gate import eval_enabled, evaluate_extraction_sample
+from app.process.extraction.practice import (
+    author_practice_sync,
+    create_item,
+    delete_item,
+    fetch_practice,
+    practice_status,
+    update_item,
+)
 from app.process.extraction.reading_guide import author_guides_sync, fetch_reading_guide, guide_status
 from app.process.extraction.skeleton import fetch_orient, fetch_skeleton, get_chapter_progress, record_skeleton_grade, refresh_orient, refresh_skeleton, update_stage
 
 __all__ = [
     "author_guides_sync",
+    "author_practice_sync",
     "concept_count",
+    "create_item",
+    "delete_item",
+    "fetch_practice",
+    "practice_status",
+    "update_item",
     "concept_counts_by_doc",
     "delete_concept",
     "eval_enabled",
