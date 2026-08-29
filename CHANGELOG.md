@@ -7,6 +7,29 @@ commit.
 
 ## [Unreleased]
 
+## [0.19.1] — 2026-08-29
+
+A prompt you can work.
+
+### Fixed
+- **Practice prompts that pointed at material they never carried.** Items read
+  "translate the quoted sentence" with no quoted sentence anywhere — unanswerable,
+  and self-grading had nothing to grade against. Authoring now requires the item to
+  carry every input it acts on, and a deixis filter drops pointer phrases. Regenerate
+  a chapter to replace affected items (edited items are kept, as always).
+- **Prompts that were passages with nothing asked of them** — the first cut of the
+  fix above overshot and made the model quote instead of ask. A prompt must now
+  contain a question or an imperative; drops are counted in the job receipt.
+
+### Changed
+- **The practice session is a paper, not a deck.** Every question sits in a numbered
+  navigator you can jump around in, coloured by grade; grading advances to the next
+  *ungraded* question. The chapter is a picker now that the left column belongs to
+  the questions.
+- **Practice text is reading-sized.** Prompts and worked solutions render through the
+  reader's own renderer at the reader's prose size (16–20px), with the shared reading
+  controls in the session header, instead of the chrome's 15px admin scale.
+
 ### Added — v0.19.0 cycle: Practice items, the pool
 - **Generated practice items.** One `ext_practice` pool per book (kinds `retrieve` +
   `problem`; `mcq`/`order`/`code` reserved for the next phases), authored per section by
