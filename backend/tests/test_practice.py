@@ -51,6 +51,50 @@ def test_filter_catches_deixis_pointing_at_material_the_prompt_lacks():
     assert practice._has_furniture("Rewrite the query shown earlier using a join.")
 
 
+def test_deixis_filter_covers_this_as_well_as_the_and_that():
+    # Regression: the first cut of the pattern listed only `the|that`, so this one shipped.
+    assert practice._has_furniture("Into what logical components does this quoted sentence break down?")
+
+
+def test_a_bare_quotation_is_not_an_item():
+    # The self-containment instruction, first phrased as "QUOTE IT IN FULL", made the model
+    # emit passages with nothing asked of them. A prompt must ask for something.
+    assert not practice._has_task(
+        '"membership takes a value in [0, 1] rather than {0, 1}, and the connectives '
+        'become min, max and 1 − x".'
+    )
+    assert not practice._has_task(
+        '"Every raven is black" is not a report of experience — nobody has met every raven.'
+    )
+
+
+def test_a_quote_plus_an_instruction_is_an_item():
+    assert practice._has_task(
+        '"A formal logic is a triple: a language, a semantics, a proof system." Using only '
+        "this information, construct a concrete formal logic for set membership."
+    )
+    assert practice._has_task("What does Soundness guarantee about a logical system?")
+    assert practice._has_task("Derive the contrapositive and show the two are equivalent.")
+
+
+def test_authoring_drops_items_that_ask_nothing(monkeypatch):
+    monkeypatch.setattr(
+        practice,
+        "ollama_structured_completion",
+        _stub_completion(
+            {
+                "problems": [
+                    {"prompt": '"A quoted passage with no task."', "answer": "…", "rubric": "r"},
+                    {"prompt": "Derive X from Y.", "answer": "Step 1 …", "rubric": "r"},
+                ]
+            }
+        ),
+    )
+    kept, dropped = practice._author_section("problem", "H", "text", "", None)
+    assert [k["prompt"] for k in kept] == ["Derive X from Y."]
+    assert dropped == 1
+
+
 def test_self_contained_prompts_that_carry_their_own_quote_pass():
     # The fix is inlining the material, not avoiding quotation — a prompt that carries its
     # subject must survive the filter.

@@ -69,10 +69,29 @@ _FURNITURE_TELLS = [
 _REFERENT_NOUN = r"(sentence|claim|statement|formula|expression|equation|query|snippet|code|passage|quote|example|definition|theorem|rule|argument)"
 
 _DEIXIS_TELLS = [
-    re.compile(rf"\b(the|that) (quoted|original|above|preceding|foregoing|aforementioned) \w*\s*{_REFERENT_NOUN}s?\b", re.I),
+    re.compile(rf"\b(the|this|that) (quoted|original|above|preceding|foregoing|aforementioned) \w*\s*{_REFERENT_NOUN}s?\b", re.I),
     re.compile(rf"\bthe {_REFERENT_NOUN} (quoted|shown|given|cited|mentioned|discussed) (above|earlier|previously)\b", re.I),
-    re.compile(r"\b(the|this) (quoted|original) (one|text)\b", re.I),
+    re.compile(r"\b(the|this|that) (quoted|original) (one|text)\b", re.I),
 ]
+
+# An item is a TASK. The first attempt at the self-containment instruction below made the
+# model emit bare quotations as prompts — material with nothing asked of it — so the
+# quote requirement needs a floor under it: every prompt must ask for something. A question
+# mark or an imperative verb is that floor, and virtually every real prompt has one, which
+# is what makes this cheap to check and safe to enforce.
+_TASK_VERBS = (
+    "write|state|give|name|list|identify|explain|describe|justify|argue|show|prove|derive|"
+    "compute|calculate|evaluate|simplify|solve|find|determine|decide|classify|compare|"
+    "contrast|construct|build|design|draw|sketch|rewrite|translate|formalize|formalise|"
+    "convert|express|apply|use|using|assign|choose|select|pick|order|arrange|complete|"
+    "fill|verify|check|test|predict|estimate|count|suppose|assume|consider|take|let"
+)
+_TASK_SIGNAL = re.compile(rf"(\?|^\s*(?:\d+[.)]\s*)?({_TASK_VERBS})\b|\b({_TASK_VERBS})\b)", re.I | re.M)
+
+
+def _has_task(prompt: str) -> bool:
+    """Whether the prompt actually asks for something, rather than merely presenting text."""
+    return bool(_TASK_SIGNAL.search(prompt or ""))
 
 _FURNITURE_BAN = (
     "NEVER reference the book itself or its apparatus: no 'according to the text', no "
@@ -81,10 +100,13 @@ _FURNITURE_BAN = (
     "had studied the material and lost the book.\n"
     "The item must be SELF-CONTAINED. The learner sees your prompt and NOTHING else — not "
     "the section, not the surrounding items. Whenever the task acts on a specific sentence, "
-    "claim, formula, query, snippet or dataset, QUOTE IT IN FULL inside the prompt. Never "
+    "claim, formula, query, snippet or dataset, quote it in full inside the prompt. Never "
     "write 'the quoted sentence', 'the original claim', 'the statement above' or any other "
     "pointer to material the prompt does not itself contain: a prompt with a hole where its "
     "subject should be cannot be worked at all.\n"
+    "But the prompt is a TASK, never a passage. Quoted material SUPPORTS an instruction and "
+    "never replaces it: every prompt must ask the learner to do something or answer "
+    "something. A prompt that is only a quotation, with nothing asked of it, is not an item.\n"
 )
 
 RETRIEVE_SYSTEM = (
@@ -195,7 +217,9 @@ def _author_section(
         rubric = repair_model_text(it.get("rubric")).strip() or None
         if not prompt or not answer:
             continue
-        if _has_furniture(prompt):
+        # Two ways an item fails to be workable, both counted as drops so the receipt
+        # shows them: it points outside itself, or it asks nothing at all.
+        if _has_furniture(prompt) or not _has_task(prompt):
             dropped += 1
             continue
         kept.append({"kind": kind, "prompt": prompt, "answer": answer, "rubric": rubric})
