@@ -35,6 +35,36 @@ def test_furniture_filter_catches_both_spike_tells():
     )
 
 
+def test_filter_catches_deixis_pointing_at_material_the_prompt_lacks():
+    # Found on the first PRODUCTION run (2026-08-29): the prompt names no book noun, so the
+    # furniture patterns miss it, but the task acts on a quote the item never carries — the
+    # learner is shown a prompt with a hole where its subject should be.
+    assert practice._has_furniture(
+        "Write the symbolic logical formula that captures the meaning of the quoted "
+        "sentence using quantifiers and appropriate variables."
+    )
+    assert practice._has_furniture(
+        'Determine whether the statement "There exists a single network…" is logically '
+        "equivalent to the original sentence."
+    )
+    assert practice._has_furniture("Simplify the expression given above.")
+    assert practice._has_furniture("Rewrite the query shown earlier using a join.")
+
+
+def test_self_contained_prompts_that_carry_their_own_quote_pass():
+    # The fix is inlining the material, not avoiding quotation — a prompt that carries its
+    # subject must survive the filter.
+    assert not practice._has_furniture(
+        'Formalize this claim with quantifiers, naming each domain: "For every continuous '
+        'function f on a compact set K and every ε > 0, there is a one-hidden-layer network '
+        'N with sup|f − N| < ε."'
+    )
+    assert not practice._has_furniture(
+        "Rewrite `SELECT * FROM a UNION SELECT * FROM b` using UNION ALL and say how the "
+        "row count changes."
+    )
+
+
 def test_furniture_filter_passes_subject_questions():
     assert not practice._has_furniture(
         "Construct a complete truth table for (P → Q) ↔ (¬Q → ¬P)."

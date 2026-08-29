@@ -10,6 +10,7 @@ export { GuidedReading } from "@/surfaces/reading/guided-reading"
 export { PdfBookView } from "@/surfaces/reading/pdf-book-view"
 export { ReadingThemeToggle } from "@/surfaces/reading/reading-theme-toggle"
 export { MathText, MarkdownReader } from "@/surfaces/reading/markdown-reader"
+export { ReadingControls } from "@/surfaces/reading/reading-controls"
 // The reading theme + prose prefs travel with the renderer: anything that wants to show
 // text the way the learner will actually read it needs all three, or it is a lookalike.
 export { useReadingTheme, type ReadingTheme } from "@/surfaces/reading/use-reading-theme"

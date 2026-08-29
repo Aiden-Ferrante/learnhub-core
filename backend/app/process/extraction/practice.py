@@ -61,11 +61,30 @@ _FURNITURE_TELLS = [
     re.compile(r"\bsections?\s+\d", re.I),
 ]
 
+# The second failure family, found on the first production run: DEIXIS — the item points
+# at material it does not carry ("translate the quoted sentence", "…equivalent to the
+# original sentence"). The furniture ban does not catch these because they name no book
+# noun, but the effect is worse: the task is unanswerable without the book open, and the
+# learner is shown a prompt with a hole where its subject should be.
+_REFERENT_NOUN = r"(sentence|claim|statement|formula|expression|equation|query|snippet|code|passage|quote|example|definition|theorem|rule|argument)"
+
+_DEIXIS_TELLS = [
+    re.compile(rf"\b(the|that) (quoted|original|above|preceding|foregoing|aforementioned) \w*\s*{_REFERENT_NOUN}s?\b", re.I),
+    re.compile(rf"\bthe {_REFERENT_NOUN} (quoted|shown|given|cited|mentioned|discussed) (above|earlier|previously)\b", re.I),
+    re.compile(r"\b(the|this) (quoted|original) (one|text)\b", re.I),
+]
+
 _FURNITURE_BAN = (
     "NEVER reference the book itself or its apparatus: no 'according to the text', no "
     "'in this section', no 'the author', and no references to numbered tables, figures, "
     "steps, or listings ('Table 2-1', 'step 3'). Ask about the SUBJECT, as if the learner "
     "had studied the material and lost the book.\n"
+    "The item must be SELF-CONTAINED. The learner sees your prompt and NOTHING else — not "
+    "the section, not the surrounding items. Whenever the task acts on a specific sentence, "
+    "claim, formula, query, snippet or dataset, QUOTE IT IN FULL inside the prompt. Never "
+    "write 'the quoted sentence', 'the original claim', 'the statement above' or any other "
+    "pointer to material the prompt does not itself contain: a prompt with a hole where its "
+    "subject should be cannot be worked at all.\n"
 )
 
 RETRIEVE_SYSTEM = (
@@ -92,7 +111,9 @@ PROBLEM_SYSTEM = (
     "a claim holds and justify it, or carry out a procedure step by step.\n\n"
     "For each problem give:\n"
     "- prompt: the task. It must have a specific, checkable target — not 'discuss' or "
-    "'explain the importance of'. Include any concrete inputs the learner needs.\n"
+    "'explain the importance of'. It must carry, in full, every input the learner works "
+    "on: if the task is to formalize a claim, the claim's words go in the prompt; if it "
+    "is to rewrite a query, the query goes in the prompt.\n"
     "- answer: the WORKED SOLUTION, showing the steps, not just the final result. This is "
     "what the learner compares their own work against.\n"
     "- rubric: one sentence naming what a correct answer must contain, so a learner can "
@@ -117,7 +138,10 @@ def _author_model(override: str | None = None) -> str | None:
 
 
 def _has_furniture(text: str) -> bool:
-    return any(rx.search(text or "") for rx in _FURNITURE_TELLS)
+    """Whether a prompt points outside itself — at the book's apparatus, or at material it
+    never carries. Either way the learner cannot work it from the prompt alone."""
+    text = text or ""
+    return any(rx.search(text) for rx in _FURNITURE_TELLS + _DEIXIS_TELLS)
 
 
 def _section_concept_lines(src: str, section_key: str) -> str:
