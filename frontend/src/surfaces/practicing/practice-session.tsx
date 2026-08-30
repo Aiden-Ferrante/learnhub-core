@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Dumbbell, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dumbbell, Grid3x3, Loader2 } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import {
@@ -29,7 +29,16 @@ import {
 } from "@/gateways/api/review"
 import { GRADES } from "@/surfaces/studying"
 import { useStudyHotkeys } from "@/surfaces/studying"
+import { MatchGame } from "@/surfaces/practicing/match-game"
 import { cn } from "@/kit/lib/utils"
+
+/** The surface's modes. Session is graded and scheduled; Match is drill only. */
+type Mode = "session" | "match"
+
+const MODES = [
+  { value: "session" as const, label: "Session", icon: Dumbbell },
+  { value: "match" as const, label: "Match", icon: Grid3x3 },
+]
 
 /** The practice session — work a problem, reveal the worked solution, grade yourself.
  *
@@ -66,11 +75,17 @@ export function PracticeSession({
 }) {
   const chapters = useMemo(() => tree.filter((n) => n.sectionKey), [tree])
   const [scope, setScope] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>("session")
   const [prefs, setPrefs] = useReadingPrefs()
   const [theme] = useReadingTheme()
 
   useEffect(() => {
     if (!scope && chapters.length) setScope(chapters[0].sectionKey)
+  }, [chapters, scope])
+
+  const chapterLabel = useMemo(() => {
+    const c = chapters.find((n) => n.sectionKey === scope)
+    return c ? displaySectionTitle(c.label, c.title) : undefined
   }, [chapters, scope])
 
   return (
@@ -85,11 +100,32 @@ export function PracticeSession({
             <Dumbbell className="h-4 w-4 shrink-0 text-brand" />
             {courseTitle}
           </h1>
-          <p className="text-xs text-muted-foreground">Practice — work it, then grade yourself</p>
+          <p className="text-xs text-muted-foreground">
+            {mode === "session"
+              ? "Practice — work it, then grade yourself"
+              : "Match — pair the terms, race your own clock"}
+          </p>
         </div>
         {/* The chapter is a picker, not a rail: the left column belongs to the questions. */}
         <div className="ml-auto flex items-center gap-2">
-          <ReadingControls prefs={prefs} onChange={setPrefs} />
+          {/* Modes on ONE surface. `99e4279` deleted seven study modules for being too
+              many activities; this arc adds modes, not nav tabs. */}
+          <div className="flex gap-1">
+            {MODES.map((m) => (
+              <Button
+                key={m.value}
+                type="button"
+                variant={mode === m.value ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 gap-1.5 px-2 text-xs"
+                onClick={() => setMode(m.value)}
+              >
+                <m.icon className="h-3.5 w-3.5" />
+                {m.label}
+              </Button>
+            ))}
+          </div>
+          {mode === "session" && <ReadingControls prefs={prefs} onChange={setPrefs} />}
           <div className="w-64">
             {loading && !chapters.length ? (
               <Skeleton className="h-9 w-full" />
@@ -111,7 +147,9 @@ export function PracticeSession({
         </div>
       </div>
 
-      {scope ? (
+      {!scope ? (
+        <p className="p-6 text-sm text-muted-foreground">Pick a chapter to practise.</p>
+      ) : mode === "session" ? (
         <PracticeRun
           key={scope}
           scope={scope}
@@ -121,7 +159,7 @@ export function PracticeSession({
           prefs={prefs}
         />
       ) : (
-        <p className="p-6 text-sm text-muted-foreground">Pick a chapter to practise.</p>
+        <MatchGame key={scope} scope={scope} docId={docId} chapterLabel={chapterLabel} />
       )}
     </div>
   )

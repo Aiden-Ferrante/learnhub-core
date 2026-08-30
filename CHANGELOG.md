@@ -7,6 +7,26 @@ commit.
 
 ## [Unreleased]
 
+## [0.19.2] — 2026-08-30
+
+Match — something to open on a day nothing is due.
+
+### Added
+- **Match**, a mode in the Practice surface: six concepts from the chapter dealt as
+  twelve tiles, pair them against your own clock, best time kept per chapter. It
+  reads the concepts you already have — no generation, no setup — and is **drill
+  only**: a round writes one activity event and cannot touch your review schedule.
+- Definitions hide the concept's own name, so a pair is never solvable by matching
+  strings (34% of this library's definitions contain their own term).
+
+### Fixed
+- **A blink in the documents list no longer wipes what you were doing.** A transient
+  failure of that fetch emptied the course and unmounted every course page's contents
+  mid-activity — losing a revealed review card, or a whole timed round. The last good
+  course is now kept for the life of the page.
+- Concept definitions with LaTeX rendered as raw TeX in the new tiles; they render as
+  math now.
+
 ## [0.19.1] — 2026-08-29
 
 A prompt you can work.

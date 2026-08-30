@@ -60,10 +60,25 @@ export function useCourseData(courseId: string) {
   // practice all read `course.learnDocId`, so overriding it here is what makes them follow a
   // switch — rather than teaching each one about versions and missing some. `bookKey` stays
   // available for the few things that are genuinely about the book, like the version list.
-  const course = useMemo<Course | null>(
+  const live = useMemo<Course | null>(
     () => (card ? { ...card, learnDocId: docKey ?? card.learnDocId } : null),
     [card, docKey],
   )
+
+  // A course, once found, STAYS found for this mount.
+  //
+  // `card` is derived from the shared documents list, and a transient failure of that
+  // fetch (a 401 on a stale session, a blip) empties it — which turned `course` null,
+  // dropped every course page to its CourseFallback, and UNMOUNTED whatever you were
+  // doing. Losing a revealed card is irritating; losing a timed Match round mid-game
+  // makes the game unplayable, which is how this was found. The last good course is kept
+  // and re-served, so a blink in the documents list can no longer destroy study state.
+  // Navigating to another course remounts the hook, so this cannot serve a stale book.
+  const lastGood = useRef<Course | null>(null)
+  useEffect(() => {
+    if (live) lastGood.current = live
+  }, [live])
+  const course = live ?? lastGood.current
 
   const [tree, setTree] = useState<LearnTreeNode[]>([])
   const [sectionCount, setSectionCount] = useState(0)
