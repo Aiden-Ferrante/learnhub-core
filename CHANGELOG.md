@@ -7,6 +7,26 @@ commit.
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-08-30
+
+Sit the exam.
+
+### Added
+- **Exams**, a third mode in the Practice surface. Pick chapters, get a paper drawn
+  across them, and **answer every question before you can see any worked solution** —
+  the practice session reveals on demand, which is right for practice and useless as
+  an audit. Submit, then mark each answer against its solution and rubric.
+- **A sitting is stored, not queried.** Its questions freeze when you start, so
+  regenerating a chapter mid-exam cannot change the paper under you, answers survive
+  a closed tab, and **you can sit the same paper again** and see the two scores
+  compared.
+- **Results say which chapter let you down** — a per-section breakdown, worst first.
+  Sections you have not marked read "—", never "0".
+- Exam marks feed the same schedule and the same production-fluency number as
+  practice, and are tagged separately on the activity heatmap. They move neither
+  coverage nor retention.
+- Requires the `2026-08-30-exam-sessions.sql` migration (manual) and an image rebuild.
+
 ## [0.19.2] — 2026-08-30
 
 Match — something to open on a day nothing is due.

@@ -1,6 +1,9 @@
-"""Practice routes: the item pool — generated practice items, their authoring job,
-and curation writes. Grading stays on /api/review/grade (study_routes); this file is
-creation and reading only."""
+"""Practice routes: the item pool — generated practice items, their authoring job and
+curation writes — plus EXAM sittings, the one assembly over that pool which stores a row.
+
+Practice grading stays on /api/review/grade (study_routes). An exam's self-grades go
+through /api/exams/{key}/grade, which routes to the same engine and only tags the study
+event differently."""
 
 from __future__ import annotations
 
@@ -14,6 +17,16 @@ from app.process.extraction import (
     fetch_practice,
     practice_status,
     update_item,
+)
+from app.supplemental.study import (
+    create_exam,
+    exam_results,
+    fetch_exam,
+    finish_exam,
+    grade_answer,
+    list_exams,
+    resit,
+    save_answer,
 )
 
 router = APIRouter()
@@ -83,3 +96,83 @@ def api_practice_update(key: str, body: dict = Body(...)) -> JSONResponse:
 def api_practice_delete(key: str) -> JSONResponse:
     data = delete_item(key)
     return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
+
+
+# ── Exams: a frozen sitting over the pool ───────────────────────────────────
+
+
+def _envelope(data: dict) -> JSONResponse:
+    """Domain functions return {error, status} on failure; routers only shape it."""
+    if data.get("error"):
+        return JSONResponse(data, status_code=data.pop("status", 400))
+    return JSONResponse(data)
+
+
+@router.get("/api/exams")
+def api_exams(doc: str | None = Query(None)) -> JSONResponse:
+    """Past and open sittings for a course, newest first."""
+    return JSONResponse(list_exams(doc))
+
+
+@router.post("/api/exams")
+def api_create_exam(body: dict = Body(...)) -> JSONResponse:
+    """Assemble and FREEZE a sitting: {doc, chapters: [...], perChapter?, kinds?}."""
+    body = body or {}
+    chapters = body.get("chapters")
+    if not isinstance(chapters, list) or not chapters:
+        return JSONResponse({"error": "chapters must be a non-empty list"}, status_code=400)
+    try:
+        per = int(body.get("perChapter") or 5)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "perChapter must be a number"}, status_code=400)
+    kinds = body.get("kinds") if isinstance(body.get("kinds"), list) else None
+    return _envelope(create_exam(body.get("doc"), [str(c) for c in chapters], per, kinds))
+
+
+@router.get("/api/exams/{key}")
+def api_exam(key: str) -> JSONResponse:
+    """One sitting with its frozen questions — how a reload resumes mid-paper."""
+    return _envelope(fetch_exam(key))
+
+
+@router.post("/api/exams/{key}/answer")
+def api_exam_answer(key: str, body: dict = Body(...)) -> JSONResponse:
+    """Record one written answer: {itemKey, response}. Saved per answer, so a closed tab
+    costs nothing."""
+    body = body or {}
+    item_key = str(body.get("itemKey") or "").strip()
+    if not item_key:
+        return JSONResponse({"error": "itemKey required"}, status_code=400)
+    return _envelope(save_answer(key, item_key, str(body.get("response") or "")))
+
+
+@router.post("/api/exams/{key}/finish")
+def api_exam_finish(key: str) -> JSONResponse:
+    """Close the paper. Answers stop being editable; grading begins."""
+    return _envelope(finish_exam(key))
+
+
+@router.post("/api/exams/{key}/grade")
+def api_exam_grade(key: str, body: dict = Body(...)) -> JSONResponse:
+    """Self-grade one answer (1-4) on the results walk — same engine as practice."""
+    body = body or {}
+    item_key = str(body.get("itemKey") or "").strip()
+    try:
+        grade = int(body.get("grade"))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "grade must be 1-4"}, status_code=400)
+    if not item_key or grade < 1 or grade > 4:
+        return JSONResponse({"error": "itemKey and grade (1-4) are required"}, status_code=400)
+    return _envelope(grade_answer(key, item_key, grade, doc=body.get("doc")))
+
+
+@router.get("/api/exams/{key}/results")
+def api_exam_results(key: str) -> JSONResponse:
+    """Score, per-section and per-kind breakdown, and the prior sitting when this is a resit."""
+    return _envelope(exam_results(key))
+
+
+@router.post("/api/exams/{key}/resit")
+def api_exam_resit(key: str) -> JSONResponse:
+    """Sit the SAME paper again — the item list is copied, never reassembled."""
+    return _envelope(resit(key))

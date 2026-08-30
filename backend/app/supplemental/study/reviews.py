@@ -220,6 +220,9 @@ class _TypedItem:
     # study_events doc attribution: None = the review row's doc. Practice rows follow the
     # BOOK (shared memory, like concepts) while the event belongs to the VERSION studied.
     event_doc: Callable[[dict, dict], str | None] | None = None
+    # Alternative study_events kinds a caller may request for this item type (the same
+    # schedule reached through a different activity — practice items sat as an exam).
+    event_kinds: frozenset[str] = frozenset()
 
 
 _TYPED: dict[str, _TypedItem] = {
@@ -247,6 +250,7 @@ _TYPED: dict[str, _TypedItem] = {
         card_name=_name_structure, card_signal=lambda r: "",
         card_extra=lambda r: {},
         event_doc=lambda body, info: str(body.get("doc") or "").strip() or info.get("docId"),
+        event_kinds=frozenset({"practice", "exam"}),
     ),
 }
 
@@ -310,7 +314,12 @@ def _grade_typed_item(spec: _TypedItem, body: dict, concept_key: str, grade: int
 
     # Append to the mastery floor (best-effort; never breaks the grade flow).
     event_doc = spec.event_doc(body, info) if spec.event_doc else doc_id
-    record_grade_event(section_key, correct=(grade >= 3), doc=event_doc, kind=spec.event_kind)
+    # An exam grades the SAME items on the SAME schedule as practice — one engine, one
+    # denominator — but the activity heatmap should say which of the two you were doing.
+    # Only the kind's own alternatives are honoured, so a caller cannot invent a kind.
+    requested = str(body.get("eventKind") or "").strip()
+    kind = requested if requested in spec.event_kinds else spec.event_kind
+    record_grade_event(section_key, correct=(grade >= 3), doc=event_doc, kind=kind)
     return {
         "conceptKey": key,
         "due": next_state["due"],

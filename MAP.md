@@ -186,6 +186,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`calendar.py`](backend/app/supplemental/study/calendar.py) | Cross-course review calendar — when everything comes due |
 | [`manual.py`](backend/app/supplemental/study/manual.py) | Manual study-time blocks — the user's corrections layer over the derived sessions |
 | [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | Which review rows belong to a course version — the retention/coverage split, in SQL |
+| [`exams.py`](backend/app/supplemental/study/exams.py) | Exam sittings: the one assembly over the pool that STORES a row — stratified draw, questions frozen at creation, answers resumable, self-graded through the one engine, per-section results + resit comparison |
 
 ### supplemental/media/ — audiobooks
 

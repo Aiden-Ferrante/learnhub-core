@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Dumbbell, Grid3x3, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dumbbell, FileText, Grid3x3, Loader2 } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import {
@@ -30,14 +30,16 @@ import {
 import { GRADES } from "@/surfaces/studying"
 import { useStudyHotkeys } from "@/surfaces/studying"
 import { MatchGame } from "@/surfaces/practicing/match-game"
+import { ExamMode } from "@/surfaces/practicing/exam-mode"
 import { cn } from "@/kit/lib/utils"
 
 /** The surface's modes. Session is graded and scheduled; Match is drill only. */
-type Mode = "session" | "match"
+type Mode = "session" | "match" | "exam"
 
 const MODES = [
   { value: "session" as const, label: "Session", icon: Dumbbell },
   { value: "match" as const, label: "Match", icon: Grid3x3 },
+  { value: "exam" as const, label: "Exam", icon: FileText },
 ]
 
 /** The practice session — work a problem, reveal the worked solution, grade yourself.
@@ -103,7 +105,9 @@ export function PracticeSession({
           <p className="text-xs text-muted-foreground">
             {mode === "session"
               ? "Practice — work it, then grade yourself"
-              : "Match — pair the terms, race your own clock"}
+              : mode === "match"
+                ? "Match — pair the terms, race your own clock"
+                : "Exam — answer the whole paper, then mark it"}
           </p>
         </div>
         {/* The chapter is a picker, not a rail: the left column belongs to the questions. */}
@@ -125,8 +129,8 @@ export function PracticeSession({
               </Button>
             ))}
           </div>
-          {mode === "session" && <ReadingControls prefs={prefs} onChange={setPrefs} />}
-          <div className="w-64">
+          {mode !== "match" && <ReadingControls prefs={prefs} onChange={setPrefs} />}
+          <div className={cn("w-64", mode === "exam" && "hidden")}>
             {loading && !chapters.length ? (
               <Skeleton className="h-9 w-full" />
             ) : (
@@ -147,7 +151,16 @@ export function PracticeSession({
         </div>
       </div>
 
-      {!scope ? (
+      {mode === "exam" ? (
+        <ExamMode
+          docId={docId}
+          tree={tree}
+          loading={loading}
+          theme={theme}
+          prefs={prefs}
+          onGraded={onAnswered}
+        />
+      ) : !scope ? (
         <p className="p-6 text-sm text-muted-foreground">Pick a chapter to practise.</p>
       ) : mode === "session" ? (
         <PracticeRun
