@@ -33,12 +33,10 @@ import { useEffect, useState } from "react"
  */
 
 const FLEET_APPS = [
-  { id: "shipyard", label: "Shipyard", port: 8845, blurb: "projects, goals, what the fleet owes" },
-  { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
-  { id: "vault-dashboard", label: "Vault", port: 8989, blurb: "daily notes, habits, health" },
   { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads" },
   { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
   { id: "content-manager", label: "Content", port: 8955, blurb: "channels, productions, scripts" },
+  { id: "helm", label: "Helm", port: 8990, blurb: "what needs me now, agenda, decisions" },
 ] as const
 
 const ME = "learnhub"
