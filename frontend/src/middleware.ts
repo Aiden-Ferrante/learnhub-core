@@ -15,8 +15,11 @@ export default auth((req) => {
 
   const isPublic = path === '/login' || path.startsWith('/api/auth')
 
-  if (isLoggedIn && path === '/login') {
-    return NextResponse.redirect(new URL('/', nextUrl))
+  // The shelf is the landing page. Redirect here, at the edge, rather than in a
+  // client effect on `/` — that effect painted a blank page for a full round
+  // trip plus hydration every time the fleet's Learn tab was clicked.
+  if (isLoggedIn && (path === '/login' || path === '/')) {
+    return NextResponse.redirect(new URL('/courses', nextUrl))
   }
   if (isPublic || isLoggedIn) {
     return NextResponse.next()

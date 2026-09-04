@@ -45,19 +45,21 @@ export default function RootLayout({
             <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
               <div className="container mx-auto px-6">
                 {/* Tier heights pinned to the fleet's 38px + 49px (+1px header
-                    border = 88px) — fleet.css enforces the same numbers on the
-                    other four apps, so landing here no longer moves the chrome. */}
-                <div className="flex h-[38px] items-end border-b border-border/60">
+                    border = 88px) — as MINIMUMS, like fleet.css: a wrapped tier
+                    on a narrow screen grows instead of clipping. */}
+                <div className="flex min-h-[38px] items-center border-b border-border/60">
                   <FleetApps />
                 </div>
               </div>
-              <div className="container mx-auto flex h-[49px] items-center justify-between gap-4 px-6">
-                <div className="flex min-w-0 items-center gap-2">
+              <div className="container mx-auto flex min-h-[49px] items-center justify-between gap-4 px-6">
+                {/* Sections sit LEFT, after the brand, where the other five apps
+                    put them (.fleet-nav); the right keeps actions only. */}
+                <div className="flex min-w-0 items-center gap-2 sm:gap-4">
                   <HeaderBrand />
                   <Breadcrumbs />
+                  <AppNav />
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-                  <AppNav />
                   <InfoModal />
                   <ThemeToggle />
                   <UserMenu />

@@ -1,7 +1,9 @@
 "use client"
 
 /** Legacy entry: the app used to be one page with #learn/#upload/#configure hash tabs.
- *  Those live at real routes now — translate old links and land on the shelf. */
+ *  Those live at real routes now — translate old links and land on the shelf.
+ *  Since 2026-09-04 the middleware sends a plain `/` to /courses server-side; this
+ *  component only still runs for a `/#hash` link, which the server cannot see. */
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
