@@ -35,11 +35,11 @@ import { useEffect, useState } from "react"
 const FLEET_APPS = [
   { id: "shipyard", label: "Shipyard", port: 8845, blurb: "projects, goals, what the fleet owes" },
   { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
-  { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads" },
+  { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads", url: "https://spark-9415.tailff006f.ts.net" },
   { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
   { id: "content-manager", label: "Content", port: 8955, blurb: "channels, productions, scripts" },
   { id: "helm", label: "Helm", port: 8990, blurb: "what needs me now, agenda, decisions" },
-] as const
+] as const satisfies readonly { id: string; label: string; port: number; blurb: string; url?: string }[]
 
 const ME = "learnhub"
 
@@ -70,7 +70,7 @@ export function FleetApps() {
             key={a.id}
             // Undefined until the effect runs: unclickable for one paint beats
             // clickable and pointing at the reader's own machine.
-            href={origin ? `${origin.protocol}//${origin.hostname}:${a.port}` : undefined}
+            href={origin ? (('url' in a && a.url && !/^(localhost|127\.0\.0\.1)$/.test(origin.hostname)) ? a.url : `${origin.protocol}//${origin.hostname}:${a.port}`) : undefined}
             title={a.blurb}
             className="rounded-t-md border-b-2 border-transparent px-2.5 py-1.5 text-meta
               text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
