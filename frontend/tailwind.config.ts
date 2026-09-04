@@ -1,8 +1,8 @@
 import type { Config } from "tailwindcss"
 
 const config: Config = {
-  // Follow the OS, as shipyard does. Was ["class"] with no class ever set on
-  // <html>, which left every `dark:` utility permanently inactive.
+  // Dark only, with the fleet (2026-09-04). There are no `dark:` utilities in
+  // src and the tokens in globals.css have one value each; this key is inert.
   darkMode: "media",
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
@@ -20,8 +20,8 @@ const config: Config = {
       // the strongest signal there is that you have left the site, and this is
       // the admin tier, where the promise is the opposite one.
       fontFamily: {
-        'sans': ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Noto Sans', 'Arial', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'],
-        'mono': ['ui-monospace', 'SF Mono', 'Cascadia Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
+        'sans': ['Geist', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Noto Sans', 'Arial', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'],
+        'mono': ['Geist Mono', 'ui-monospace', 'SF Mono', 'Cascadia Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       letterSpacing: {
         'tighter': '-0.02em',
@@ -34,8 +34,10 @@ const config: Config = {
         // eyebrows, tile/facet labels, table headers. The scale above tops out
         // at 0.05em, so every uppercase label in the app was rendering at
         // essentially no tracking — the one idiom that most says "shipyard".
-        'label': '0.12em',
-        'tile': '0.09em',
+        // One label register since fleet.css v2: every uppercase label tracks
+        // 0.08em. The three names stay so call sites need not change.
+        'label': '0.08em',
+        'tile': '0.08em',
         'th': '0.08em',
       },
       colors: {
@@ -107,26 +109,6 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
-        // Add these custom text colors
-        "text-dark": "#333333",
-        "text-light": "#E6E6E6",
       },
       // THE TYPE SCALE — the fleet's six steps, hand-synced from fleet.css
       // (--fleet-text-*). Shipyard's note on why they exist: hierarchy carried

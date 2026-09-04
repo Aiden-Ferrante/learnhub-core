@@ -362,7 +362,7 @@ function ExamRunner({
             {answeredCount}/{exam.questions.length}
           </span>
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
           {exam.questions.map((x, i) => (
             <button
               key={x.key}
@@ -426,7 +426,7 @@ function ExamRunner({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => void persist()}
             placeholder="Work it out here — you will see the model answer after you submit."
-            className="mt-1 h-56 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="mt-1 h-56 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </article>
 
@@ -611,7 +611,7 @@ function ExamResultsView({
                 </p>
               )}
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {GRADES.map(({ grade: g, label, cls }) => (
                   <Button
                     key={g}

@@ -492,7 +492,7 @@ export function CourseShelf({
             <button
               type="button"
               onClick={onNewCourse}
-              className="mt-7 inline-flex items-center gap-2 rounded-lg border border-brand/40 bg-brand/10 px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand/20 focus:outline-none focus:ring-2 focus:ring-brand/50"
+              className="mt-7 inline-flex items-center gap-2 rounded-lg border border-brand/40 bg-brand/10 px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand/20 focus-visible:outline-none focus:ring-2 focus:ring-brand/50"
             >
               <Plus className="h-4 w-4" />
               Upload a document
@@ -552,7 +552,7 @@ export function CourseShelf({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search courses…"
               aria-label="Search courses"
-              className="mb-4 h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-brand/50"
+              className="mb-4 h-9 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus:ring-1 focus:ring-brand/50"
             />
           )}
           {visibleCourses.length === 0 && query.trim() && (

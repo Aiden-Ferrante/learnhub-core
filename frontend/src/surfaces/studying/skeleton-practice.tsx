@@ -293,7 +293,7 @@ export function SkeletonPractice({
               <select
                 value={scope ?? ""}
                 onChange={(e) => setScope(e.target.value || null)}
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-brand/50"
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus:ring-1 focus:ring-brand/50"
               >
                 {choices.length === 0 && <option value="">Nothing to practice at this level</option>}
                 {choices.map((c) => (

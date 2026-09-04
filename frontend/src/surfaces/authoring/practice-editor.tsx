@@ -152,7 +152,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
         autoFocus
         spellCheck={false}
         onChange={(e) => setDraft((d) => ({ ...d, prompt: e.target.value }))}
-        className="h-24 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-24 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       <label className="block text-micro font-medium uppercase text-muted-foreground">
         Worked solution
@@ -161,7 +161,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
         value={draft.answer}
         spellCheck={false}
         onChange={(e) => setDraft((d) => ({ ...d, answer: e.target.value }))}
-        className="h-40 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-40 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       <label className="block text-micro font-medium uppercase text-muted-foreground">
         Rubric (what a correct answer must contain)
@@ -170,7 +170,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
         value={draft.rubric}
         spellCheck={false}
         onChange={(e) => setDraft((d) => ({ ...d, rubric: e.target.value }))}
-        className="h-14 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-14 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       <div className="flex items-center gap-2">
         <Button

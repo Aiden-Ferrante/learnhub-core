@@ -18,7 +18,7 @@ export default function StudyPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 pb-6 pt-6">
+    <main className="mx-auto w-full max-w-6xl px-6 pb-6 pt-6">
       <StudyPlanner onOpenCourse={openCourse} />
     </main>
   )

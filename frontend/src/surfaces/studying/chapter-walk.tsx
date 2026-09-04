@@ -307,7 +307,7 @@ export function ChapterWalk({ scope, docId, tree, onAnswered, onComplete }: Chap
                 onChange={(e) => onRecallChange(e.target.value)}
                 rows={6}
                 placeholder={"1. …\n2. …"}
-                className="w-full resize-y rounded-md border bg-background p-3 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-brand/50"
+                className="w-full resize-y rounded-md border bg-background p-3 text-sm leading-relaxed focus-visible:outline-none focus:ring-1 focus:ring-brand/50"
               />
             ) : (
               <div className="space-y-4">

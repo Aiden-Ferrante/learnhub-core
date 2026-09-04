@@ -1,13 +1,11 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-import { ThemeProvider } from "@/kit/layout/theme-provider"
 import { DocumentProvider } from "@/surfaces/processing"
 import { HeaderBrand } from "@/kit/layout/header-brand"
 import { AppNav } from "@/app/_chrome/app-nav"
 import { FleetApps } from "@/app/_chrome/fleet-apps"
 import { Breadcrumbs } from "@/app/_chrome/breadcrumbs"
-import { ThemeToggle } from "@/kit/layout/theme-toggle"
 import { InfoModal } from "@/kit/layout/info-modal"
 import { Toaster } from "@/kit/ui/toaster"
 import { UserMenu } from "@/app/_chrome/user-menu"
@@ -24,17 +22,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    // No font class: the sans comes from tailwind.config's `sans`, which is the
-    // fleet stack (fleet.css --fleet-font-sans). This used to load Inter, and a
-    // different typeface is the loudest way one app in a fleet says it is a
-    // different product.
-    <html lang="en" suppressHydrationWarning>
+    // The sans is the fleet's (Geist, self-hosted under /fleet-fonts, declared
+    // in globals.css and tailwind.config's `sans`); dark only, with the fleet.
+    <html lang="en" className="dark">
       <body>
-        {/* Follow the OS, as shipyard does. Tokens now key off
-            prefers-color-scheme, so this class is cosmetic — but "dark" would
-            claim the opposite of what the page renders, and would silently pin
-            the app dark again if darkMode ever went back to "class". */}
-        <ThemeProvider defaultTheme="system">
           <DocumentProvider>
             {/* Two tiers, matching the rest of the fleet: which app above, this
                 app's own sections below. */}
@@ -61,7 +52,6 @@ export default function RootLayout({
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
                   <InfoModal />
-                  <ThemeToggle />
                   <UserMenu />
                 </div>
               </div>
@@ -70,7 +60,6 @@ export default function RootLayout({
             <ShortcutsHelp />
             <Toaster />
           </DocumentProvider>
-        </ThemeProvider>
       </body>
     </html>
   )

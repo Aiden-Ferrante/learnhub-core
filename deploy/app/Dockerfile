@@ -54,6 +54,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy necessary files from builder
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# public/ is not part of standalone output; the fleet fonts live there.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Create data directory for query logs with proper permissions
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data

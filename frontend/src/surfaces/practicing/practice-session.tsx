@@ -350,7 +350,7 @@ function PracticeRun({
             {doneCount}/{cards.length}
           </span>
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
           {cards.map((c, i) => {
             const k = c.practiceKey ?? String(i)
             const g = grades[k]
@@ -469,7 +469,7 @@ function PracticeRun({
                   {card.rubric}
                 </p>
               )}
-              <div className="grid grid-cols-4 gap-2 pt-1">
+              <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-4">
                 {GRADES.map(({ grade: g, label, cls }) => (
                   <Button
                     key={g}

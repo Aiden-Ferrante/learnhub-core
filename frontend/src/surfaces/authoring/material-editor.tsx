@@ -221,7 +221,7 @@ export function MaterialEditor({ docId, tree, loading }: MaterialEditorProps) {
                       autoFocus
                       spellCheck={false}
                       onChange={(e) => setDraft(e.target.value)}
-                      className="h-80 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="h-80 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
                     <div className="flex items-center gap-2">
                       <Button

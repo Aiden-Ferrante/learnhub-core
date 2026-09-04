@@ -2,8 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The fleet's faces, copied from fleet-ui/fonts (the Docker build cannot
+   reach the sibling repo; check.sh compares the bytes by sha256). */
+@font-face { font-family: "Geist"; src: url("/fleet-fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("/fleet-fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
 :root {
-  color-scheme: light dark;
+  /* Dark only, with the fleet (anchored 2026-09-04 on chart problem 486ccc778f75). */
+  color-scheme: dark;
+  /* The paper reader's serif — a reading register, not the app's face. */
+  --reading-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }
 
 /* Ground and ink come from --background / --foreground below, and from nowhere
@@ -74,120 +82,71 @@ body {
    `dark:` utility was permanently off. Following the OS is what shipyard does,
    and it makes both halves of this file reachable. */
 @layer base {
+  /* One ground. The values are the fleet's zinc ramp and oklch semantics as the
+     hsl triplets shadcn expects; the names and the triplet convention are
+     unchanged, so every existing utility keeps working. The light block that
+     used to sit above this is gone with the dual mode (2026-09-04). */
   :root {
-    --background: 0 0% 98%;         /* zinc-50  */
-    --foreground: 240 6% 10%;       /* zinc-900 */
+    --background: 240 10% 4%;     /* zinc-950 */
+    --foreground: 240 5% 96%;     /* zinc-100 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 6% 10%;
+    --card: 240 6% 10%;           /* zinc-900 */
+    --card-foreground: 240 5% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 10%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 240 5% 96%;
 
-    /* shipyard accent oklch(0.65 0.19 250), deepened for contrast on a light ground */
-    --primary: 209 100% 43%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 205 100% 50%;      /* fleet accent, full strength on dark */
+    --primary-foreground: 240 10% 4%;
 
-    --secondary: 240 5% 96%;        /* zinc-100 */
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 240 4% 16%;      /* zinc-800 */
+    --secondary-foreground: 240 5% 96%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 5% 34%; /* zinc-600 */
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%; /* zinc-400 — the fleet's faint ink */
 
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 96%;
 
-    --destructive: 360 89% 62%;     /* shipyard danger */
+    --destructive: 360 89% 62%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 90%;           /* zinc-200 */
-    --input: 240 6% 90%;
+    --border: 240 4% 16%;         /* zinc-800 */
+    --input: 240 4% 16%;
     --ring: 205 100% 50%;
 
-    --radius: 0.75rem;
+    /* Instrument, not app store: the fleet's tighter corners. */
+    --radius: 0.5rem;
 
-    /* Brand tracks shipyard's accent. New code should use --brand-accent or the
-       `brand` Tailwind color (text-brand / bg-brand). --brand is a
-       deprecated alias kept for the ~50 legacy `text-brand` call-sites. */
-    --brand-accent: 209 100% 43%;
-    --brand-accent-dark: 209 100% 34%;
-    --brand-accent-light: 205 100% 50%;
+    /* Brand tracks the fleet's accent. --brand is a deprecated alias kept for
+       the ~50 legacy `text-brand` call-sites. */
+    --brand-accent: 205 100% 50%;
+    --brand-accent-dark: 209 100% 43%;
+    --brand-accent-light: 207 100% 66%;
     --brand: var(--brand-accent);
     --brand-dark: var(--brand-accent-dark);
     --brand-light: var(--brand-accent-light);
 
     /* Domain status colors — the ONE vocabulary for study/pipeline state.
-       Use via Tailwind `status-*` colors (e.g. text-status-due, bg-status-mastered/15).
        mastered = retained · ready = available to study · due = review owed now ·
        fading = will fall due soon · building = pipeline running · error = failed.
-       These stay domain-owned; only mastered/ready/error are pulled onto
-       shipyard's ok/accent/danger hues, since those three carry the same meaning
-       there and reading two greens across the fleet was the whole complaint. */
-    --status-mastered: 150 70% 32%;
-    --status-ready: 209 100% 43%;
-    --status-due: 32 95% 40%;
-    --status-fading: 16 80% 44%;
-    --status-building: 265 55% 50%;
-    --status-error: 360 89% 48%;
+       mastered/ready/error sit on the fleet's ok/accent/danger hues; due and
+       fading are warm and distinct from each other; building is the fleet's
+       first categorical hue (a state of the pipeline, not a judgement). */
+    --status-mastered: 150 70% 45%;
+    --status-ready: 205 100% 50%;
+    --status-due: 40 81% 54%;
+    --status-fading: 16 85% 58%;
+    --status-building: 290 60% 72%;
+    --status-error: 360 89% 62%;
 
-    /* Concept-kind hues — deliberately untouched. They are a categorical scale
-       whose only job is being distinguishable from each other, not from
-       shipyard. Deepened variants for a light ground. */
-    --kind-definition: 201 98% 39%;
-    --kind-theorem: 271 81% 56%;
-    --kind-principle: 32 95% 44%;
-    --kind-result: 161 94% 30%;
-    --kind-method: 347 77% 50%;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: 240 10% 4%;     /* zinc-950 */
-      --foreground: 240 5% 96%;     /* zinc-100 */
-
-      --card: 240 6% 10%;           /* zinc-900 */
-      --card-foreground: 240 5% 96%;
-
-      --popover: 240 6% 10%;
-      --popover-foreground: 240 5% 96%;
-
-      --primary: 205 100% 50%;      /* shipyard accent, full strength on dark */
-      --primary-foreground: 240 10% 4%;
-
-      --secondary: 240 4% 16%;      /* zinc-800 */
-      --secondary-foreground: 240 5% 96%;
-
-      --muted: 240 4% 16%;
-      --muted-foreground: 240 5% 65%; /* zinc-400 */
-
-      --accent: 240 4% 16%;
-      --accent-foreground: 240 5% 96%;
-
-      --destructive: 360 89% 62%;
-      --destructive-foreground: 0 0% 98%;
-
-      --border: 240 4% 16%;         /* zinc-800 */
-      --input: 240 4% 16%;
-      --ring: 205 100% 50%;
-
-      --brand-accent: 205 100% 50%;
-      --brand-accent-dark: 209 100% 43%;
-      --brand-accent-light: 207 100% 66%;
-
-      /* Domain colors lifted for a dark ground. */
-      --status-mastered: 150 70% 45%;
-      --status-ready: 205 100% 50%;
-      --status-due: 40 81% 54%;
-      --status-fading: 16 85% 58%;
-      --status-building: 265 65% 68%;
-      --status-error: 360 89% 62%;
-
-      --kind-definition: 199 89% 60%;
-      --kind-theorem: 271 91% 75%;
-      --kind-principle: 43 96% 56%;
-      --kind-result: 160 64% 52%;
-      --kind-method: 351 95% 71%;
-    }
+    /* Concept-kind hues — a categorical scale whose only job is being
+       distinguishable from each other. Kept off the four status hues. */
+    --kind-definition: 205 70% 62%;
+    --kind-theorem: 290 70% 75%;
+    --kind-principle: 43 80% 60%;
+    --kind-result: 172 55% 52%;
+    --kind-method: 340 75% 71%;
   }
 }
 
@@ -272,7 +231,7 @@ body {
   --tw-prose-pre-bg: hsl(var(--paper-code-bg));
   --tw-prose-th-borders: hsl(var(--paper-border-th));
   --tw-prose-td-borders: hsl(var(--paper-border-td));
-  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: var(--reading-serif);
   line-height: 1.75;
 }
 
@@ -394,16 +353,6 @@ body {
 .dropdown-container {
   position: relative;
 }
-
-/* Light mode: soften elevation globally to reduce heavy shadows. Kept, and it
-   pulls the same direction as the fleet move — shipyard's surfaces are a 1px
-   border and a flat fill, with no shadow at all below the floating layer. */
-.light .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important; }
-.light .shadow, 
-.light .shadow-md { box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important; }
-.light .shadow-lg { box-shadow: 0 6px 14px -6px rgba(0,0,0,0.10) !important; }
-.light .shadow-xl { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
-.light .shadow-2xl { box-shadow: 0 12px 22px -10px rgba(0,0,0,0.14) !important; }
 
 /* Progress bar indeterminate animation - smooth sliding with gradient shine */
 @keyframes progress {

@@ -199,7 +199,7 @@ export function ReviewPanel({
       </div>
 
       {revealed && (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {GRADES.map(({ grade: g, label, cls }) => (
             <Button
               key={g}

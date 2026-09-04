@@ -57,7 +57,7 @@ export function AppNav() {
             <Icon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{label}</span>
             {href === "/study" && dueNow > 0 && (
-              <span className="ml-0.5 rounded-full bg-status-due/15 px-1.5 font-mono text-micro font-semibold tabular-nums text-status-due">
+              <span aria-live="polite" className="ml-0.5 rounded-full bg-status-due/15 px-1.5 font-mono text-micro font-semibold tabular-nums text-status-due">
                 {dueNow}
               </span>
             )}

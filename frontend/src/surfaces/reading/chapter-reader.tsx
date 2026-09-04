@@ -273,7 +273,7 @@ export function ChapterReader({
                 }
               }}
               placeholder="Find in chapter"
-              className="w-36 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              className="w-36 bg-transparent text-sm focus-visible:outline-none placeholder:text-muted-foreground"
             />
             <span className="min-w-[3.5rem] text-right text-xs tabular-nums text-muted-foreground">
               {find.query ? `${find.count ? find.active + 1 : 0}/${find.count}` : ""}

@@ -183,7 +183,7 @@ export function DocumentsTable() {
         </div>
       </div>
 
-      <div className="overflow-hidden">
+      <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border/20 bg-muted/5">
@@ -245,7 +245,7 @@ export function DocumentsTable() {
                             cancelRename()
                           }
                         }}
-                        className="min-w-0 flex-1 max-w-[220px] rounded border border-input bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                        className="min-w-0 flex-1 max-w-[220px] rounded border border-input bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                       />
                     ) : (
                       <span className="text-sm font-medium text-foreground truncate max-w-[200px]" title={doc.name}>{doc.name}</span>
