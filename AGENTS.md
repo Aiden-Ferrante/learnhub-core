@@ -15,7 +15,7 @@ agent tool layer.
 
 ## How to reach the apps
 
-Use the **fleet MCP** (`fleet` server, registered by this repo's `.mcp.json`; 48 tools named
+Use the **fleet MCP** (`fleet` server, registered by this repo's `.mcp.json`; ~50 tools named
 `shipyard_*`, `helm_*`, `mc_*`, `learnhub_*`). Reads are marked read-only. Writes change state.
 Destructive tools (`shipyard_thaw`, `shipyard_delete_problem`, `mc_stop_app`) need the
 `impact_token` their impact read returned **and a human's yes**. A refusal from any tool carries the
