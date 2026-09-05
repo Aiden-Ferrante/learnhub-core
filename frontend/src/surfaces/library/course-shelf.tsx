@@ -34,7 +34,7 @@ import {
 import { GroupSidebar } from "@/surfaces/library/group-sidebar"
 import { TodayStrip } from "@/surfaces/library/today-strip"
 import { countSections, type LearnTreeNode } from "@/gateways/api/outline"
-import { deleteLearnDocument } from "@/gateways/api/pipeline"
+import { deleteLearnDocument, fetchLearnDeletion } from "@/gateways/api/pipeline"
 import { fetchVersions } from "@/gateways/api/versions"
 import { fetchStudyDebt, type MasteryResponse } from "@/gateways/api/progress"
 import { fetchReadingProgress, type ReadingProgress } from "@/surfaces/reading"
@@ -302,7 +302,10 @@ export function CourseShelf({
     setDeleteError(null)
     try {
       if (deleteTarget.learnDocId) {
-        const res = await deleteLearnDocument(deleteTarget.learnDocId)
+        // The impact read's token is what the delete accepts — no read, no delete.
+        const impact = await fetchLearnDeletion(deleteTarget.learnDocId)
+        if (impact.error || !impact.token) throw new Error(impact.error || "no deletion token")
+        const res = await deleteLearnDocument(deleteTarget.learnDocId, impact.token)
         if (res.error) throw new Error(res.error)
       }
       deleteDocuments([deleteTarget.id])

@@ -158,3 +158,17 @@ def test_the_default_course_cannot_be_deleted_on_its_own(book):
     out = delete_version(V_DEFAULT)
     assert out.get("status") == 409
     assert _rows("raw_documents", "key", V_DEFAULT) == 1
+
+
+def test_deletion_impact_reads_without_removing(book):
+    """v0.22.0: the impact read names every version and study row the delete would take,
+    and takes nothing itself."""
+    from app.process.content.documents import deletion_impact
+
+    before = _rows("raw_documents", "source_id", BOOK)
+    imp = deletion_impact(BOOK)
+    assert imp["exists"] is True and imp["source"] == BOOK
+    assert set(imp["versions"]) >= {V_DEFAULT, V_CUSTOM}
+    assert isinstance(imp["study_rows"], dict)
+    assert _rows("raw_documents", "source_id", BOOK) == before          # read-only
+    assert _rows("raw_documents", "source_id", OTHER) >= 1

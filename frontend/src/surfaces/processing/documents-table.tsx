@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/kit/ui/alert-dialog"
-import { deleteLearnDocument } from "@/gateways/api/pipeline"
+import { deleteLearnDocument, fetchLearnDeletion } from "@/gateways/api/pipeline"
 import { downloadDocument } from "@/kit/lib/utils"
 import { toast } from "@/kit/hooks/use-toast"
 
@@ -73,7 +73,10 @@ export function DocumentsTable() {
       const learnDocId = documents.find((d) => d.id === id)?.learnDocId
       if (!learnDocId) { deleted.push(id); continue }   // never reached the backend at all
       try {
-        const res = await deleteLearnDocument(learnDocId)
+        // Read the impact, then delete with its token — the backend refuses otherwise.
+        const impact = await fetchLearnDeletion(learnDocId)
+        if (impact.error || !impact.token) throw new Error(impact.error || 'no deletion token')
+        const res = await deleteLearnDocument(learnDocId, impact.token)
         if (res.error) throw new Error(res.error)
         deleted.push(id)
       } catch {

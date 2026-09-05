@@ -32,10 +32,23 @@ export async function fetchCourseStatus(doc: string): Promise<CoursePipelineStat
 }
 
 // Delete a course's learn content outright (document, sections, concepts, reviews, artifacts).
+export type LearnDeletionImpact = {
+  doc?: string; source?: string; exists?: boolean; versions?: string[]
+  study_rows?: Record<string, number>; audiobooks?: number | null; token?: string; error?: string
+}
+
+/** What deleting a course removes, plus the token the delete needs. Read first. */
+export async function fetchLearnDeletion(doc: string): Promise<LearnDeletionImpact> {
+  const res = await fetch(`/api/learn/document/deletion?doc=${encodeURIComponent(doc)}`)
+  return parseJsonResponse(res)
+}
+
 export async function deleteLearnDocument(
   doc: string,
+  token: string,
 ): Promise<{ deleted?: string; removed?: Record<string, number>; error?: string }> {
-  const res = await fetch(`/api/learn/document?doc=${encodeURIComponent(doc)}`, {
+  // The backend refuses a delete without the token its deletion read issued.
+  const res = await fetch(`/api/learn/document?doc=${encodeURIComponent(doc)}&token=${encodeURIComponent(token)}`, {
     method: 'DELETE',
   })
   return parseJsonResponse(res)

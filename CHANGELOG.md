@@ -7,6 +7,24 @@ commit.
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-09-05
+
+A course deletion proves it read its impact.
+
+### Added
+- **`GET /api/document/deletion?doc=`** — what deleting a course would remove (the source,
+  every version, the study rows keyed to them, the audiobooks), plus a `token`. Read-only.
+- **`DELETE /api/document` requires that token.** Without it — or with one issued for
+  another course, an expired one, or one whose impact has since changed — the delete is
+  refused with 422 and the sentence names the read to make. Single use, ten minutes,
+  forgotten on restart. The same module (`app/tokens.py`) runs in shipyard and
+  mission-control; it is copied, not shared.
+
+### Changed
+- The documents table and the course shelf read the impact before deleting and pass its
+  token; a failed read is a failed delete, never a blind one.
+- Requires an image rebuild (`learn` and `app`). No migration.
+
 ## [0.20.0] — 2026-08-30
 
 Sit the exam.

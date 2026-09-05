@@ -205,6 +205,32 @@ def _existing_tables(conn, names: tuple[str, ...]) -> set[str]:
     return {r["t"] for r in rows}
 
 
+def deletion_impact(doc_id: str) -> dict[str, Any]:
+    """What `delete_document` would remove, without removing it: the source, every
+    version of it, and the study rows keyed to those versions. Read-only. The
+    api layer adds the audiobook count (it may import supplemental; this module
+    may not) and issues the token the delete needs. ``{error}`` on a bad id."""
+    if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", doc_id or ""):
+        return {"error": "invalid doc id", "status": 400}
+    with db() as conn:
+        src = (conn.execute(
+            f"SELECT source_id FROM {DOCUMENTS} WHERE key = %(d)s", {"d": doc_id}
+        ).fetchone() or {}).get("source_id") or doc_id
+        versions = [r["key"] for r in conn.execute(
+            f"SELECT key FROM {DOCUMENTS} WHERE source_id = %(s)s", {"s": src}).fetchall()] or [doc_id]
+        existed = conn.execute(f"SELECT 1 FROM {SOURCES} WHERE key = %(s)s", {"s": src}).fetchone() is not None
+        rows: dict[str, int] = {}
+        present = _existing_tables(conn, tuple(t for t, _ in _STUDY_CASCADE))
+        for coll, field in _STUDY_CASCADE:
+            if coll not in present:
+                continue
+            n = conn.execute(f"SELECT count(*) AS n FROM {coll} WHERE {field} = ANY(%(v)s)",
+                             {"v": versions}).fetchone()["n"]
+            if n:
+                rows[coll] = n
+    return {"doc": doc_id, "source": src, "exists": existed, "versions": versions, "study_rows": rows}
+
+
 def delete_document(doc_id: str, *, on_deleted: Callable[[list[str]], None] | None = None
                     ) -> dict[str, Any]:
     """Delete a course outright — the whole book, meaning the source row and EVERY version

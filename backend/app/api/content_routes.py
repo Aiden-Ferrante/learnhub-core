@@ -11,6 +11,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from app import tokens
+from app.process.content.documents import deletion_impact
+from app.supplemental.media.audiobook import list_audiobooks
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -62,8 +65,25 @@ def api_list_documents() -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=503)
 
 
+@router.get("/api/document/deletion")
+def api_document_deletion(doc: str = Query(...)) -> JSONResponse:
+    """What deleting a course would remove — source, versions, study rows, audiobooks —
+    plus the token `DELETE /api/document` needs. Read before the button, never after."""
+    try:
+        impact = deletion_impact(doc)
+        if impact.get("error"):
+            return JSONResponse(impact, status_code=impact.pop("status", 400))
+        try:
+            impact["audiobooks"] = sum(len(list_audiobooks(v).get("items") or []) for v in impact["versions"])
+        except Exception:  # noqa: BLE001 — media is a check here, not the verdict
+            impact["audiobooks"] = None
+        return JSONResponse({**impact, "token": tokens.issue("course-delete", doc, impact)})
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
 @router.delete("/api/document")
-def api_delete_document(doc: str = Query(...)) -> JSONResponse:
+def api_delete_document(doc: str = Query(...), token: str | None = Query(None)) -> JSONResponse:
     """Delete a course outright: document row, every learn table keyed by it, its on-disk
     artifacts, and its audiobooks. Irreversible.
 
@@ -73,6 +93,15 @@ def api_delete_document(doc: str = Query(...)) -> JSONResponse:
     here, at the one layer allowed to know about both (finding B5).
     """
     try:
+        current = deletion_impact(doc)
+        if not current.get("error"):
+            try:
+                current["audiobooks"] = sum(len(list_audiobooks(v).get("items") or []) for v in current["versions"])
+            except Exception:  # noqa: BLE001
+                current["audiobooks"] = None
+        reason = tokens.check("course-delete", doc, token, current, "GET /api/document/deletion?doc=…")
+        if reason:
+            return JSONResponse({"error": reason}, status_code=422)
         data = delete_document(doc, on_deleted=remove_audiobooks)
         return JSONResponse(data, status_code=data.pop("status", 200) if data.get("error") else 200)
     except Exception as exc:  # noqa: BLE001
