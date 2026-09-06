@@ -21,6 +21,10 @@ services:
       # Auth.js (login sessions)
       - AUTH_SECRET=${AUTH_SECRET:?set in compose/.env}
       - AUTH_TRUST_HOST=true
+      # Without this Auth.js derives its origin from the Node runtime's own host,
+      # 0.0.0.0:3000 (2026-09-06: providers/callback URLs and sign-in redirects all
+      # pointed there, and one /api/auth/csrf set two csrf + two callback-url cookies).
+      - AUTH_URL=http://localhost:3001
       # Ollama configuration
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=nemotron-3-nano:30b
