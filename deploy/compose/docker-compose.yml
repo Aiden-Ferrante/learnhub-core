@@ -24,7 +24,10 @@ services:
       # Without this Auth.js derives its origin from the Node runtime's own host,
       # 0.0.0.0:3000 (2026-09-06: providers/callback URLs and sign-in redirects all
       # pointed there, and one /api/auth/csrf set two csrf + two callback-url cookies).
-      - AUTH_URL=http://localhost:3001
+      # It must be the TAILNET origin, not localhost: `tailscale serve` fronts this at
+      # the tailnet root, so a localhost pin sent every other device's login redirect
+      # and callback-url cookie to its OWN dead localhost:3001 (2026-09-07).
+      - AUTH_URL=${AUTH_URL:-https://spark-9415.tailff006f.ts.net}
       # Ollama configuration
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=nemotron-3-nano:30b

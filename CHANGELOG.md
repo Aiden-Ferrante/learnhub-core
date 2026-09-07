@@ -7,6 +7,13 @@ commit.
 
 ## [Unreleased]
 
+### Fixed
+- **Login worked from the Spark only.** `AUTH_URL` was pinned to `http://localhost:3001`,
+  so `/` redirected every other tailnet device to *its own* dead localhost and the
+  callback-url cookie pointed there too. `tailscale serve` fronts the app at the tailnet
+  root, so that origin is the pin — and the cookies are now `__Host-`/`__Secure-` prefixed
+  because it is https.
+
 ## [0.22.0] — 2026-09-05
 
 A course deletion proves it read its impact.
