@@ -7,6 +7,10 @@ commit.
 
 ## [Unreleased]
 
+## [0.22.1] — 2026-09-08
+
+Login from any tailnet device.
+
 ### Fixed
 - **Login worked from the Spark only.** `AUTH_URL` was pinned to `http://localhost:3001`,
   so `/` redirected every other tailnet device to *its own* dead localhost and the
