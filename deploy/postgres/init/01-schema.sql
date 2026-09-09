@@ -262,6 +262,7 @@ CREATE TABLE ext_practice (
   answer       text,
   rubric       text,
   payload      jsonb,
+  difficulty   smallint CHECK (difficulty BETWEEN 1 AND 3),  -- 1 direct · 2 combines · 3 constructs; NULL = unrated
   "order"      int,
   created_at   timestamptz,
   edited_at    timestamptz);

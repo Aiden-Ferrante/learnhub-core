@@ -62,6 +62,10 @@ class RetrieveItem(BaseModel):
 
     q: str
     a: str
+    # 1 = applies one definition or rule directly · 2 = combines several steps or two
+    # ideas · 3 = constructs, proves, or is multi-part (v0.23.0). Validated 1–3 at
+    # post-processing; anything else is stored as unrated, never coerced.
+    difficulty: int
 
 
 class RetrieveSet(BaseModel):
@@ -75,6 +79,7 @@ class ProblemItem(BaseModel):
     prompt: str
     answer: str
     rubric: str
+    difficulty: int
 
 
 class ProblemSet(BaseModel):

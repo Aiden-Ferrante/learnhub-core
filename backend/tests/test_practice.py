@@ -176,7 +176,43 @@ def test_author_section_retrieve_maps_q_a_and_requires_both(monkeypatch):
         "prompt": "When is P → Q false?",
         "answer": "Only when P is true and Q is false.",
         "rubric": None,
+        "difficulty": None,
     }
+
+
+# ── difficulty (v0.23.0) — rated at generation, validated, never coerced ─────
+
+
+def test_rating_accepts_only_one_to_three_and_never_clamps():
+    assert practice._rating(1) == 1 and practice._rating("3") == 3
+    # A clamped 0 or 7 would be a confident number nobody chose: out of range is UNRATED.
+    assert practice._rating(0) is None and practice._rating(7) is None
+    assert practice._rating(None) is None and practice._rating("hard") is None
+
+
+def test_author_section_carries_the_models_rating_and_unrates_nonsense(monkeypatch):
+    monkeypatch.setattr(
+        practice,
+        "ollama_structured_completion",
+        _stub_completion(
+            {
+                "problems": [
+                    {"prompt": "Derive X from Y.", "answer": "…", "rubric": "r", "difficulty": 2},
+                    {"prompt": "Prove Z.", "answer": "…", "rubric": "r", "difficulty": 9},
+                    {"prompt": "Compute W.", "answer": "…", "rubric": "r"},
+                ]
+            }
+        ),
+    )
+    kept, dropped = practice._author_section("problem", "H", "text", "", None)
+    assert dropped == 0
+    assert [k["difficulty"] for k in kept] == [2, None, None]
+
+
+def test_both_prompts_define_the_scale_the_human_set():
+    for system in (practice.RETRIEVE_SYSTEM, practice.PROBLEM_SYSTEM):
+        for n, words in practice.DIFFICULTY_SCALE.items():
+            assert f"{n} = {words}" in system
 
 
 # ── review keys + queue cards ────────────────────────────────────────────────

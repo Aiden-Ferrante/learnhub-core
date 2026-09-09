@@ -38,7 +38,7 @@ from app.process.extraction.concepts_extract import repair_model_text
 DEFAULT_KINDS = ("retrieve", "problem")
 
 # Curators may edit content and check data; provenance (doc/section/key) is read-only.
-EDITABLE_FIELDS = frozenset({"prompt", "answer", "rubric", "kind", "payload"})
+EDITABLE_FIELDS = frozenset({"prompt", "answer", "rubric", "kind", "payload", "difficulty"})
 
 _MAX_PASSAGE = 20_000  # chars of section text per call; num_ctx is 32768 tokens
 
@@ -93,6 +93,34 @@ def _has_task(prompt: str) -> bool:
     """Whether the prompt actually asks for something, rather than merely presenting text."""
     return bool(_TASK_SIGNAL.search(prompt or ""))
 
+
+# v0.23.0 — a paper is drawn by difficulty, so an item carries one. The scale is the
+# human's (2026-09-08) and goes into both prompts verbatim; the model rates its own item.
+# That rating is a PROXY until someone reads it, which is why the editor can change it
+# and why an out-of-range value is stored as unrated (NULL) rather than clamped — a
+# clamped 0 or 7 would be a confident number nobody chose.
+DIFFICULTY_SCALE = {
+    1: "applies one definition or rule directly",
+    2: "combines several steps or two ideas",
+    3: "constructs, proves, or is multi-part",
+}
+
+
+def _rating(value: Any) -> int | None:
+    """A difficulty in 1..3, or None for anything else (missing, malformed, out of range)."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    return n if n in DIFFICULTY_SCALE else None
+
+
+_DIFFICULTY_INSTRUCTION = (
+    "Rate each item's difficulty as an integer 1-3: "
+    + " · ".join(f"{n} = {d}" for n, d in DIFFICULTY_SCALE.items())
+    + ". Spread the items across the scale when the material allows it.\n"
+)
+
 _FURNITURE_BAN = (
     "NEVER reference the book itself or its apparatus: no 'according to the text', no "
     "'in this section', no 'the author', and no references to numbered tables, figures, "
@@ -120,7 +148,8 @@ RETRIEVE_SYSTEM = (
     + "NEVER write a question about the document's own structure or purpose. If the section "
     "is front matter or contains nothing teachable, return an EMPTY list — refusing is a "
     "correct answer.\n"
-    "Write 2 or 3 questions. No markdown headers, no preamble."
+    + _DIFFICULTY_INSTRUCTION
+    + "Write 2 or 3 questions. No markdown headers, no preamble."
 )
 
 # Lifted from the validated step-2 spike (scripts/spike_problem_items.py) with the
@@ -145,7 +174,8 @@ PROBLEM_SYSTEM = (
     + "If the section is purely descriptive, a tutorial walkthrough, or contains nothing "
     "that can be worked from knowledge of the subject, return an EMPTY list rather than "
     "inventing a task — refusing is a correct answer.\n"
-    "Write 2 or 3 problems. No markdown headers, no preamble."
+    + _DIFFICULTY_INSTRUCTION
+    + "Write 2 or 3 problems. No markdown headers, no preamble."
 )
 
 
@@ -194,7 +224,8 @@ def _author_section(
             RetrieveSet, temperature=0.3, model=model,
         )
         raw = [
-            {"prompt": q.get("q"), "answer": q.get("a"), "rubric": None}
+            {"prompt": q.get("q"), "answer": q.get("a"), "rubric": None,
+             "difficulty": q.get("difficulty")}
             for q in ((obj or {}).get("questions") or [])
         ]
     elif kind == "problem":
@@ -222,7 +253,10 @@ def _author_section(
         if _has_furniture(prompt) or not _has_task(prompt):
             dropped += 1
             continue
-        kept.append({"kind": kind, "prompt": prompt, "answer": answer, "rubric": rubric})
+        kept.append({
+            "kind": kind, "prompt": prompt, "answer": answer, "rubric": rubric,
+            "difficulty": _rating(it.get("difficulty")),
+        })
     return kept, dropped
 
 
@@ -279,9 +313,9 @@ def author_practice_sync(
                 with db() as conn:
                     conn.execute(
                         "INSERT INTO ext_practice (key, doc_id, structure_id, section_key, kind, "
-                        'prompt, answer, rubric, payload, "order", created_at) '
+                        'prompt, answer, rubric, payload, difficulty, "order", created_at) '
                         "VALUES (%(k)s, %(d)s, (SELECT id FROM raw_structure WHERE id = %(sid)s), "
-                        "%(sk)s, %(kind)s, %(p)s, %(a)s, %(r)s, %(pl)s, %(o)s, now())",
+                        "%(sk)s, %(kind)s, %(p)s, %(a)s, %(r)s, %(pl)s, %(diff)s, %(o)s, now())",
                         {
                             "k": uuid.uuid4().hex,
                             "d": src,
@@ -292,6 +326,7 @@ def author_practice_sync(
                             "a": it["answer"],
                             "r": it["rubric"],
                             "pl": Json(it["payload"]) if it.get("payload") is not None else None,
+                            "diff": it.get("difficulty"),
                             "o": i,
                         },
                     )
@@ -314,7 +349,7 @@ def fetch_practice(doc: str | None, scope: str | None) -> dict[str, Any]:
         with db() as conn:
             rows = conn.execute(
                 'SELECT key, section_key AS "sectionKey", kind, prompt, answer, rubric, payload, '
-                '"order", extract(epoch from created_at)::float8 AS "createdAt", '
+                'difficulty, "order", extract(epoch from created_at)::float8 AS "createdAt", '
                 'extract(epoch from edited_at)::float8 AS "editedAt" '
                 f'FROM ext_practice WHERE {pred} ORDER BY section_key, kind, "order", created_at',
                 binds,
@@ -419,14 +454,15 @@ def create_item(doc: str | None, section_key: str, fields: dict[str, Any]) -> di
     with db() as conn:
         conn.execute(
             "INSERT INTO ext_practice (key, doc_id, structure_id, section_key, kind, prompt, "
-            'answer, rubric, payload, "order", created_at, edited_at) '
+            'answer, rubric, payload, difficulty, "order", created_at, edited_at) '
             "VALUES (%(k)s, %(d)s, (SELECT id FROM raw_structure WHERE id = %(sid)s), %(sk)s, "
-            "%(kind)s, %(p)s, %(a)s, %(r)s, %(pl)s, 0, now(), now())",
+            "%(kind)s, %(p)s, %(a)s, %(r)s, %(pl)s, %(diff)s, 0, now(), now())",
             {
                 "k": key, "d": src, "sid": f"{src}::{src_keys[0]}", "sk": src_keys[0],
                 "kind": kind, "p": prompt, "a": answer,
                 "r": (str(fields.get("rubric")).strip() or None) if fields.get("rubric") else None,
                 "pl": Json(fields["payload"]) if fields.get("payload") is not None else None,
+                "diff": _rating(fields.get("difficulty")),
             },
         )
     return {"created": key}
@@ -437,10 +473,16 @@ def update_item(key: str, patch: dict[str, Any]) -> dict[str, Any]:
     patch = {k: v for k, v in (patch or {}).items() if k in EDITABLE_FIELDS}
     if not patch:
         return {"error": f"no editable fields; allowed: {sorted(EDITABLE_FIELDS)}", "status": 400}
+    if "difficulty" in patch and patch["difficulty"] is not None and _rating(patch["difficulty"]) is None:
+        return {"error": "difficulty must be 1, 2 or 3 (or null to unrate)", "status": 400}
     sets, params = [], {"key": key}
     for f, v in patch.items():
         sets.append(f'"{f}" = %({f})s')
-        params[f] = Json(v) if f == "payload" and v is not None else v
+        if f == "payload" and v is not None:
+            v = Json(v)
+        elif f == "difficulty":
+            v = _rating(v)
+        params[f] = v
     with db() as conn:
         row = conn.execute(
             f"UPDATE ext_practice SET {', '.join(sets)}, edited_at = now() "
