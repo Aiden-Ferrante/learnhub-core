@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, FileText, Loader2, RotateCcw } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, FileText, Loader2, RotateCcw } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { MarkdownReader, type ReadingPrefs, type ReadingTheme } from "@/surfaces/reading"
@@ -10,16 +10,19 @@ import { GRADES } from "@/surfaces/studying"
 import {
   createExam,
   fetchExam,
+  fetchExamPool,
   fetchExamResults,
   fetchExams,
   finishExam,
   gradeExamAnswer,
   resitExam,
   saveExamAnswer,
+  type ExamPool,
   type ExamResults,
   type ExamSitting,
   type ExamSummary,
 } from "@/gateways/api/exams"
+import { DIFFICULTY_LABEL, type PracticeDifficulty, type PracticeKind } from "@/gateways/api/practice"
 import { cn } from "@/kit/lib/utils"
 
 /** Exams — sit a frozen paper, then mark it.
@@ -31,6 +34,16 @@ import { cn } from "@/kit/lib/utils"
  *
  *  Three screens, one mode: SETUP picks the chapters, RUNNER is the paper, RESULTS is the
  *  marking walk plus the per-section breakdown that says which chapter let you down. */
+
+/** The kinds a paper can draw. The three that are not built stay visible and greyed, so
+ *  the learner sees the shape of what is coming rather than a shorter list. */
+const KIND_OPTIONS: { kind: PracticeKind; label: string; built: boolean }[] = [
+  { kind: "retrieve", label: "retrieval", built: true },
+  { kind: "problem", label: "problem", built: true },
+  { kind: "mcq", label: "multiple choice", built: false },
+  { kind: "order", label: "ordering", built: false },
+  { kind: "code", label: "code", built: false },
+]
 
 type Screen =
   | { at: "setup" }
@@ -106,8 +119,11 @@ function ExamSetup({
   onOpenResults: (key: string) => void
 }) {
   const chapters = useMemo(() => tree.filter((n) => n.sectionKey), [tree])
-  const [picked, setPicked] = useState<string[]>([])
-  const [perChapter, setPerChapter] = useState(5)
+  const [pool, setPool] = useState<ExamPool | null>(null)
+  const [picks, setPicks] = useState<Record<string, number>>({})
+  const [kinds, setKinds] = useState<PracticeKind[]>(["retrieve", "problem"])
+  const [difficulties, setDifficulties] = useState<PracticeDifficulty[]>([])
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [past, setPast] = useState<ExamSummary[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,14 +136,117 @@ function ExamSetup({
 
   useEffect(loadPast, [loadPast])
 
-  const toggle = (key: string) =>
-    setPicked((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]))
+  // The pool is read BEFORE the pick: what each section holds, by kind and difficulty. A
+  // section with nothing is unprocessed and is greyed out here rather than refused later.
+  useEffect(() => {
+    let active = true
+    fetchExamPool(docId)
+      .then((p) => {
+        if (active) setPool(p.error ? { docId, sections: {} } : p)
+      })
+      .catch(() => {
+        if (active) setPool({ docId, sections: {} })
+      })
+    return () => {
+      active = false
+    }
+  }, [docId])
+
+  /** Items under a node (itself + every descendant section) that the current filters admit. */
+  const available = useCallback(
+    (node: LearnTreeNode): number => {
+      if (!pool) return 0
+      let n = 0
+      const walk = (x: LearnTreeNode) => {
+        const byKind = x.sectionKey ? pool.sections[x.sectionKey] : undefined
+        if (byKind) {
+          for (const k of kinds) {
+            const levels = byKind[k] ?? {}
+            for (const [level, count] of Object.entries(levels)) {
+              // A difficulty filter EXCLUDES unrated items — "2–3" means rated 2 or 3.
+              if (!difficulties.length || difficulties.includes(Number(level) as PracticeDifficulty))
+                n += count
+            }
+          }
+        }
+        x.children?.forEach(walk)
+      }
+      walk(node)
+      return n
+    },
+    [pool, kinds, difficulties],
+  )
+
+  const nodeByKey = useMemo(() => {
+    const m = new Map<string, LearnTreeNode>()
+    const walk = (x: LearnTreeNode) => {
+      if (x.sectionKey) m.set(x.sectionKey, x)
+      x.children?.forEach(walk)
+    }
+    tree.forEach(walk)
+    return m
+  }, [tree])
+
+  const descendantKeys = useCallback((node: LearnTreeNode): string[] => {
+    const out: string[] = []
+    const walk = (x: LearnTreeNode) => {
+      x.children?.forEach((c) => {
+        if (c.sectionKey) out.push(c.sectionKey)
+        walk(c)
+      })
+    }
+    walk(node)
+    return out
+  }, [])
+
+  // The pick is honest about the draw: a count can never exceed what the filters leave.
+  const draw = useMemo(() => {
+    let total = 0
+    const rows: { scope: string; count: number; max: number }[] = []
+    for (const [scope, count] of Object.entries(picks)) {
+      const node = nodeByKey.get(scope)
+      const max = node ? available(node) : 0
+      const c = Math.min(count, max)
+      rows.push({ scope, count: c, max })
+      total += c
+    }
+    return { total, rows }
+  }, [picks, nodeByKey, available])
+
+  const toggle = (node: LearnTreeNode) => {
+    const key = node.sectionKey as string
+    setPicks((p) => {
+      if (key in p) {
+        const { [key]: _gone, ...rest } = p
+        return rest
+      }
+      // Picking a chapter covers its sections: any section picks inside it fold into it.
+      const rest = { ...p }
+      for (const k of descendantKeys(node)) delete rest[k]
+      return { ...rest, [key]: Math.min(5, Math.max(1, available(node))) }
+    })
+  }
+
+  const setCount = (scope: string, raw: number) => {
+    const node = nodeByKey.get(scope)
+    const max = node ? available(node) : 1
+    setPicks((p) => ({ ...p, [scope]: Math.max(1, Math.min(max || 1, Math.floor(raw) || 1)) }))
+  }
+
+  const toggleKind = (k: PracticeKind) =>
+    setKinds((ks) => (ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]))
+  const toggleDifficulty = (d: PracticeDifficulty) =>
+    setDifficulties((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d].sort()))
 
   async function start() {
     setBusy(true)
     setError(null)
     try {
-      const exam = await createExam(docId, picked, perChapter)
+      const exam = await createExam(
+        docId,
+        draw.rows.filter((r) => r.count > 0).map((r) => ({ scope: r.scope, count: r.count })),
+        { kinds, difficulties: difficulties.length ? difficulties : null },
+      )
       if (exam.error) throw new Error(exam.error)
       onSit(exam.key)
     } catch (e) {
@@ -137,72 +256,152 @@ function ExamSetup({
     }
   }
 
+  /** One outline row — a chapter or a section. Greyed and unpickable when the filters
+   *  leave nothing under it; carries its own count once picked. */
+  const row = (node: LearnTreeNode, depth: number, coveredBy: string | null) => {
+    const key = node.sectionKey as string
+    const n = available(node)
+    const on = key in picks
+    const covered = coveredBy != null
+    const sections = (node.children ?? []).filter((c) => c.sectionKey)
+    const open = !!expanded[key]
+    return (
+      <div key={node.id}>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded px-2 py-1 text-xs",
+            on ? "bg-brand/15 font-medium text-brand" : covered ? "text-muted-foreground" : "hover:bg-muted/50",
+          )}
+          style={{ paddingLeft: `${8 + depth * 16}px` }}
+        >
+          <button
+            type="button"
+            disabled={n === 0 || covered}
+            onClick={() => toggle(node)}
+            title={
+              n === 0
+                ? "Not generated yet — author this chapter's items in the course editor first"
+                : covered
+                  ? "Covered by the chapter picked above it"
+                  : undefined
+            }
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-not-allowed",
+              n === 0 && "opacity-50",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-micro",
+                on || covered ? "border-brand bg-brand text-background" : "border-border",
+              )}
+            >
+              {on || covered ? "✓" : ""}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{displaySectionTitle(node.label, node.title)}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {n === 0 ? "not generated yet" : `${n} item${n === 1 ? "" : "s"}`}
+            </span>
+          </button>
+          {on && (
+            <input
+              type="number"
+              min={1}
+              max={n}
+              value={picks[key]}
+              onChange={(e) => setCount(key, Number(e.target.value))}
+              title={`How many to draw from here (at most ${n})`}
+              className="h-6 w-14 rounded border bg-background px-1 text-right text-xs tabular-nums text-foreground"
+            />
+          )}
+          {sections.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((x) => ({ ...x, [key]: !open }))}
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted"
+              title={open ? "Hide sections" : "Pick individual sections"}
+            >
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")} />
+            </button>
+          ) : (
+            <span className="w-[18px] shrink-0" />
+          )}
+        </div>
+        {open && sections.map((c) => row(c, depth + 1, on ? key : coveredBy))}
+      </div>
+    )
+  }
+
   return (
     <div className="flex gap-5">
       <div className="min-w-0 flex-1 space-y-4">
         <section className="rounded-lg border bg-card p-5">
           <h2 className="text-sm font-medium">Set a paper</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Pick the chapters to be examined on. You answer every question before seeing any
+            Pick chapters or sections and say how many questions to draw from each. Only what
+            has been generated can be picked. You answer every question before seeing any
             worked solution — that is the whole point.
           </p>
 
-          <div className="mt-3 max-h-72 space-y-0.5 overflow-y-auto rounded border p-1">
-            {loading && !chapters.length ? (
-              Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-7 w-full" />)
-            ) : (
-              chapters.map((c) => {
-                const key = c.sectionKey as string
-                const on = picked.includes(key)
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => toggle(key)}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs",
-                      on ? "bg-brand/15 font-medium text-brand" : "hover:bg-muted/50",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-micro",
-                        on ? "border-brand bg-brand text-background" : "border-border",
-                      )}
-                    >
-                      {on ? "✓" : ""}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {displaySectionTitle(c.label, c.title)}
-                    </span>
-                  </button>
-                )
-              })
-            )}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+            <span className="flex items-center gap-2">
+              <span className="text-micro font-medium uppercase text-muted-foreground">Kinds</span>
+              {KIND_OPTIONS.map(({ kind, label, built }) => (
+                <label
+                  key={kind}
+                  className={cn("flex items-center gap-1", !built && "cursor-not-allowed opacity-50")}
+                  title={built ? undefined : "Not built yet"}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={!built}
+                    checked={kinds.includes(kind)}
+                    onChange={() => toggleKind(kind)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="text-micro font-medium uppercase text-muted-foreground">Difficulty</span>
+              {([1, 2, 3] as PracticeDifficulty[]).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDifficulty(d)}
+                  title={DIFFICULTY_LABEL[d]}
+                  className={cn(
+                    "h-6 w-7 rounded border tabular-nums",
+                    difficulties.includes(d) ? "border-brand bg-brand/15 text-brand" : "hover:bg-muted/50",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+              <span className="text-muted-foreground">
+                {difficulties.length ? "unrated items left out" : "any"}
+              </span>
+            </span>
+          </div>
+
+          <div className="mt-3 max-h-80 space-y-0.5 overflow-y-auto rounded border p-1">
+            {(loading && !chapters.length) || !pool
+              ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-7 w-full" />)
+              : chapters.map((c) => row(c, 0, null))}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs">
-              Questions per chapter
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={perChapter}
-                onChange={(e) => setPerChapter(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                className="h-8 w-16 rounded border bg-background px-2 text-xs"
-              />
-            </label>
             <span className="text-xs text-muted-foreground">
-              {picked.length
-                ? `${picked.length} chapter${picked.length === 1 ? "" : "s"} · up to ${picked.length * perChapter} questions`
-                : "no chapters picked"}
+              {draw.rows.length
+                ? `${draw.total} question${draw.total === 1 ? "" : "s"} from ${draw.rows.length} pick${draw.rows.length === 1 ? "" : "s"}`
+                : "nothing picked"}
+              {draw.rows.some((r) => r.count < (picks[r.scope] ?? 0)) && " · some picks clamped to what is available"}
             </span>
             <Button
               type="button"
               size="sm"
               className="ml-auto h-8"
-              disabled={busy || !picked.length}
+              disabled={busy || draw.total === 0}
               onClick={() => void start()}
             >
               {busy && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
@@ -224,35 +423,38 @@ function ExamSetup({
           <p className="text-xs text-muted-foreground">Nothing sat yet.</p>
         ) : (
           <ul className="space-y-1.5">
-            {past.map((e) => (
-              <li key={e.key}>
-                {/* An unfinished paper resumes into the RUNNER. Opening the marking screen
-                    for a sitting you have not submitted would show you the worked solutions
-                    to questions you still have to answer — the one thing an exam must not
-                    do. Found by reloading mid-paper. */}
-                <button
-                  type="button"
-                  onClick={() => (e.status === "open" ? onSit(e.key) : onOpenResults(e.key))}
-                  className="w-full rounded border px-3 py-2 text-left text-xs hover:border-foreground/40"
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-medium">
-                      {e.status === "open" ? "Resume" : "Sat"}
-                      {e.resitOf && " · resit"}
+            {past.map((e) => {
+              const scopes = e.config?.picks?.length ?? e.config?.chapters?.length ?? 0
+              return (
+                <li key={e.key}>
+                  {/* An unfinished paper resumes into the RUNNER. Opening the marking screen
+                      for a sitting you have not submitted would show you the worked solutions
+                      to questions you still have to answer — the one thing an exam must not
+                      do. Found by reloading mid-paper. */}
+                  <button
+                    type="button"
+                    onClick={() => (e.status === "open" ? onSit(e.key) : onOpenResults(e.key))}
+                    className="w-full rounded border px-3 py-2 text-left text-xs hover:border-foreground/40"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="font-medium">
+                        {e.status === "open" ? "Resume" : "Sat"}
+                        {e.resitOf && " · resit"}
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {e.score?.fraction != null
+                          ? `${Math.round(e.score.fraction * 100)}%`
+                          : `${e.answered}/${e.count}`}
+                      </span>
                     </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {e.score?.fraction != null
-                        ? `${Math.round(e.score.fraction * 100)}%`
-                        : `${e.answered}/${e.count}`}
+                    <span className="mt-0.5 block text-micro text-muted-foreground">
+                      {scopes} pick{scopes === 1 ? "" : "s"} · {e.count} questions
+                      {e.config?.difficulties?.length ? ` · d${e.config.difficulties.join("–")}` : ""}
                     </span>
-                  </span>
-                  <span className="mt-0.5 block text-micro text-muted-foreground">
-                    {(e.config?.chapters ?? []).length} chapter
-                    {(e.config?.chapters ?? []).length === 1 ? "" : "s"} · {e.count} questions
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </aside>
@@ -560,6 +762,11 @@ function ExamResultsView({
                 <span className="rounded bg-brand/15 px-2 py-0.5 text-micro font-medium uppercase text-brand">
                   {q.kind}
                 </span>
+                {q.difficulty != null && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-micro tabular-nums text-muted-foreground" title={DIFFICULTY_LABEL[q.difficulty]}>
+                    d{q.difficulty}
+                  </span>
+                )}
                 <span className="text-micro text-muted-foreground">{q.sectionKey}</span>
                 {graded && (
                   <span className="ml-auto text-xs text-muted-foreground">

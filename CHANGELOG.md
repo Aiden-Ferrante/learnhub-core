@@ -7,6 +7,26 @@ commit.
 
 ## [Unreleased]
 
+Set the paper. (v0.23.0, open)
+
+### Added
+- **Difficulty on a practice item**, 1–3: applies one definition or rule directly ·
+  combines several steps or two ideas · constructs, proves, or is multi-part. Rated by the
+  model at generation on that scale, shown and editable in the Practice tab; an
+  out-of-range rating is stored unrated, never clamped. Migration
+  `2026-09-08-practice-difficulty.sql` (manual) + image rebuild.
+- **The paper is the learner's pick.** Exam setup is the course outline: chapters expand
+  to sections, each picked chapter or section carries its own question count (clamped to
+  what is there), kinds are checkboxes, difficulty is a 1/2/3 filter. Nothing that has not
+  been generated can be picked — it reads "not generated yet" instead of failing after
+  Start. `GET /api/exams/pool` is the read behind it; `POST /api/exams` takes
+  `picks=[{scope,count}]`, `kinds`, `difficulties`.
+
+### Changed
+- A difficulty filter leaves unrated items out: "2–3" means rated 2 or 3.
+- The pre-v0.23.0 exam body (`chapters` + `perChapter`) still works and old sittings
+  still render.
+
 ## [0.22.1] — 2026-09-08
 
 Login from any tailnet device.

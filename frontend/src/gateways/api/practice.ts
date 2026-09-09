@@ -10,6 +10,15 @@ import { parseJsonResponse } from './http'
 
 export type PracticeKind = 'retrieve' | 'problem' | 'mcq' | 'order' | 'code'
 
+export type PracticeDifficulty = 1 | 2 | 3
+
+/** The human's scale (2026-09-08), the same words the authoring prompt carries. */
+export const DIFFICULTY_LABEL: Record<PracticeDifficulty, string> = {
+  1: 'applies one definition or rule directly',
+  2: 'combines several steps or two ideas',
+  3: 'constructs, proves, or is multi-part',
+}
+
 export type PracticeItem = {
   key: string
   /** THIS version's section key (translated server-side from the book's). */
@@ -21,6 +30,9 @@ export type PracticeItem = {
   rubric: string | null
   /** Per-kind check data (mcq choices, order steps, code tests) — null for retrieve/problem. */
   payload: Record<string, unknown> | null
+  /** 1 applies one rule · 2 combines steps · 3 constructs/proves — rated at generation,
+   *  yours to change. null = unrated: drawn into a paper only when no difficulty is set. */
+  difficulty: PracticeDifficulty | null
   order: number | null
   createdAt: number | null
   /** null = generated + untouched = will be replaced by a regenerate. */
@@ -85,7 +97,7 @@ export async function createPracticeItem(
   docId: string | undefined,
   sectionKey: string,
   fields: Pick<PracticeItem, 'kind' | 'prompt' | 'answer'> &
-    Partial<Pick<PracticeItem, 'rubric' | 'payload'>>,
+    Partial<Pick<PracticeItem, 'rubric' | 'payload' | 'difficulty'>>,
 ): Promise<{ created?: string; error?: string }> {
   const res = await fetch('/api/learn/practice/item', {
     method: 'POST',
@@ -97,7 +109,7 @@ export async function createPracticeItem(
 
 export async function updatePracticeItem(
   key: string,
-  patch: Partial<Pick<PracticeItem, 'prompt' | 'answer' | 'rubric' | 'kind' | 'payload'>>,
+  patch: Partial<Pick<PracticeItem, 'prompt' | 'answer' | 'rubric' | 'kind' | 'payload' | 'difficulty'>>,
 ): Promise<{ updated?: string; error?: string }> {
   const res = await fetch(`/api/learn/practice/item/${encodeURIComponent(key)}`, {
     method: 'POST',

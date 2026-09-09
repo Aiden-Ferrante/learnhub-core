@@ -9,7 +9,7 @@
  * practice session and only tags the study event differently.
  */
 import { parseJsonResponse } from './http'
-import type { PracticeKind } from './practice'
+import type { PracticeDifficulty, PracticeKind } from './practice'
 
 /** A question as it was ASKED — frozen at creation, never re-read from the pool. */
 export type ExamQuestion = {
@@ -19,7 +19,11 @@ export type ExamQuestion = {
   answer: string
   rubric: string | null
   sectionKey: string
+  difficulty?: PracticeDifficulty | null
 }
+
+/** One line of the learner's pick: a chapter or section key and how many to draw from it. */
+export type ExamPick = { scope: string; count: number }
 
 export type ExamAnswer = {
   response?: string
@@ -31,7 +35,14 @@ export type ExamSitting = {
   key: string
   docId: string
   scope: string | null
-  config: { chapters?: string[]; perChapter?: number; kinds?: string[] | null }
+  config: {
+    picks?: ExamPick[]
+    kinds?: string[] | null
+    difficulties?: number[] | null
+    /** Pre-v0.23.0 sittings stored only these two. */
+    chapters?: string[]
+    perChapter?: number
+  }
   questions: ExamQuestion[]
   answers: Record<string, ExamAnswer>
   resitOf: string | null
@@ -71,16 +82,34 @@ export async function fetchExams(docId?: string): Promise<{ exams: ExamSummary[]
   return parseJsonResponse(res)
 }
 
+/** Per version-section counts by kind × difficulty ("unrated" for items with none). A
+ *  section absent from the map has no items — it has not been processed. */
+export type ExamPool = {
+  docId: string | null
+  sections: Record<string, Partial<Record<PracticeKind, Record<string, number>>>>
+  error?: string
+}
+
+export async function fetchExamPool(docId?: string): Promise<ExamPool> {
+  const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
+  const res = await fetch(`/api/learn/exams/pool${qs}`, { cache: 'no-store' })
+  return parseJsonResponse(res)
+}
+
 export async function createExam(
   docId: string | undefined,
-  chapters: string[],
-  perChapter: number,
-  kinds?: PracticeKind[],
+  picks: ExamPick[],
+  opts: { kinds?: PracticeKind[] | null; difficulties?: PracticeDifficulty[] | null } = {},
 ): Promise<ExamSitting> {
   const res = await fetch('/api/learn/exams', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ doc: docId ?? null, chapters, perChapter, kinds: kinds ?? null }),
+    body: JSON.stringify({
+      doc: docId ?? null,
+      picks,
+      kinds: opts.kinds ?? null,
+      difficulties: opts.difficulties ?? null,
+    }),
   })
   return parseJsonResponse<ExamSitting>(res)
 }

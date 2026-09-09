@@ -27,6 +27,8 @@ import {
   fetchPracticeStatus,
   preparePractice,
   updatePracticeItem,
+  DIFFICULTY_LABEL,
+  type PracticeDifficulty,
   type PracticeItem,
   type PracticeKind,
 } from "@/gateways/api/practice"
@@ -45,9 +47,24 @@ const KIND_LABEL: Record<string, string> = {
   code: "code",
 }
 
-type Draft = { prompt: string; answer: string; rubric: string }
+type Draft = { prompt: string; answer: string; rubric: string; difficulty: PracticeDifficulty | null }
 
-const EMPTY_DRAFT: Draft = { prompt: "", answer: "", rubric: "" }
+const EMPTY_DRAFT: Draft = { prompt: "", answer: "", rubric: "", difficulty: null }
+
+const DIFFICULTIES: PracticeDifficulty[] = [1, 2, 3]
+
+/** The rating as a badge: "d2" plus the scale's words on hover; unrated reads "—",
+ *  never 0 — a paper drawn by difficulty leaves unrated items out, and the badge says so. */
+function DifficultyBadge({ value }: { value: PracticeDifficulty | null }) {
+  return (
+    <span
+      className="rounded bg-muted px-1.5 py-0.5 text-micro font-medium tabular-nums text-muted-foreground"
+      title={value ? `Difficulty ${value} — ${DIFFICULTY_LABEL[value]}` : "Unrated — drawn only when a paper sets no difficulty"}
+    >
+      {value ? `d${value}` : "d—"}
+    </span>
+  )
+}
 
 export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
   const chapters = useMemo(() => tree.filter((n) => n.sectionKey), [tree])
@@ -172,6 +189,26 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
         onChange={(e) => setDraft((d) => ({ ...d, rubric: e.target.value }))}
         className="h-14 w-full resize-y rounded border bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
+      <label className="flex items-center gap-2 text-micro font-medium uppercase text-muted-foreground">
+        Difficulty
+        <select
+          value={draft.difficulty ?? ""}
+          onChange={(e) =>
+            setDraft((d) => ({
+              ...d,
+              difficulty: e.target.value ? (Number(e.target.value) as PracticeDifficulty) : null,
+            }))
+          }
+          className="h-6 rounded border bg-background px-1 text-xs normal-case"
+        >
+          <option value="">unrated</option>
+          {DIFFICULTIES.map((n) => (
+            <option key={n} value={n}>
+              {n} — {DIFFICULTY_LABEL[n]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -309,6 +346,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
                     prompt: draft.prompt.trim(),
                     answer: draft.answer.trim(),
                     rubric: draft.rubric.trim() || null,
+                    difficulty: draft.difficulty,
                   }),
                 ),
               "Add",
@@ -347,7 +385,12 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
                       onClick={() => {
                         setAdding(false)
                         setEditingKey(it.key)
-                        setDraft({ prompt: it.prompt, answer: it.answer, rubric: it.rubric ?? "" })
+                        setDraft({
+                          prompt: it.prompt,
+                          answer: it.answer,
+                          rubric: it.rubric ?? "",
+                          difficulty: it.difficulty ?? null,
+                        })
                       }}
                     >
                       <PencilLine className="h-3 w-3" />
@@ -375,6 +418,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
                           prompt: draft.prompt.trim(),
                           answer: draft.answer.trim(),
                           rubric: draft.rubric.trim() || null,
+                          difficulty: draft.difficulty,
                         }),
                       ),
                     "Save",
@@ -385,6 +429,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
                       <span className="rounded bg-brand/15 px-1.5 py-0.5 text-micro font-medium uppercase text-brand">
                         {KIND_LABEL[it.kind] ?? it.kind}
                       </span>
+                      <DifficultyBadge value={it.difficulty ?? null} />
                       {it.editedAt != null && (
                         <span
                           className="rounded bg-primary/10 px-1.5 py-0.5 text-micro text-primary"
