@@ -49,49 +49,90 @@ def _rows_to_sitting(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _pool(doc: str, chapters: list[str], kinds: list[str] | None) -> list[dict[str, Any]]:
-    """Every eligible item under the chosen chapters, tagged with the chapter it came from.
+def exam_pool(doc: str | None) -> dict[str, Any]:
+    """What a paper could be drawn from, BEFORE the pick: per version-section counts by
+    kind × difficulty. Zero rows for a section means it has not been processed, and the
+    setup screen greys it out — the learner learns that before Start, not from a 400 after.
+    Read through ``concept_filter`` like every other pool read, so a re-cut version sees
+    its book's items; keys come back translated onto THIS version's outline."""
+    doc = resolve_doc_id(doc)
+    if not doc:
+        return {"docId": None, "sections": {}}
+    pred, binds = concept_filter(doc, None)
+    with db() as conn:
+        rows = conn.execute(
+            'SELECT section_key AS "sectionKey", kind, difficulty, count(*) AS n '
+            f"FROM ext_practice WHERE {pred} GROUP BY 1, 2, 3",
+            binds,
+        ).fetchall()
+    by_source = version_sections_by_source(doc)
+    sections: dict[str, dict[str, dict[str, int]]] = {}
+    for r in rows:
+        vks = by_source.get(r["sectionKey"]) or [r["sectionKey"]]
+        level = str(r["difficulty"]) if r.get("difficulty") is not None else "unrated"
+        by_kind = sections.setdefault(vks[0], {}).setdefault(r["kind"], {})
+        by_kind[level] = by_kind.get(level, 0) + int(r["n"])
+    return {"docId": doc, "sections": sections}
 
-    Reads through ``concept_filter`` per chapter, so a version inherits its book's items and
+
+def _pool(
+    doc: str,
+    picks: list[dict[str, Any]],
+    kinds: list[str] | None,
+    difficulties: list[int] | None = None,
+) -> list[dict[str, Any]]:
+    """Every eligible item under the picked scopes, tagged with the pick it came from
+    (``chapter`` — the name predates section-level picks and is kept for the tests).
+
+    Reads through ``concept_filter`` per pick, so a version inherits its book's items and
     a re-cut course still assembles — the same rule every other read of the pool follows.
+    A difficulty filter EXCLUDES unrated items: "2–3" means rated 2 or 3, and an item
+    nobody has rated is not silently promoted into that.
     """
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for ch in chapters:
-        span = scope_section_keys(doc, ch)
+    for pick in picks:
+        scope = pick["scope"]
+        span = scope_section_keys(doc, scope)
         pred, binds = concept_filter(doc, list(span) if span is not None else None)
-        sql = (
-            'SELECT key, kind, section_key AS "sectionKey" FROM ext_practice '
-            f'WHERE {pred} ORDER BY section_key, "order"'
-        )
+        where = [pred]
         if kinds:
-            sql = sql.replace("ORDER BY", "AND kind = ANY(%(kinds)s::text[]) ORDER BY")
+            where.append("kind = ANY(%(kinds)s::text[])")
             binds = {**binds, "kinds": list(kinds)}
+        if difficulties:
+            where.append("difficulty = ANY(%(diffs)s::int[])")
+            binds = {**binds, "diffs": [int(d) for d in difficulties]}
+        sql = (
+            'SELECT key, kind, difficulty, section_key AS "sectionKey" FROM ext_practice '
+            f'WHERE {" AND ".join(where)} ORDER BY section_key, "order"'
+        )
         with db() as conn:
             for r in conn.execute(sql, binds).fetchall():
-                if r["key"] in seen:  # a section shared by two chosen chapters counts once
+                if r["key"] in seen:  # a section inside two picks (a chapter and its own section) counts once
                     continue
                 seen.add(r["key"])
-                out.append({**r, "chapter": ch})
+                out.append({**r, "chapter": scope})
     return out
 
 
-def _stratify(pool: list[dict[str, Any]], per_chapter: int) -> list[str]:
-    """Take up to ``per_chapter`` items from each chapter, round-robin within a chapter so
-    one long section cannot crowd out the rest of it. Deterministic given the pool: the
-    variety comes from what was authored, not from a shuffle nobody can reproduce."""
+def _stratify(pool: list[dict[str, Any]], per_chapter: int | dict[str, int]) -> list[str]:
+    """Take up to the pick's count from each pick (an int applies the same count to all),
+    round-robin within a pick across its sections so one long section cannot crowd out the
+    rest of it. Deterministic given the pool: the variety comes from what was authored,
+    not from a shuffle nobody can reproduce."""
     by_chapter: dict[str, dict[str, list[str]]] = {}
     for it in pool:
         by_chapter.setdefault(it["chapter"], {}).setdefault(it.get("sectionKey") or "", []).append(it["key"])
     chosen: list[str] = []
     for chapter in sorted(by_chapter):
+        want = per_chapter if isinstance(per_chapter, int) else int(per_chapter.get(chapter, 0))
         sections = by_chapter[chapter]
         taken: list[str] = []
         round_ = 0
-        while len(taken) < per_chapter:
+        while len(taken) < want:
             added = False
             for sk in sorted(sections):
-                if round_ < len(sections[sk]) and len(taken) < per_chapter:
+                if round_ < len(sections[sk]) and len(taken) < want:
                     taken.append(sections[sk][round_])
                     added = True
             if not added:
@@ -101,35 +142,75 @@ def _stratify(pool: list[dict[str, Any]], per_chapter: int) -> list[str]:
     return chosen[:MAX_ITEMS]
 
 
+def normalize_picks(
+    picks: list[dict[str, Any]] | None,
+    chapters: list[str] | None = None,
+    per_chapter: int | None = None,
+) -> list[dict[str, Any]]:
+    """One shape for the two request forms: ``picks=[{scope, count}]`` (v0.23.0) or the
+    older ``chapters + perChapter``. Counts are clamped to 1..MAX_ITEMS; empty scopes and
+    repeats are dropped (first occurrence wins, matching ``_pool``'s dedupe)."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    source: list[dict[str, Any]] = list(picks or [])
+    if not source and chapters:
+        source = [{"scope": c, "count": per_chapter or DEFAULT_PER_CHAPTER} for c in chapters]
+    for p in source:
+        scope = str((p or {}).get("scope") or "").strip()
+        if not scope or scope in seen:
+            continue
+        seen.add(scope)
+        raw = (p or {}).get("count")
+        try:
+            count = DEFAULT_PER_CHAPTER if raw is None else int(raw)
+        except (TypeError, ValueError):
+            count = DEFAULT_PER_CHAPTER
+        out.append({"scope": scope, "count": max(1, min(MAX_ITEMS, count))})
+    return out
+
+
 def create_exam(
     doc: str | None,
-    chapters: list[str],
+    chapters: list[str] | None = None,
     per_chapter: int = DEFAULT_PER_CHAPTER,
     kinds: list[str] | None = None,
+    *,
+    picks: list[dict[str, Any]] | None = None,
+    difficulties: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Assemble and freeze a sitting. Returns the sitting, or an error envelope."""
+    """Assemble and freeze a sitting from the learner's pick — which scopes, how many from
+    each, which kinds, which difficulties. Returns the sitting, or an error envelope."""
     doc = resolve_doc_id(doc)
     if not doc:
         return {"error": "no document found", "status": 404}
-    chapters = [c for c in (chapters or []) if c]
-    if not chapters:
-        return {"error": "pick at least one chapter", "status": 400}
-    pool = _pool(doc, chapters, kinds)
-    items = _snapshot(doc, _stratify(pool, max(1, per_chapter)))
+    picks = normalize_picks(picks, chapters, per_chapter)
+    if not picks:
+        return {"error": "pick at least one chapter or section", "status": 400}
+    difficulties = sorted({d for d in (difficulties or []) if d in (1, 2, 3)}) or None
+    pool = _pool(doc, picks, kinds, difficulties)
+    items = _snapshot(doc, _stratify(pool, {p["scope"]: p["count"] for p in picks}))
     if not items:
         return {
-            "error": "those chapters have no practice items yet — generate some first",
+            "error": "nothing in the pool matches that pick — widen it, or generate items first",
             "status": 400,
         }
     key = uuid.uuid4().hex
-    config = {"chapters": chapters, "perChapter": per_chapter, "kinds": kinds or None}
+    scopes = [p["scope"] for p in picks]
+    config = {
+        "picks": picks,
+        "kinds": kinds or None,
+        "difficulties": difficulties,
+        # Kept for readers of pre-v0.23.0 sittings, which stored only these two.
+        "chapters": scopes,
+        "perChapter": per_chapter,
+    }
     with db() as conn:
         conn.execute(
             "INSERT INTO exam_sessions (key, doc_id, scope, config, items, answers, status, started_at) "
             "VALUES (%(k)s,%(d)s,%(s)s,%(c)s,%(i)s,'{}'::jsonb,'open', now())",
             {
                 "k": key, "d": doc,
-                "s": chapters[0] if len(chapters) == 1 else None,
+                "s": scopes[0] if len(scopes) == 1 else None,
                 "c": Json(config), "i": Json(items),
             },
         )
@@ -171,7 +252,7 @@ def _snapshot(doc: str, item_keys: list[str]) -> list[dict[str, Any]]:
         return []
     with db() as conn:
         rows = conn.execute(
-            'SELECT key, kind, prompt, answer, rubric, section_key AS "sectionKey" '
+            'SELECT key, kind, prompt, answer, rubric, difficulty, section_key AS "sectionKey" '
             "FROM ext_practice WHERE key = ANY(%(ks)s::text[])",
             {"ks": item_keys},
         ).fetchall()

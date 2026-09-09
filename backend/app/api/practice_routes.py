@@ -20,6 +20,7 @@ from app.process.extraction import (
 )
 from app.supplemental.study import (
     create_exam,
+    exam_pool,
     exam_results,
     fetch_exam,
     finish_exam,
@@ -114,19 +115,37 @@ def api_exams(doc: str | None = Query(None)) -> JSONResponse:
     return JSONResponse(list_exams(doc))
 
 
+@router.get("/api/exams/pool")
+def api_exam_pool(doc: str | None = Query(None)) -> JSONResponse:
+    """What a paper can be drawn from: per-section counts by kind × difficulty. Declared
+    before /api/exams/{key} so "pool" is never read as a sitting key."""
+    return _envelope(exam_pool(doc))
+
+
 @router.post("/api/exams")
 def api_create_exam(body: dict = Body(...)) -> JSONResponse:
-    """Assemble and FREEZE a sitting: {doc, chapters: [...], perChapter?, kinds?}."""
+    """Assemble and FREEZE a sitting from the learner's pick:
+    {doc, picks: [{scope, count}], kinds?, difficulties?} — or the pre-v0.23.0 form
+    {doc, chapters: [...], perChapter?, kinds?}, which still works."""
     body = body or {}
-    chapters = body.get("chapters")
-    if not isinstance(chapters, list) or not chapters:
-        return JSONResponse({"error": "chapters must be a non-empty list"}, status_code=400)
+    picks = body.get("picks") if isinstance(body.get("picks"), list) else None
+    chapters = body.get("chapters") if isinstance(body.get("chapters"), list) else None
+    if not picks and not chapters:
+        return JSONResponse({"error": "picks must be a non-empty list"}, status_code=400)
     try:
         per = int(body.get("perChapter") or 5)
     except (TypeError, ValueError):
         return JSONResponse({"error": "perChapter must be a number"}, status_code=400)
     kinds = body.get("kinds") if isinstance(body.get("kinds"), list) else None
-    return _envelope(create_exam(body.get("doc"), [str(c) for c in chapters], per, kinds))
+    diffs = body.get("difficulties") if isinstance(body.get("difficulties"), list) else None
+    try:
+        diffs = [int(d) for d in diffs] if diffs else None
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "difficulties must be numbers 1-3"}, status_code=400)
+    return _envelope(create_exam(
+        body.get("doc"), [str(c) for c in chapters] if chapters else None, per, kinds,
+        picks=picks, difficulties=diffs,
+    ))
 
 
 @router.get("/api/exams/{key}")

@@ -15,6 +15,7 @@ Depends on: process/content, process/extraction (chapter stage ledger), gateways
 from app.supplemental.study.calendar import build_review_calendar, build_study_debt
 from app.supplemental.study.exams import (
     create_exam,
+    exam_pool,
     exam_results,
     fetch_exam,
     finish_exam,
@@ -44,6 +45,7 @@ __all__ = [
     "compute_mastery",
     "create_exam",
     "delete_concept_reviews",
+    "exam_pool",
     "exam_results",
     "fetch_exam",
     "finish_exam",

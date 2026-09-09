@@ -5,7 +5,7 @@ course; what is unit-tested here is the part with real branching: how a paper is
 from the pool, and how a score reports what it does and does not know.
 """
 
-from app.supplemental.study.exams import _score, _stratify
+from app.supplemental.study.exams import MAX_ITEMS, _score, _stratify, normalize_picks
 
 
 def _pool(spec):
@@ -53,3 +53,38 @@ def test_score_of_nothing_graded_is_unknown_not_zero():
     # The honesty rule the whole measurement layer follows: an absent measurement is
     # never rendered as a bad one.
     assert _score([]) == {"graded": 0, "good": 0, "fraction": None}
+
+
+# ── v0.23.0 — the learner's pick: per-scope counts, clamped and deduped ─────
+
+
+def test_stratify_honours_a_count_per_pick():
+    pool = _pool({"toc:1": {"toc:1.1": 10}, "toc:2.3": {"toc:2.3": 10}})
+    picked = _stratify(pool, {"toc:1": 6, "toc:2.3": 3})
+    assert sum(1 for k in picked if k.startswith("toc:1.1")) == 6
+    assert sum(1 for k in picked if k.startswith("toc:2.3")) == 3
+
+
+def test_stratify_with_a_dict_takes_nothing_from_an_unlisted_pick():
+    pool = _pool({"toc:1": {"toc:1.1": 5}, "toc:2": {"toc:2.1": 5}})
+    assert all(k.startswith("toc:1.1") for k in _stratify(pool, {"toc:1": 2}))
+
+
+def test_normalize_picks_clamps_dedupes_and_drops_blanks():
+    picks = normalize_picks(
+        [{"scope": "toc:1", "count": 0}, {"scope": "toc:1", "count": 4},
+         {"scope": "", "count": 3}, {"scope": "toc:2.1", "count": 999}, {"scope": "toc:3", "count": "x"}]
+    )
+    assert picks == [
+        {"scope": "toc:1", "count": 1},
+        {"scope": "toc:2.1", "count": MAX_ITEMS},
+        {"scope": "toc:3", "count": 5},
+    ]
+
+
+def test_normalize_picks_accepts_the_pre_v0_23_body():
+    assert normalize_picks(None, ["toc:1", "toc:2"], 7) == [
+        {"scope": "toc:1", "count": 7},
+        {"scope": "toc:2", "count": 7},
+    ]
+    assert normalize_picks(None, None, None) == []
