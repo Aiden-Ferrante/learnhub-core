@@ -14,6 +14,12 @@ not add to it mid-build.
 
 ## Pruned
 
+- **Fluency-before snapshot on a sitting** (v0.23.0, cut at plan time 2026-09-08). Freeze
+  each picked scope's fluency into the sitting's `config` so results can show predicted
+  beside actual per section — the whole "the app told me before the exam did" waypoint in
+  one column. Cut so the cycle stayed the pick; still the cheapest way to make the
+  Competency waypoint observable.
+
 - **v0.19.0 Practice items and v0.20.0 Show your work — both cycles aborted 2026-08-26**,
   to be re-planned with more care. No versions cut. Both records are kept, renamed out of the
   version namespace, and carry retros; the two spikes are the part worth not re-running.
@@ -55,6 +61,13 @@ not add to it mid-build.
   never averaged into retention, unknown ≠ zero, no solid/shaky adjectives.
 
 ## Carries forward
+
+- **Per-section mastery ignores items and concepts on non-leaf sections.** (v0.23.0 verify,
+  2026-09-09.) `mastery.py` rolls a section up from `descendant_leaves` only, so anything
+  attached to a chapter or sub-chapter node counts overall but in no section: prod chapter 2
+  shows 22 problem items and 0 attempted where 29 exist and 2 were graded. Latent since
+  v0.19.0; surfaced by a book whose chapters carry their own prose. One-line fix, but it is
+  a mastery-axis change and belongs to its own light cycle with a planted violation.
 
 - **Two documents have no card, so they cannot be deleted from the Processing tab at all.**
   (v0.17.0.) `Axler-Measure-Integration` and `Durrett-Probability`. The tab lists
