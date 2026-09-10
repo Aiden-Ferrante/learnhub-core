@@ -33,12 +33,12 @@ import { useEffect, useState } from "react"
  */
 
 const FLEET_APPS = [
-  { id: "shipyard", label: "Shipyard", port: 8845, blurb: "projects, goals, what the fleet owes" },
-  { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
-  { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads", url: "https://spark-9415.tailff006f.ts.net" },
-  { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
-  { id: "content-manager", label: "Content", port: 8955, blurb: "channels, productions, scripts" },
   { id: "helm", label: "Helm", port: 8990, blurb: "what needs me now, agenda, decisions" },
+  { id: "shipyard", label: "Shipyard", port: 8845, blurb: "projects, goals, what the fleet owes" },
+  { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads", url: "https://spark-9415.tailff006f.ts.net" },
+  { id: "content-manager", label: "Content", port: 8955, blurb: "channels, productions, scripts" },
+  { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
+  { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
 ] as const satisfies readonly { id: string; label: string; port: number; blurb: string; url?: string }[]
 
 const ME = "learnhub"
