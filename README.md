@@ -1,10 +1,41 @@
 # Learn Hub
 
-Turn a textbook PDF into something you can actually study: a structured reader, an
-extracted concept layer, and a spaced-repetition loop that schedules what to review next.
+A local-first study app: it turns a textbook PDF into a hierarchical table of contents with
+page ranges, extracts a concept layer with an LLM, generates practice items (`retrieve` and
+`problem` kinds), and schedules them in a spaced-repetition review loop. Every LLM pass goes
+to a local [Ollama](https://ollama.com); no API keys, no third-party inference.
 
-Runs entirely on your own machine. No API keys, no third-party inference — every LLM pass
-goes to a local [Ollama](https://ollama.com) instance.
+**Result:** the backend suite runs from a fresh clone with no services running —
+175 passed, 30 skipped (Postgres integration tests, opt in with `LEARN_PG_TESTS=1`), 1 xfailed.
+
+## Quickstart
+
+Tests only, no Docker. `requirements.txt` pulls docling and torch, so the first install is a
+large download.
+
+```bash
+git clone https://github.com/Aiden-Ferrante/learnhub-core.git && cd learnhub-core
+uv venv .venv && VIRTUAL_ENV=.venv uv pip install -r backend/requirements.txt pytest
+.venv/bin/python -m pytest backend/tests -q
+```
+
+The full app (Next.js 15 + React 19 UI, FastAPI backend, Postgres, Ollama with
+`nemotron-3-nano:30b` and `gemma4`) runs under Docker Compose — see
+[Running the full stack](#running-the-full-stack).
+
+## What went wrong / what I learned
+
+- **The TOC pass guessed structure the book had already stated.** It clamped headings to three
+  levels and returned 81 entries for a book with seven chapters; a title-matching pointer then
+  collapsed 67 of 81 blocks into the last section, feeding extraction 558 characters of the
+  wrong chapter. Now a book that numbers its headings is read by that numbering first
+  (`from-numbered-headings`, CHANGELOG [0.15.0]).
+- **Generated questions quizzed the book's furniture, not its subject.** A spike measured 23%
+  of retrieval questions phrased "according to the text…". The prompt forbids it and a
+  deterministic post-filter backstops it (`backend/app/process/extraction/practice.py`).
+- **Fire-and-forget hid a total failure.** `/api/engagement` raised a `TypeError` on every
+  call since it shipped, and nothing reported it. v0.15.0 became an audit of every place the
+  app answered confidently and wrongly instead of admitting it did not know.
 
 ## Why
 
@@ -21,7 +52,7 @@ queue, so the system decides what is due rather than asking you to.
 Extraction is per-chapter and on demand: a whole-book LLM pass is hours, not seconds, and
 studying chapter 2 shouldn't wait on chapter 40.
 
-## Quickstart
+## Running the full stack
 
 Requirements: Docker with Compose, and ~8 GB free for models. An NVIDIA GPU is optional but
 strongly recommended — the converter and extraction passes are much slower on CPU.
