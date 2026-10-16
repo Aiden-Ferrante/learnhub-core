@@ -14,6 +14,18 @@ not add to it mid-build.
 
 ## Pruned
 
+- **v0.23.0 Set the paper — aborted 2026-10-16** (human decision, to open the
+  authoring-quality cycle). Its code is in `main` and observed on prod; what it owed:
+  - **Rung 3 — sit one self-set paper on :3001** and log every miss. Still the only
+    evidence a human has ever used the exam.
+  - **M1 — per-section fluency drops chapter-level items.** `mastery.py`'s rollup sums
+    `descendant_leaves` only, so an item or concept on a non-leaf section is invisible to
+    every per-section number (chapter 2: 22 counted of 29, attempted 0 of 2).
+  - **M2 — fluency reads 1.0 after a 50% paper.** FSRS retrievability is ~1 right after
+    any review, whatever the grade; honest about the engine, useless about the sitting.
+  - **Verify-rung debris on prod**: open sittings `e8419b3a`, `e985e027`, `acb30ef1` and
+    finished `710bf83c` — the human decides whether they go.
+
 - **Fluency-before snapshot on a sitting** (v0.23.0, cut at plan time 2026-09-08). Freeze
   each picked scope's fluency into the sitting's `config` so results can show predicted
   beside actual per section — the whole "the app told me before the exam did" waypoint in

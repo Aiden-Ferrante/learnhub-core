@@ -7,7 +7,8 @@ commit.
 
 ## [Unreleased]
 
-Set the paper. (v0.23.0, open)
+Set the paper — shipped untagged: the v0.23.0 cycle was aborted 2026-10-16 with first
+contact owed; the work below rides in the next version cut.
 
 ### Added
 - **Difficulty on a practice item**, 1–3: applies one definition or rule directly ·

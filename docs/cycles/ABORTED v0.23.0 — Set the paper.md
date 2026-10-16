@@ -1,4 +1,4 @@
-# v0.23.0 — Set the paper
+# ABORTED — Set the paper (was v0.23.0)
 
 Sub-cycle plan under [[0.) Development Protocol 1.0]]
 Opened 2026-09-08
@@ -162,8 +162,27 @@ that ran it crashed before writing this section, so the evidence below was re-re
 are the agent's rows, not a study record — the human decides whether they go before first
 contact.
 
-**Rung 3 — first contact.** _Owed. One self-set paper on :3001, misses logged here._
+**Rung 3 — first contact.** _Never run — the cycle was aborted first (see Retro)._
 
 ## Review
 
 _What was learned, including what went wrong._
+
+## Retro — aborted 2026-10-16
+
+**No version was cut.** The human aborted the cycle with rung 3 still owed (one self-set
+paper sat on :3001) so the next cycle — authoring-time quality checks and a model bake-off —
+could open. The record is renamed out of the version namespace, as v0.19.0's was, so it
+stops counting as open; kept rather than deleted because rung 2's evidence is real.
+
+**What landed anyway.** Difficulty on the item, the pool read, the outline setup screen and
+the pick-honouring draw are all in `main`, and rung 2 observed them on prod (sitting
+`710bf83c`). Aborting withdraws the version, not the work.
+
+**What the plan missed.** First contact is the human's step (the agent cannot log in to
+:3001), and five weeks passed without it — a rung that only the human can run needs a date,
+not a slot at the end.
+
+**Carried to Backlog:** rung 3 (sit one self-set paper), M1 (per-section fluency drops
+chapter-level items), M2 (fluency reads 1.0 after a 50% paper), and the four verify-rung
+sittings left on prod.
