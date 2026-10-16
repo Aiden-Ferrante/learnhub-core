@@ -48,12 +48,27 @@ export type PracticeResponse = {
   error?: string
 }
 
+/** What the newest finished authoring run kept and threw away (v0.23.0). Counters a
+ *  run predating the checks did not write are absent, not zero. */
+export type PracticeReceipt = {
+  authored: number
+  dropped: number
+  refused: number
+  failedCheck?: number
+  relabeled?: number
+  unchecked?: number
+  unrevised?: number
+  total: number
+  finishedAt?: number | null
+}
+
 export type PracticeStatus = {
   /** Sections in scope / sections with any authored items. */
   total: number
   authored: number
   byKind: Record<string, number>
   running: boolean
+  lastReceipt?: PracticeReceipt | null
   error?: string
 }
 

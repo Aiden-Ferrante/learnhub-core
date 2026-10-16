@@ -499,16 +499,22 @@ def practice_status(doc: str | None, scope: str | None) -> dict[str, Any]:
                 covered.add(r["section_key"])
                 by_kind[r["kind"]] = by_kind.get(r["kind"], 0) + int(r["n"])
     running = False
+    last_receipt = None
     try:
         from app.gateways import list_builds
 
-        running = any(
-            j.get("scope") == (scope or "") and j.get("status") in ("queued", "running")
-            for j in list_builds(doc, kind="practice").get("builds", [])
-        )
+        jobs = [j for j in list_builds(doc, kind="practice").get("builds", [])
+                if j.get("scope") == (scope or "")]
+        running = any(j.get("status") in ("queued", "running") for j in jobs)
+        # v0.23.0: the receipt was persisted on the ledger row and shown nowhere, so what the
+        # checks dropped was invisible. The newest finished run's receipt rides along here.
+        done = [j for j in jobs if j.get("status") == "done" and isinstance(j.get("receipt"), dict)]
+        if done:
+            last_receipt = {**done[-1]["receipt"], "finishedAt": done[-1].get("finishedAt")}
     except Exception:  # noqa: BLE001
         pass
-    return {"total": len(sections), "authored": len(covered), "byKind": by_kind, "running": running}
+    return {"total": len(sections), "authored": len(covered), "byKind": by_kind,
+            "running": running, "lastReceipt": last_receipt}
 
 
 # --------------------------------------------------------------------------- #

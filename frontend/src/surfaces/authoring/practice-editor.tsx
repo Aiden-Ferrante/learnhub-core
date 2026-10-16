@@ -31,6 +31,7 @@ import {
   type PracticeDifficulty,
   type PracticeItem,
   type PracticeKind,
+  type PracticeReceipt,
 } from "@/gateways/api/practice"
 
 type PracticeEditorProps = {
@@ -52,6 +53,22 @@ type Draft = { prompt: string; answer: string; rubric: string; difficulty: Pract
 const EMPTY_DRAFT: Draft = { prompt: "", answer: "", rubric: "", difficulty: null }
 
 const DIFFICULTIES: PracticeDifficulty[] = [1, 2, 3]
+
+/** One line of what the last run kept and why it threw the rest away. Only counters the
+ *  run actually wrote are named; a zero is left out so the line stays readable. */
+function receiptLine(r: PracticeReceipt): string {
+  const parts = [`${r.authored} kept`]
+  const named: [number | undefined, string][] = [
+    [r.dropped, "dropped by the screen"],
+    [r.failedCheck, "failed the answer check"],
+    [r.relabeled, "relabelled recall"],
+    [r.unchecked, "unchecked"],
+    [r.unrevised, "unrevised"],
+    [r.refused, "sections refused"],
+  ]
+  for (const [n, label] of named) if (n) parts.push(`${n} ${label}`)
+  return parts.join(" · ")
+}
 
 /** The rating as a badge: "d2" plus the scale's words on hover; unrated reads "—",
  *  never 0 — a paper drawn by difficulty leaves unrated items out, and the badge says so. */
@@ -76,6 +93,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
   const [stale, setStale] = useState<string[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [running, setRunning] = useState(false)
+  const [receipt, setReceipt] = useState<PracticeReceipt | null>(null)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [adding, setAdding] = useState(false)
@@ -121,6 +139,7 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
       const st = await fetchPracticeStatus(docId, scope)
       if (!st.running && running) void loadItems(scope)
       setRunning(st.running)
+      setReceipt(st.lastReceipt ?? null)
     } catch {
       /* status is decoration — never break the editor */
     }
@@ -312,6 +331,12 @@ export function PracticeEditor({ docId, tree, loading }: PracticeEditorProps) {
         {error && (
           <p className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             {error}
+          </p>
+        )}
+
+        {receipt && !running && (
+          <p className="text-xs text-muted-foreground" title="The newest finished generation run for this chapter">
+            Last run: {receiptLine(receipt)}
           </p>
         )}
 
