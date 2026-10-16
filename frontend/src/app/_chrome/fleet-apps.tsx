@@ -39,6 +39,8 @@ const FLEET_APPS = [
   { id: "content-manager", label: "Content", port: 8955, blurb: "channels, productions, scripts" },
   { id: "feedwall", label: "Feed", port: 8975, blurb: "what the frontier said this week" },
   { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
+  { id: "internwatch", label: "Intern", port: 8962, blurb: "internship boards, diffed daily" },
+  { id: "studyloop", label: "Study", port: 8963, blurb: "the focus-block loop, concepts per hour" },
 ] as const satisfies readonly { id: string; label: string; port: number; blurb: string; url?: string }[]
 
 const ME = "learnhub"
