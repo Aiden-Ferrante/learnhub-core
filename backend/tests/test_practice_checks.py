@@ -174,6 +174,43 @@ def test_gate_failure_keeps_items_and_counts_unchecked_never_a_silent_pass(monke
     assert len(kept) == 2 and unchecked == 1  # item 1 had no verdict
 
 
+def test_gate_retries_items_a_short_batch_left_out(monkeypatch):
+    # Observed: gpt-oss answered a batch of three long problems with an EMPTY list.
+    calls = _stub(monkeypatch, {
+        AttemptSet: [{"attempts": []}, {"attempts": [{"index": 0, "answer": "a"}]},
+                     {"attempts": [{"index": 1, "answer": "  "}]}],
+        AnswerVerdictSet: {"verdicts": [{"index": 0, "verdict": "consistent", "reason": "ok"}]},
+    })
+    kept, failed, unchecked = practice_checks.answerability("H", "text", [_item("P0?"), _item("P1?")], None)
+    assert calls.count(AttemptSet) == 3  # the batch, then one per missing item
+    assert len(kept) == 2 and unchecked == 1  # item 1's blank answer is not an attempt
+
+
+def test_gate_drops_an_item_that_gives_its_answer_away(monkeypatch):
+    _stub(monkeypatch, {
+        AttemptSet: {"attempts": [{"index": 0, "answer": "the distance from the truth"}]},
+        AnswerVerdictSet: {"verdicts": [{"index": 0, "verdict": "gives_away", "reason": "prompt states it"}]},
+    })
+    kept, failed, _ = practice_checks.answerability(
+        "H", "text", [_item("Define bias as the distance from the truth.", kind="retrieve")], None)
+    assert kept == [] and failed[0]["check"]["verdict"] == "gives_away"
+
+
+def test_screen_drops_are_recorded_with_their_reason(monkeypatch):
+    _stub(monkeypatch, {
+        ObjectiveSet: {"objectives": [{"text": "Derive X.", "level": "produce"}]},
+        ProblemSet: {"problems": [
+            {"prompt": "As shown in Table 2, derive X.", "answer": "s", "rubric": "r", "difficulty": 2},
+            {"prompt": "The bias of an estimator.", "answer": "s", "rubric": "r", "difficulty": 2},
+        ]},
+    })
+    items, receipt, failed = practice.author_section_items("H", "text", "", ["problem"], None, revise_passes=0)
+    assert receipt["dropped"] == 2 and items == []
+    reasons = [f["check"]["reason"] for f in failed]
+    assert all(f["check"]["verdict"] == "screened" for f in failed)
+    assert "As shown in" in reasons[0] and reasons[1] == "asks nothing"
+
+
 # ── recall in disguise ───────────────────────────────────────────────────────
 
 

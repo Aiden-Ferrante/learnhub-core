@@ -47,6 +47,10 @@ OBJECTIVES_SYSTEM = (
     "example or counterexample, or decides whether a claim holds and justifies it.\n\n"
     "Only tag an objective 'produce' if the section gives the learner enough to actually "
     "do the work. A section that only describes or narrates has no produce objectives.\n"
+    "Name the SKILL, never its answer: write 'Define bias at a point', not 'Define bias as "
+    "the distance between the truth and the average prediction' — an item is written "
+    "from each objective, and an objective that states its answer becomes an item that "
+    "gives it away.\n"
     f"List at most {MAX_OBJECTIVES_PER_LEVEL} of each level, each one sentence, distinct "
     "from the others. If the section is front matter or teaches nothing, return an EMPTY "
     "list — refusing is a correct answer."
@@ -173,23 +177,19 @@ COMPARE_SYSTEM = (
     "- consistent: they agree, or the student's answer is a correct alternative.\n"
     "- contradicts: they reach different results or make incompatible claims.\n"
     "- unanswerable: the student answered 'CANNOT ANSWER', or the item cannot be answered "
-    "from what it states.\n"
+    "from what it states — it relies on a table, figure, dataset, number or passage it "
+    "mentions but does not include.\n"
+    "- gives_away: the item's own wording already contains its answer, so a learner can "
+    "copy it back without knowing anything.\n"
     "Give a one-sentence reason for each. Judge every item, keeping its index."
 )
 
-DROP_VERDICTS = frozenset({"contradicts", "unanswerable"})
-
-
-def answerability(
-    heading: str, passage: str, items: list[dict[str, Any]], model: str | None
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
-    """Round-trip each item: a fresh attempt from the passage (never shown the stored
-    answer), then a comparison. Returns ``(kept, failed, unchecked)``. ``failed`` items
-    carry ``check = {verdict, reason}`` so the bake-off can show WHY. A call that fails, or
-    an item the model skipped, keeps the item and counts it unchecked — never a silent pass."""
-    if not items:
-        return [], [], 0
-    numbered = "\n\n".join(f"[{i}] {it['prompt']}" for i, it in enumerate(items))
+def _attempt(
+    heading: str, passage: str, indexed: list[tuple[int, dict[str, Any]]], model: str | None
+) -> dict[int, str]:
+    """The student's answers by item index — only for indices that were asked and answered
+    non-empty. A failed call returns {}."""
+    numbered = "\n\n".join(f"[{i}] {it['prompt']}" for i, it in indexed)
     obj, err = ollama_structured_completion(
         [
             {"role": "system", "content": ATTEMPT_SYSTEM},
@@ -201,8 +201,34 @@ def answerability(
         AttemptSet, temperature=0.0, model=model,
     )
     if err or obj is None:
-        return list(items), [], len(items)
-    attempts = {a.get("index"): (a.get("answer") or "").strip() for a in obj.get("attempts") or []}
+        return {}
+    asked = {i for i, _ in indexed}
+    out = {}
+    for a in obj.get("attempts") or []:
+        ans = (a.get("answer") or "").strip()
+        if a.get("index") in asked and ans:
+            out[a["index"]] = ans
+    return out
+
+
+DROP_VERDICTS = frozenset({"contradicts", "unanswerable", "gives_away"})
+
+
+def answerability(
+    heading: str, passage: str, items: list[dict[str, Any]], model: str | None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+    """Round-trip each item: a fresh attempt from the passage (never shown the stored
+    answer), then a comparison. Returns ``(kept, failed, unchecked)``. ``failed`` items
+    carry ``check = {verdict, reason}`` so the bake-off can show WHY. A call that fails, or
+    an item the model skipped, keeps the item and counts it unchecked — never a silent pass."""
+    if not items:
+        return [], [], 0
+    attempts = _attempt(heading, passage, list(enumerate(items)), model)
+    # A batch can come back short — gpt-oss returned an EMPTY list for three long problems
+    # (bake-off trace, 2026-10-16). Each missing item gets one attempt on its own.
+    for i, it in enumerate(items):
+        if i not in attempts:
+            attempts.update(_attempt(heading, passage, [(i, it)], model))
 
     pairs = "\n\n".join(
         f"[{i}] ITEM: {it['prompt']}\nREFERENCE: {it['answer']}\nSTUDENT: {attempts[i]}"

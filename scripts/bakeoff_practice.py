@@ -95,8 +95,8 @@ def compare(args: argparse.Namespace) -> None:
             print(f"**[{tag}] {heading}**\n\n> {i['prompt']}\n\n{i['answer']}\n")
         fails = [(s["heading"], f) for s in r["sections"] for f in s["failed"]]
         if fails:
-            print(f"### {r['model']} — gate rejects ({len(fails)})\n")
-            for heading, f in fails[: args.sample]:
+            print(f"### {r['model']} — rejects, gate and screen ({len(fails)})\n")
+            for heading, f in fails:
                 c = f["check"]
                 print(f"- **{c['verdict']}** ({heading}): {f['prompt'][:160]} — _{c['reason']}_")
 

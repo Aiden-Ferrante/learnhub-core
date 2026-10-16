@@ -119,7 +119,7 @@ class AnswerVerdict(BaseModel):
     """Does the fresh attempt agree with the stored answer on what matters?"""
 
     index: int
-    verdict: Literal["consistent", "contradicts", "unanswerable"]
+    verdict: Literal["consistent", "contradicts", "unanswerable", "gives_away"]
     reason: str
 
 

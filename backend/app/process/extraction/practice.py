@@ -190,6 +190,16 @@ def _author_model(override: str | None = None) -> str | None:
     )
 
 
+def _screen_reason(prompt: str) -> str | None:
+    """Why the screen drops a prompt — the tell's matched words, or 'asks nothing' — or None
+    when it passes. The bake-off records these so a high drop rate can be read, not guessed."""
+    for rx in _FURNITURE_TELLS + _DEIXIS_TELLS:
+        m = rx.search(prompt or "")
+        if m:
+            return f"points outside itself: '{m.group(0)}'"
+    return None if _has_task(prompt) else "asks nothing"
+
+
 def _has_furniture(text: str) -> bool:
     """Whether a prompt points outside itself — at the book's apparatus, or at material it
     never carries. Either way the learner cannot work it from the prompt alone."""
@@ -217,6 +227,7 @@ def _author_section(
     concept_lines: str,
     model: str | None,
     objectives: list[dict[str, str]] | None = None,
+    screened: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Author one section's items of one kind → (kept items, dropped-by-filter count).
     An empty list with zero drops is a refusal, which the prompts allow. ``objectives``
@@ -248,12 +259,15 @@ def _author_section(
         return [], 0
     if err or obj is None:
         raise RuntimeError(f"{kind} authoring failed: {err}")
-    return _clean(kind, raw)
+    return _clean(kind, raw, screened)
 
 
-def _clean(kind: str, raw: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+def _clean(
+    kind: str, raw: list[dict[str, Any]], screened: list[dict[str, Any]] | None = None
+) -> tuple[list[dict[str, Any]], int]:
     """The deterministic screen every model-written item passes — at authoring and again
-    after a revise pass, since a reviser can reintroduce what the author avoided."""
+    after a revise pass, since a reviser can reintroduce what the author avoided. Each drop
+    is appended to ``screened`` (when given) with its reason."""
     kept: list[dict[str, Any]] = []
     dropped = 0
     for it in raw:
@@ -264,8 +278,12 @@ def _clean(kind: str, raw: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
             continue
         # Two ways an item fails to be workable, both counted as drops so the receipt
         # shows them: it points outside itself, or it asks nothing at all.
-        if _has_furniture(prompt) or not _has_task(prompt):
+        reason = _screen_reason(prompt)
+        if reason:
             dropped += 1
+            if screened is not None:
+                screened.append({"kind": kind, "prompt": prompt, "answer": answer,
+                                 "check": {"verdict": "screened", "reason": reason}})
             continue
         kept.append({
             "kind": kind, "prompt": prompt, "answer": answer, "rubric": rubric,
@@ -299,7 +317,8 @@ def author_section_items(
     """One section through every authoring stage, writing NOTHING (v0.23.0):
     objectives → author per kind → screen → critique/revise → screen → answerability gate
     → recall-in-disguise. Returns ``(items, receipt, failed)`` where ``failed`` holds the
-    gate's rejects with their reasons, for the bake-off to show."""
+    gate's rejects AND the screen's drops (verdict ``screened``) with their reasons, for
+    the bake-off to show."""
     passage = text[:_MAX_PASSAGE]
     passes = _revise_passes() if revise_passes is None else revise_passes
     receipt = empty_receipt()
@@ -313,7 +332,8 @@ def author_section_items(
         if not steer:
             receipt["refused"] += 1  # nothing of this level taught here: refused, no call
             continue
-        kept, dropped = _author_section(kind, heading, text, concept_lines, model, objectives=steer)
+        kept, dropped = _author_section(kind, heading, text, concept_lines, model,
+                                        objectives=steer, screened=failed)
         receipt["dropped"] += dropped
         for _ in range(passes):
             if not kept:
@@ -322,7 +342,7 @@ def author_section_items(
             if raw is None:
                 receipt["unrevised"] += len(kept)
                 break
-            kept, dropped = _clean(kind, raw)
+            kept, dropped = _clean(kind, raw, failed)
             receipt["dropped"] += dropped
         if not kept and not dropped:
             receipt["refused"] += 1
