@@ -31,6 +31,7 @@ from app.process.content import (
     source_id_of,
     version_sections_by_source,
 )
+from app.process.extraction import practice_checks
 from app.process.extraction.concepts_extract import repair_model_text
 
 # Kinds this pass can author. mcq/order/code join in later phases; the registry shape
@@ -210,15 +211,23 @@ def _section_concept_lines(src: str, section_key: str) -> str:
 
 
 def _author_section(
-    kind: str, heading: str, text: str, concept_lines: str, model: str | None
+    kind: str,
+    heading: str,
+    text: str,
+    concept_lines: str,
+    model: str | None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Author one section's items of one kind → (kept items, dropped-by-filter count).
-    An empty list with zero drops is a refusal, which the prompts allow."""
+    An empty list with zero drops is a refusal, which the prompts allow. ``objectives``
+    (v0.23.0) steers it to one item per objective."""
     passage = text[:_MAX_PASSAGE]
+    steer = practice_checks.objectives_block(objectives) if objectives else ""
     if kind == "retrieve":
         user = f"Section: {heading}\n\n<section_text>\n{passage}\n</section_text>"
         if concept_lines:
             user += f"\n\n<key_concepts>\n{concept_lines}\n</key_concepts>"
+        user += steer
         obj, err = ollama_structured_completion(
             [{"role": "system", "content": RETRIEVE_SYSTEM}, {"role": "user", "content": user}],
             RetrieveSet, temperature=0.3, model=model,
@@ -229,7 +238,7 @@ def _author_section(
             for q in ((obj or {}).get("questions") or [])
         ]
     elif kind == "problem":
-        user = f"Section: {heading}\n\n<section_text>\n{passage}\n</section_text>"
+        user = f"Section: {heading}\n\n<section_text>\n{passage}\n</section_text>" + steer
         obj, err = ollama_structured_completion(
             [{"role": "system", "content": PROBLEM_SYSTEM}, {"role": "user", "content": user}],
             ProblemSet, temperature=0.3, model=model,
@@ -239,7 +248,12 @@ def _author_section(
         return [], 0
     if err or obj is None:
         raise RuntimeError(f"{kind} authoring failed: {err}")
+    return _clean(kind, raw)
 
+
+def _clean(kind: str, raw: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """The deterministic screen every model-written item passes — at authoring and again
+    after a revise pass, since a reviser can reintroduce what the author avoided."""
     kept: list[dict[str, Any]] = []
     dropped = 0
     for it in raw:
@@ -260,6 +274,72 @@ def _author_section(
     return kept, dropped
 
 
+def _revise_passes() -> int:
+    """``LEARN_PRACTICE_REVISE_PASSES``, default 1, clamped to 0..MAX_REVISE_PASSES."""
+    try:
+        n = int(os.environ.get("LEARN_PRACTICE_REVISE_PASSES", "1"))
+    except ValueError:
+        n = 1
+    return max(0, min(n, practice_checks.MAX_REVISE_PASSES))
+
+
+def empty_receipt() -> dict[str, int]:
+    return {"authored": 0, "dropped": 0, "refused": 0, "failedCheck": 0,
+            "relabeled": 0, "unchecked": 0, "unrevised": 0}
+
+
+def author_section_items(
+    heading: str,
+    text: str,
+    concept_lines: str,
+    kinds: list[str],
+    model: str | None,
+    revise_passes: int | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
+    """One section through every authoring stage, writing NOTHING (v0.23.0):
+    objectives → author per kind → screen → critique/revise → screen → answerability gate
+    → recall-in-disguise. Returns ``(items, receipt, failed)`` where ``failed`` holds the
+    gate's rejects with their reasons, for the bake-off to show."""
+    passage = text[:_MAX_PASSAGE]
+    passes = _revise_passes() if revise_passes is None else revise_passes
+    receipt = empty_receipt()
+    items: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+
+    objs = practice_checks.objectives(heading, passage, concept_lines, model)
+    for kind in kinds:
+        level = "recall" if kind == "retrieve" else "produce"
+        steer = [o for o in objs if o["level"] == level]
+        if not steer:
+            receipt["refused"] += 1  # nothing of this level taught here: refused, no call
+            continue
+        kept, dropped = _author_section(kind, heading, text, concept_lines, model, objectives=steer)
+        receipt["dropped"] += dropped
+        for _ in range(passes):
+            if not kept:
+                break
+            raw = practice_checks.revise(kind, heading, passage, kept, model)
+            if raw is None:
+                receipt["unrevised"] += len(kept)
+                break
+            kept, dropped = _clean(kind, raw)
+            receipt["dropped"] += dropped
+        if not kept and not dropped:
+            receipt["refused"] += 1
+            continue
+        kept, rejects, unchecked = practice_checks.answerability(heading, passage, kept, model)
+        receipt["failedCheck"] += len(rejects)
+        receipt["unchecked"] += unchecked
+        failed.extend(rejects)
+        items.extend(kept)
+
+    items, relabeled, unchecked = practice_checks.recall_in_disguise(items, concept_lines, model)
+    receipt["relabeled"] += relabeled
+    receipt["unchecked"] += unchecked
+    receipt["authored"] = len(items)
+    return items, receipt, failed
+
+
 def author_practice_sync(
     doc: str | None,
     scope: str | None,
@@ -271,7 +351,8 @@ def author_practice_sync(
     """Author practice items for every section in scope that has none of that kind yet.
     Synchronous so the build queue runs it as a ledgered job. ``regenerate`` first clears
     the scope's UNTOUCHED rows (edited_at IS NULL) of the requested kinds — edited items
-    survive by construction. Returns an {authored, dropped, refused, total} receipt."""
+    survive by construction. Each section runs ``author_section_items``; the receipt is
+    {authored, dropped, refused, failedCheck, relabeled, unchecked, unrevised, total}."""
     doc = resolve_doc_id(doc)
     if not doc:
         return {"error": "no document found"}
@@ -296,19 +377,21 @@ def author_practice_sync(
             ).fetchall()
         }
 
-    authored = dropped = refused = 0
+    receipt = empty_receipt()
     total_calls = len(sections) * len(kinds)
     done = 0
     for s in sections:
+        done += len(kinds)
+        todo = [k for k in kinds if (s.source_section_key, k) not in existing]
+        if not todo:
+            continue
         concept_lines = _section_concept_lines(src, s.source_section_key)
-        for kind in kinds:
-            done += 1
-            if (s.source_section_key, kind) in existing:
-                continue
-            items, n_dropped = _author_section(kind, s.heading, s.markdown, concept_lines, _author_model(model))
-            dropped += n_dropped
-            if not items and not n_dropped:
-                refused += 1  # an empty list is the prompt's sanctioned answer, not an error
+        items, r, _failed = author_section_items(
+            s.heading, s.markdown, concept_lines, todo, _author_model(model)
+        )
+        for k, v in r.items():
+            receipt[k] += v
+        if items:
             for i, it in enumerate(items):
                 with db() as conn:
                     conn.execute(
@@ -330,10 +413,9 @@ def author_practice_sync(
                             "o": i,
                         },
                     )
-                authored += 1
-            if on_progress:
-                on_progress(done, total_calls, s.heading)
-    return {"authored": authored, "dropped": dropped, "refused": refused, "total": total_calls}
+        if on_progress:
+            on_progress(done, total_calls, s.heading)
+    return {**receipt, "total": total_calls}
 
 
 def fetch_practice(doc: str | None, scope: str | None) -> dict[str, Any]:

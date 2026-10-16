@@ -87,6 +87,59 @@ class ProblemSet(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# practice_checks.py — authoring-time quality stages (v0.23.0). Generation is LLM;
+# grading is not: none of these is ever read by the graded loop.
+# --------------------------------------------------------------------------- #
+
+
+class Objective(BaseModel):
+    """One thing a section teaches. ``recall`` = state, define, distinguish (→ retrieve
+    items); ``produce`` = derive, apply, construct, decide (→ problem items)."""
+
+    text: str
+    level: Literal["recall", "produce"]
+
+
+class ObjectiveSet(BaseModel):
+    objectives: List[Objective]
+
+
+class Attempt(BaseModel):
+    """A fresh answer to item ``index``, written without seeing the stored answer."""
+
+    index: int
+    answer: str
+
+
+class AttemptSet(BaseModel):
+    attempts: List[Attempt]
+
+
+class AnswerVerdict(BaseModel):
+    """Does the fresh attempt agree with the stored answer on what matters?"""
+
+    index: int
+    verdict: Literal["consistent", "contradicts", "unanswerable"]
+    reason: str
+
+
+class AnswerVerdictSet(BaseModel):
+    verdicts: List[AnswerVerdict]
+
+
+class RecallVerdict(BaseModel):
+    """Is this 'problem' only a definition restated — the Competency falsifier?"""
+
+    index: int
+    restates: bool
+    reason: str
+
+
+class RecallVerdictSet(BaseModel):
+    verdicts: List[RecallVerdict]
+
+
+# --------------------------------------------------------------------------- #
 # skeleton.py — SKELETON_SCHEMA / ORIENT_SCHEMA
 # --------------------------------------------------------------------------- #
 
