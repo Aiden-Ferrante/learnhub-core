@@ -14,6 +14,16 @@ not add to it mid-build.
 
 ## Pruned
 
+- **MCQ flaw rules + distractor metrics** (v0.23.0, deferred at plan time 2026-10-16 —
+  human decision). Deterministic item-writing-flaw rules for `mcq` items (longest option
+  correct, "all of the above", stem cue repeated in the key — Tarrant et al.'s 19, as
+  operationalised by SAQUET, arXiv 2405.20529) and D-GEN's distractor metrics (ACL 2025
+  Findings). Rides with the cycle that builds the `mcq` kind; nothing to check until then.
+- **DeepSeek-V4-Flash in the bake-off** (v0.23.0, cut at plan time). The strongest open
+  weight that nominally fits the Spark, but its 3-bit build is 129 GB against ~120 GB, and
+  the 2–3-bit builds (97–103 GB) need the QEMU VM and most of the fleet stopped. Worth one
+  run if a bake-off winner disappoints.
+
 - **v0.23.0 Set the paper — aborted 2026-10-16** (human decision, to open the
   authoring-quality cycle). Its code is in `main` and observed on prod; what it owed:
   - **Rung 3 — sit one self-set paper on :3001** and log every miss. Still the only

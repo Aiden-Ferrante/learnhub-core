@@ -7,6 +7,20 @@ commit.
 
 ## [Unreleased]
 
+Items that check themselves. (v0.23.0, open)
+
+### Added
+- **Practice authoring checks its own items** before anything is written: the section's
+  objectives come first (each tagged recall or produce, one item per objective), a critique
+  → revise pass fixes flaws against a checklist (`LEARN_PRACTICE_REVISE_PASSES`, default 1,
+  max 2), an answerability gate re-answers every item from the passage without seeing the
+  stored answer and drops those that contradict it or cannot be answered, and a problem
+  whose solution only restates a concept is relabelled retrieve so it never counts toward
+  fluency. The job receipt adds `failedCheck · relabeled · unchecked · unrevised`; a check
+  that errors is counted, never passed.
+- `scripts/bakeoff_practice.py` — run one chapter through the pipeline per model, write
+  nothing, compare.
+
 Set the paper — shipped untagged: the v0.23.0 cycle was aborted 2026-10-16 with first
 contact owed; the work below rides in the next version cut.
 
