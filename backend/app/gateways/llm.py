@@ -110,7 +110,7 @@ def _claude_structured(
     system prompt; the rest go on stdin in order."""
     exe = shutil.which("claude")
     if not exe:
-        return None, "claude CLI not found (claude:* models run on the host only)"
+        return _claude_via_bridge(messages, schema, model, timeout)
     system = "\n\n".join(m["content"] for m in messages if m.get("role") == "system")
     prompt = "\n\n".join(m["content"] for m in messages if m.get("role") != "system")
     cmd = [exe, "-p", "--model", model, "--output-format", "json",
@@ -123,9 +123,39 @@ def _claude_structured(
         data = json.loads(out.stdout or "{}")
     except Exception as e:  # noqa: BLE001
         return None, str(e)
+    log = os.environ.get("LEARN_CLAUDE_USAGE_LOG")
+    if log:  # one JSON line per call: what the authoring actually costs in tokens
+        try:
+            with open(log, "a") as f:
+                f.write(json.dumps({"model": model, "usage": data.get("modelUsage"),
+                                    "costUSD": data.get("total_cost_usd")}) + "\n")
+        except OSError:
+            pass
     if data.get("is_error") or data.get("subtype") != "success":
         return None, f"claude: {data.get('subtype') or out.stderr.strip()[:200] or 'no result'}"
     parsed = data.get("structured_output")
     if not isinstance(parsed, dict):
         return None, "No structured content in response"
     return parsed, None
+
+
+def _claude_via_bridge(
+    messages: list[dict[str, str]], schema: dict[str, Any], model: str, timeout: float
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Inside the container there is no CLI: ``CLAUDE_BRIDGE_URL`` (scripts/claude_bridge.py
+    on the host) makes the same call there."""
+    url = os.environ.get("CLAUDE_BRIDGE_URL")
+    if not url:
+        return None, "claude CLI not found and CLAUDE_BRIDGE_URL unset (claude:* needs one)"
+    try:
+        resp = httpx.post(
+            f"{url.rstrip('/')}/structured",
+            json={"messages": messages, "schema": schema, "model": model, "timeout": timeout},
+            headers={"x-bridge-token": os.environ.get("CLAUDE_BRIDGE_TOKEN", "")},
+            timeout=timeout + 30,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+    except Exception as e:  # noqa: BLE001
+        return None, f"claude bridge: {e}"
+    return body.get("result"), body.get("error")

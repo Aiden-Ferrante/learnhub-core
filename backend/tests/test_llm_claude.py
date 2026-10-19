@@ -46,10 +46,35 @@ def test_claude_error_result_is_an_error_not_a_pass(monkeypatch):
     assert out is None and "error_max_turns" in err
 
 
-def test_no_cli_is_an_error(monkeypatch):
+def test_no_cli_and_no_bridge_is_an_error(monkeypatch):
     monkeypatch.setattr(llm.shutil, "which", lambda _: None)
+    monkeypatch.delenv("CLAUDE_BRIDGE_URL", raising=False)
     out, err = llm.ollama_structured_completion([{"role": "user", "content": "x"}], {}, model="claude:opus")
-    assert out is None and "claude CLI not found" in err
+    assert out is None and "CLAUDE_BRIDGE_URL" in err
+
+
+def test_no_cli_goes_through_the_bridge_with_its_token(monkeypatch):
+    seen = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"result": {"n": 1}, "error": None}
+
+    def post(url, json=None, headers=None, timeout=None):
+        seen.update(url=url, body=json, headers=headers)
+        return _Resp()
+
+    monkeypatch.setattr(llm.shutil, "which", lambda _: None)
+    monkeypatch.setenv("CLAUDE_BRIDGE_URL", "http://bridge:8897/")
+    monkeypatch.setenv("CLAUDE_BRIDGE_TOKEN", "t0k")
+    monkeypatch.setattr(llm.httpx, "post", post)
+    out, err = llm.ollama_structured_completion([{"role": "user", "content": "x"}], {}, model="claude:opus")
+    assert (out, err) == ({"n": 1}, None)
+    assert seen["url"] == "http://bridge:8897/structured" and seen["body"]["model"] == "opus"
+    assert seen["headers"] == {"x-bridge-token": "t0k"}
 
 
 def test_timeout_is_an_error(monkeypatch):

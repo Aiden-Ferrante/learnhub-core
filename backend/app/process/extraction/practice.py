@@ -190,6 +190,12 @@ def _author_model(override: str | None = None) -> str | None:
     )
 
 
+def _judge_model() -> str | None:
+    """LEARN_PRACTICE_JUDGE_MODEL runs the answerability gate and the recall check; unset,
+    the author judges its own items (the pre-v0.23.0 behaviour)."""
+    return os.environ.get("LEARN_PRACTICE_JUDGE_MODEL") or None
+
+
 def _screen_reason(prompt: str) -> str | None:
     """Why the screen drops a prompt — the tell's matched words, or 'asks nothing' — or None
     when it passes. The bake-off records these so a high drop rate can be read, not guessed."""
@@ -410,7 +416,8 @@ def author_practice_sync(
             continue
         concept_lines = _section_concept_lines(src, s.source_section_key)
         items, r, _failed = author_section_items(
-            s.heading, s.markdown, concept_lines, todo, _author_model(model)
+            s.heading, s.markdown, concept_lines, todo, _author_model(model),
+            judge_model=_judge_model(),
         )
         for k, v in r.items():
             receipt[k] += v
