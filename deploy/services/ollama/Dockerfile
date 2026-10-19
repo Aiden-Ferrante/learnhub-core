@@ -1,6 +1,7 @@
+# 0.40.6: qwen3.8 (the v0.23.0 practice author) needs a newer runtime than 0.31.2.
 # 0.31.2+: required for GLM-4.7-Flash agentic use — tool-call parser and
 # repetition fixes landed in the 0.30–0.31 series (0.24 garbles tool calls).
-FROM ollama/ollama:0.31.2
+FROM ollama/ollama:0.40.6
 
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh

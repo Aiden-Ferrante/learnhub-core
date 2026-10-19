@@ -30,7 +30,7 @@ services:
       - AUTH_URL=${AUTH_URL:-https://spark-9415.tailff006f.ts.net}
       # Ollama configuration
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=gpt-oss:120b
+      - OLLAMA_MODEL=qwen3.8:27b-q8_0
       # Other settings
       - NODE_TLS_REJECT_UNAUTHORIZED=0
       - NODE_OPTIONS=--max-http-header-size=80000
@@ -62,7 +62,7 @@ services:
       - POSTGRES_DSN=host=postgres port=5432 user=learnhub password=${POSTGRES_PASSWORD:?set in compose/.env} dbname=learnhub
       - SHARED_DIR=/shared
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=gpt-oss:120b
+      - OLLAMA_MODEL=qwen3.8:27b-q8_0
       # Quizzes use the deterministic triple-based builder (no LLM) so studying never loads a
       # model — concept extraction is the only LLM workload. Set to 1 to re-enable LLM quizzes.
       - LEARN_QUIZ_LLM=0
@@ -81,8 +81,9 @@ services:
       # must be CORRECT, and authoring is a one-time background job where minutes are fine.
       # The step-2 spike hand-verified nemotron's solutions; gemma is the fallback if too slow.
       # v0.23.0 bake-off on Classical ML ch. 3: gpt-oss:120b kept 28 items (13 problems) to
-      # nemotron's 10 (1 problem), and judged its own items harder. ~65 GB resident, 30 min/chapter.
-      - LEARN_PRACTICE_MODEL=gpt-oss:120b
+      # nemotron's 10 (1 problem). The human picked qwen3.8 (2026-10-19) over gpt-oss:120b as
+      # the newer model at ~29 GB vs ~65 GB resident; needs Ollama 0.40.6+ (services/ollama).
+      - LEARN_PRACTICE_MODEL=qwen3.8:27b-q8_0
       # PDF->Markdown converter: "docling" (higher fidelity) | "pymupdf" (lightweight fallback)
       - LEARN_CONVERTER=docling
       # Docling's torch/table/layout models run on the GB10 GPU (cu130 wheel in the image).
