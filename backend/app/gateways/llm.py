@@ -16,12 +16,20 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 from typing import Any
 
 import httpx
 from pydantic import BaseModel
 
 DEFAULT_TIMEOUT = 120.0
+
+# A model named ``claude:<model>`` (``claude:sonnet``, ``claude:opus``) is served by the
+# host's Claude Code CLI on the user's own login instead of Ollama (v0.23.0, the human's
+# call for practice authoring). The CLI lives on the host, not in the container image, so
+# inside Docker such a model returns an error through the usual (None, error) contract.
+CLAUDE_PREFIX = "claude:"
 
 
 def ollama_base_url() -> str:
@@ -62,6 +70,14 @@ def ollama_structured_completion(
     wire-format field names directly — no aliasing)."""
     pyd = isinstance(json_schema, type) and issubclass(json_schema, BaseModel)
     schema = json_schema.model_json_schema() if pyd else json_schema
+    if (model or "").startswith(CLAUDE_PREFIX):
+        parsed, err = _claude_structured(messages, schema, model[len(CLAUDE_PREFIX):], timeout)
+        if err:
+            return None, err
+        try:
+            return (json_schema.model_validate(parsed).model_dump() if pyd else parsed), None
+        except Exception as e:  # noqa: BLE001
+            return None, str(e)
     try:
         resp = httpx.post(
             f"{ollama_base_url()}/api/chat",
@@ -84,3 +100,32 @@ def ollama_structured_completion(
         return parsed, None
     except Exception as e:  # noqa: BLE001 — preserve the (None, error) contract for callers
         return None, str(e)
+
+
+def _claude_structured(
+    messages: list[dict[str, str]], schema: dict[str, Any], model: str, timeout: float
+) -> tuple[dict[str, Any] | None, str | None]:
+    """One schema-constrained call through ``claude -p``: no tools, no MCP servers, no
+    settings or session, so the model sees only these messages. System messages become the
+    system prompt; the rest go on stdin in order."""
+    exe = shutil.which("claude")
+    if not exe:
+        return None, "claude CLI not found (claude:* models run on the host only)"
+    system = "\n\n".join(m["content"] for m in messages if m.get("role") == "system")
+    prompt = "\n\n".join(m["content"] for m in messages if m.get("role") != "system")
+    cmd = [exe, "-p", "--model", model, "--output-format", "json",
+           "--json-schema", json.dumps(schema), "--tools", "", "--strict-mcp-config",
+           "--setting-sources", "", "--no-session-persistence"]
+    if system:
+        cmd += ["--system-prompt", system]
+    try:
+        out = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout)
+        data = json.loads(out.stdout or "{}")
+    except Exception as e:  # noqa: BLE001
+        return None, str(e)
+    if data.get("is_error") or data.get("subtype") != "success":
+        return None, f"claude: {data.get('subtype') or out.stderr.strip()[:200] or 'no result'}"
+    parsed = data.get("structured_output")
+    if not isinstance(parsed, dict):
+        return None, "No structured content in response"
+    return parsed, None

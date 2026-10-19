@@ -9,6 +9,9 @@ The other judge is a human reading the sample.
 
     # one run per model (unattended; minutes to an hour each)
     python scripts/bakeoff_practice.py run --doc <id> --scope toc:4 --model gpt-oss:120b
+    # Claude on the host's Claude Code login; a separate judge runs the gate + recall check
+    python scripts/bakeoff_practice.py run --doc <id> --scope toc:4 --model claude:sonnet \
+        --judge-model claude:opus
     # then the comparison table + a fixed random sample per model for the human read
     python scripts/bakeoff_practice.py compare out/bakeoff-*.json --sample 10
 
@@ -40,7 +43,8 @@ def run(args: argparse.Namespace) -> None:
     sections = load_section_blocks(doc, scope=args.scope, coalesce=True)
     if args.limit:
         sections = sections[: args.limit]
-    out_path = args.out or f"out/bakeoff-{args.model.replace(':', '_').replace('/', '_')}.json"
+    label = args.model + (f"+judge={args.judge_model}" if args.judge_model else "")
+    out_path = args.out or f"out/bakeoff-{label.replace(':', '_').replace('/', '_')}.json"
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
     totals = practice.empty_receipt()
@@ -51,7 +55,8 @@ def run(args: argparse.Namespace) -> None:
         t = time.time()
         try:
             items, receipt, failed = practice.author_section_items(
-                s.heading, s.markdown, concept_lines, list(practice.DEFAULT_KINDS), args.model
+                s.heading, s.markdown, concept_lines, list(practice.DEFAULT_KINDS), args.model,
+                judge_model=args.judge_model,
             )
             error = None
         except Exception as exc:  # noqa: BLE001 — a section that errors is a result too
@@ -65,11 +70,11 @@ def run(args: argparse.Namespace) -> None:
               + (f"  ERROR {error}" if error else ""), flush=True)
         # Written every section so a crashed or interrupted run still leaves evidence.
         with open(out_path, "w") as fh:
-            json.dump({"model": args.model, "doc": doc, "scope": args.scope,
+            json.dump({"model": label, "doc": doc, "scope": args.scope,
                        "wallSecs": round(time.time() - t0, 1), "totals": totals,
                        "errors": sum(1 for r in rows if r["error"]), "sections": rows},
                       fh, ensure_ascii=False, indent=1)
-    print(f"\n{args.model}: {totals}  wall {time.time() - t0:.0f}s → {out_path}")
+    print(f"\n{label}: {totals}  wall {time.time() - t0:.0f}s → {out_path}")
 
 
 def compare(args: argparse.Namespace) -> None:
@@ -108,6 +113,7 @@ def main() -> None:
     r.add_argument("--doc", required=True)
     r.add_argument("--scope", required=True)
     r.add_argument("--model", required=True)
+    r.add_argument("--judge-model", default=None, help="gate + recall-check model (default: --model)")
     r.add_argument("--schema", default=None, help="tenant schema (X-User-Db)")
     r.add_argument("--limit", type=int, default=0, help="first N sections only")
     r.add_argument("--out", default=None)

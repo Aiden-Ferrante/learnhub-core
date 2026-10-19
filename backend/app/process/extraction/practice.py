@@ -313,13 +313,16 @@ def author_section_items(
     kinds: list[str],
     model: str | None,
     revise_passes: int | None = None,
+    judge_model: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
     """One section through every authoring stage, writing NOTHING (v0.23.0):
     objectives → author per kind → screen → critique/revise → screen → answerability gate
     → recall-in-disguise. Returns ``(items, receipt, failed)`` where ``failed`` holds the
     gate's rejects AND the screen's drops (verdict ``screened``) with their reasons, for
-    the bake-off to show."""
+    the bake-off to show. ``judge_model`` runs the answerability gate and the recall check
+    (default: ``model``) — a judge that is not the author does not grade its own work."""
     passage = text[:_MAX_PASSAGE]
+    judge = judge_model or model
     passes = _revise_passes() if revise_passes is None else revise_passes
     receipt = empty_receipt()
     items: list[dict[str, Any]] = []
@@ -347,13 +350,13 @@ def author_section_items(
         if not kept and not dropped:
             receipt["refused"] += 1
             continue
-        kept, rejects, unchecked = practice_checks.answerability(heading, passage, kept, model)
+        kept, rejects, unchecked = practice_checks.answerability(heading, passage, kept, judge)
         receipt["failedCheck"] += len(rejects)
         receipt["unchecked"] += unchecked
         failed.extend(rejects)
         items.extend(kept)
 
-    items, relabeled, unchecked = practice_checks.recall_in_disguise(items, concept_lines, model)
+    items, relabeled, unchecked = practice_checks.recall_in_disguise(items, concept_lines, judge)
     receipt["relabeled"] += relabeled
     receipt["unchecked"] += unchecked
     receipt["authored"] = len(items)

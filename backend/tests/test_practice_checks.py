@@ -249,3 +249,29 @@ def test_graded_loop_never_imports_the_checks():
     for name in ("reviews.py", "exams.py"):
         src = (study / name).read_text()
         assert "practice_checks" not in src and "ollama" not in src.lower()
+
+
+# ── a judge that is not the author ───────────────────────────────────────────
+
+
+def test_judge_model_runs_the_gate_and_recall_check_only(monkeypatch):
+    models = {}
+
+    def fake(messages, schema, temperature=0.3, model=None):
+        models.setdefault(schema, set()).add(model)
+        return {
+            ObjectiveSet: {"objectives": [{"text": "Derive X.", "level": "produce"}]},
+            ProblemSet: {"problems": [{"prompt": "Derive X from Y and Z.", "answer": "Steps.",
+                                       "rubric": "r", "difficulty": 2}]},
+            AttemptSet: {"attempts": [{"index": 0, "answer": "Steps."}]},
+            AnswerVerdictSet: {"verdicts": [{"index": 0, "verdict": "consistent", "reason": "same"}]},
+            RecallVerdictSet: {"verdicts": [{"index": 0, "restates": False, "reason": "derives"}]},
+        }.get(schema, {}), None
+
+    monkeypatch.setattr(practice, "ollama_structured_completion", fake)
+    monkeypatch.setattr(practice_checks, "ollama_structured_completion", fake)
+    practice.author_section_items("H", "text", "concept: X", ["problem"], "author",
+                                  revise_passes=0, judge_model="judge")
+    assert models[ObjectiveSet] == {"author"} and models[ProblemSet] == {"author"}
+    assert models[AttemptSet] == {"judge"} and models[AnswerVerdictSet] == {"judge"}
+    assert models[RecallVerdictSet] == {"judge"}
