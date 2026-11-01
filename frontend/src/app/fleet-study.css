@@ -1,0 +1,53 @@
+/* study:begin — the study theme: the look of the midterm artifacts, dark like everything else.
+   Graph paper behind, one working sheet at a time, accent for "you can act here", ok and danger
+   only when something is marked, mono for numbers. Type sizes come from the app, not from here.
+   learnhub carries a byte-identical copy of this block; check.sh compares them. */
+.study-page { min-height: 100vh; background-color: var(--fleet-bg);
+  background-image: linear-gradient(color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px),
+                    linear-gradient(90deg, color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px; }
+.study-bar { position: sticky; top: 0; z-index: 5; background: var(--fleet-surface); border-bottom: 1px solid var(--fleet-border); }
+.study-tabs { display: flex; border: 1px solid var(--fleet-border); border-radius: 8px; overflow: hidden; }
+.study-tabs button { background: none; border: 0; padding: 6px 14px; color: var(--fleet-text-faint); cursor: pointer; }
+.study-tabs button + button { border-left: 1px solid var(--fleet-border); }
+.study-tabs button[aria-selected="true"] { background: var(--fleet-accent); color: var(--fleet-on-accent); }
+.study-clock { padding: 4px 10px; border-radius: 6px; background: color-mix(in srgb, var(--fleet-accent) 14%, transparent);
+  color: var(--fleet-accent-text); font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.study-clock.low { background: color-mix(in srgb, var(--fleet-danger) 16%, transparent); color: var(--fleet-danger-text); }
+.study-stepper { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.study-step { flex: 0 0 auto; min-width: 104px; text-align: left; padding: 5px 10px; border: 1px solid var(--fleet-border);
+  border-radius: 8px; background: var(--fleet-surface); color: var(--fleet-text); cursor: pointer; }
+.study-step[aria-current="true"] { border-color: var(--fleet-accent); background: color-mix(in srgb, var(--fleet-accent) 12%, var(--fleet-surface)); }
+.study-step:disabled { color: var(--fleet-text-faint); cursor: default; }
+.study-sheet { background: var(--fleet-surface); border: 1px solid var(--fleet-border); border-radius: 10px; padding: 20px 22px; min-width: 0; }
+.study-booklet { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+@media (max-width: 860px) { .study-booklet { grid-template-columns: minmax(0, 1fr); } }
+.study-choice { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; text-align: left;
+  padding: 9px 12px; border: 1px solid var(--fleet-border); border-radius: 8px; background: var(--fleet-surface); color: var(--fleet-text);
+  overflow-wrap: anywhere; cursor: pointer; }
+.study-choice:hover:not(:disabled) { border-color: var(--fleet-accent); }
+.study-choice:disabled { cursor: default; }
+.study-letter { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--fleet-border); color: var(--fleet-text-faint); }
+.study-choice.sel { border-color: var(--fleet-accent); background: color-mix(in srgb, var(--fleet-accent) 12%, transparent); }
+.study-choice.sel .study-letter { background: var(--fleet-accent); border-color: var(--fleet-accent); color: var(--fleet-on-accent); }
+.study-choice.right { border-color: var(--fleet-ok); background: color-mix(in srgb, var(--fleet-ok) 12%, transparent); }
+.study-choice.right .study-letter { background: var(--fleet-ok); border-color: var(--fleet-ok); color: var(--fleet-bg); }
+.study-choice.wrong { border-color: var(--fleet-danger); background: color-mix(in srgb, var(--fleet-danger) 12%, transparent); }
+.study-choice.wrong .study-letter { background: var(--fleet-danger); border-color: var(--fleet-danger); color: var(--fleet-bg); }
+.study-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 6px; }
+.study-cell { position: relative; height: 34px; border-radius: 6px; border: 1px solid var(--fleet-border); background: var(--fleet-surface);
+  color: var(--fleet-text-dim); font-variant-numeric: tabular-nums; cursor: pointer; }
+.study-cell.ans { background: color-mix(in srgb, var(--fleet-accent) 14%, transparent); border-color: var(--fleet-accent); color: var(--fleet-accent-text); }
+.study-cell.cur { box-shadow: inset 0 0 0 1px var(--fleet-text); }
+.study-cell.flag::after { content: ""; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--fleet-warn); }
+.study-cell.ok { background: color-mix(in srgb, var(--fleet-ok) 14%, transparent); border-color: var(--fleet-ok); color: var(--fleet-ok-text); }
+.study-cell.no { background: color-mix(in srgb, var(--fleet-danger) 14%, transparent); border-color: var(--fleet-danger); color: var(--fleet-danger-text); }
+.study-cell.pending { border-color: var(--fleet-warn); color: var(--fleet-warn-text); }
+.study-note { padding: 10px 14px; border-left: 3px solid var(--fleet-accent); border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--fleet-accent) 8%, transparent); overflow-wrap: anywhere; }
+.study-note.warn { border-left-color: var(--fleet-warn); background: color-mix(in srgb, var(--fleet-warn) 10%, transparent); }
+.study-track { height: 8px; border-radius: 4px; background: var(--fleet-border); overflow: hidden; }
+.study-track > i { display: block; height: 100%; background: var(--fleet-ok); }
+.study-track > i.mid { background: var(--fleet-warn); }
+.study-track > i.low { background: var(--fleet-danger); }
+/* study:end */

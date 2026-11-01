@@ -330,6 +330,33 @@ def due_skills(pack: str) -> list[dict[str, Any]]:
     return list(out.values())
 
 
+def review_set(pack: str) -> dict[str, Any]:
+    """One question per due skill: a fresh instance where a generator exists, else a Learn
+    MCQ. Long-term review, so fresh numbers keep the memory honest."""
+    dues = due_skills(pack)
+    with db() as conn:
+        items = _items(conn, pack)
+        seen = _seen(conn, pack)
+        shown: list[str] = []
+        out = []
+        rng = random.Random()
+        for d in dues:
+            own = [i for i in items if i["skill"] == d["skill"]]
+            g = next((i for i in own if i["qtype"] == "gen"), None)
+            m = next((i for i in own if i["qtype"] == "mcq"), None)
+            if g:
+                inst = gen.render_unseen(g["payload"]["spec"], seen, rng.randrange(1 << 30))
+                if inst:
+                    seen.add(inst["fingerprint"])
+                    shown.append(inst["fingerprint"])
+                    out.append(_learn_q(g, inst))
+                    continue
+            if m:
+                out.append(_learn_q(m, m["payload"]))
+        _see(conn, pack, shown)
+    return {"questions": out}
+
+
 def today(pack: str) -> dict[str, Any]:
     p = get_pack(pack)
     if p.get("error"):

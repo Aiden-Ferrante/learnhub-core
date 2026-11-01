@@ -1,3 +1,5 @@
+@import "./fleet-study.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +12,22 @@
 :root {
   /* Dark only, with the fleet (anchored 2026-09-04 on chart problem 486ccc778f75). */
   color-scheme: dark;
+  /* The fleet tokens the study theme reads, aliased onto this app's own palette. */
+  --fleet-bg: hsl(var(--background));
+  --fleet-surface: hsl(var(--card));
+  --fleet-border: hsl(var(--border));
+  --fleet-text: hsl(var(--foreground));
+  --fleet-text-dim: hsl(240 5% 84%);
+  --fleet-text-faint: hsl(var(--muted-foreground));
+  --fleet-accent: oklch(0.65 0.19 250);
+  --fleet-accent-text: oklch(0.80 0.15 250);
+  --fleet-on-accent: hsl(0 0% 98%);
+  --fleet-ok: oklch(0.72 0.17 155);
+  --fleet-ok-text: oklch(0.80 0.15 155);
+  --fleet-warn: oklch(0.78 0.15 80);
+  --fleet-warn-text: oklch(0.84 0.14 80);
+  --fleet-danger: oklch(0.65 0.21 25);
+  --fleet-danger-text: oklch(0.78 0.16 25);
   /* The paper reader's serif — a reading register, not the app's face. */
   --reading-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }

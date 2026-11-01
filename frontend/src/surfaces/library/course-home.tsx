@@ -46,6 +46,8 @@ type CourseHomeProps = {
   onSkeletonPractice?: () => void
   /** The practice session — work generated problems, self-graded on its own FSRS clock. */
   onPractice?: () => void
+  /** Exam packs: chapters built into Learn and a fresh exam. */
+  onPacks?: () => void
   /** Edit the words this course is built from. */
   onEditMaterial?: () => void
   /** The courses cut from this book, and which one is open. Omitted = no picker. */
@@ -124,6 +126,7 @@ export function CourseHome({
   onViewConcepts,
   onSkeletonPractice,
   onPractice,
+  onPacks,
   onEditMaterial,
   bookKey,
   versions,
@@ -293,6 +296,14 @@ export function CourseHome({
           bodyClassName="p-3"
         >
           <div className="grid gap-2 sm:grid-cols-3">
+            {onPacks && (
+              <PracticeTile
+                icon={<GraduationCap className="h-4 w-4 text-brand" />}
+                title="Exam packs"
+                desc="Pick chapters and get a Learn walk plus a fresh exam every sitting."
+                onClick={onPacks}
+              />
+            )}
             <PracticeTile
               icon={<RotateCcw className="h-4 w-4 text-brand" />}
               title="Review"

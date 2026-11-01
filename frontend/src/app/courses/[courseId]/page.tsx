@@ -35,6 +35,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onViewConcepts={() => router.push(`/courses/${courseId}/concepts`)}
         onSkeletonPractice={() => router.push(`/courses/${courseId}/skeleton`)}
         onPractice={() => router.push(`/courses/${courseId}/practice`)}
+        onPacks={() => router.push(`/courses/${courseId}/packs`)}
         onEditMaterial={() => router.push(`/courses/${courseId}/edit`)}
         bookKey={data.bookKey}
         versions={data.versions}

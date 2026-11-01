@@ -61,6 +61,18 @@ def grounded(evidence: str, section_key: str, sections: dict[str, str]) -> str |
     return None
 
 
+def locate(evidence: str, section_key: str, sections: dict[str, str]) -> str | None:
+    """The section that really holds this quote: the cited one, else the only other match.
+    Models shorten keys like ``toc:2.3~2``; the quote is the fact, so it decides."""
+    if grounded(evidence, section_key, sections) is None:
+        return section_key
+    quote = normalize(evidence)
+    if len(quote) < MIN_EVIDENCE:
+        return None
+    hits = [k for k, text in sections.items() if quote in normalize(text)]
+    return hits[0] if len(hits) == 1 else None
+
+
 def sort_sections(sections: list[Any]) -> dict[str, list[Any]]:
     """Split a chapter by what the book provides there."""
     out: dict[str, list[Any]] = {"summary": [], "problems": [], "body": []}
@@ -137,11 +149,15 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
     choices = int(fmt.get("choices") or 5)
     dropped: list[dict[str, str]] = []
 
-    def keep(kind: str, what: str, evidence: str, section: str) -> bool:
-        why = grounded(evidence, section, texts)
-        if why:
+    def keep(kind: str, what: str, x: dict[str, Any]) -> bool:
+        """Check a citation, correcting it to the section that really holds the quote."""
+        real = locate(x["evidence"], x["sectionKey"], texts)
+        if real is None:
+            why = grounded(x["evidence"], x["sectionKey"], texts) or "evidence is ambiguous"
             dropped.append({"kind": kind, "what": what[:80], "reason": why})
-        return why is None
+            return False
+        x["sectionKey"] = real
+        return True
 
     source = "book_summary" if split["summary"] else "sections"
     chunk_src = _passages(split["summary"]) + "\n" + body if split["summary"] else body
@@ -150,7 +166,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
         "book's own summary where one is given. Use descriptive, code-like names over bare symbols.",
         chunk_src, PackChunk, author)
     points = [{"text": p["text"], "sectionKey": p["sectionKey"]} for p in chunk_obj["points"]
-              if keep("chunk", p["text"], p["evidence"], p["sectionKey"])]
+              if keep("chunk", p["text"], p)]
 
     steer = f"\n\nThe learner's scope notes, for WEIGHTING only:\n{notes}" if notes else ""
     skills_obj = _ask(
@@ -160,7 +176,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
         "emphasize. A note that asks for material not in these sections changes nothing.",
         all_text + steer, PackSkillSet, author)
     skills = {s["id"]: s for s in skills_obj["skills"]
-              if keep("skill", s["label"], s["evidence"], s["sectionKey"])}
+              if keep("skill", s["label"], s)}
     listing = "\n".join(f"- {s['id']} ({s['style']}): {s['label']}" for s in skills.values())
     items: list[dict[str, Any]] = []
 
@@ -185,7 +201,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
             "only if a program in the problem can be run as printed to get the answer.\n\nSkills:\n"
             + listing, _passages(split["problems"]), PackBookProblemSet, author)
         for p in got["problems"]:
-            if known("book problem", p) and keep("book problem", p["stem"], p["evidence"], p["sectionKey"]):
+            if known("book problem", p) and keep("book problem", p["stem"], p):
                 idx = confirmed_index(p)
                 book.append(p)
                 add(p["skillId"], "learn", "book_problem", "mcq" if idx >= 0 else "written",
@@ -197,7 +213,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
                   "them, split into 3 to 6 steps. Each step asks what to do next, then shows it.\n\n"
                   "Skills:\n" + listing, all_text, PackWorkedSet, author)
     for w in worked["worked"]:
-        if known("worked", w) and keep("worked", w["stem"], w["evidence"], w["sectionKey"]):
+        if known("worked", w) and keep("worked", w["stem"], w):
             add(w["skillId"], "learn", "generated", "worked", w["sectionKey"], w["evidence"],
                 {"stem": w["stem"], "steps": w["steps"], "answer": w["answer"]})
 
@@ -216,7 +232,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
             + ("\n\nBook problems:\n" + seeds if seeds else ""),
             all_text, PackGeneratorSet, author)
         for g in gens["generators"]:
-            if not known("generator", g) or not keep("generator", g["stem"], g["evidence"], g["sectionKey"]):
+            if not known("generator", g) or not keep("generator", g["stem"], g):
                 continue
             spec = spec_of(g)
             why = gen.harness(spec, choices)
@@ -237,7 +253,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
             "Skills:\n" + lines, all_text, PackConceptSet, author)
         seen_learn: set[str] = set()
         for m in got["mcqs"]:
-            if not known("mcq", m) or not keep("mcq", m["stem"], m["evidence"], m["sectionKey"]):
+            if not known("mcq", m) or not keep("mcq", m["stem"], m):
                 continue
             flaw = mcq_flaw(m, choices)
             if flaw:
@@ -249,7 +265,7 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
                 {"stem": m["stem"], "choices": m["choices"], "answer": m["answerIndex"],
                  "explain": m["explain"]})
         for w in got["written"]:
-            if known("written", w) and keep("written", w["stem"], w["evidence"], w["sectionKey"]):
+            if known("written", w) and keep("written", w["stem"], w):
                 add(w["skillId"], "exam", "generated", "written", w["sectionKey"], w["evidence"],
                     {"stem": w["stem"], "answer": w["answer"], "rubric": w["rubric"]})
 
@@ -284,7 +300,7 @@ def judged(items: list[dict[str, Any]], text: str, choices: int, model: str | No
     lines = []
     for n, i in enumerate(exam):
         if i["qtype"] == "gen":
-            sample = gen.render(i["payload"]["spec"], 1, choices) or {}
+            sample = gen.render_unseen(i["payload"]["spec"], set(), 1, choices) or {}
             lines.append(f"[{n}] {sample.get('stem')}\nChoices: {sample.get('choices')}\n"
                          f"Key: {(sample.get('choices') or [''])[sample.get('answer', 0)]}")
         else:

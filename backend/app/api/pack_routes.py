@@ -47,6 +47,11 @@ def api_today(key: str) -> JSONResponse:
     return _out(packs.today(key))
 
 
+@router.get("/api/packs/{key}/review")
+def api_review(key: str) -> JSONResponse:
+    return _out(packs.review_set(key))
+
+
 @router.get("/api/packs/{key}/units/{unit}")
 def api_unit(key: str, unit: str) -> JSONResponse:
     return _out(packs.learn_unit(key, unit))

@@ -46,6 +46,13 @@ def test_grounded_checks_the_quote_in_the_cited_section():
     assert "not found" in author.grounded("a sentence the book never wrote", "s", secs)
 
 
+def test_a_shortened_key_is_corrected_by_where_the_quote_really_is():
+    secs = {"toc:2.3~2": TEXT, "toc:2.3~3": "something else entirely in this other section"}
+    assert author.locate(QUOTE, "toc:2.3", secs) == "toc:2.3~2"
+    assert author.locate(QUOTE, "toc:2.3~3", secs) == "toc:2.3~2"
+    assert author.locate("a sentence the book never wrote", "toc:2.3", secs) is None
+
+
 def test_sections_sort_by_what_the_book_provides():
     out = author.sort_sections([sec("a", "2.1 SECTION SUMMARY"), sec("b", "2.1 SECTION QUIZ"), sec("c", "Literals")])
     assert [len(out[k]) for k in ("summary", "problems", "body")] == [1, 1, 1]
