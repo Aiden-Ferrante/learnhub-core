@@ -101,6 +101,7 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
 SKELETON_KEY_PREFIX = "skel-"
 CHAPTER_KEY_PREFIX = "chap-"
 PRACTICE_KEY_PREFIX = "prac-"
+PACK_KEY_PREFIX = "pack-"
 
 
 def _typed_key(prefix: str, *parts: object) -> str:
@@ -118,6 +119,17 @@ def skeleton_review_key(doc_id: str, section_key: str) -> str:
 def chapter_review_key(doc_id: str, scope: str) -> str:
     """Chapter-resurface row key (reading a chapter seeds it into the decay cycle)."""
     return _typed_key(CHAPTER_KEY_PREFIX, doc_id, "chap", scope)
+
+
+def pack_review_key(doc_id: str, skill: str) -> str:
+    """A pack skill's row: one per book and skill, so instances change and the memory stays."""
+    return _typed_key(PACK_KEY_PREFIX, doc_id, skill)
+
+
+def _resolve_pack(body: dict, key: str) -> tuple[str, dict]:
+    if not body.get("doc") or not body.get("skill"):
+        return key, {}
+    return key, {"docId": body["doc"], "sectionKey": body.get("sectionKey")}
 
 
 def practice_review_key(item_key: str) -> str:
@@ -250,6 +262,15 @@ _TYPED: dict[str, _TypedItem] = {
         card_name=_name_structure, card_signal=lambda r: "",
         card_extra=lambda r: {},
         event_doc=lambda body, info: str(body.get("doc") or "").strip() or info.get("docId"),
+        event_kinds=frozenset({"practice", "exam"}),
+    ),
+    "pack": _TypedItem(
+        item_type="pack", prefix=PACK_KEY_PREFIX, body_flag=None,
+        event_kind="practice", card_kind="pack",
+        lookup_cols=', doc_id AS "docId", section_key AS "sectionKey", heading',
+        resolve=_resolve_pack, extra=lambda body, info: {"heading": body.get("skillLabel")},
+        card_name=_name_structure, card_signal=lambda r: "",
+        card_extra=lambda r: {},
         event_kinds=frozenset({"practice", "exam"}),
     ),
 }
@@ -445,7 +466,7 @@ def build_review_queue(
             for r in conn.execute(
                 "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
                 "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
-                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter', 'practice'))",
+                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter', 'practice', 'pack'))",
                 {"doc": source_id_of(doc) if doc else None},
             ).fetchall():
                 reviews[r["key"]] = r
