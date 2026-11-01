@@ -68,12 +68,14 @@ grow one app into another's tier (helm is the scheduler; shipyard owns the chart
 
 | tab | app | port | what |
 |---|---|---|---|
-| Shipyard | `shipyard` | `:8845` | projects, goals, what the fleet owes |
-| Control | `mission-control` | `:9090` | what is running |
-| Learn | `learnhub` | `:3001` | courses, study queue, uploads |
-| Feed | `feedwall` | `:8975` | what the frontier said this week |
-| Content | `content-manager` | `:8955` | channels, productions, scripts |
 | Helm | `helm` | `:8990` | what needs me now, agenda, decisions |
+| Shipyard | `shipyard` | `:8845` | projects, goals, what the fleet owes |
+| Learn | `learnhub` | `:3001` | courses, study queue, uploads |
+| Content | `content-manager` | `:8955` | channels, productions, scripts |
+| Feed | `feedwall` | `:8975` | what the frontier said this week |
+| Control | `mission-control` | `:9090` | what is running |
+| Intern | `internwatch` | `:8962` | internship boards, diffed daily |
+| Study | `studyloop` | `:8963` | the focus-block loop, concepts per hour |
 | — | `vaultwriter` | `:8799` | the one vault writer (library tier) |
 | — | `learnhub` API | `:8010` | Learn Hub's FastAPI behind the :3001 UI |
 

@@ -7,7 +7,9 @@ commit.
 
 ## [Unreleased]
 
-Items that check themselves. (v0.23.0, open)
+## [0.23.0] - 2026-11-01
+
+Items that check themselves.
 
 ### Added
 - **Practice authoring checks its own items** before anything is written: the section's
