@@ -15,6 +15,7 @@ from app.conductor.ingest import run_convert
 from app.conductor.worker import ensure_worker, register_runner
 from app.process.extraction import author_guides_sync, author_practice_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
+from app.process.packs.author import build_pack
 from app.gateways import set_doc_resolver
 from app.supplemental.media import run_audiobook, warm_tts
 
@@ -48,6 +49,10 @@ def _run_orient(job: dict[str, Any], ctx) -> dict[str, Any]:
     return refresh_orient(job["docId"], job["scope"])
 
 
+def _run_pack(job: dict[str, Any], ctx) -> dict[str, Any]:
+    return build_pack(job["packKey"], on_progress=ctx.progress)
+
+
 def install() -> None:
     set_doc_resolver(_latest_doc_id)
     register_runner("convert", run_convert)
@@ -55,6 +60,7 @@ def install() -> None:
     register_runner("extract", run_extract)
     register_runner("guides", _run_guides)
     register_runner("practice", _run_practice)
+    register_runner("pack", _run_pack)
     register_runner("skeleton", _run_skeleton)
     register_runner("orient", _run_orient)
     register_runner("audiobook", run_audiobook)

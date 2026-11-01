@@ -171,3 +171,130 @@ class ConceptVerdict(BaseModel):
     informative: bool = Field(description="signal explains the concept, not merely restates its name")
     durable: bool = Field(description="a teachable general concept, not a one-off fact/statistic/opinion")
     reason: str = Field(description="one short sentence justifying the weakest judgment")
+
+
+# --------------------------------------------------------------------------- #
+# process/packs/author.py: exam-pack authoring. Every item names the section it came
+# from and quotes that section, which the build verifies against the stored text.
+# --------------------------------------------------------------------------- #
+
+
+class PackPoint(BaseModel):
+    text: str
+    sectionKey: str
+    evidence: str
+
+
+class PackChunk(BaseModel):
+    points: List[PackPoint]
+
+
+class PackSkill(BaseModel):
+    id: str
+    label: str
+    sectionKey: str
+    style: Literal["computable", "conceptual"]
+    weight: float = 1.0
+    evidence: str
+
+
+class PackSkillSet(BaseModel):
+    skills: List[PackSkill]
+
+
+class PackBookProblem(BaseModel):
+    skillId: str
+    sectionKey: str
+    stem: str
+    choices: List[str] = Field(default_factory=list)
+    answerIndex: int = -1
+    printedAnswer: str = ""
+    code: str = ""
+    evidence: str
+
+
+class PackBookProblemSet(BaseModel):
+    problems: List[PackBookProblem]
+
+
+class PackStep(BaseModel):
+    ask: str
+    show: str = ""
+    code: str = ""
+
+
+class PackWorked(BaseModel):
+    skillId: str
+    sectionKey: str
+    stem: str
+    steps: List[PackStep]
+    answer: str
+    evidence: str
+
+
+class PackWorkedSet(BaseModel):
+    worked: List[PackWorked]
+
+
+class PackParam(BaseModel):
+    name: str
+    kind: Literal["int", "choice"]
+    min: int = 0
+    max: int = 0
+    values: List[str] = Field(default_factory=list)
+
+
+class PackDistractor(BaseModel):
+    misconception: str
+    code: str
+
+
+class PackGenerator(BaseModel):
+    skillId: str
+    sectionKey: str
+    params: List[PackParam]
+    stem: str
+    code: str
+    distractors: List[PackDistractor]
+    explain: str
+    steps: List[PackStep]
+    evidence: str
+    basedOnBookProblem: bool = False
+
+
+class PackGeneratorSet(BaseModel):
+    generators: List[PackGenerator]
+
+
+class PackMcq(BaseModel):
+    skillId: str
+    sectionKey: str
+    stem: str
+    choices: List[str]
+    answerIndex: int
+    explain: str
+    evidence: str
+
+
+class PackWritten(BaseModel):
+    skillId: str
+    sectionKey: str
+    stem: str
+    answer: str
+    rubric: str
+    evidence: str
+
+
+class PackConceptSet(BaseModel):
+    mcqs: List[PackMcq]
+    written: List[PackWritten]
+
+
+class PackVerdict(BaseModel):
+    index: int
+    keep: bool
+    reason: str
+
+
+class PackVerdictSet(BaseModel):
+    verdicts: List[PackVerdict]
