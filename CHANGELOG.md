@@ -7,7 +7,9 @@ commit.
 
 ## [Unreleased]
 
-Exam packs. (v0.24.0, open)
+## [0.24.0] - 2026-11-01
+
+Exam packs.
 
 ### Added
 - **Exam packs.** Pick chapters of any course, set a short format with per-course presets, add
@@ -20,7 +22,7 @@ Exam packs. (v0.24.0, open)
   exams draw only unseen instances, so numbers change on every sitting.
 - Marked answers feed FSRS by skill through a `pack-` review row. Written answers leave the score
   provisional until self-marked.
-- Migration `2026-11-01-exam-packs.sql`, not yet applied to prod.
+- Migration `2026-11-01-exam-packs.sql`.
 
 ## [0.23.0] - 2026-11-01
 

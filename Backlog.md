@@ -91,6 +91,14 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **The human reads generated pack questions.** (v0.24.0, 2026-11-01.) Shipped without it; the
+  repo's criterion for generated content is still owed.
+- **The `learn` container runs as root.** (v0.24.0.) The pack sandbox's process limit does not bind
+  there. Run snippets as an unprivileged user.
+- **Reconvert Python Essentials 2.** (v0.24.0.) Its upload is in `Error` with no content.
+- **Agent docs are stale across the fleet and feedwall's source is behind its repo.** (v0.24.0.)
+  Fix `fleet/agents` before rendering, or feedwall loses its current credentials note.
+
 - **Per-section mastery ignores items and concepts on non-leaf sections.** (v0.23.0 verify,
   2026-09-09.) `mastery.py` rolls a section up from `descendant_leaves` only, so anything
   attached to a chapter or sub-chapter node counts overall but in no section: prod chapter 2
