@@ -139,21 +139,21 @@ export function PacksHome({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Pack name">
-              <input className="fleet-input w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${courseTitle} exam`} />
+              <input className="study-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${courseTitle} exam`} />
             </Field>
             <Field label="Exam date (optional)">
-              <input className="fleet-input w-full" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
+              <input className="study-input" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
             </Field>
             <Field label="Questions">
-              <input className="fleet-input w-full" type="number" min={1} max={100} value={format.count}
+              <input className="study-input" type="number" min={1} max={100} value={format.count}
                 onChange={(e) => setFormat({ ...format, count: Number(e.target.value) })} />
             </Field>
             <Field label="Minutes">
-              <input className="fleet-input w-full" type="number" min={1} max={300} value={format.minutes}
+              <input className="study-input" type="number" min={1} max={300} value={format.minutes}
                 onChange={(e) => setFormat({ ...format, minutes: Number(e.target.value) })} />
             </Field>
             <Field label="Choices per question">
-              <select className="fleet-input w-full" value={format.choices}
+              <select className="study-input" value={format.choices}
                 onChange={(e) => setFormat({ ...format, choices: Number(e.target.value) === 4 ? 4 : 5 })}>
                 <option value={5}>5</option>
                 <option value={4}>4</option>
@@ -172,7 +172,7 @@ export function PacksHome({
           </label>
 
           <Field label="Scope notes (optional). These weight questions; they can't add material the book doesn't have.">
-            <textarea className="fleet-input w-full" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <textarea className="study-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Field>
 
           <div className="flex flex-wrap items-center gap-2">

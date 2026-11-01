@@ -14,6 +14,13 @@ not add to it mid-build.
 
 ## Pruned
 
+- **Sandboxed widget host** (v0.24.0, cut at plan time 2026-11-01, agent's default, human to
+  confirm). Native React covers the picked scope; no bespoke per-course tool needs it yet.
+- **Hardening the pack sandbox** (v0.24.0). AST gate plus limits contains our own model's code.
+  Real isolation (a separate user or container) is the `code` kind's job when that cycle comes.
+- **Formula anatomy cards, geometry sandboxes, predicted-vs-actual** (brainstorm 2026-11-01). Not
+  in the agreed scope.
+
 - **MCQ flaw rules + distractor metrics** (v0.23.0, deferred at plan time 2026-10-16 —
   human decision). Deterministic item-writing-flaw rules for `mcq` items (longest option
   correct, "all of the above", stem cue repeated in the key — Tarrant et al.'s 19, as

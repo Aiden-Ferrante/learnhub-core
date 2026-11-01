@@ -7,6 +7,21 @@ commit.
 
 ## [Unreleased]
 
+Exam packs. (v0.24.0, open)
+
+### Added
+- **Exam packs.** Pick chapters of any course, set a short format with per-course presets, add
+  optional scope notes, and a background job builds a Learn walk and an exam pool from that book.
+  Each pack has Today, Learn, Exam and Results.
+- Every item cites a section with a quote checked against the stored text. A second model judges
+  exam items, generators must pass a seed harness, and the receipt lists what was kept, what was
+  dropped and why, and any thin chapter. Nothing is padded.
+- Book summaries and practice problems are used where they exist. Book problems stay in Learn;
+  exams draw only unseen instances, so numbers change on every sitting.
+- Marked answers feed FSRS by skill through a `pack-` review row. Written answers leave the score
+  provisional until self-marked.
+- Migration `2026-11-01-exam-packs.sql`, not yet applied to prod.
+
 ## [0.23.0] - 2026-11-01
 
 Items that check themselves.

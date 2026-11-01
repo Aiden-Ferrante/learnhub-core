@@ -44,7 +44,7 @@ const LETTERS = "ABCDE"
 const cite = (key: string) => `§ ${key.replace(/^toc:/, "")}`
 
 function Prose({ text }: { text: string }) {
-  return <MarkdownReader content={text} proseSize="sm" />
+  return <MarkdownReader content={text} proseSize="sm" className="mx-0 max-w-none text-left" />
 }
 
 export function PackView({ packKey, onBack }: { packKey: string; onBack: () => void }) {
@@ -464,7 +464,7 @@ function ExamTab({ pack, sitKey, setSitKey, onClock, onFinished }: {
             ))}
           </div>
         ) : (
-          <textarea className="fleet-input w-full" rows={7} value={a.response ?? ""} onChange={(e) => update({ response: e.target.value })} placeholder="Write your answer. You'll mark it against the worked solution on Results." />
+          <textarea className="study-input" rows={7} value={a.response ?? ""} onChange={(e) => update({ response: e.target.value })} placeholder="Write your answer. You'll mark it against the worked solution on Results." />
         )}
         {error && <div className="study-note warn text-sm">{error}</div>}
         <div className="flex flex-wrap items-center gap-2">

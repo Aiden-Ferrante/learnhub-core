@@ -71,7 +71,9 @@ def render(spec: dict[str, Any], seed: int, choices: int = 5) -> dict[str, Any] 
     picked = rng.sample(sorted(wrong), choices - 1)
     options = picked + [key]
     rng.shuffle(options)
-    values = {**values, "code": code}
+    # Code is shown fenced so markdown cannot eat `**` or `_`, unless the stem fences it itself.
+    fenced = "```" in (spec.get("stem") or "")
+    values = {**values, "code": code if fenced else f"\n\n```python\n{code}\n```\n\n"}
     shown = {i: _outcome(r) for (i, _), r in zip(step_codes, runs[1 + len(bugs):])}
     steps = []
     for i, s in enumerate(spec.get("steps") or []):

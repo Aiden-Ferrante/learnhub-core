@@ -55,3 +55,9 @@ def test_render_unseen_skips_fingerprints():
     first = gen.render_unseen(SPEC, set(), 11)
     second = gen.render_unseen(SPEC, {first["fingerprint"]}, 11)
     assert second["fingerprint"] != first["fingerprint"]
+
+
+def test_code_in_a_stem_is_fenced_once():
+    assert "```python" in gen.render(SPEC, 3)["stem"]
+    own = {**SPEC, "stem": "See:\n```python\n{{code}}\n```"}
+    assert gen.render(own, 3)["stem"].count("```") == 2

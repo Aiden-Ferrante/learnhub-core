@@ -50,4 +50,7 @@
 .study-track > i { display: block; height: 100%; background: var(--fleet-ok); }
 .study-track > i.mid { background: var(--fleet-warn); }
 .study-track > i.low { background: var(--fleet-danger); }
+.study-input { width: 100%; padding: 8px 10px; border: 1px solid var(--fleet-border); border-radius: 8px;
+  background: var(--fleet-bg); color: var(--fleet-text); color-scheme: dark; }
+.study-input:focus { border-color: var(--fleet-accent); }
 /* study:end */
