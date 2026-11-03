@@ -3,8 +3,8 @@
  *  mode and match game were deleted in v0.25.0 (docs/ui-spec.md §1); packs replace them.
  *
  *  This file is the surface's HUB: the only legal import surface from outside.
- *  Depends on: reading (the one renderer + prose prefs), studying (grade scale, hotkeys),
+ *  Depends on: reading (the one renderer + prose prefs), studying (grade scale),
  *  gateways/, kit/. */
 
 export { PacksHome } from "@/surfaces/practicing/packs-home"
-export { PackView } from "@/surfaces/practicing/pack-view"
+export { PackView, PACK_TABS, parsePackTab, type PackTab } from "@/surfaces/practicing/pack-view"
