@@ -1,7 +1,8 @@
 /** Client-side organization layer for the course shelf: nestable groups + tag membership.
  *
- * Groups are a pure frontend concept, persisted per-user via /api/user-settings
- * (with a one-time import from the legacy localStorage store). A course can belong
+ * Groups are a pure frontend concept, persisted per-user via /api/user-settings (read
+ * and written by use-course-groups.ts, with a one-time import from the legacy
+ * localStorage store). A course can belong
  * to multiple groups at once (`membership[courseId] = groupId[]`), and groups nest
  * arbitrarily via `parentId`.
  */
@@ -42,38 +43,15 @@ function generateId(): string {
   })
 }
 
-function normalizeGroupsState(raw: unknown): GroupsState {
-  const parsed = (raw ?? {}) as Partial<GroupsState>
+/** Shape-check a stored `courseGroups` value; null when nothing was ever saved (which is
+ *  what lets the one-time legacy import run). */
+export function normalizeGroupsState(raw: unknown): GroupsState | null {
+  if (!raw || typeof raw !== "object") return null
+  const parsed = raw as Partial<GroupsState>
   return {
     groups: Array.isArray(parsed.groups) ? parsed.groups : [],
     membership:
       parsed.membership && typeof parsed.membership === "object" ? parsed.membership : {},
-  }
-}
-
-/** Server state, or null when the user has never saved groups (allows legacy import). */
-export async function fetchGroupsState(): Promise<GroupsState | null> {
-  try {
-    const res = await fetch("/api/user-settings")
-    if (!res.ok) return null
-    const data = await res.json()
-    const raw = data?.settings?.courseGroups
-    if (!raw || typeof raw !== "object") return null
-    return normalizeGroupsState(raw)
-  } catch {
-    return null
-  }
-}
-
-export async function persistGroupsState(state: GroupsState): Promise<void> {
-  try {
-    await fetch("/api/user-settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courseGroups: state }),
-    })
-  } catch {
-    // groups are non-critical, so swallow
   }
 }
 

@@ -1,16 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Skeleton } from "@/kit/ui/skeleton"
-import { fetchActivity, type ActivityDay, type ActivityResponse } from "@/gateways/api/progress"
+import { fetchActivity, type ActivityDay } from "@/gateways/api/progress"
+import { AsyncView, qk, useApi } from "@/kit/data"
+import { cn } from "@/kit/lib/utils"
+import { Sheet } from "@/kit/study"
+import { orThrow } from "@/surfaces/library/envelope"
 
 const WEEKS = 53
 const DAY_MS = 86_400_000
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-]
-const LEVEL_OPACITY: Record<number, number> = { 1: 0.28, 2: 0.5, 3: 0.72, 4: 1 }
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+/** Level → cell fill: the accent at rising strength, muted for no activity. */
+const LEVEL_FILL = ["bg-muted", "bg-brand/30", "bg-brand/50", "bg-brand/70", "bg-brand"]
 
 /** UTC midnight (ms) for a given Date — keeps cell keys aligned with the
  *  backend, which buckets events by UTC date. */
@@ -33,52 +35,22 @@ function levelFor(count: number, max: number): number {
   return 4
 }
 
-function cellStyle(count: number, max: number): React.CSSProperties {
-  const level = levelFor(count, max)
-  if (level === 0) return { backgroundColor: "hsl(var(--muted))" }
-  return { backgroundColor: `hsl(var(--brand) / ${LEVEL_OPACITY[level]})` }
-}
-
-export function StudyHeatmap({ doc }: { doc?: string }) {
-  const [days, setDays] = useState<ActivityDay[] | null>(null)
-  const [cadence, setCadence] = useState<ActivityResponse["cadence"]>(undefined)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-    fetchActivity(doc)
-      .then((r) => {
-        if (!active) return
-        if (r.error) setError(r.error)
-        else {
-          setDays(r.days)
-          setCadence(r.cadence)
-        }
-      })
-      .catch((e) => {
-        if (active) setError(e instanceof Error ? e.message : "Failed to load activity")
-      })
-    return () => {
-      active = false
-    }
-  }, [doc])
-
-  const { weeks, total, max, monthLabels } = useMemo(() => {
+function useGrid(days: ActivityDay[]) {
+  return useMemo(() => {
     const counts = new Map<string, number>()
-    let maxCount = 0
-    let sum = 0
-    for (const d of days ?? []) {
+    let max = 0
+    let total = 0
+    for (const d of days) {
       counts.set(d.date, d.count)
-      sum += d.count
-      if (d.count > maxCount) maxCount = d.count
+      total += d.count
+      if (d.count > max) max = d.count
     }
-
     const end = utcMidnight(new Date())
     const endDow = new Date(end).getUTCDay() // 0 = Sun
     const gridEnd = end + (6 - endDow) * DAY_MS // Saturday of the current week
     const gridStart = gridEnd - (WEEKS * 7 - 1) * DAY_MS // a Sunday
 
-    const weekCols: Cell[][] = []
+    const weeks: Cell[][] = []
     for (let w = 0; w < WEEKS; w++) {
       const col: Cell[] = []
       for (let d = 0; d < 7; d++) {
@@ -86,116 +58,93 @@ export function StudyHeatmap({ doc }: { doc?: string }) {
         const key = isoDay(ms)
         col.push({ ms, key, count: counts.get(key) ?? 0, future: ms > end })
       }
-      weekCols.push(col)
+      weeks.push(col)
     }
-
     // Month label above a column when its first day starts a new month.
-    const labels: { col: number; text: string }[] = []
-    let prevMonth = -1
-    weekCols.forEach((col, i) => {
+    const monthAt = new Map<number, string>()
+    let prev = -1
+    weeks.forEach((col, i) => {
       const m = new Date(col[0].ms).getUTCMonth()
-      if (m !== prevMonth) {
-        labels.push({ col: i, text: MONTHS[m] })
-        prevMonth = m
+      if (m !== prev) {
+        monthAt.set(i, MONTHS[m])
+        prev = m
       }
     })
-
-    return { weeks: weekCols, total: sum, max: maxCount, monthLabels: labels }
+    return { weeks, total, max, monthAt }
   }, [days])
+}
 
-  if (error) return null
-
+function Grid({ days }: { days: ActivityDay[] }) {
+  const { weeks, max, monthAt } = useGrid(days)
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground">Study activity</span>
-        <span className="flex items-center gap-2">
-          {cadence && (
-            <span
-              className="rounded-full bg-brand/10 px-2 py-0.5 text-micro font-medium tabular-nums text-brand"
-              title="Days with any study activity in the last week"
-            >
-              {cadence.activeDays}/{cadence.windowDays} days this week
-            </span>
-          )}
-          {days && (
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {total} activit{total === 1 ? "y" : "ies"} this year
-            </span>
-          )}
-        </span>
-      </div>
-
-      <div className="overflow-x-auto p-3">
-        {!days ? (
-          <Skeleton className="h-[104px] w-full" />
-        ) : (
-          <div className="inline-flex flex-col gap-1.5">
-            {/* Month labels */}
-            {/* pl-8 = the weekday gutter's w-7 + mr-1 below. The two have to add
-                up or the month labels sit off their columns. */}
-            <div className="flex gap-[3px] pl-8 text-micro text-muted-foreground">
-              {weeks.map((_, i) => {
-                const label = monthLabels.find((l) => l.col === i)
-                return (
-                  <div key={i} className="w-2.5">
-                    {label ? <span className="block -ml-px">{label.text}</span> : null}
-                  </div>
-                )
-              })}
+    <div className="overflow-x-auto">
+      <div className="inline-flex flex-col gap-1.5">
+        {/* pl-8 = the weekday gutter's w-7 + mr-1 below, so labels sit on their columns. */}
+        <div className="flex gap-[3px] pl-8 text-micro text-muted-foreground">
+          {weeks.map((_, i) => (
+            <div key={i} className="w-2.5">
+              {monthAt.has(i) ? <span className="-ml-px block">{monthAt.get(i)}</span> : null}
             </div>
-
-            <div className="flex gap-[3px]">
-              {/* Weekday gutter */}
-              {/* w-7, not w-5: these labels were text-[9px] and fit a 20px box.
-                  Lifting them to the 11px floor made "Mon" ~22px wide, which
-                  overran the gutter into the first column of squares. */}
-              <div className="mr-1 flex w-7 shrink-0 flex-col gap-[3px] text-micro text-muted-foreground">
-                {["", "Mon", "", "Wed", "", "Fri", ""].map((d, i) => (
-                  <div key={i} className="flex h-2.5 items-center leading-none">
-                    {d}
-                  </div>
-                ))}
+          ))}
+        </div>
+        <div className="flex gap-[3px]">
+          <div className="mr-1 flex w-7 shrink-0 flex-col gap-[3px] text-micro text-muted-foreground">
+            {["", "Mon", "", "Wed", "", "Fri", ""].map((d, i) => (
+              <div key={i} className="flex h-2.5 items-center leading-none">
+                {d}
               </div>
-
-              {/* Week columns */}
-              {weeks.map((col, i) => (
-                <div key={i} className="flex flex-col gap-[3px]">
-                  {col.map((cell) => (
-                    <div
-                      key={cell.key}
-                      className="h-2.5 w-2.5 rounded-[2px]"
-                      style={cell.future ? { visibility: "hidden" } : cellStyle(cell.count, max)}
-                      title={
-                        cell.future
-                          ? undefined
-                          : `${cell.count} activit${cell.count === 1 ? "y" : "ies"} · ${cell.key}`
-                      }
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center justify-end gap-1.5 pt-0.5 text-micro text-muted-foreground">
-              <span>Less</span>
-              {[0, 1, 2, 3, 4].map((lvl) => (
+            ))}
+          </div>
+          {weeks.map((col, i) => (
+            <div key={i} className="flex flex-col gap-[3px]">
+              {col.map((cell) => (
                 <div
-                  key={lvl}
-                  className="h-2.5 w-2.5 rounded-[2px]"
-                  style={
-                    lvl === 0
-                      ? { backgroundColor: "hsl(var(--muted))" }
-                      : { backgroundColor: `hsl(var(--brand) / ${LEVEL_OPACITY[lvl]})` }
-                  }
+                  key={cell.key}
+                  className={cn("h-2.5 w-2.5 rounded-[2px]", cell.future ? "invisible" : LEVEL_FILL[levelFor(cell.count, max)])}
+                  title={cell.future ? undefined : `${cell.count} activit${cell.count === 1 ? "y" : "ies"} · ${cell.key}`}
                 />
               ))}
-              <span>More</span>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-1.5 pt-0.5 text-micro text-muted-foreground">
+          <span>Less</span>
+          {LEVEL_FILL.map((fill) => (
+            <div key={fill} className={cn("h-2.5 w-2.5 rounded-[2px]", fill)} />
+          ))}
+          <span>More</span>
+        </div>
       </div>
     </div>
+  )
+}
+
+/** A year of study activity, one cell per day (the whole library when `doc` is omitted). */
+export function StudyHeatmap({ doc }: { doc?: string }) {
+  const q = useApi(qk.activity(doc), (signal) => fetchActivity(doc, signal).then(orThrow))
+  const cadence = q.data?.cadence
+  const total = q.data?.days.reduce((sum, d) => sum + d.count, 0)
+  return (
+    <Sheet
+      title="Study activity"
+      actions={
+        q.data && (
+          <span className="flex items-center gap-2 text-meta tabular-nums text-muted-foreground">
+            {cadence && (
+              <span className="text-ink-accent" title="Days with any study activity in the last week">
+                {cadence.activeDays}/{cadence.windowDays} days this week
+              </span>
+            )}
+            <span>
+              {total} activit{total === 1 ? "y" : "ies"} this year
+            </span>
+          </span>
+        )
+      }
+    >
+      <AsyncView q={q} errorTitle="Couldn't load your study activity" skeleton={<Skeleton className="h-[104px] w-full" />}>
+        {(d) => <Grid days={d.days} />}
+      </AsyncView>
+    </Sheet>
   )
 }
