@@ -1,10 +1,13 @@
 "use client"
 
+/** /study — Plan: the review calendar, the agenda and recent sessions, on the study theme. */
+
 import { useRouter } from "next/navigation"
 import { StudyPlanner } from "@/surfaces/studying"
 import { useDocuments } from "@/surfaces/processing"
+import { StudyPage } from "@/kit/study"
 
-export default function StudyPage() {
+export default function StudyPlanPage() {
   const router = useRouter()
   const { documents } = useDocuments()
 
@@ -18,8 +21,8 @@ export default function StudyPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-6 pt-6">
+    <StudyPage>
       <StudyPlanner onOpenCourse={openCourse} />
-    </main>
+    </StudyPage>
   )
 }
