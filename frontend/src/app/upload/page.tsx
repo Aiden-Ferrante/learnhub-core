@@ -1,41 +1,20 @@
 "use client"
 
-import { Table, Upload } from "lucide-react"
-import { DocumentsTable } from "@/surfaces/processing"
-import { UploadDocuments } from "@/surfaces/processing"
+import { PageHeader } from "@/kit/patterns/page-header"
+import { SectionCard } from "@/kit/patterns/section-card"
+import { DocumentsTable, UploadDocuments } from "@/surfaces/processing"
 
 export default function UploadPage() {
   return (
-    <main className="container mx-auto px-6 py-6">
-      <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-        <div className="w-full lg:w-1/3 space-y-8">
-          <div className="rounded-lg border bg-card p-5">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
-                <Upload className="h-4 w-4 text-brand" />
-              </div>
-              <h2 className="text-lg font-semibold text-foreground">Upload Documents</h2>
-            </div>
-            <UploadDocuments />
-          </div>
-        </div>
-
-        <div className="w-full lg:w-2/3">
-          <div className="overflow-hidden rounded-lg border bg-card">
-            <div className="p-6 border-b border-border/10">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
-                  <Table className="h-4 w-4 text-brand" />
-                </div>
-                <h2 className="text-lg font-semibold text-foreground">Documents Overview</h2>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Upload and manage the documents your courses are built from
-              </p>
-            </div>
-            <DocumentsTable />
-          </div>
-        </div>
+    <main className="container mx-auto space-y-6 px-6 py-6">
+      <PageHeader title="Upload" description="Upload and manage the documents your courses are built from." />
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <SectionCard title="Upload documents" className="w-full lg:w-1/3 lg:self-start">
+          <UploadDocuments />
+        </SectionCard>
+        <SectionCard title="Documents" className="w-full overflow-hidden lg:w-2/3" bodyClassName="p-0">
+          <DocumentsTable />
+        </SectionCard>
       </div>
     </main>
   )
