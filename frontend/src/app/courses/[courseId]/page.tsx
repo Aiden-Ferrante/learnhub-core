@@ -14,7 +14,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
 
   if (!data.course) return <CourseFallback isInitialized={data.isInitialized} />
 
-  const openChapter = (scope: string | null, opts?: { drawer?: string; all?: boolean }) => {
+  const openChapter = (scope: string | null, opts?: { drawer?: string }) => {
     if (scope) data.persistReadingPosition(scope)
     router.push(chapterHref(courseId, scope, opts))
   }
@@ -34,7 +34,6 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onDeepRead={() => openChapter(data.continueSectionKey ?? null)}
         onViewConcepts={() => router.push(`/courses/${courseId}/concepts`)}
         onSkeletonPractice={() => router.push(`/courses/${courseId}/skeleton`)}
-        onPractice={() => router.push(`/courses/${courseId}/practice`)}
         onPacks={() => router.push(`/courses/${courseId}/packs`)}
         onEditMaterial={() => router.push(`/courses/${courseId}/edit`)}
         bookKey={data.bookKey}
@@ -48,7 +47,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
         onBackToShelf={() => router.push("/courses")}
         continueNode={data.continueNode}
         dueCount={data.reviewDue}
-        onReviewAll={() => openChapter(data.continueSectionKey ?? null, { drawer: "review", all: true })}
+        onReviewAll={() => router.push(`/courses/${courseId}/review`)}
         onRetry={data.retry}
       />
     </main>
