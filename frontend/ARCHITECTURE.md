@@ -33,7 +33,7 @@ frontend/                   # root = framework configs only (next/tailwind/ts/sh
     │   ├── ui/             #   shadcn primitives (managed by components.json)
     │   ├── patterns/       #   the pattern kit: stat-tile, status-pill, meter-bar, …
     │   ├── layout/         #   brand mark, theme provider/toggle, info modal
-    │   ├── hooks/          #   use-polling, use-async-data, use-toast
+    │   ├── hooks/          #   use-polling, use-toast
     │   └── lib/            #   cn(), course-title, schedule, scope-url
     ├── middleware.ts       # auth redirects (Next requires it at src/ root)
     └── types/              # ambient .d.ts overrides
