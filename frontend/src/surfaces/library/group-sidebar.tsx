@@ -11,7 +11,9 @@ import {
   Plus,
   Trash2,
 } from "lucide-react"
+import { Button } from "@/kit/ui/button"
 import { ScrollArea } from "@/kit/ui/scroll-area"
+import { Sheet } from "@/kit/study"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +54,8 @@ type GroupSidebarProps = {
   onRenameGroup: (groupId: string, currentName: string) => void
   onDeleteGroup: (groupId: string) => void
   onMoveGroup: (dragId: string, target: GroupDropTarget) => void
+  /** False until the saved groups load: creating one waits for them. */
+  canEdit: boolean
 }
 
 function GroupRow({
@@ -121,45 +125,41 @@ function GroupRow({
         style={{ paddingLeft: `${depth * 0.75 + 0.25}rem` }}
       >
         {hasChildren ? (
-          <button
-            type="button"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 shrink-0 text-muted-foreground"
             onClick={(e) => {
               e.stopPropagation()
               onToggleExpand(group.id)
             }}
             aria-label={isExpanded ? "Collapse" : "Expand"}
           >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </button>
+            {isExpanded ? <ChevronDown /> : <ChevronRight />}
+          </Button>
         ) : (
           <span className="w-4 shrink-0" />
         )}
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left leading-snug"
+        <Button
+          variant="ghost"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left font-normal leading-snug hover:bg-transparent"
           onClick={() => onSelect(group.id)}
         >
-          <FolderTree className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <FolderTree className="text-muted-foreground" />
           <span className="truncate font-medium">{group.name}</span>
-          <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-            {count}
-          </span>
-        </button>
+          <span className="ml-auto shrink-0 text-meta tabular-nums text-muted-foreground">{count}</span>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground group-hover/row:opacity-100 data-[state=open]:opacity-100"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
               aria-label="Group actions"
               onClick={(e) => e.stopPropagation()}
             >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
+              <MoreVertical />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
             <DropdownMenuItem onClick={() => onRenameGroup(group.id, group.name)}>
@@ -167,7 +167,7 @@ function GroupRow({
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="text-ink-danger focus:text-ink-danger"
               onClick={() => onDeleteGroup(group.id)}
             >
               <Trash2 className="h-4 w-4" />
@@ -209,6 +209,7 @@ export function GroupSidebar({
   onRenameGroup,
   onDeleteGroup,
   onMoveGroup,
+  canEdit,
 }: GroupSidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
@@ -243,23 +244,22 @@ export function GroupSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground">Groups</span>
-        <button
-          type="button"
-          onClick={onNewGroup}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-        >
-          <Plus className="h-3.5 w-3.5" />
+    <Sheet
+      as="aside"
+      title="Groups"
+      actions={
+        <Button variant="ghost" size="sm" className="h-7 gap-1 px-2" onClick={onNewGroup} disabled={!canEdit}>
+          <Plus />
           New
-        </button>
-      </div>
-      <ScrollArea className="flex-1 px-2 py-2">
+        </Button>
+      }
+      className="min-h-0 flex-1"
+    >
+      <ScrollArea className="-mx-2 flex-1 px-2">
         <ul>
           <li className="list-none">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => onSelect(null)}
               onDragOver={(e) => {
                 if (!dnd.dragId) return
@@ -273,7 +273,7 @@ export function GroupSidebar({
                 dnd.onDrop({ kind: "into", groupId: null }) // un-nest to top level
               }}
               className={cn(
-                "flex w-full items-center gap-1.5 rounded-md py-1 pl-[0.25rem] pr-1 text-sm",
+                "h-auto w-full justify-start gap-1.5 py-1 pl-1 pr-1 font-normal",
                 selectedGroupId === null
                   ? "bg-brand/15 text-foreground"
                   : "hover:bg-muted/60",
@@ -281,12 +281,10 @@ export function GroupSidebar({
               )}
             >
               <span className="w-4 shrink-0" />
-              <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <Layers className="text-muted-foreground" />
               <span className="font-medium">All courses</span>
-              <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-                {totalCount}
-              </span>
-            </button>
+              <span className="ml-auto shrink-0 text-meta tabular-nums text-muted-foreground">{totalCount}</span>
+            </Button>
           </li>
           {tree.map((node) => (
             <GroupRow
@@ -305,11 +303,11 @@ export function GroupSidebar({
           ))}
         </ul>
         {tree.length === 0 && (
-          <p className="px-2 py-3 text-xs text-muted-foreground">
+          <p className="px-2 py-3 text-meta text-muted-foreground">
             No groups yet. Create one to organize your courses.
           </p>
         )}
       </ScrollArea>
-    </div>
+    </Sheet>
   )
 }
