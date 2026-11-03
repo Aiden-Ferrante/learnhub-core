@@ -7,6 +7,8 @@ import { MathText } from "@/surfaces/reading"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { cn } from "@/kit/lib/utils"
+import { AsyncView, qk, useApi } from "@/kit/data"
+import { EmptyState } from "@/kit/patterns/empty-state"
 import { fetchSectionConcepts, type ConceptLesson } from "@/gateways/api/concepts"
 import { KIND_CHIP } from "@/surfaces/concepts/kind-palette"
 
@@ -37,10 +39,11 @@ function ConceptRecallRow({
         open ? "border-brand/40 bg-card" : "bg-card/60 hover:border-border",
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onOpen}
-        className="flex w-full items-center gap-2.5 px-3 py-2 text-left"
+        aria-expanded={open}
+        className="h-auto w-full justify-start gap-2.5 rounded-none px-3 py-2 text-left font-normal hover:bg-transparent"
         title={open ? undefined : "Describe it to yourself, then tap to check"}
       >
         <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground/70">
@@ -48,13 +51,13 @@ function ConceptRecallRow({
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{concept.name}</span>
         {mark === "got" ? (
-          <Check className="h-3.5 w-3.5 shrink-0 text-brand" />
+          <Check className="h-3.5 w-3.5 shrink-0 text-ink-accent" />
         ) : mark === "fuzzy" ? (
-          <span className="shrink-0 text-xs font-semibold text-status-due">~</span>
+          <span className="shrink-0 text-xs font-semibold text-ink-warn">~</span>
         ) : (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full border border-muted-foreground/40" />
         )}
-      </button>
+      </Button>
       {/* Smooth reveal — grid-rows animation, no remount, no layout jump. */}
       <div
         className={cn(
@@ -80,7 +83,7 @@ function ConceptRecallRow({
                 type="button"
                 variant="outline"
                 size="sm"
-                className={cn("h-7 gap-1 px-2.5 text-xs", mark === "got" && "border-brand/60 text-brand")}
+                className={cn("h-7 gap-1 px-2.5 text-xs", mark === "got" && "border-brand/60 text-ink-accent")}
                 onClick={() => onMark("got")}
               >
                 <Check className="h-3 w-3" />
@@ -92,7 +95,7 @@ function ConceptRecallRow({
                 size="sm"
                 className={cn(
                   "h-7 px-2.5 text-xs",
-                  mark === "fuzzy" && "border-status-due/60 text-status-due",
+                  mark === "fuzzy" && "border-status-due/60 text-ink-warn",
                 )}
                 onClick={() => onMark("fuzzy")}
               >
@@ -117,11 +120,13 @@ export function SectionConceptsPanel({
   scope: string | null
   docId?: string
 }) {
-  const [concepts, setConcepts] = useState<ConceptLesson[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [marks, setMarks] = useState<Record<string, RecallMark>>({})
+  const q = useApi(
+    qk.sectionConcepts(docId, scope ?? ""),
+    (signal) => fetchSectionConcepts(scope as string, docId, signal),
+    { enabled: Boolean(scope) },
+  )
 
   const marksKey = `txt2k:concept-recall:${docId ?? ""}:${scope ?? ""}`
   useEffect(() => {
@@ -134,53 +139,68 @@ export function SectionConceptsPanel({
     }
   }, [marksKey])
 
-  useEffect(() => {
-    if (!scope) {
-      setConcepts([])
-      return
-    }
-    let active = true
-    setLoading(true)
-    setError(null)
-    fetchSectionConcepts(scope, docId)
-      .then((res) => {
-        if (!active) return
-        if (res.error) setError(res.error)
-        else setConcepts(res.concepts || [])
-      })
-      .catch((e) => active && setError(e instanceof Error ? e.message : "Failed to load concepts"))
-      .finally(() => active && setLoading(false))
-    return () => {
-      active = false
-    }
-  }, [scope, docId])
-
   if (!scope) {
     return <p className="p-4 text-sm text-muted-foreground">Select a section to see its concepts.</p>
   }
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-2 p-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-lg border bg-card p-3">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="mt-2 h-3 w-full" />
-            <Skeleton className="mt-1 h-3 w-4/5" />
-          </div>
-        ))}
-      </div>
-    )
-  }
-  if (error) {
-    return <p className="p-4 text-sm text-destructive">{error}</p>
-  }
-  if (concepts.length === 0) {
-    return (
-      <div className="m-4 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        No concepts extracted for this section yet. Extract it from the syllabus to build them.
-      </div>
-    )
-  }
+  return (
+    <div className="p-4">
+      <AsyncView
+        q={q}
+        errorTitle="Couldn't load this section's concepts"
+        skeleton={<PanelSkeleton />}
+        isEmpty={(d) => (d.concepts ?? []).length === 0}
+        empty={
+          <EmptyState
+            title="No concepts extracted for this section yet"
+            description="Extract it from the syllabus to build them."
+          />
+        }
+      >
+        {(d) => (
+          <RecallList
+            concepts={d.concepts}
+            marks={marks}
+            setMarks={setMarks}
+            marksKey={marksKey}
+            openKey={openKey}
+            setOpenKey={setOpenKey}
+          />
+        )}
+      </AsyncView>
+    </div>
+  )
+}
+
+function PanelSkeleton() {
+  return (
+    <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="rounded-lg border p-3">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="mt-2 h-3 w-full" />
+          <Skeleton className="mt-1 h-3 w-4/5" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** The names-first list itself, with its marks kept in localStorage per section. */
+function RecallList({
+  concepts,
+  marks,
+  setMarks,
+  marksKey,
+  openKey,
+  setOpenKey,
+}: {
+  concepts: ConceptLesson[]
+  marks: Record<string, RecallMark>
+  setMarks: (m: Record<string, RecallMark>) => void
+  marksKey: string
+  openKey: string | null
+  setOpenKey: (k: string | null) => void
+}) {
   const keyFor = (c: ConceptLesson, i: number) => c.conceptKey ?? `${c.name}-${i}`
   const markedCount = concepts.filter((c, i) => marks[keyFor(c, i)]).length
   const allMarked = markedCount >= concepts.length
@@ -207,7 +227,7 @@ export function SectionConceptsPanel({
 
   // Names first — the recall act is describing each one before its definition appears.
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           From memory — can you <span className="font-medium text-foreground">describe</span> each
@@ -234,7 +254,7 @@ export function SectionConceptsPanel({
         })}
       </ul>
       {allMarked && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-brand">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-ink-accent">
           <CheckCircle2 className="h-3.5 w-3.5" />
           All checked — run a quick check to lock them in.
         </p>
