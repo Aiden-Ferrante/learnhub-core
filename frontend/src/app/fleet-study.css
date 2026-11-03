@@ -6,7 +6,7 @@
   background-image: linear-gradient(color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px),
                     linear-gradient(90deg, color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px);
   background-size: 24px 24px; }
-.study-bar { position: sticky; top: 0; z-index: 5; background: var(--fleet-surface); border-bottom: 1px solid var(--fleet-border); }
+.study-bar { position: sticky; top: var(--fleet-header-h, 0); z-index: 5; background: var(--fleet-surface); border-bottom: 1px solid var(--fleet-border); }
 .study-tabs { display: flex; border: 1px solid var(--fleet-border); border-radius: 8px; overflow: hidden; }
 .study-tabs button { background: none; border: 0; padding: 6px 14px; color: var(--fleet-text-faint); cursor: pointer; }
 .study-tabs button + button { border-left: 1px solid var(--fleet-border); }

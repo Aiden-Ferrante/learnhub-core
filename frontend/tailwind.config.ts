@@ -76,6 +76,18 @@ const config: Config = {
           building: "hsl(var(--status-building))",
           error: "hsl(var(--status-error))",
         },
+        // INKS — the colours for coloured WORDS (fleet KIT.md: fills measure as low as
+        // 2.8:1 at micro size, so text never wears a fill). text-ink-accent replaces
+        // text-brand / text-primary on words; ok/warn/danger replace text-status-*
+        // mastered/due/error on words. Fills (bg-*, border-*, dots) keep the fill tokens.
+        ink: {
+          accent: "var(--fleet-accent-text)",
+          ok: "var(--fleet-ok-text)",
+          warn: "var(--fleet-warn-text)",
+          danger: "var(--fleet-danger-text)",
+          dim: "var(--fleet-text-dim)",
+          "on-accent": "var(--fleet-on-accent)",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
