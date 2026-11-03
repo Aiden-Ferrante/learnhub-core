@@ -1,14 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/kit/ui/button"
-import { KIND_BADGE } from "@/surfaces/concepts"
-import { ConceptMarkdown } from "@/surfaces/concepts"
-import { fetchSectionConcepts, type ConceptLesson } from "@/gateways/api/concepts"
+import { AsyncView, ErrorNotice, GRADE_INVALIDATES, qk, useApi, useApiMutation, unwrap } from "@/kit/data"
+import { Sheet } from "@/kit/study"
+import { EmptyState } from "@/kit/patterns/empty-state"
+import { KIND_BADGE, ConceptMarkdown } from "@/surfaces/concepts"
+import { fetchSectionConcepts } from "@/gateways/api/concepts"
 import { submitReviewGrade } from "@/gateways/api/review"
 
 /** Guided walkthrough: step a section's concepts in order, read each, then self-check —
- *  "Got it" (grade Good) or "Needs review" (grade Again) feeds the spaced-repetition schedule. */
+ *  "Got it" (grade Good) or "Needs review" (grade Again) feeds the spaced-repetition
+ *  schedule. The step advances only once the grade is saved. */
 export function LessonPanel({
   scope,
   docId,
@@ -18,111 +21,110 @@ export function LessonPanel({
   docId?: string
   onAnswered?: () => void
 }) {
-  const [concepts, setConcepts] = useState<ConceptLesson[]>([])
-  const [idx, setIdx] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const q = useApi(
+    qk.sectionConcepts(docId, scope ?? ""),
+    (signal) => unwrap(fetchSectionConcepts(scope ?? "", docId, signal)),
+    { enabled: Boolean(scope) },
+  )
+  // The position belongs to one scope: switching section starts the lesson from the top.
+  const [at, setAt] = useState<{ scope: string | null; idx: number }>({ scope, idx: 0 })
+  const idx = at.scope === scope ? at.idx : 0
+  const next = () => setAt((cur) => ({ scope, idx: (cur.scope === scope ? cur.idx : 0) + 1 }))
 
-  useEffect(() => {
-    if (!scope) {
-      setConcepts([])
-      return
-    }
-    let active = true
-    setLoading(true)
-    setError(null)
-    setIdx(0)
-    fetchSectionConcepts(scope, docId)
-      .then((res) => {
-        if (!active) return
-        if (res.error) setError(res.error)
-        else setConcepts(res.concepts || [])
-      })
-      .catch((e) => active && setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => active && setLoading(false))
-    return () => {
-      active = false
-    }
-  }, [scope, docId])
-
-  const c = concepts[idx]
-
-  const mark = useCallback(
-    (gotIt: boolean) => {
-      if (c?.conceptKey) {
-        submitReviewGrade(c.conceptKey, gotIt ? 3 : 1, docId).catch(() => {})
+  const [last, setLast] = useState<{ key: string; gotIt: boolean } | null>(null)
+  const mark = useApiMutation(
+    (v: { key: string; gotIt: boolean }) => unwrap(submitReviewGrade(v.key, v.gotIt ? 3 : 1, docId)),
+    {
+      invalidates: GRADE_INVALIDATES,
+      onSuccess: () => {
+        next()
         onAnswered?.()
-      }
-      setIdx((i) => i + 1)
+      },
     },
-    [c, docId, onAnswered],
   )
 
   if (!scope) return <p className="p-4 text-sm text-muted-foreground">Select a section to study.</p>
-  if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading lesson…</p>
-  if (error) return <p className="p-4 text-sm text-destructive">{error}</p>
-  if (concepts.length === 0)
-    return (
-      <div className="m-4 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        No concepts extracted for this section yet.
-      </div>
-    )
-
-  if (!c) {
-    return (
-      <div className="flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm font-medium">Lesson complete — {concepts.length} concepts.</p>
-        <Button variant="outline" size="sm" onClick={() => setIdx(0)}>
-          Start over
-        </Button>
-      </div>
-    )
-  }
-
-  const kindClass = KIND_BADGE[c.kind] || "bg-muted text-muted-foreground"
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Lesson</span>
-        <span className="tabular-nums">
-          {idx + 1} / {concepts.length}
-        </span>
-      </div>
+    <AsyncView
+      q={q}
+      errorTitle="Couldn't load this lesson"
+      isEmpty={(d) => (d.concepts ?? []).length === 0}
+      empty={<EmptyState title="No concepts yet" description="No concepts extracted for this section yet." />}
+    >
+      {(d) => {
+        const concepts = d.concepts ?? []
+        const c = concepts[idx]
+        if (!c) {
+          return (
+            <EmptyState
+              title={`Lesson complete — ${concepts.length} concepts.`}
+              action={
+                <Button variant="outline" size="sm" onClick={() => setAt({ scope, idx: 0 })}>
+                  Start over
+                </Button>
+              }
+            />
+          )
+        }
+        const onMark = (gotIt: boolean) => {
+          if (!c.conceptKey) return next() // nothing to schedule: just move on
+          const v = { key: c.conceptKey, gotIt }
+          setLast(v)
+          mark.fire(v)
+        }
+        return (
+          <div className="flex h-full flex-col gap-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Lesson</span>
+              <span className="tabular-nums">
+                {idx + 1} / {concepts.length}
+              </span>
+            </div>
 
-      <div className="flex flex-1 flex-col gap-3 rounded-lg border bg-card p-5">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-semibold">{c.name}</span>
-          <span className={`rounded px-1.5 py-0.5 text-micro font-medium uppercase ${kindClass}`}>
-            {c.kind}
-          </span>
-        </div>
-        <ConceptMarkdown content={c.signal} className="text-sm" />
-        {c.source && (
-          <div className="border-l-2 border-muted pl-3 text-xs italic text-muted-foreground">
-            <ConceptMarkdown content={c.source} />
+            <Sheet as="article" className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold">{c.name}</span>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-micro font-medium uppercase ${KIND_BADGE[c.kind] || "bg-muted text-muted-foreground"}`}
+                >
+                  {c.kind}
+                </span>
+              </div>
+              <ConceptMarkdown content={c.signal} className="text-sm" />
+              {c.source && (
+                <div className="border-l-2 border-muted pl-3 text-xs italic text-muted-foreground">
+                  <ConceptMarkdown content={c.source} />
+                </div>
+              )}
+            </Sheet>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mark.pending}
+                className="border-destructive/40 text-ink-danger hover:bg-destructive/10"
+                onClick={() => onMark(false)}
+              >
+                Needs review
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mark.pending}
+                className="border-status-mastered/40 text-ink-ok hover:bg-status-mastered/10"
+                onClick={() => onMark(true)}
+              >
+                Got it
+              </Button>
+            </div>
+            {mark.error && (
+              <ErrorNotice compact title="Not saved" error={mark.error} onRetry={() => last && mark.fire(last)} />
+            )}
           </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="border-destructive/40 text-destructive hover:bg-destructive/10"
-          onClick={() => mark(false)}
-        >
-          Needs review
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="border-status-mastered/40 text-status-mastered hover:bg-status-mastered/10"
-          onClick={() => mark(true)}
-        >
-          Got it
-        </Button>
-      </div>
-    </div>
+        )
+      }}
+    </AsyncView>
   )
 }

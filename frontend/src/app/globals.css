@@ -28,6 +28,9 @@
   --fleet-warn-text: oklch(0.84 0.14 80);
   --fleet-danger: oklch(0.65 0.21 25);
   --fleet-danger-text: oklch(0.78 0.16 25);
+  /* The app header's height (layout.tsx: 38px + 49px tiers + a 1px border), the one
+     legal sticky offset. fleet-study.css's .study-bar sticks below it. */
+  --fleet-header-h: 88px;
   /* The paper reader's serif — a reading register, not the app's face. */
   --reading-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }

@@ -2,28 +2,34 @@
 
 import { useState } from "react"
 import { ArrowRight, X } from "lucide-react"
+import { Button } from "@/kit/ui/button"
+import { cn } from "@/kit/lib/utils"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { displaySectionTitle } from "@/gateways/api/outline"
 import type { SectionMemory } from "@/gateways/api/progress"
 
-/** State → block color. Unbuilt chapters are dim; built-but-unreviewed get a faint
- *  brand tint so "there's material here" reads at a glance without shouting. */
-function blockClass(memory: SectionMemory | undefined): string {
-  if (!memory || memory.total === 0) return "bg-muted text-muted-foreground"
+/** State → block fill. Unbuilt chapters are dim; built-but-unreviewed get a faint accent
+ *  tint so "there's material here" reads at a glance without shouting. */
+function blockFill(memory: SectionMemory | undefined): string {
+  if (!memory || memory.total === 0) return "bg-muted hover:bg-muted"
   switch (memory.state) {
     case "solid":
-      // text-background, matching its two siblings below. `text-brand-foreground`
-      // resolved to nothing — tailwind.config defines brand with only
-      // DEFAULT/dark/light — so this label had been inheriting ambient ink on a
-      // solid blue chip.
-      return "bg-brand text-background"
+      return "bg-brand hover:bg-brand"
     case "shaky":
-      return "bg-status-due text-background"
+      return "bg-status-due hover:bg-status-due"
     case "fading":
-      return "bg-status-fading text-background"
+      return "bg-status-fading hover:bg-status-fading"
     default:
-      return "bg-brand/25 text-foreground/80" // built, nothing reviewed yet
+      return "bg-brand/25 hover:bg-brand/25" // built, nothing reviewed yet
   }
+}
+
+/** Label ink on a block: words never wear a fill token, so a solid block takes the
+ *  on-accent ink and the dim blocks take the ordinary text inks. */
+function blockInk(memory: SectionMemory | undefined): string {
+  if (!memory || memory.total === 0) return "text-muted-foreground"
+  if (memory.state === "solid") return "text-ink-on-accent"
+  return memory.state === "new" ? "text-foreground" : "text-background"
 }
 
 function blockTitle(label: string, memory: SectionMemory | undefined): string {
@@ -54,8 +60,16 @@ function blockLabel(node: LearnTreeNode): string {
   return title.length > 22 ? `${title.slice(0, 21)}…` : title
 }
 
-/** The expanded chapter: its subtree in outline hierarchy, but spoken in blocks —
- *  indented rows of state-colored chips, titles on hover, click to open the section. */
+const LEGEND: [string, string][] = [
+  ["bg-muted", "unbuilt"],
+  ["bg-brand/25", "new"],
+  ["bg-brand", "solid"],
+  ["bg-status-due", "shaky"],
+  ["bg-status-fading", "fading"],
+]
+
+/** The expanded chapter: its subtree in outline hierarchy, spoken in blocks — indented
+ *  rows of state-filled chips, titles on hover, click to open the section. */
 function ChapterBreakdown({
   chapter,
   bySection,
@@ -64,49 +78,48 @@ function ChapterBreakdown({
 }: {
   chapter: LearnTreeNode
   bySection: Record<string, SectionMemory>
-  onOpen: (scope: string | null, node: LearnTreeNode | null) => void
+  onOpen: (scope: string) => void
   onClose: () => void
 }) {
   const rows = sectionRows(chapter)
   return (
-    <div className="border-t bg-muted/20 p-3">
+    <div className="rounded-md border border-border p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen(chapter.sectionKey, chapter)}
-          className="group flex items-center gap-1.5 text-xs font-medium hover:text-brand"
+        <Button
+          variant="link"
+          className="group h-auto gap-1.5 p-0 text-meta font-medium text-foreground"
+          onClick={() => chapter.sectionKey && onOpen(chapter.sectionKey)}
           title="Open this chapter"
         >
           {displaySectionTitle(chapter.label, chapter.title)}
-          <ArrowRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label="Collapse chapter breakdown"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+          <ArrowRight className="opacity-0 transition-opacity group-hover:opacity-100" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onClose} aria-label="Collapse chapter breakdown">
+          <X />
+        </Button>
       </div>
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No sub-sections — this chapter is one block.</p>
+        <p className="text-meta text-muted-foreground">No sub-sections — this chapter is one block.</p>
       ) : (
         <div className="flex flex-col gap-[3px]">
           {rows.map(({ node, depth }) => {
             const memory = bySection[node.sectionKey!]
             const title = blockTitle(displaySectionTitle(node.label, node.title), memory)
             return (
+              // Indent is dynamic geometry (outline depth), the sanctioned inline style.
               <div key={node.sectionKey} style={{ paddingLeft: depth * 18 }}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(node.sectionKey, node)}
-                  className={`inline-flex h-5 min-w-9 items-center justify-center rounded-[4px] px-1.5 text-micro font-medium tabular-nums transition-transform hover:scale-110 ${blockClass(memory)}`}
+                <Button
+                  onClick={() => onOpen(node.sectionKey as string)}
+                  className={cn(
+                    "h-5 min-w-9 rounded-[4px] px-1.5 text-micro font-medium tabular-nums transition-transform hover:scale-110",
+                    blockFill(memory),
+                    blockInk(memory),
+                  )}
                   title={title}
                   aria-label={title}
                 >
                   {blockLabel(node)}
-                </button>
+                </Button>
               </div>
             )
           })}
@@ -116,10 +129,9 @@ function ChapterBreakdown({
   )
 }
 
-/** The chapter state strip: the whole book's memory state as one compact pixel row —
- *  the spatial twin of the activity heatmap ("the book across chapters" vs "you across
- *  time"). Hover a square for the numbers; click to unfold the chapter's sections as
- *  blocks (the breakdown's open-arrow navigates into the chapter itself). */
+/** The chapter state strip: the whole book's memory state as one compact pixel row, the
+ *  spatial twin of the activity heatmap. Hover a square for the numbers; click to unfold
+ *  the chapter's sections as blocks. Renders inside the caller's sheet. */
 export function ChapterStateStrip({
   rows,
   bySection,
@@ -127,46 +139,38 @@ export function ChapterStateStrip({
 }: {
   rows: { node: LearnTreeNode; memory: SectionMemory }[]
   bySection: Record<string, SectionMemory>
-  onOpen: (scope: string | null, node: LearnTreeNode | null) => void
+  onOpen: (scope: string) => void
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   if (rows.length === 0) return null
   const expanded = expandedKey ? rows.find((r) => r.node.sectionKey === expandedKey) : undefined
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground">Chapters</span>
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-meta font-medium text-muted-foreground">Chapters</span>
         <span className="flex items-center gap-2 text-micro text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-muted" /> unbuilt
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-brand/25" /> new
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-brand" /> solid
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-status-due" /> shaky
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-[2px] bg-status-fading" /> fading
-          </span>
+          {LEGEND.map(([fill, label]) => (
+            <span key={label} className="flex items-center gap-1">
+              <span className={cn("h-2 w-2 rounded-[2px]", fill)} /> {label}
+            </span>
+          ))}
         </span>
       </div>
-      <div className="flex flex-wrap gap-[3px] p-3">
+      <div className="flex flex-wrap gap-[3px]">
         {rows.map(({ node, memory }) => {
           const isOpen = node.sectionKey === expandedKey
+          const title = blockTitle(displaySectionTitle(node.label, node.title), memory)
           return (
-            <button
+            <Button
               key={node.sectionKey}
-              type="button"
               onClick={() => setExpandedKey(isOpen ? null : node.sectionKey)}
-              className={`h-4 w-4 rounded-[3px] transition-transform hover:scale-125 ${blockClass(memory).split(" ")[0]} ${
-                isOpen ? "ring-2 ring-brand ring-offset-1 ring-offset-card" : ""
-              }`}
-              title={blockTitle(displaySectionTitle(node.label, node.title), memory)}
-              aria-label={blockTitle(displaySectionTitle(node.label, node.title), memory)}
+              className={cn(
+                "h-4 w-4 rounded-[3px] p-0 transition-transform hover:scale-125",
+                blockFill(memory),
+                isOpen && "ring-2 ring-brand ring-offset-1 ring-offset-card",
+              )}
+              title={title}
+              aria-label={title}
               aria-expanded={isOpen}
             />
           )

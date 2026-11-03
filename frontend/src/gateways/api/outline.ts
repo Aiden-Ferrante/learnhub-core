@@ -30,18 +30,18 @@ export type OutlineEntry = {
   hiddenReason?: string | null
 }
 
-export async function fetchTocTree(doc?: string): Promise<TocTreeResponse> {
+export async function fetchTocTree(doc?: string, signal?: AbortSignal): Promise<TocTreeResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
-  const res = await fetch(`/api/learn/toc-tree${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/toc-tree${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<TocTreeResponse>(res)
 }
 
 export type OutlineResponse = { docId?: string; outline: OutlineEntry[]; error?: string }
 
 // The document's outline only (chapter list) — cheap (no markdown), for the chapter reader.
-export async function fetchOutline(doc?: string): Promise<OutlineResponse> {
+export async function fetchOutline(doc?: string, signal?: AbortSignal): Promise<OutlineResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
-  const res = await fetch(`/api/learn/outline${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/outline${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<OutlineResponse>(res)
 }
 

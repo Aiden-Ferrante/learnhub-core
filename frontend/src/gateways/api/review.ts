@@ -19,19 +19,10 @@ export type ReviewCard = {
   pageEnd?: number | null
   /** 'skeleton' = a structure-recall card (rebuild a branch's sub-sections from memory),
    *  seeded by the chapter walk's self-grades. 'chapter' = a chapter-resurface card
-   *  (recall what the chapter covered), seeded by reading. 'practice' = a practice-item
-   *  card from the separate practice session. Absent/'concept' = a concept card. */
-  itemType?: 'concept' | 'skeleton' | 'chapter' | 'practice'
+   *  (recall what the chapter covered), seeded by reading. Absent/'concept' = a concept card. */
+  itemType?: 'concept' | 'skeleton' | 'chapter'
   /** Skeleton/chapter cards only: the true structure snapshot for the reveal. */
   children?: { heading: string; essence?: string }[]
-  /** Practice cards only — the item's fields, read LIVE from the pool at queue time
-   *  (never snapshotted into the review row, so edits always show). */
-  practiceKey?: string
-  practiceKind?: 'retrieve' | 'problem' | 'mcq' | 'order' | 'code'
-  prompt?: string
-  answer?: string
-  rubric?: string | null
-  payload?: Record<string, unknown> | null
 }
 
 export type ReviewQueueResponse = {
@@ -57,12 +48,24 @@ export async function fetchReviewQueue(
   docId: string | undefined,
   scope: string,
   limit = 40,
-  session: 'concepts' | 'practice' = 'concepts',
+  signal?: AbortSignal,
 ): Promise<ReviewQueueResponse> {
   const params = new URLSearchParams({ scope, limit: String(limit) })
   if (docId) params.set('doc', docId)
-  if (session !== 'concepts') params.set('session', session)
-  const res = await fetch(`/api/learn/review/queue?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/review/queue?${params}`, { signal, cache: 'no-store' })
+  return parseJsonResponse<ReviewQueueResponse>(res)
+}
+
+/** The whole-course review queue: every DUE concept, skeleton and chapter card in the
+ *  course (no new cards), earliest first. Backs /courses/[id]/review; its `counts.due` is
+ *  what the study-debt badges count for this course. `docId` is the learnDocId. */
+export async function fetchCourseReviewQueue(
+  docId: string,
+  limit = 200,
+  signal?: AbortSignal,
+): Promise<ReviewQueueResponse> {
+  const params = new URLSearchParams({ scope: 'course', limit: String(limit), doc: docId })
+  const res = await fetch(`/api/learn/review/queue?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ReviewQueueResponse>(res)
 }
 
@@ -70,28 +73,13 @@ export async function submitReviewGrade(
   conceptKey: string,
   grade: ReviewGrade,
   docId?: string,
+  signal?: AbortSignal,
 ): Promise<ReviewGradeResponse> {
   const res = await fetch('/api/learn/review/grade', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
-  })
-  return parseJsonResponse<ReviewGradeResponse>(res)
-}
-
-// Seed-or-advance a PRACTICE item's spaced-repetition state. The practice session's
-// separate queue grades through this on every self-grade; the item key (not the review-row
-// key) addresses it, so first grades and re-grades are the same call. `doc` attributes the
-// study event to the VERSION being studied while the review row follows the book.
-export async function submitPracticeReviewGrade(
-  practiceKey: string,
-  grade: ReviewGrade,
-  docId?: string,
-): Promise<ReviewGradeResponse> {
-  const res = await fetch('/api/learn/review/grade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ practice: true, practiceKey, grade, doc: docId ?? null }),
   })
   return parseJsonResponse<ReviewGradeResponse>(res)
 }
@@ -109,8 +97,10 @@ export async function submitSkeletonReviewGrade(
     chapterScope?: string
     children?: { heading: string; essence?: string }[]
   },
+  signal?: AbortSignal,
 ): Promise<ReviewGradeResponse> {
   const res = await fetch('/api/learn/review/grade', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ skeleton: true, doc: docId, sectionKey, grade, ...snapshot }),

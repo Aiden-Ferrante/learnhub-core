@@ -430,23 +430,49 @@ def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
     }
 
 
+# The scope value that means "every section of the doc" (an omitted scope means the same).
+COURSE_SCOPE = "course"
+
+# The concept_reviews item types the course review serves. NULL item_type is a concept card.
+# Practice and pack rows are scheduled elsewhere (their own session / their pack's Today tab),
+# so every due count that leads to the course review counts only these (calendar.py).
+COURSE_REVIEW_TYPES: frozenset[str] = frozenset({"concept", "skeleton", "chapter"})
+
+
+def is_course_scope(scope: str | None) -> bool:
+    """True when ``scope`` asks for the whole course (omitted, blank or ``"course"``)."""
+    return not (scope or "").strip() or scope == COURSE_SCOPE
+
+
+def served_by_course_review(item_type: str | None) -> bool:
+    """Whether a concept_reviews row of this item_type is a card the course review serves."""
+    return (item_type or "concept") in COURSE_REVIEW_TYPES
+
+
 def build_review_queue(
-    doc: str | None, scope: str, limit: int = 40, session: str = "concepts"
+    doc: str | None, scope: str | None, limit: int = 40, session: str = "concepts"
 ) -> dict[str, Any]:
     """Cards to review now for ONE chapter/section scope: due cards (earliest first)
-    then the scope's new (unseen) concept cards. Studying is deliberately
-    chapter-scoped — the course-wide session was retired 2026-07-15.
+    then the scope's new (unseen) concept cards.
+
+    A whole-course scope (``scope`` omitted, blank or ``"course"``, see is_course_scope)
+    serves every DUE concept, skeleton and chapter card in the doc and no new cards: it
+    backs /courses/[id]/review, whose job is to clear what the due badges count. New
+    concepts are introduced chapter by chapter, where they are read.
 
     ``session="practice"`` returns ONLY practice-item cards — a separate session, never a
     mixed queue: a ten-minute derivation must not land mid-run of twenty-second concept
     cards. The default session excludes practice symmetrically."""
     now = time.time()
+    whole_course = is_course_scope(scope)
+    if whole_course:
+        scope = None
     if session == "practice":
-        return _build_practice_queue(doc, scope, limit, now)
+        return _build_practice_queue(doc, scope or "", limit, now)
     try:
         # A chapter scope spans ALL its sub-sections (the reader's reading-order span) —
-        # exact-key matching misses everything under a chapter node.
-        span = scope_section_keys(doc, scope)
+        # exact-key matching misses everything under a chapter node. None = whole course.
+        span = None if whole_course else scope_section_keys(doc, scope)
         with db() as conn:
             cols = (
                 'SELECT c.key, c.name, c.kind, c.signal, c.source, c.section_key AS "sectionKey", '
@@ -488,11 +514,12 @@ def build_review_queue(
             concept_span = set(source_sections(doc, list(span))) or span
             concepts = [c for c in concepts if c.get("sectionKey") in concept_span]
         # Typed rows (skeleton/chapter) follow the VERSION, so they keep the untranslated span.
-        typed_rows = [
-            r
-            for r in typed_rows
-            if r.get("chapterScope") == scope or (span and r.get("sectionKey") in span)
-        ]
+        if not whole_course:
+            typed_rows = [
+                r
+                for r in typed_rows
+                if r.get("chapterScope") == scope or (span and r.get("sectionKey") in span)
+            ]
     except Exception as exc:  # noqa: BLE001
         return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)}
 
@@ -502,7 +529,8 @@ def build_review_queue(
     for c in concepts:
         r = reviews.get(c["key"])
         if r is None:
-            new.append(_card(c, "new", None))
+            if not whole_course:
+                new.append(_card(c, "new", None))
         elif float(r.get("due", 0)) <= now:
             due.append(_card(c, r.get("state", "review"), r.get("due")))
         else:

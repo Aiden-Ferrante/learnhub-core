@@ -18,8 +18,9 @@ export type CoursePipelineStatus = {
   error?: string
 }
 
-export async function fetchCourseStatus(doc: string): Promise<CoursePipelineStatus> {
+export async function fetchCourseStatus(doc: string, signal?: AbortSignal): Promise<CoursePipelineStatus> {
   const res = await fetch(`/api/learn/course-status?doc=${encodeURIComponent(doc)}`, {
+    signal,
     cache: 'no-store',
   })
   // 404 = the course points at content that no longer exists — a state the caller renders,
@@ -38,17 +39,19 @@ export type LearnDeletionImpact = {
 }
 
 /** What deleting a course removes, plus the token the delete needs. Read first. */
-export async function fetchLearnDeletion(doc: string): Promise<LearnDeletionImpact> {
-  const res = await fetch(`/api/learn/document/deletion?doc=${encodeURIComponent(doc)}`)
+export async function fetchLearnDeletion(doc: string, signal?: AbortSignal): Promise<LearnDeletionImpact> {
+  const res = await fetch(`/api/learn/document/deletion?doc=${encodeURIComponent(doc)}`, { signal })
   return parseJsonResponse(res)
 }
 
 export async function deleteLearnDocument(
   doc: string,
   token: string,
+  signal?: AbortSignal,
 ): Promise<{ deleted?: string; removed?: Record<string, number>; error?: string }> {
   // The backend refuses a delete without the token its deletion read issued.
   const res = await fetch(`/api/learn/document?doc=${encodeURIComponent(doc)}&token=${encodeURIComponent(token)}`, {
+    signal,
     method: 'DELETE',
   })
   return parseJsonResponse(res)
@@ -79,6 +82,7 @@ export async function startExtraction(
   doc?: string,
   sectionKeys?: string[],
   model?: string,
+  signal?: AbortSignal,
 ): Promise<ExtractStatusResponse> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
@@ -88,6 +92,7 @@ export async function startExtraction(
   if (sectionKeys && sectionKeys.length) payload.sectionKeys = sectionKeys
   if (useModel) payload.model = useModel
   const res = await fetch(`/api/learn/extract?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -98,11 +103,12 @@ export async function startExtraction(
 export async function getExtractionStatus(
   scope: string | null,
   doc?: string,
+  signal?: AbortSignal,
 ): Promise<ExtractStatusResponse> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/extract/status?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/extract/status?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ExtractStatusResponse>(res)
 }
 
@@ -163,9 +169,11 @@ export async function enqueueChapterBuild(
   scope: string,
   at?: number | null,
   kind: BuildKind = 'build',
+  signal?: AbortSignal,
 ): Promise<ChapterBuildJob & { error?: string }> {
   const params = new URLSearchParams({ doc, scope })
   const res = await fetch(`/api/learn/build?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...(at ? { at } : {}), ...(kind !== 'build' ? { kind } : {}) }),
@@ -177,9 +185,11 @@ export async function cancelChapterBuild(
   doc: string,
   scope: string,
   kind: BuildKind = 'build',
+  signal?: AbortSignal,
 ): Promise<{ cancelled: boolean; cancelling?: boolean; reason?: string; error?: string }> {
   const params = new URLSearchParams({ doc, scope, ...(kind !== 'build' ? { kind } : {}) })
   const res = await fetch(`/api/learn/build/cancel?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{}',

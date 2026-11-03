@@ -9,13 +9,16 @@ export type DomainStatus =
   | "error"
   | "neutral"
 
+/** Fills (dot, wash) keep the status fill tokens; the word wears an ink token, because a
+ *  fill measures as low as 2.8:1 as text (spec §4). fading/building have no ink of their
+ *  own, so their words take the dim ink and the hue stays in the dot and wash. */
 const TONES: Record<DomainStatus, { dot: string; text: string; bg: string }> = {
-  mastered: { dot: "bg-status-mastered", text: "text-status-mastered", bg: "bg-status-mastered/10" },
-  ready: { dot: "bg-status-ready", text: "text-status-ready", bg: "bg-status-ready/10" },
-  due: { dot: "bg-status-due", text: "text-status-due", bg: "bg-status-due/10" },
-  fading: { dot: "bg-status-fading", text: "text-status-fading", bg: "bg-status-fading/10" },
-  building: { dot: "bg-status-building", text: "text-status-building", bg: "bg-status-building/10" },
-  error: { dot: "bg-status-error", text: "text-status-error", bg: "bg-status-error/10" },
+  mastered: { dot: "bg-status-mastered", text: "text-ink-ok", bg: "bg-status-mastered/10" },
+  ready: { dot: "bg-status-ready", text: "text-ink-accent", bg: "bg-status-ready/10" },
+  due: { dot: "bg-status-due", text: "text-ink-warn", bg: "bg-status-due/10" },
+  fading: { dot: "bg-status-fading", text: "text-ink-dim", bg: "bg-status-fading/10" },
+  building: { dot: "bg-status-building", text: "text-ink-dim", bg: "bg-status-building/10" },
+  error: { dot: "bg-status-error", text: "text-ink-danger", bg: "bg-status-error/10" },
   neutral: { dot: "bg-muted-foreground/60", text: "text-muted-foreground", bg: "bg-muted/40" },
 }
 

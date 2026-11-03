@@ -1,12 +1,11 @@
 import { cn } from "@/kit/lib/utils"
 
-/** The standard content card: border-only surface, optional titled header row.
- *  `elevated` adds shadow — reserve it for overlays/hero surfaces, not grids. */
+/** The standard content card: border-only surface, optional titled header row. Flat, as
+ *  fleet has no shadows. */
 export function SectionCard({
   title,
   description,
   actions,
-  elevated = false,
   className,
   bodyClassName,
   children,
@@ -14,14 +13,13 @@ export function SectionCard({
   title?: React.ReactNode
   description?: string
   actions?: React.ReactNode
-  elevated?: boolean
   className?: string
   bodyClassName?: string
   children: React.ReactNode
 }) {
   return (
     <section
-      className={cn("rounded-lg border bg-card", elevated && "shadow-lg", className)}
+      className={cn("rounded-lg border bg-card", className)}
     >
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">

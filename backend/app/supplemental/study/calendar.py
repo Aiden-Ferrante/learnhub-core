@@ -1,10 +1,14 @@
 """Cross-course review calendar — when everything comes due.
 
-One whole-library read model over ``concept_reviews``: every scheduled item (concepts,
-skeletons, figures, chapter resurfaces) bucketed into "due now" plus per-day counts over a
-horizon, broken down per course and per item type. This is the aggregator behind the /study
-calendar; /api/study-debt stays the compact rollup for external surfaces (nav badge, vault
-briefing).
+One whole-library read model over ``concept_reviews``: every item the course review
+serves (concepts, skeletons, chapter resurfaces) bucketed into "due now" plus per-day counts
+over a horizon, broken down per course and per item type. This is the aggregator behind the
+/study calendar; /api/study-debt stays the compact rollup for external surfaces (nav badge,
+vault briefing).
+
+Both count ONLY what the course review serves (reviews.COURSE_REVIEW_TYPES), so every due
+badge can reach zero from /courses/[id]/review. Practice rows (the deleted practice session)
+and pack rows (worked inside their own pack) are never counted here.
 """
 
 from __future__ import annotations
@@ -13,8 +17,9 @@ import time
 from typing import Any
 
 from app.gateways import db
+from app.supplemental.study.reviews import served_by_course_review
 
-_TYPES = ("concept", "skeleton", "figure", "chapter", "practice")
+_TYPES = ("concept", "skeleton", "chapter")
 
 # Per-bucket cap on the ITEM list (counts stay exact). A day with more than this many
 # reviews sends the first slice plus ``itemsTruncated`` so the UI can say "+N more"
@@ -104,6 +109,8 @@ def build_review_calendar(days: int = 60) -> dict[str, Any]:
         doc = r.get("docId")
         if doc not in titles:  # reviews orphaned by deleted courses
             continue
+        if not served_by_course_review(r.get("itemType")):
+            continue
         tracked += 1
         item_type = r.get("itemType") if r.get("itemType") in _TYPES else "concept"
         item = {
@@ -142,29 +149,34 @@ def build_study_debt(days: int = 7) -> dict[str, Any]:
                 for r in conn.execute("SELECT d.key AS k, s.title AS t FROM raw_documents d "
                                       "JOIN sources s ON s.key = d.source_id").fetchall()
             }
+            # Grouped by item type too, so the filter below can drop what the course
+            # review never serves (practice, pack) before the per-course sums.
             rows = conn.execute(
-                "SELECT doc_id AS d, "
+                'SELECT doc_id AS d, item_type AS "itemType", '
                 "SUM(CASE WHEN due <= to_timestamp(%(now)s) THEN 1 ELSE 0 END) AS due, "
                 "SUM(CASE WHEN due > to_timestamp(%(now)s) AND due <= to_timestamp(%(hz)s) "
                 "THEN 1 ELSE 0 END) AS soon, "
                 "COUNT(*) AS tracked "
-                "FROM concept_reviews WHERE due IS NOT NULL GROUP BY doc_id",
+                "FROM concept_reviews WHERE due IS NOT NULL GROUP BY doc_id, item_type",
                 {"now": now, "hz": horizon},
             ).fetchall()
     except Exception as exc:  # noqa: BLE001 — soft error, never 500
         return {"dueNow": 0, "fadingSoon": 0, "tracked": 0, "days": days, "courses": [], "error": str(exc)}
 
-    courses = [
-        {
-            "doc": r["d"],
-            "title": titles.get(r["d"]) or r["d"],
-            "dueNow": int(r["due"] or 0),
-            "fadingSoon": int(r["soon"] or 0),
-            "tracked": int(r["tracked"] or 0),
-        }
-        for r in rows
-        if r.get("d") in titles  # skip reviews orphaned by deleted courses
-    ]
+    by_doc: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        doc = r.get("d")
+        if doc not in titles:  # skip reviews orphaned by deleted courses
+            continue
+        if not served_by_course_review(r.get("itemType")):
+            continue
+        c = by_doc.setdefault(
+            doc, {"doc": doc, "title": titles.get(doc) or doc, "dueNow": 0, "fadingSoon": 0, "tracked": 0}
+        )
+        c["dueNow"] += int(r.get("due") or 0)
+        c["fadingSoon"] += int(r.get("soon") or 0)
+        c["tracked"] += int(r.get("tracked") or 0)
+    courses = list(by_doc.values())
     courses.sort(key=lambda c: (-c["dueNow"], -c["fadingSoon"]))
     return {
         "dueNow": sum(c["dueNow"] for c in courses),

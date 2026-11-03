@@ -1,32 +1,34 @@
 "use client"
 
+/** /courses/[id]/skeleton — skeleton recall over the whole course, on the study theme.
+ *  The breadcrumbs (Library › Course › Skeleton) are the way back. */
+
 import { use } from "react"
-import { useRouter } from "next/navigation"
 import { CourseFallback, useCourseData } from "@/surfaces/library"
 import { SkeletonPractice } from "@/surfaces/studying"
-import { cleanCourseTitle } from "@/kit/lib/course-title"
+import { StudyPage } from "@/kit/study"
+import { PageHeader } from "@/kit/patterns/page-header"
+import { ErrorNotice } from "@/kit/data"
 
-export default function SkeletonPracticePage({
-  params,
-}: {
-  params: Promise<{ courseId: string }>
-}) {
+export default function SkeletonPracticePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)
-  const router = useRouter()
   const data = useCourseData(courseId)
 
   if (!data.course) return <CourseFallback isInitialized={data.isInitialized} />
 
   return (
-    <main className="mx-auto w-full px-4 pb-3 pt-3">
-      <SkeletonPractice
-        courseTitle={cleanCourseTitle(data.course.title).title}
-        docId={data.docKey ?? data.course.id}
-        tree={data.tree}
-        loading={data.loading}
-        onBack={() => router.push(`/courses/${courseId}`)}
-        onAnswered={data.retry}
-      />
-    </main>
+    <StudyPage narrow>
+      <PageHeader title="Skeleton recall" description="Rebuild the book's structure from memory, one level at a time." />
+      {data.error ? (
+        <ErrorNotice title="Couldn't load the syllabus" error={new Error(data.error)} onRetry={data.retry} />
+      ) : (
+        <SkeletonPractice
+          courseTitle={data.course.title}
+          docId={data.docKey ?? data.course.id}
+          tree={data.tree}
+          loading={data.loading}
+        />
+      )}
+    </StudyPage>
   )
 }

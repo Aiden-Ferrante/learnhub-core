@@ -6,18 +6,6 @@ export type MemoryState = 'new' | 'solid' | 'shaky' | 'fading'
 
 /** One unit's memory summary: how much is touched (coverage) and how well it holds
  *  right now (mean FSRS retrievability over reviewed concepts; null = nothing reviewed). */
-/** PRODUCTION FLUENCY — the fourth measure ("can I use it?"), same FSRS engine over a
- *  different denominator: the unit's worked-problem items (kind problem/code only).
- *  A SEPARATE axis: never averaged into retention, and `unknown` (no items generated)
- *  is a distinct state from a low score — render it as absence, never as 0%. */
-export type FluencySummary = {
-  items: number
-  attempted: number
-  /** Mean FSRS retrievability over attempted items; null when unknown/unattempted. */
-  fluency: number | null
-  state: 'unknown' | 'unattempted' | 'measured'
-}
-
 export type SectionMemory = {
   total: number
   reviewed: number
@@ -25,7 +13,6 @@ export type SectionMemory = {
   retention: number | null
   state: MemoryState
   fading: number
-  fluency?: FluencySummary
 }
 
 export type FadingSection = SectionMemory & {
@@ -56,27 +43,35 @@ export type ActivityResponse = {
   error?: string
 }
 
-export async function fetchMastery(doc?: string): Promise<MasteryResponse> {
+export async function fetchMastery(doc?: string, signal?: AbortSignal): Promise<MasteryResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
-  const res = await fetch(`/api/learn/mastery${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/mastery${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<MasteryResponse>(res)
 }
 
-export async function fetchActivity(doc?: string): Promise<ActivityResponse> {
+export async function fetchActivity(doc?: string, signal?: AbortSignal): Promise<ActivityResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
-  const res = await fetch(`/api/learn/activity${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/activity${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ActivityResponse>(res)
 }
 
-// Record a passive engagement event (read/listen/…) so the dashboard reflects all study,
-// not just graded reviews. Fire-and-forget — never blocks the UI.
-export function recordEngagement(kind: string, scope: string | null, doc?: string): void {
+/** Record a passive engagement event (read/listen/…) so the dashboard reflects all study,
+ *  not just graded reviews. Callers fire it as a mutation and never block on it; a failed
+ *  request throws (ApiError) so the caller can say so. A null scope records nothing. */
+export async function recordEngagement(
+  kind: string,
+  scope: string | null,
+  doc?: string,
+  signal?: AbortSignal,
+): Promise<void> {
   if (!scope) return
-  void fetch('/api/learn/engagement', {
+  const res = await fetch('/api/learn/engagement', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind, scope, doc: doc ?? null }),
-  }).catch(() => {})
+  })
+  await parseJsonResponse<unknown>(res)
 }
 
 // ----- Whole-library study debt (the one cross-course rollup) -----
@@ -90,8 +85,8 @@ export type StudyDebt = {
   error?: string
 }
 
-export async function fetchStudyDebt(days = 7): Promise<StudyDebt> {
-  const res = await fetch(`/api/learn/study-debt?days=${days}`, { cache: 'no-store' })
+export async function fetchStudyDebt(days = 7, signal?: AbortSignal): Promise<StudyDebt> {
+  const res = await fetch(`/api/learn/study-debt?days=${days}`, { signal, cache: 'no-store' })
   return parseJsonResponse<StudyDebt>(res)
 }
 
@@ -116,9 +111,8 @@ export type ConceptMasteryResponse = {
   error?: string
 }
 
-export async function fetchConceptMastery(docId?: string): Promise<ConceptMasteryResponse> {
+export async function fetchConceptMastery(docId?: string, signal?: AbortSignal): Promise<ConceptMasteryResponse> {
   const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
-  const res = await fetch(`/api/learn/concept-mastery${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/concept-mastery${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ConceptMasteryResponse>(res)
 }
-

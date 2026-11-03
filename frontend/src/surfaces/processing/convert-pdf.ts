@@ -1,3 +1,5 @@
+import { ApiError, onUnauthorized } from '@/gateways/api/http';
+
 export type PdfConvertResponse = {
   markdown: string;
   sourceFilename: string;
@@ -61,7 +63,12 @@ export async function startPdfConversion(file: File): Promise<ConversionStart> {
   const startRes = await fetch('/api/convert-pdf', { method: 'POST', body: form });
   const startData = (await startRes.json().catch(() => ({}))) as Record<string, unknown>;
   if (!startRes.ok) {
-    throw new Error((startData.error as string) || `PDF conversion failed (${startRes.status})`);
+    if (startRes.status === 401) onUnauthorized();
+    throw new ApiError(
+      startRes.status,
+      (startData.error as string) || `PDF conversion failed (${startRes.status})`,
+      startData.detail ?? startData.error,
+    );
   }
 
   // Identical content already ingested (matched by hash): reuse the stored conversion
@@ -93,6 +100,9 @@ export async function loadConvertedDocument(
   const docRes = await fetch(`/api/learn/document?id=${encodeURIComponent(docId)}`, {
     cache: 'no-store',
   });
+  // An expired session goes to /login like every other request; any other miss is the
+  // "stored content could not be loaded" case below, which names the way out.
+  if (docRes.status === 401) onUnauthorized();
   const docData = (await docRes.json().catch(() => ({}))) as {
     document?: { markdown?: string; pageCount?: number; sourceFilename?: string } | null;
   };

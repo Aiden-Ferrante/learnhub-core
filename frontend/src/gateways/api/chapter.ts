@@ -28,12 +28,13 @@ export async function fetchSkeleton(
   scope: string | null,
   doc?: string,
   regenerate = false,
+  signal?: AbortSignal,
 ): Promise<SkeletonResponse> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
   if (regenerate) params.set('regenerate', '1')
-  const res = await fetch(`/api/learn/skeleton?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/skeleton?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<SkeletonResponse>(res)
 }
 
@@ -41,11 +42,13 @@ export async function gradeSkeleton(
   scope: string | null,
   doc: string | undefined,
   grade: SkeletonGrade,
+  signal?: AbortSignal,
 ): Promise<{ stages?: Record<string, unknown>; error?: string }> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
   const res = await fetch(`/api/learn/skeleton/grade?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ grade }),
@@ -55,11 +58,11 @@ export async function gradeSkeleton(
 
 export type ChapterProgress = { docId?: string; scope?: string | null; stages: Record<string, Record<string, unknown>> }
 
-export async function fetchChapterProgress(scope: string | null, doc?: string): Promise<ChapterProgress> {
+export async function fetchChapterProgress(scope: string | null, doc?: string, signal?: AbortSignal): Promise<ChapterProgress> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
-  const res = await fetch(`/api/learn/chapter-progress?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/chapter-progress?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ChapterProgress>(res)
 }
 
@@ -68,11 +71,13 @@ export async function updateChapterStage(
   doc: string | undefined,
   stage: string,
   data: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<ChapterProgress> {
   const params = new URLSearchParams()
   if (scope) params.set('scope', scope)
   if (doc) params.set('doc', doc)
   const res = await fetch(`/api/learn/chapter-progress?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ stage, data }),
@@ -108,9 +113,9 @@ export type GuidedReadingResponse = {
   error?: string
 }
 
-export async function fetchGuidedReading(doc: string, scope: string): Promise<GuidedReadingResponse> {
+export async function fetchGuidedReading(doc: string, scope: string, signal?: AbortSignal): Promise<GuidedReadingResponse> {
   const params = new URLSearchParams({ doc, scope })
-  const res = await fetch(`/api/learn/guided-reading?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/guided-reading?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<GuidedReadingResponse>(res)
 }
 
@@ -128,8 +133,9 @@ export type CourseChapter = { key: string; title: string; label?: string; hasCon
 
 export async function fetchCourseChapters(
   doc: string,
+  signal?: AbortSignal,
 ): Promise<{ docId?: string; chapters: CourseChapter[]; error?: string }> {
-  const res = await fetch(`/api/learn/chapters?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/chapters?doc=${encodeURIComponent(doc)}`, { signal, cache: 'no-store' })
   return parseJsonResponse<{ docId?: string; chapters: CourseChapter[] }>(res)
 }
 

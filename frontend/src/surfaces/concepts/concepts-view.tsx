@@ -1,172 +1,116 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Sparkles } from "lucide-react"
+import { useMemo } from "react"
+import { Sparkles } from "lucide-react"
 import { Button } from "@/kit/ui/button"
-import { prettyScope } from "@/surfaces/concepts/concept-card"
+import { AsyncView, ErrorNotice, qk, useApi } from "@/kit/data"
+import { EmptyState } from "@/kit/patterns/empty-state"
+import { PageHeader } from "@/kit/patterns/page-header"
+import { Sheet, StudyPage } from "@/kit/study"
 import { ConceptTree } from "@/surfaces/concepts/concept-tree"
-import type { LearnTreeNode } from "@/gateways/api/outline"
 import { ConceptDetail } from "@/surfaces/concepts/concept-detail"
+import { prettyScope } from "@/surfaces/concepts/concept-format"
+import type { LearnTreeNode } from "@/gateways/api/outline"
 import { fetchDocumentConcepts, type ConceptLesson } from "@/gateways/api/concepts"
-import { fetchDocumentMarkdown } from "@/gateways/api/content"
 import { fetchConceptMastery, type ConceptMastery } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library"
 
 type ConceptsViewProps = {
   course: Course
-  /** The course outline tree (toc-tree) — the concept tree reuses its skeleton. */
+  /** The course outline tree (toc-tree): the concept tree reuses its skeleton, and its
+   *  headings name each concept's section. */
   tree: LearnTreeNode[]
-  onBack: () => void
-  /** Open straight onto this concept's detail (e.g. a concept clicked in the syllabus tree). */
-  initialConceptKey?: string | null
+  /** The open concept (the page keeps it in `?concept=`), or null for the list. */
+  conceptKey: string | null
+  onSelect: (key: string | null) => void
 }
 
-type Mode = "list" | "detail"
+/** Section headings by section key, from the outline tree the page already holds. */
+function headings(nodes: LearnTreeNode[], into: Record<string, string> = {}): Record<string, string> {
+  for (const n of nodes) {
+    if (n.sectionKey && n.title && !into[n.sectionKey]) into[n.sectionKey] = n.title
+    headings(n.children || [], into)
+  }
+  return into
+}
 
-export function ConceptsView({ course, tree, onBack, initialConceptKey }: ConceptsViewProps) {
-  const [concepts, setConcepts] = useState<ConceptLesson[]>([])
-  const [titles, setTitles] = useState<Record<string, string>>({})
-  const [mastery, setMastery] = useState<Record<string, ConceptMastery>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<Mode>("list")
-  const [selected, setSelected] = useState<ConceptLesson | null>(null)
+const NO_MASTERY: Record<string, ConceptMastery> = {}
 
-  const loadMastery = useCallback(() => {
-    fetchConceptMastery(course.learnDocId)
-      .then((m) => {
-        if (!m.error) setMastery(m.byConcept || {})
-      })
-      .catch(() => {})
-  }, [course.learnDocId])
+/** The Concepts screen: what to learn next, then the concept tree; or one concept. */
+export function ConceptsView({ course, tree, conceptKey, onSelect }: ConceptsViewProps) {
+  const doc = course.learnDocId
+  const concepts = useApi(qk.concepts(doc), (signal) => fetchDocumentConcepts(doc, signal))
+  const mastery = useApi(qk.conceptMastery(doc), (signal) => fetchConceptMastery(doc, signal))
+  const byConcept = mastery.data?.byConcept ?? NO_MASTERY
+  const titles = useMemo(() => headings(tree), [tree])
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError(null)
-    fetchDocumentConcepts(course.learnDocId)
-      .then((res) => {
-        if (!active) return
-        if (res.error) setError(res.error)
-        else setConcepts(res.concepts || [])
-      })
-      .catch((e) => active && setError(e instanceof Error ? e.message : "Failed to load concepts"))
-      .finally(() => active && setLoading(false))
-    // Real section headings (best-effort) for nicer group headers.
-    fetchDocumentMarkdown(course.learnDocId)
-      .then((d) => {
-        if (!active) return
-        const map: Record<string, string> = {}
-        for (const o of d.document?.outline || []) {
-          if (o.sectionKey && o.title && !map[o.sectionKey]) map[o.sectionKey] = o.title
-        }
-        setTitles(map)
-      })
-      .catch(() => {})
-    loadMastery()
-    return () => {
-      active = false
-    }
-  }, [course.learnDocId, loadMastery])
-
-  // "What can I learn next": concepts not yet solid (new, shaky, or fading).
-  const ready = useMemo(
-    () => concepts.filter((c) => c.conceptKey && mastery[c.conceptKey]?.state !== "solid").slice(0, 10),
-    [concepts, mastery],
-  )
-
+  const list = useMemo(() => concepts.data?.concepts ?? [], [concepts.data])
   const lessonsByKey = useMemo(() => {
     const out: Record<string, ConceptLesson> = {}
-    for (const c of concepts) if (c.conceptKey) out[c.conceptKey] = c
+    for (const c of list) if (c.conceptKey) out[c.conceptKey] = c
     return out
-  }, [concepts])
-  const masteryFor = (c: ConceptLesson) => (c.conceptKey ? mastery[c.conceptKey] : undefined)
-  const openConcept = (c: ConceptLesson) => {
-    setSelected(c)
-    setMode("detail")
-  }
-
-  // Deep-link from the syllabus tree: once concepts arrive, jump to the requested one.
-  const focusedRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!initialConceptKey || focusedRef.current === initialConceptKey || !concepts.length) return
-    const found = concepts.find((c) => c.conceptKey === initialConceptKey)
-    if (found) {
-      focusedRef.current = initialConceptKey
-      openConcept(found)
-    }
-  }, [initialConceptKey, concepts])
-
-
-  if (mode === "detail" && selected) {
-    const sm = masteryFor(selected)
-    return (
-      <ConceptDetail
-        concept={selected}
-        sectionTitle={titles[selected.sectionKey || ""] || prettyScope(selected.sectionKey)}
-        docId={course.learnDocId}
-        memory={sm}
-        onBack={() => {
-          setMode("list")
-          loadMastery()
-        }}
-        onGraded={loadMastery}
-      />
-    )
-  }
+  }, [list])
+  // "What can I learn next": concepts not yet solid (new, shaky, or fading).
+  const ready = useMemo(
+    () => list.filter((c) => c.conceptKey && byConcept[c.conceptKey]?.state !== "solid").slice(0, 10),
+    [list, byConcept],
+  )
+  const open = (c: ConceptLesson) => c.conceptKey && onSelect(c.conceptKey)
+  const selected = conceptKey ? lessonsByKey[conceptKey] : undefined
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-          <ChevronLeft className="h-4 w-4" /> Back to course
-        </Button>
-        <span className="text-sm font-medium">{course.title} · Concepts</span>
-        <div className="ml-auto flex items-center gap-3">
-          {!loading && (
-            <span className="text-xs text-muted-foreground">
-              {concepts.length} concept{concepts.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {loading && <p className="px-1 text-sm text-muted-foreground">Loading concepts…</p>}
-      {error && <p className="px-1 text-sm text-destructive">{error}</p>}
-      {!loading && !error && concepts.length === 0 && (
-        <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-          No concepts extracted yet. Process this document (or a chapter) to build its concept course.
-        </div>
+    <StudyPage>
+      <PageHeader
+        title="Concepts"
+        description={concepts.data ? `${list.length} concept${list.length === 1 ? "" : "s"} in ${course.title}` : course.title}
+      />
+      {mastery.status === "error" && (
+        <ErrorNotice compact title="Couldn't load how well you know these" error={mastery.error} onRetry={mastery.retry} />
       )}
-
-      {ready.length > 0 && (
-        <div className="rounded-lg border bg-card p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-micro font-medium uppercase tracking-label text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-brand" /> Ready to learn
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {ready.map((c) => (
-              <button
-                key={c.conceptKey}
-                type="button"
-                onClick={() => openConcept(c)}
-                className="rounded-full border bg-background px-2.5 py-1 text-xs hover:bg-muted"
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!loading && !error && concepts.length > 0 && (
-        <ConceptTree
-          tree={tree}
-          lessonsByKey={lessonsByKey}
-          mastery={mastery}
-          onOpenConcept={openConcept}
-        />
-      )}
-    </div>
+      <AsyncView
+        q={concepts}
+        errorTitle="Couldn't load the concepts"
+        isEmpty={(d) => d.concepts.length === 0}
+        empty={
+          <EmptyState
+            title="No concepts extracted yet"
+            description="Process this document (or a chapter) to build its concept course."
+          />
+        }
+      >
+        {() =>
+          selected ? (
+            <ConceptDetail
+              key={selected.conceptKey}
+              concept={selected}
+              sectionTitle={titles[selected.sectionKey || ""] || prettyScope(selected.sectionKey)}
+              docId={doc}
+              memory={selected.conceptKey ? byConcept[selected.conceptKey] : undefined}
+            />
+          ) : (
+            <>
+              {ready.length > 0 && (
+                <Sheet
+                  title={
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-ink-accent" aria-hidden /> Ready to learn
+                    </span>
+                  }
+                >
+                  <div className="flex flex-wrap gap-1.5">
+                    {ready.map((c) => (
+                      <Button key={c.conceptKey} variant="outline" size="sm" className="h-7 rounded-full px-2.5 text-xs" onClick={() => open(c)}>
+                        {c.name}
+                      </Button>
+                    ))}
+                  </div>
+                </Sheet>
+              )}
+              <ConceptTree tree={tree} lessonsByKey={lessonsByKey} mastery={byConcept} onOpenConcept={open} />
+            </>
+          )
+        }
+      </AsyncView>
+    </StudyPage>
   )
 }

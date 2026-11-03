@@ -30,8 +30,9 @@ export type VersionsResponse = {
   error?: string
 }
 
-export async function fetchVersions(doc: string): Promise<VersionsResponse> {
+export async function fetchVersions(doc: string, signal?: AbortSignal): Promise<VersionsResponse> {
   const res = await fetch(`/api/learn/versions?doc=${encodeURIComponent(doc)}`, {
+    signal,
     cache: 'no-store',
   })
   return parseJsonResponse<VersionsResponse>(res)
@@ -42,25 +43,27 @@ export async function fetchVersions(doc: string): Promise<VersionsResponse> {
 export async function createVersion(
   doc: string,
   name: string,
+  signal?: AbortSignal,
 ): Promise<{ docId: string; name: string }> {
   const res = await fetch(
     `/api/learn/version?doc=${encodeURIComponent(doc)}&name=${encodeURIComponent(name)}`,
-    { method: 'POST' },
+    { signal, method: 'POST' },
   )
   return parseJsonResponse(res)
 }
 
-export async function renameVersion(doc: string, name: string): Promise<{ docId: string }> {
+export async function renameVersion(doc: string, name: string, signal?: AbortSignal): Promise<{ docId: string }> {
   const res = await fetch(
     `/api/learn/version?doc=${encodeURIComponent(doc)}&name=${encodeURIComponent(name)}`,
-    { method: 'PATCH' },
+    { signal, method: 'PATCH' },
   )
   return parseJsonResponse(res)
 }
 
 /** Make this the version the course opens. */
-export async function setMainVersion(doc: string): Promise<{ docId: string }> {
+export async function setMainVersion(doc: string, signal?: AbortSignal): Promise<{ docId: string }> {
   const res = await fetch(`/api/learn/version?doc=${encodeURIComponent(doc)}&main=true`, {
+    signal,
     method: 'PATCH',
   })
   return parseJsonResponse(res)
@@ -68,8 +71,9 @@ export async function setMainVersion(doc: string): Promise<{ docId: string }> {
 
 /** Delete one version — its outline and its progress. The book, its text and its concepts
  *  survive. The Default cannot be deleted (the API answers 409). */
-export async function deleteVersion(doc: string): Promise<{ deleted: string }> {
+export async function deleteVersion(doc: string, signal?: AbortSignal): Promise<{ deleted: string }> {
   const res = await fetch(`/api/learn/version?doc=${encodeURIComponent(doc)}`, {
+    signal,
     method: 'DELETE',
   })
   return parseJsonResponse(res)

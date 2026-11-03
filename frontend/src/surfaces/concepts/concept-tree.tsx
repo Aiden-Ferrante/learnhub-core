@@ -8,6 +8,8 @@ import { ConceptMasteryDot } from "@/surfaces/concepts/concept-mastery-dot"
 import type { ConceptLesson } from "@/gateways/api/concepts"
 import type { ConceptMastery } from "@/gateways/api/progress"
 import { cn } from "@/kit/lib/utils"
+import { Button } from "@/kit/ui/button"
+import { Sheet } from "@/kit/study"
 
 /** The Concepts page's tree: the SAME chapter/section skeleton as the course outline,
  *  pruned to concept-bearing branches, with each concept as a rich row (kind badge,
@@ -54,14 +56,11 @@ function ConceptRow({
 }) {
   return (
     <li className="list-none">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onOpen}
         disabled={!onOpen}
-        className={cn(
-          "group flex w-full items-start gap-2 rounded-md py-1 pl-1 pr-2 text-left text-sm",
-          onOpen && "cursor-pointer hover:bg-muted/60",
-        )}
+        className="group h-auto w-full items-start justify-start gap-2 whitespace-normal py-1 pl-1 pr-2 text-left font-normal hover:bg-muted/60 disabled:opacity-100"
       >
         <ConceptMasteryDot state={mastery?.state} retention={mastery?.retention} className="mt-1.5" />
         <span
@@ -80,7 +79,7 @@ function ConceptRow({
             </span>
           )}
         </span>
-      </button>
+      </Button>
     </li>
   )
 }
@@ -193,26 +192,28 @@ export function ConceptTree({ tree, lessonsByKey, mastery, onOpenConcept }: Conc
 
   if (pruned.length === 0) return null
   return (
-    <div className="flex flex-col gap-1">
+    <Sheet className="gap-1">
       <div className="flex justify-end gap-1 px-1">
-        <button
-          type="button"
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
           title="Expand all"
           aria-label="Expand all"
           onClick={() => setExpanded(collectIds(pruned, new Set()))}
         >
           <ChevronsUpDown className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
           title="Collapse all"
           aria-label="Collapse all"
           onClick={() => setExpanded(new Set())}
         >
           <ChevronsDownUp className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
       <ul>
         {pruned.map((node) => (
@@ -229,6 +230,6 @@ export function ConceptTree({ tree, lessonsByKey, mastery, onOpenConcept }: Conc
           />
         ))}
       </ul>
-    </div>
+    </Sheet>
   )
 }

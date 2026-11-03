@@ -1,5 +1,5 @@
 # dependencies
-node_modules/
+node_modules
 .pnpm-store/
 
 # next.js
@@ -16,4 +16,4 @@ next-env.d.ts
 pnpm-lock.yaml
 
 # runtime data
-data/
+/data/

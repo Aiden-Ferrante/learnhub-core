@@ -2,20 +2,18 @@
 
 /** The shared plumbing every course-scoped route needs: the live course (derived from
  *  the documents context so processing→ready updates flow through), its syllabus tree,
- *  mastery, due count, and reading position. This replaces the old LearnTab state
- *  machine — each route page mounts it with the courseId from the URL. */
+ *  mastery, due count, and reading position. Every read goes through the query cache, so
+ *  sub-routes reuse what the course home already loaded and a version switch can never
+ *  land a stale response (the key changes; the old request is aborted). */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { fetchTocTree, findNodeBySectionKey, type LearnTreeNode } from "@/gateways/api/outline"
-import { fetchMastery, type MasteryResponse } from "@/gateways/api/progress"
-import { fetchStudyDebt } from "@/gateways/api/progress"
-import {
-  fetchReadingProgress,
-  saveReadingPosition,
-  type ReadingProgress,
-} from "@/surfaces/reading"
+import { fetchTocTree, findNodeBySectionKey } from "@/gateways/api/outline"
+import { fetchMastery } from "@/gateways/api/progress"
+import { fetchVersions } from "@/gateways/api/versions"
+import { saveReadingPositionStrict } from "@/gateways/api/user-settings"
+import { qk, roots, useApi, useApiMutation, useInvalidate, orThrow } from "@/kit/data"
 import { courseFromDocument, isCourseReady, type Course } from "@/surfaces/library/courses"
-import { fetchVersions, type CourseVersion } from "@/gateways/api/versions"
+import { useReadingPositions, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
 
 export function useCourseData(courseId: string) {
@@ -30,166 +28,90 @@ export function useCourseData(courseId: string) {
   // The card points at the BOOK; the course you actually study is one version of it.
   const bookKey = card ? (card.learnDocId ?? card.id) : undefined
 
-  const [versions, setVersions] = useState<CourseVersion[]>([])
-
-  const loadVersions = useCallback(async (doc: string) => {
-    try {
-      const data = await fetchVersions(doc)
-      setVersions(data.error ? [] : data.versions)
-    } catch {
-      // A book with no version list still reads through its own key — see docKey.
-      setVersions([])
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isLive && bookKey) loadVersions(bookKey)
-  }, [isLive, bookKey, loadVersions])
-
-  // Syllabus, mastery and reviews are keyed by the ACTIVE version — the book's main one.
-  // Falling back to bookKey keeps a course readable if the version list fails or hasn't
-  // arrived yet, which is also what makes this safe for books ingested before versions.
-  const activeVersion = useMemo(
-    () => versions.find((v) => v.isMain) ?? null,
-    [versions],
+  const versionsQuery = useApi(
+    qk.versions(bookKey ?? ""),
+    (signal) => fetchVersions(bookKey as string, signal).then(orThrow),
+    { enabled: isLive && !!bookKey },
   )
-  const docKey = activeVersion?.docId ?? bookKey
+  const versions = useMemo(() => versionsQuery.data?.versions ?? [], [versionsQuery.data])
 
-  // The course handed to every surface carries the ACTIVE VERSION as its learnDocId. That
-  // is the whole propagation: the reader, concepts, the heatmap, the audiobook and skeleton
-  // practice all read `course.learnDocId`, so overriding it here is what makes them follow a
-  // switch — rather than teaching each one about versions and missing some. `bookKey` stays
-  // available for the few things that are genuinely about the book, like the version list.
+  // Syllabus, mastery and reviews are keyed by the ACTIVE version, the book's main one.
+  // Falling back to bookKey keeps a course readable when the version list fails, which is
+  // also what makes this safe for books ingested before versions. Course reads wait for
+  // the list to settle so they don't load the book key first and the version second.
+  const activeVersion = useMemo(() => versions.find((v) => v.isMain) ?? null, [versions])
+  const docKey = activeVersion?.docId ?? bookKey
+  const versionsSettled = versionsQuery.status !== "loading"
+
+  // The course handed to every surface carries the ACTIVE VERSION as its learnDocId: the
+  // reader, concepts, the heatmap, the audiobook and skeleton practice all read
+  // `course.learnDocId`, so overriding it here is what makes them follow a switch.
   const live = useMemo<Course | null>(
     () => (card ? { ...card, learnDocId: docKey ?? card.learnDocId } : null),
     [card, docKey],
   )
 
-  // A course, once found, STAYS found for this mount.
-  //
-  // `card` is derived from the shared documents list, and a transient failure of that
-  // fetch (a 401 on a stale session, a blip) empties it — which turned `course` null,
-  // dropped every course page to its CourseFallback, and UNMOUNTED whatever you were
-  // doing. Losing a revealed card is irritating; losing a timed Match round mid-game
-  // makes the game unplayable, which is how this was found. The last good course is kept
-  // and re-served, so a blink in the documents list can no longer destroy study state.
-  // Navigating to another course remounts the hook, so this cannot serve a stale book.
+  // A course, once found, STAYS found for this mount. A transient failure of the documents
+  // list empties it, which used to drop every course page to its fallback and unmount
+  // whatever you were doing. Navigating to another course remounts the hook.
   const lastGood = useRef<Course | null>(null)
   useEffect(() => {
     if (live) lastGood.current = live
   }, [live])
   const course = live ?? lastGood.current
 
-  const [tree, setTree] = useState<LearnTreeNode[]>([])
-  const [sectionCount, setSectionCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [mastery, setMastery] = useState<MasteryResponse | null>(null)
-  // null means "we could not find out", which is NOT the same as zero — a failed fetch
-  // used to render as "Caught up" and quietly talk the user out of their reviews.
-  const [reviewDue, setReviewDue] = useState<number | null>(null)
-  const [readingProgress, setReadingProgress] = useState<ReadingProgress>({})
+  const enabled = isLive && !!docKey && versionsSettled
+  const treeQuery = useApi(qk.tocTree(docKey), (signal) => fetchTocTree(docKey, signal).then(orThrow), { enabled })
+  const masteryQuery = useApi(qk.mastery(docKey), (signal) => fetchMastery(docKey, signal).then(orThrow), { enabled })
+  const debtQuery = useStudyDebt()
+  const positionsQuery = useReadingPositions()
 
-  const loadTree = useCallback(async (doc: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await fetchTocTree(doc)
-      if (data.error) {
-        setError(data.error)
-        setTree([])
-        setSectionCount(0)
-      } else {
-        setTree(data.tree)
-        setSectionCount(data.sectionCount)
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load syllabus")
-      setTree([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // null means "we could not find out", which is NOT zero: a failed read once rendered as
+  // "Caught up" and quietly talked the user out of their reviews. The endpoint answers for
+  // the whole library, so a course simply being absent from it is a real zero.
+  const reviewDue = debtQuery.data
+    ? (debtQuery.data.courses.find((c) => c.doc === docKey)?.dueNow ?? 0)
+    : null
 
-  // Both loaders take the doc they were asked about and a liveness check, because these
-  // are course-scoped reads that outlive a course switch. Keeping the previous value on
-  // failure meant course B could render with course A's coverage numbers; applying a slow
-  // response unconditionally meant A's could land on top of B's.
-  const loadMastery = useCallback(async (doc: string, isCurrent: () => boolean) => {
-    try {
-      const data = await fetchMastery(doc)
-      if (!isCurrent()) return
-      setMastery(data.error ? null : data)
-    } catch {
-      if (isCurrent()) setMastery(null)
-    }
-  }, [])
-
-  const loadDue = useCallback(async (doc: string, isCurrent: () => boolean) => {
-    try {
-      const debt = await fetchStudyDebt()
-      if (!isCurrent()) return
-      // The endpoint answers for the whole library, so a course simply being absent is a
-      // real zero. An error envelope is not — that is "unknown".
-      setReviewDue(debt.error ? null : (debt.courses?.find((c) => c.doc === doc)?.dueNow ?? 0))
-    } catch {
-      if (isCurrent()) setReviewDue(null)
-    }
-  }, [])
-
-  // The doc these reads were started for, as of right now. Every course-scoped response
-  // checks itself against this before it is applied, so a slow answer about the course you
-  // just left can never land on the course you are looking at.
-  const docKeyRef = useRef(docKey)
-  docKeyRef.current = docKey
-  const isCurrentDoc = useCallback((doc: string) => () => docKeyRef.current === doc, [])
-
-  // One load path: fires on mount and again when the course flips processing→ready.
-  useEffect(() => {
-    if (!isLive || !docKey) return
-    // Drop the outgoing course's numbers immediately, so nothing stale is ever on screen
-    // next to the new course's title while its own reads are in flight.
-    setMastery(null)
-    setReviewDue(null)
-    loadTree(docKey)
-    loadMastery(docKey, isCurrentDoc(docKey))
-    loadDue(docKey, isCurrentDoc(docKey))
-  }, [isLive, docKey, loadTree, loadMastery, loadDue, isCurrentDoc])
-
-  useEffect(() => {
-    fetchReadingProgress().then(setReadingProgress)
-  }, [])
-
+  // Positions written in this mount win over the cached map until it refetches.
+  const [localPositions, setLocalPositions] = useState<Record<string, string>>({})
+  const savePosition = useApiMutation(
+    (v: { courseId: string; sectionKey: string }) => saveReadingPositionStrict(v.courseId, v.sectionKey),
+    { serialKey: "reading-position", invalidates: [roots.readingProgress] },
+  )
+  const { fire: firePosition } = savePosition
   const persistReadingPosition = useCallback(
     (sectionKey: string) => {
-      setReadingProgress((prev) => ({ ...prev, [courseId]: sectionKey }))
-      saveReadingPosition(courseId, sectionKey)
+      setLocalPositions((prev) => ({ ...prev, [courseId]: sectionKey }))
+      firePosition({ courseId, sectionKey })
     },
-    [courseId],
+    [courseId, firePosition],
   )
 
+  const invalidate = useInvalidate()
   /** Re-pull mastery + due after study activity (review graded, walk finished, …). */
   const refresh = useCallback(() => {
-    if (!docKey) return
-    loadMastery(docKey, isCurrentDoc(docKey))
-    loadDue(docKey, isCurrentDoc(docKey))
-  }, [docKey, loadMastery, loadDue, isCurrentDoc])
+    void invalidate(roots.mastery, roots.studyDebt)
+  }, [invalidate])
 
+  const { retry: retryTree } = treeQuery
+  const { retry: retryMastery } = masteryQuery
+  const { retry: retryDebt } = debtQuery
   /** Full reload after a transient backend failure. */
   const retry = useCallback(() => {
-    if (!docKey) return
-    loadTree(docKey)
-    loadMastery(docKey, isCurrentDoc(docKey))
-    loadDue(docKey, isCurrentDoc(docKey))
-  }, [docKey, loadTree, loadMastery, loadDue, isCurrentDoc])
+    retryTree()
+    retryMastery()
+    retryDebt()
+  }, [retryTree, retryMastery, retryDebt])
 
   /** Re-read the version set after creating, switching, renaming or deleting one. A
-   *  changed main flips docKey, and the load effect above pulls the new course in. */
+   *  changed main flips docKey, and the keyed reads above pull the new course in. */
   const refreshVersions = useCallback(() => {
-    if (bookKey) loadVersions(bookKey)
-  }, [bookKey, loadVersions])
+    void invalidate(roots.versions)
+  }, [invalidate])
 
-  const continueSectionKey = readingProgress[courseId]
+  const tree = useMemo(() => (isLive ? (treeQuery.data?.tree ?? []) : []), [isLive, treeQuery.data])
+  const continueSectionKey: string | undefined = localPositions[courseId] ?? positionsQuery.data?.[courseId]
   const continueNode = continueSectionKey ? findNodeBySectionKey(tree, continueSectionKey) : null
 
   return {
@@ -201,16 +123,22 @@ export function useCourseData(courseId: string) {
     versions,
     activeVersion,
     refreshVersions,
-    tree: isLive ? tree : [],
-    sectionCount: isLive ? sectionCount : 0,
-    loading: isLive ? loading : false,
-    error: isLive ? error : null,
-    mastery: isLive ? mastery : null,
+    tree,
+    sectionCount: isLive ? (treeQuery.data?.sectionCount ?? 0) : 0,
+    loading: isLive ? treeQuery.status === "loading" : false,
+    error: isLive && treeQuery.data === undefined && treeQuery.error ? treeQuery.error.message : null,
+    mastery: isLive ? (masteryQuery.data ?? null) : null,
     reviewDue,
     continueSectionKey,
     continueNode: isLive ? continueNode : null,
     persistReadingPosition,
+    /** A failed position save (the reading position is a side effect of opening a
+     *  chapter, so it is reported here rather than blocking the navigation). */
+    positionError: savePosition.error,
     refresh,
     retry,
+    queries: { tree: treeQuery, mastery: masteryQuery, debt: debtQuery, versions: versionsQuery },
   }
 }
+
+export type CourseData = ReturnType<typeof useCourseData>

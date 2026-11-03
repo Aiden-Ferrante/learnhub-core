@@ -3,11 +3,12 @@
 import { Suspense, use } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ConceptsView } from "@/surfaces/concepts"
-import { CourseFallback } from "@/surfaces/library"
-import { useCourseData } from "@/surfaces/library"
+import { CourseFallback, useCourseData } from "@/surfaces/library"
 
 type Params = Promise<{ courseId: string }>
 
+/** /courses/[id]/concepts, with `?concept=<key>` for one concept's lesson (deep-linked
+ *  from the syllabus tree). Opening a concept pushes, so browser Back returns to the list. */
 function ConceptsInner({ params }: { params: Params }) {
   const { courseId } = use(params)
   const router = useRouter()
@@ -16,15 +17,14 @@ function ConceptsInner({ params }: { params: Params }) {
 
   if (!data.course) return <CourseFallback isInitialized={data.isInitialized} />
 
+  const base = `/courses/${courseId}/concepts`
   return (
-    <main className="mx-auto w-full px-4 pb-3 pt-3">
-      <ConceptsView
-        course={data.course}
-        tree={data.tree}
-        onBack={() => router.push(`/courses/${courseId}`)}
-        initialConceptKey={search.get("concept")}
-      />
-    </main>
+    <ConceptsView
+      course={data.course}
+      tree={data.tree}
+      conceptKey={search.get("concept")}
+      onSelect={(key) => router.push(key ? `${base}?concept=${encodeURIComponent(key)}` : base)}
+    />
   )
 }
 

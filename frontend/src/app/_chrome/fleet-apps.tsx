@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
  *
  * The same row renders in shipyard, Mission Control and vault-dashboard, so
  * moving between them does not move the furniture. Tier two — this app's own
- * Learn / Study / Process / Upload — stays in `app-nav.tsx`. The split is the
+ * Library / Plan / Admin — stays in `app-nav.tsx`. The split is the
  * point: switching app and switching page are different acts.
  *
  * The list is duplicated from code/fleet-ui/apps.js rather than imported. The
@@ -32,7 +32,9 @@ import { useEffect, useState } from "react"
  * route to prefetch.
  */
 
-const FLEET_APPS = [
+type FleetApp = { id: string; label: string; port: number; blurb: string; url?: string }
+
+const FLEET_APPS: readonly FleetApp[] = [
   { id: "helm", label: "Helm", port: 8990, blurb: "what needs me now, agenda, decisions" },
   { id: "shipyard", label: "Shipyard", port: 8845, blurb: "projects, goals, what the fleet owes" },
   { id: "learnhub", label: "Learn", port: 3001, blurb: "courses, study queue, uploads", url: "https://spark-9415.tailff006f.ts.net" },
@@ -41,7 +43,7 @@ const FLEET_APPS = [
   { id: "mission-control", label: "Control", port: 9090, blurb: "what is running" },
   { id: "internwatch", label: "Intern", port: 8962, blurb: "internship boards, diffed daily" },
   { id: "studyloop", label: "Study", port: 8963, blurb: "the focus-block loop, concepts per hour" },
-] as const satisfies readonly { id: string; label: string; port: number; blurb: string; url?: string }[]
+]
 
 const ME = "learnhub"
 
@@ -72,7 +74,7 @@ export function FleetApps() {
             key={a.id}
             // Undefined until the effect runs: unclickable for one paint beats
             // clickable and pointing at the reader's own machine.
-            href={origin ? (('url' in a && a.url && !/^(localhost|127\.0\.0\.1)$/.test(origin.hostname)) ? a.url : `${origin.protocol}//${origin.hostname}:${a.port}`) : undefined}
+            href={origin ? ((a.url && !/^(localhost|127\.0\.0\.1)$/.test(origin.hostname)) ? a.url : `${origin.protocol}//${origin.hostname}:${a.port}`) : undefined}
             title={a.blurb}
             className="rounded-t-md border-b-2 border-transparent px-2.5 py-1.5 text-meta
               text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"

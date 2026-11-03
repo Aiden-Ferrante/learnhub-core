@@ -29,14 +29,14 @@ export type DocumentConceptsResponse = {
 
 // Document-level canonical (deduped) concept list — one entry per concept, with the merged
 // provenance of every section it appears in.
-export async function fetchDocumentConcepts(doc?: string): Promise<DocumentConceptsResponse> {
+export async function fetchDocumentConcepts(doc?: string, signal?: AbortSignal): Promise<DocumentConceptsResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
-  const res = await fetch(`/api/learn/concepts${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/concepts${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<DocumentConceptsResponse>(res)
 }
 
-export async function deleteConcept(key: string): Promise<{ deleted?: string; error?: string }> {
-  const res = await fetch(`/api/learn/concept/${encodeURIComponent(key)}`, { method: 'DELETE' })
+export async function deleteConcept(key: string, signal?: AbortSignal): Promise<{ deleted?: string; error?: string }> {
+  const res = await fetch(`/api/learn/concept/${encodeURIComponent(key)}`, { signal, method: 'DELETE' })
   return parseJsonResponse(res)
 }
 
@@ -55,10 +55,11 @@ export type SectionConceptsResponse = {
 export async function fetchSectionConcepts(
   sectionKey: string,
   docId?: string,
+  signal?: AbortSignal,
 ): Promise<SectionConceptsResponse> {
   const segs = sectionKey.split('/').map(encodeURIComponent).join('/')
   const qs = docId ? `?doc=${encodeURIComponent(docId)}` : ''
-  const res = await fetch(`/api/learn/section/concepts/${segs}${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/section/concepts/${segs}${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<SectionConceptsResponse>(res)
 }
 

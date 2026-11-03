@@ -20,6 +20,7 @@
     "@radix-ui/react-switch": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
     "@tailwindcss/forms": "latest",
+    "@tanstack/react-query": "^5.105.2",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
