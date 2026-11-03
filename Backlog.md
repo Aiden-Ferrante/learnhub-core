@@ -74,6 +74,11 @@ not add to it mid-build.
 
 ## ADR seeds
 
+- **Versioned-course due counts.** (v0.25.0.) Concept review rows sit under the source book's id,
+  so a re-cut version's dues count under the source course.
+- **On-accent ink.** (v0.25.0.) `--primary-foreground` is zinc-950 and `--fleet-on-accent` is zinc-50.
+  Alias one onto the other or document the split.
+
 - **Should a derived outline synthesise chapters the document did not number?**
   (2026-08-25.) `from-numbered-headings` reads the numbering the author wrote and refuses to
   invent levels — correct as a contract, but a book whose chapters read "Chapter 2 The
@@ -90,6 +95,14 @@ not add to it mid-build.
   never averaged into retention, unknown ≠ zero, no solid/shaky adjectives.
 
 ## Carries forward
+
+- **ESLint.** (v0.25.0.) There is no config or package, so `next lint` stops at a setup prompt.
+- **Dead backend.** (v0.25.0.) The practice-session and old-exam backend routes, and their
+  `prac-` rows, are unused since the frontend was removed. Deleting the rows is a migration and
+  needs the human's decision.
+- **Unused hook.** (v0.25.0.) `kit/hooks/use-polling.ts` has no importers.
+- **Prod browser verification.** (v0.25.0.) Decide on a sanctioned way for agents to sign in, or
+  keep using the human's Chrome.
 
 - **The human reads generated pack questions.** (v0.24.0, 2026-11-01.) Shipped without it; the
   repo's criterion for generated content is still owed.
