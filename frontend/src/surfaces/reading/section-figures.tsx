@@ -60,7 +60,7 @@ export function SectionFigures({
             src={figureUrl(docId, f.order)}
             alt={f.caption ?? ""}
             loading="lazy"
-            className="max-h-56 w-full bg-white object-contain"
+            className="max-h-56 w-full bg-paper-card object-contain"
           />
           <figcaption className="border-t px-2.5 py-1.5 text-xs italic text-muted-foreground">
             {f.caption}
