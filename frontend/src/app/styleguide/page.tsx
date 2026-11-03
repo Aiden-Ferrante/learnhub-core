@@ -1,8 +1,9 @@
 "use client"
 
-/** The design-system kit on one page — tokens, type scale, and every pattern primitive
- *  with sample data. Unlinked from the app chrome; open /styleguide directly. Doubles as
- *  visual regression: if this page looks wrong, a token or purge change broke the kit. */
+/** The design-system kit on one page — tokens, type scale, every pattern primitive, the
+ *  study kit and the data states, with sample data. Linked from the header's Admin menu
+ *  (Kit). Doubles as visual regression: if this page looks wrong, a token or purge change
+ *  broke the kit. */
 
 import { BookOpen, Inbox, Layers, Upload } from "lucide-react"
 import { Button } from "@/kit/ui/button"
@@ -15,6 +16,7 @@ import { StatusPill, type DomainStatus } from "@/kit/patterns/status-pill"
 import { ListRow } from "@/kit/patterns/list-row"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { SkeletonCard, SkeletonRow, SkeletonStatStrip } from "@/kit/patterns/skeletons"
+import { StudyKitDemo } from "@/app/styleguide/study-kit-demo"
 
 const STATUSES: DomainStatus[] = ["mastered", "ready", "due", "fading", "building", "error", "neutral"]
 
@@ -30,7 +32,7 @@ const TYPE_SCALE = [
   { cls: "text-meta font-medium", label: "meta · 12.5px — row titles, buttons (= text-sm)" },
   { cls: "text-meta text-muted-foreground", label: "meta muted · secondary lines" },
   { cls: "text-micro text-muted-foreground", label: "micro · 11px — chips, counts, labels (= text-xs)" },
-  { cls: "text-micro uppercase tracking-label text-muted-foreground", label: "micro uppercase · 0.12em — the eyebrow label" },
+  { cls: "text-micro uppercase tracking-label text-muted-foreground", label: "micro uppercase · 0.08em — the eyebrow label" },
 ]
 
 const SWATCHES = [
@@ -45,6 +47,15 @@ const SWATCHES = [
   { name: "status-fading", cls: "bg-status-fading" },
   { name: "status-building", cls: "bg-status-building" },
   { name: "status-error", cls: "bg-status-error" },
+]
+
+/* Inks: the colours for coloured WORDS. Fills above are for dots, borders and washes. */
+const INKS = [
+  { name: "ink-accent", cls: "text-ink-accent" },
+  { name: "ink-ok", cls: "text-ink-ok" },
+  { name: "ink-warn", cls: "text-ink-warn" },
+  { name: "ink-danger", cls: "text-ink-danger" },
+  { name: "ink-dim", cls: "text-ink-dim" },
 ]
 
 export default function Styleguide() {
@@ -70,7 +81,16 @@ export default function Styleguide() {
             </div>
           ))}
         </div>
+        <div className="mt-3 flex flex-wrap gap-4">
+          {INKS.map((s) => (
+            <span key={s.name} className={`text-meta font-medium ${s.cls}`}>
+              {s.name}
+            </span>
+          ))}
+        </div>
       </SectionCard>
+
+      <StudyKitDemo />
 
       <SectionCard title="Type scale" description="UI chrome sizes — the reading surface has its own scale.">
         <div className="space-y-2">
