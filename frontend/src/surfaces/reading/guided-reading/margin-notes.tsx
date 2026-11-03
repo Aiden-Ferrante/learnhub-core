@@ -1,5 +1,6 @@
 "use client"
 
+import { Button } from "@/kit/ui/button"
 import { MathText } from "@/surfaces/reading/markdown-reader"
 import type { Measure } from "@/surfaces/reading/use-reading-prefs"
 import { HALF_MEASURE, type MarginNote } from "./lib"
@@ -25,11 +26,13 @@ export function MarginNotes({
   return (
     <>
       {notes.map((n) => (
-        <button
+        <Button
           key={n.key}
           type="button"
+          variant={null}
+          size={null}
           className={cn(
-            "absolute hidden w-52 rounded-md border border-transparent p-1.5 text-left transition-colors min-[1440px]:block",
+            "absolute hidden h-auto w-52 whitespace-normal rounded-md border border-transparent p-1.5 text-left font-normal transition-colors min-[1440px]:block",
             paper ? "hover:border-paper-border hover:bg-paper-card" : "hover:border-border hover:bg-card",
           )}
           style={{ top: n.top, left: `calc(50% + ${HALF_MEASURE[measure]} + 28px)` }}
@@ -45,7 +48,7 @@ export function MarginNotes({
           <div className={cn("mt-0.5 line-clamp-3 text-micro leading-snug", mutedCls)}>
             <MathText text={n.signal} />
           </div>
-        </button>
+        </Button>
       ))}
     </>
   )

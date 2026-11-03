@@ -6,6 +6,7 @@
 import React from "react"
 import type { ConceptLesson } from "@/gateways/api/concepts"
 import type { ConceptMastery } from "@/gateways/api/progress"
+import { Button } from "@/kit/ui/button"
 import { cn } from "@/kit/lib/utils"
 
 /** Underline tint = live mastery state: unseen (quiet invite), learning, due again (amber),
@@ -59,17 +60,21 @@ export function annotateNode(
         seen.add(name)
         parts.push(child.slice(last, m.index))
         parts.push(
-          <button
+          // A kit Button reset to an inline run of prose: no box, no fixed height; it wraps
+          // with the sentence and inherits the paragraph's size and weight.
+          <Button
             key={`${name}-${m.index}`}
             type="button"
+            variant={null}
+            size={null}
             data-concept={idx}
             className={cn(
-              "dc-term cursor-pointer rounded-sm border-b bg-transparent p-0 text-inherit hover:bg-brand/10",
+              "dc-term inline h-auto cursor-pointer whitespace-normal rounded-sm border-b bg-transparent p-0 align-baseline text-[length:inherit] font-[number:inherit] leading-[inherit] text-inherit hover:bg-brand/10",
               classForIdx(idx),
             )}
           >
             {m[1]}
-          </button>,
+          </Button>,
         )
         last = m.index + m[1].length
       }

@@ -1,107 +1,65 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { fetchGuidedReading, type GuidedReadingResponse } from "@/gateways/api/chapter"
-import { fetchOutline, type LearnTreeNode, type OutlineEntry } from "@/gateways/api/outline"
+import { useCallback, useMemo } from "react"
+import { qk, roots, useApi, useInvalidate } from "@/kit/data"
+import { fetchGuidedReading } from "@/gateways/api/chapter"
+import type { LearnTreeNode } from "@/gateways/api/outline"
 import { fetchConceptMastery, type ConceptMastery } from "@/gateways/api/progress"
 import { fetchReviewQueue } from "@/gateways/api/review"
-import { useCourseChapters } from "@/surfaces/library"
+import { outlineEntries, useChapterList, useOutline } from "@/surfaces/reading/use-reading-data"
 import { guidedChapters } from "./lib"
-import { usePolling } from "@/kit/hooks/use-polling"
+
+const NO_MASTERY: Record<string, ConceptMastery> = {}
 
 /** Everything the guided-reading surface FETCHES, in one hook: the document outline, the
- *  canonical chapter list, the chapter payload (with its prepare-poll), and the
- *  mastery/due-count layer. The shell consumes plain values and callbacks — no
- *  fetch, poll, or interval lives outside this hook. */
+ *  canonical chapter list, the chapter payload (polled while a prepare pass runs), and the
+ *  mastery/due-count layer. Every read is a keyed query, so a chapter switch drops the old
+ *  chapter's request and its response can never land on the new chapter. */
 export function useGuidedReadingData(docId: string, chapterKey: string | null, tree: LearnTreeNode[]) {
-  const [outline, setOutline] = useState<OutlineEntry[]>([])
-  const [outlineReady, setOutlineReady] = useState(false)
-  const [data, setData] = useState<GuidedReadingResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [preparing, setPreparing] = useState(false)
-  const [masteryByKey, setMasteryByKey] = useState<Record<string, ConceptMastery>>({})
-  const [dueCount, setDueCount] = useState(0)
+  const outlineQ = useOutline(docId)
+  const outline = outlineEntries(outlineQ)
+  // A failed outline still lets the reader resolve a chapter (from the tree / chapter list).
+  const outlineReady = outlineQ.status !== "loading"
 
-  // Chapter list inputs: the outline (numbered chapters where available)…
-  useEffect(() => {
-    let alive = true
-    fetchOutline(docId)
-      .then((o) => alive && setOutline(o.outline || []))
-      .catch(() => {})
-      .finally(() => alive && setOutlineReady(true))
-    return () => {
-      alive = false
-    }
-  }, [docId])
-
-  // …and the canonical list (see useCourseChapters); guidedChapters' outline rule
-  // only covers the moment before the fetch lands (or a backend error).
+  // The canonical list; guidedChapters' outline rule only covers the moment before the
+  // fetch lands (or a backend error).
   const chapterFallback = useMemo(() => guidedChapters(outline, tree), [outline, tree])
-  const chapters = useCourseChapters(docId, chapterFallback)
+  const { chapters, query: chaptersQ } = useChapterList(docId, chapterFallback)
 
-  // The chapter payload itself.
-  const load = useCallback(async () => {
-    if (!chapterKey) return
-    setLoading(true)
-    setError(null)
-    try {
-      const d = await fetchGuidedReading(docId, chapterKey)
-      setData(d)
-      setPreparing(Boolean(d.status?.running))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load chapter")
-    } finally {
-      setLoading(false)
-    }
-  }, [docId, chapterKey])
+  // The chapter payload. Polls every 6 s while a prepare pass runs, so explanations stream
+  // in as they finish; the poll stops by itself once `status.running` goes false.
+  const chapter = useApi(
+    qk.guidedReading(docId, chapterKey ?? ""),
+    (signal) => fetchGuidedReading(docId, chapterKey ?? "", signal),
+    { enabled: Boolean(chapterKey), poll: (d) => (d?.status?.running ? 6000 : false) },
+  )
 
-  useEffect(() => {
-    setData(null)
-    load()
-  }, [load])
+  // Mastery layer: per-concept mastery for tint/wash + this chapter's due count.
+  const masteryQ = useApi(qk.conceptMastery(docId), (signal) => fetchConceptMastery(docId, signal))
+  const dueQ = useApi(
+    qk.reviewQueue(docId, chapterKey ?? "", 1),
+    (signal) => fetchReviewQueue(docId, chapterKey ?? "", 1, signal),
+    { enabled: Boolean(chapterKey) },
+  )
 
-  // Poll while a prepare pass runs so explanations stream in as they finish.
-  usePolling(async () => {
-    if (!chapterKey) return
-    try {
-      const d = await fetchGuidedReading(docId, chapterKey)
-      setData(d)
-      if (!d.status?.running) setPreparing(false)
-    } catch {
-      setPreparing(false)
-    }
-  }, preparing ? 6000 : null)
-
-  // Mastery layer: per-concept mastery for tint/wash + the chapter's due count.
+  // The study drawers report answers through this; the grades' own mutations may already
+  // invalidate these roots, and a second invalidation is a cheap no-op refetch.
+  const invalidate = useInvalidate()
   const refreshMastery = useCallback(() => {
-    fetchConceptMastery(docId)
-      .then((r) => {
-        setMasteryByKey(r.byConcept || {})
-      })
-      .catch(() => {})
-    if (chapterKey) {
-      fetchReviewQueue(docId, chapterKey, 1)
-        .then((r) => setDueCount(r.counts?.due ?? 0))
-        .catch(() => {})
-    }
-  }, [docId, chapterKey])
-
-  useEffect(() => {
-    refreshMastery()
-  }, [refreshMastery])
+    void invalidate(roots.conceptMastery, roots.reviewQueue)
+  }, [invalidate])
 
   return {
     outline,
     outlineReady,
+    outlineQ,
     chapters,
-    data,
-    loading,
-    error,
-    preparing,
-    load,
-    masteryByKey,
-    dueCount,
+    chaptersQ,
+    chapter,
+    preparing: Boolean(chapter.data?.status?.running),
+    masteryByKey: masteryQ.data?.byConcept ?? NO_MASTERY,
+    masteryQ,
+    dueCount: dueQ.data?.counts?.due ?? 0,
     refreshMastery,
   }
 }

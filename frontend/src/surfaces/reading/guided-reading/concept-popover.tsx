@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
+import { Button } from "@/kit/ui/button"
 import { MathText } from "@/surfaces/reading/markdown-reader"
 import { ConceptMasteryDot } from "@/surfaces/concepts"
 import type { ConceptLesson } from "@/gateways/api/concepts"
@@ -19,13 +20,15 @@ function CheckReveal({ q, a }: { q: string; a: string }) {
       {open ? (
         <MathText text={a} className="mt-1 text-muted-foreground" />
       ) : (
-        <button
+        <Button
           type="button"
+          variant={null}
+          size={null}
           onClick={() => setOpen(true)}
-          className="mt-1 text-brand hover:underline"
+          className="mt-1 h-auto p-0 text-xs font-normal text-ink-accent hover:underline"
         >
           Reveal answer
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -68,9 +71,16 @@ export function ConceptPopover({
             {concept.kind}
           </span>
         </div>
-        <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <X className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
       <div className="max-h-72 space-y-2 overflow-y-auto pr-1 text-sm">
         <MathText text={concept.signal} className="text-foreground/90" />
