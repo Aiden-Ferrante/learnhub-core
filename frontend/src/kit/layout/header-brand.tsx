@@ -9,7 +9,7 @@ export function HeaderBrand() {
     <Link
       href="/courses"
       aria-label="Learn Hub home"
-      className="flex items-center gap-2 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+      className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
     >
       {/* The .fleet-brand treatment: 15px / 600 / -0.01em, in the ink colour.
           It was 20px bold in a blue gradient — the fleet's other four wordmarks

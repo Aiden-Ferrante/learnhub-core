@@ -49,8 +49,8 @@ export default function RootLayout({
                     put them (.fleet-nav); the right keeps actions only. */}
                 <div className="flex min-w-0 items-center gap-2 sm:gap-4">
                   <HeaderBrand />
-                  <Breadcrumbs />
                   <AppNav />
+                  <Breadcrumbs />
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
                   <InfoModal />

@@ -41,7 +41,7 @@ export function AppNav() {
   const adminActive = ADMIN.some((a) => isUnder(pathname, a.href))
 
   return (
-    <nav className="flex items-center gap-4" aria-label="Primary">
+    <nav className="flex shrink-0 items-center gap-4 whitespace-nowrap" aria-label="Primary">
       <Link
         href="/courses"
         title="Library"
