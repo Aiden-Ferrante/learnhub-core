@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/kit/ui/button"
-import { GRADE_INVALIDATES, useApiMutation } from "@/kit/data"
+import { GRADE_INVALIDATES, useApiMutation, unwrap } from "@/kit/data"
 import { GradeButtons, Sheet } from "@/kit/study"
 import { cn } from "@/kit/lib/utils"
 import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
@@ -32,7 +32,7 @@ export function ConceptDetail({ concept: c, sectionTitle, docId, memory }: {
   const elsewhere = (c.appearsIn || []).filter((p) => p.sectionKey !== c.sectionKey)
 
   const grade = useApiMutation(
-    (g: ReviewGrade) => submitReviewGrade(c.conceptKey as string, g, docId),
+    (g: ReviewGrade) => unwrap(submitReviewGrade(c.conceptKey as string, g, docId)),
     { invalidates: GRADE_INVALIDATES },
   )
   const send = (g: ReviewGrade) => {
