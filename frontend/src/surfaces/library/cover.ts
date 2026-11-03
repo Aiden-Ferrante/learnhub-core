@@ -1,12 +1,6 @@
 /** Deterministic per-book identity derived from the title, so every course is recognizable
  *  at a glance without real cover art. The shelf shows only the monogram (colour is a
- *  signal in the fleet, not decoration); `coverHue` stays for the planner's dots. */
-
-export function coverHue(title: string): number {
-  let h = 0
-  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0
-  return h % 360
-}
+ *  signal in the fleet, not decoration). */
 
 /** Up to two initials from the title's significant words ("AI Engineering" → "AE"). */
 export function coverMonogram(title: string): string {
