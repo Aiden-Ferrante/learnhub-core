@@ -33,9 +33,11 @@ export async function startAudiobook(
   scope: string | null,
   doc: string | undefined,
   voice: string,
+  signal?: AbortSignal,
 ): Promise<AudiobookStatusResponse> {
   const params = audiobookParams(scope, doc)
   const res = await fetch(`/api/learn/audiobook?${params}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ voice }),
@@ -46,9 +48,10 @@ export async function startAudiobook(
 export async function getAudiobookStatus(
   scope: string | null,
   doc: string | undefined,
+  signal?: AbortSignal,
 ): Promise<AudiobookStatusResponse> {
   const params = audiobookParams(scope, doc)
-  const res = await fetch(`/api/learn/audiobook/status?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/audiobook/status?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<AudiobookStatusResponse>(res)
 }
 
@@ -64,10 +67,11 @@ export type AudiobookTimeline = {
 export async function fetchAudiobookTimeline(
   scope: string | null,
   doc: string | undefined,
+  signal?: AbortSignal,
 ): Promise<AudiobookTimeline | null> {
   try {
     const params = audiobookParams(scope, doc)
-    const res = await fetch(`/api/learn/audiobook/timeline?${params}`, { cache: 'no-store' })
+    const res = await fetch(`/api/learn/audiobook/timeline?${params}`, { signal, cache: 'no-store' })
     if (!res.ok) return null
     const data = await parseJsonResponse<AudiobookTimeline>(res)
     return data.error || !data.chunks?.length ? null : data
@@ -87,9 +91,9 @@ export function audiobookFileUrl(
   return `/api/learn/audiobook/file?${params}`
 }
 
-export async function fetchAudiobookVoices(): Promise<string[]> {
+export async function fetchAudiobookVoices(signal?: AbortSignal): Promise<string[]> {
   try {
-    const res = await fetch('/api/learn/audiobook/voices', { cache: 'no-store' })
+    const res = await fetch('/api/learn/audiobook/voices', { signal, cache: 'no-store' })
     const data = await parseJsonResponse<{ voices?: string[] }>(res)
     return data.voices || []
   } catch {

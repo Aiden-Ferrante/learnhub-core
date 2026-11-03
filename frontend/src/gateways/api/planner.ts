@@ -45,8 +45,8 @@ export type ReviewCalendar = {
   error?: string
 }
 
-export async function fetchReviewCalendar(days = 60): Promise<ReviewCalendar> {
-  const res = await fetch(`/api/learn/review-calendar?days=${days}`, { cache: 'no-store' })
+export async function fetchReviewCalendar(days = 60, signal?: AbortSignal): Promise<ReviewCalendar> {
+  const res = await fetch(`/api/learn/review-calendar?days=${days}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ReviewCalendar>(res)
 }
 
@@ -76,10 +76,10 @@ export type SessionsResponse = {
 
 // `docId` is the learn-doc-key (course.learnDocId), matching the rest of features/learn/api;
 // it becomes the backend's ?doc= query param. See frontend ARCHITECTURE.md "Identifiers".
-export async function fetchSessions(days = 90, docId?: string): Promise<SessionsResponse> {
+export async function fetchSessions(days = 90, docId?: string, signal?: AbortSignal): Promise<SessionsResponse> {
   const params = new URLSearchParams({ days: String(days) })
   if (docId) params.set('doc', docId)
-  const res = await fetch(`/api/learn/study-sessions?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/study-sessions?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<SessionsResponse>(res)
 }
 
@@ -98,8 +98,10 @@ export type ManualSessionInput = {
 
 export async function saveManualSession(
   input: ManualSessionInput,
+  signal?: AbortSignal,
 ): Promise<{ ok?: boolean; key?: string; error?: string }> {
   const res = await fetch('/api/learn/study/manual-session', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -107,8 +109,9 @@ export async function saveManualSession(
   return parseJsonResponse<{ ok?: boolean; key?: string; error?: string }>(res)
 }
 
-export async function deleteManualSession(key: string): Promise<{ ok?: boolean; error?: string }> {
+export async function deleteManualSession(key: string, signal?: AbortSignal): Promise<{ ok?: boolean; error?: string }> {
   const res = await fetch(`/api/learn/study/manual-session?key=${encodeURIComponent(key)}`, {
+    signal,
     method: 'DELETE',
   })
   return parseJsonResponse<{ ok?: boolean; error?: string }>(res)

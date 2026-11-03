@@ -7,15 +7,16 @@ import type { BuildKind, ChapterBuildJob } from "@/gateways/api/pipeline"
 
 export type LearnDocumentInfo = { docId: string; title: string; sourceFilename?: string }
 
-export async function fetchLearnDocuments(): Promise<{ documents: LearnDocumentInfo[]; error?: string }> {
-  const res = await fetch('/api/learn/documents', { cache: 'no-store' })
+export async function fetchLearnDocuments(signal?: AbortSignal): Promise<{ documents: LearnDocumentInfo[]; error?: string }> {
+  const res = await fetch('/api/learn/documents', { signal, cache: 'no-store' })
   return parseJsonResponse<{ documents: LearnDocumentInfo[] }>(res)
 }
 
 export async function fetchChapterBuilds(
   doc: string,
+  signal?: AbortSignal,
 ): Promise<{ docId?: string; builds: ChapterBuildJob[]; error?: string }> {
-  const res = await fetch(`/api/learn/build?doc=${encodeURIComponent(doc)}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/build?doc=${encodeURIComponent(doc)}`, { signal, cache: 'no-store' })
   return parseJsonResponse<{ docId?: string; builds: ChapterBuildJob[] }>(res)
 }
 
@@ -51,13 +52,14 @@ export type SystemStatus = {
   }
 }
 
-export async function fetchSystemStatus(): Promise<SystemStatus & { error?: string }> {
-  const res = await fetch('/api/learn/system', { cache: 'no-store' })
+export async function fetchSystemStatus(signal?: AbortSignal): Promise<SystemStatus & { error?: string }> {
+  const res = await fetch('/api/learn/system', { signal, cache: 'no-store' })
   return parseJsonResponse<SystemStatus>(res)
 }
 
-export async function setQueuePaused(paused: boolean): Promise<{ paused: boolean; error?: string }> {
+export async function setQueuePaused(paused: boolean, signal?: AbortSignal): Promise<{ paused: boolean; error?: string }> {
   const res = await fetch('/api/learn/queue', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paused }),

@@ -146,13 +146,14 @@ export type SittingResults = Sitting & {
 const base = '/api/learn'
 const enc = encodeURIComponent
 
-async function get<T>(path: string): Promise<T> {
-  return parseJsonResponse<T>(await fetch(`${base}${path}`, { cache: 'no-store' }))
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return parseJsonResponse<T>(await fetch(`${base}${path}`, { signal, cache: 'no-store' }))
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   return parseJsonResponse<T>(
     await fetch(`${base}${path}`, {
+      signal,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
@@ -160,32 +161,41 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   )
 }
 
-export const fetchPacks = (doc: string) => get<{ packs: PackSummary[] }>(`/packs?doc=${enc(doc)}`)
-export const fetchPresets = (doc: string) =>
-  get<{ presets: { name: string; format: PackFormat }[]; default: PackFormat }>(`/packs/presets?doc=${enc(doc)}`)
-export const savePreset = (doc: string, name: string, format: PackFormat) =>
-  post('/packs/presets', { doc, name, format })
-export const createPack = (body: {
-  doc: string
-  title: string
-  chapters: { scope: string; title: string }[]
-  format: PackFormat
-  scopeNotes: string
-  examDate: string | null
-}) => post<{ key: string }>('/packs', body)
-export const fetchPack = (key: string) => get<Pack>(`/packs/${enc(key)}`)
-export const fetchToday = (key: string) => get<Today>(`/packs/${enc(key)}/today`)
-export const fetchReviewSet = (key: string) => get<{ questions: LearnQuestion[] }>(`/packs/${enc(key)}/review`)
-export const fetchUnit = (key: string, unit: string) => get<LearnUnit>(`/packs/${enc(key)}/units/${enc(unit)}`)
-export const saveProgress = (key: string, unit: string, patch: UnitProgress) =>
-  post(`/packs/${enc(key)}/units/${enc(unit)}/progress`, patch)
-export const gradeSkill = (key: string, skill: string, correct: boolean) =>
-  post(`/packs/${enc(key)}/grade`, { skill, correct })
-export const startSitting = (key: string) => post<Sitting>(`/packs/${enc(key)}/sittings`)
-export const fetchSitting = (key: string) => get<Sitting>(`/sittings/${enc(key)}`)
-export const saveSitAnswer = (key: string, questionKey: string, answer: SitAnswer) =>
-  post(`/sittings/${enc(key)}/answer`, { questionKey, answer })
-export const finishSitting = (key: string) => post<SittingResults>(`/sittings/${enc(key)}/finish`)
-export const markWritten = (key: string, questionKey: string, grade: number) =>
-  post<SittingResults>(`/sittings/${enc(key)}/mark`, { questionKey, grade })
-export const fetchResults = (key: string) => get<SittingResults>(`/sittings/${enc(key)}/results`)
+export const fetchPacks = (doc: string, signal?: AbortSignal) =>
+  get<{ packs: PackSummary[] }>(`/packs?doc=${enc(doc)}`, signal)
+export const fetchPresets = (doc: string, signal?: AbortSignal) =>
+  get<{ presets: { name: string; format: PackFormat }[]; default: PackFormat }>(`/packs/presets?doc=${enc(doc)}`, signal)
+export const savePreset = (doc: string, name: string, format: PackFormat, signal?: AbortSignal) =>
+  post('/packs/presets', { doc, name, format }, signal)
+export const createPack = (
+  body: {
+    doc: string
+    title: string
+    chapters: { scope: string; title: string }[]
+    format: PackFormat
+    scopeNotes: string
+    examDate: string | null
+  },
+  signal?: AbortSignal,
+) => post<{ key: string }>('/packs', body, signal)
+export const fetchPack = (key: string, signal?: AbortSignal) => get<Pack>(`/packs/${enc(key)}`, signal)
+export const fetchToday = (key: string, signal?: AbortSignal) => get<Today>(`/packs/${enc(key)}/today`, signal)
+export const fetchReviewSet = (key: string, signal?: AbortSignal) =>
+  get<{ questions: LearnQuestion[] }>(`/packs/${enc(key)}/review`, signal)
+export const fetchUnit = (key: string, unit: string, signal?: AbortSignal) =>
+  get<LearnUnit>(`/packs/${enc(key)}/units/${enc(unit)}`, signal)
+export const saveProgress = (key: string, unit: string, patch: UnitProgress, signal?: AbortSignal) =>
+  post(`/packs/${enc(key)}/units/${enc(unit)}/progress`, patch, signal)
+export const gradeSkill = (key: string, skill: string, correct: boolean, signal?: AbortSignal) =>
+  post(`/packs/${enc(key)}/grade`, { skill, correct }, signal)
+export const startSitting = (key: string, signal?: AbortSignal) =>
+  post<Sitting>(`/packs/${enc(key)}/sittings`, undefined, signal)
+export const fetchSitting = (key: string, signal?: AbortSignal) => get<Sitting>(`/sittings/${enc(key)}`, signal)
+export const saveSitAnswer = (key: string, questionKey: string, answer: SitAnswer, signal?: AbortSignal) =>
+  post(`/sittings/${enc(key)}/answer`, { questionKey, answer }, signal)
+export const finishSitting = (key: string, signal?: AbortSignal) =>
+  post<SittingResults>(`/sittings/${enc(key)}/finish`, undefined, signal)
+export const markWritten = (key: string, questionKey: string, grade: number, signal?: AbortSignal) =>
+  post<SittingResults>(`/sittings/${enc(key)}/mark`, { questionKey, grade }, signal)
+export const fetchResults = (key: string, signal?: AbortSignal) =>
+  get<SittingResults>(`/sittings/${enc(key)}/results`, signal)

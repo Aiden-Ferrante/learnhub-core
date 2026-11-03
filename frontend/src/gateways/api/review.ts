@@ -48,10 +48,24 @@ export async function fetchReviewQueue(
   docId: string | undefined,
   scope: string,
   limit = 40,
+  signal?: AbortSignal,
 ): Promise<ReviewQueueResponse> {
   const params = new URLSearchParams({ scope, limit: String(limit) })
   if (docId) params.set('doc', docId)
-  const res = await fetch(`/api/learn/review/queue?${params}`, { cache: 'no-store' })
+  const res = await fetch(`/api/learn/review/queue?${params}`, { signal, cache: 'no-store' })
+  return parseJsonResponse<ReviewQueueResponse>(res)
+}
+
+/** The whole-course review queue: every DUE concept, skeleton and chapter card in the
+ *  course (no new cards), earliest first. Backs /courses/[id]/review; its `counts.due` is
+ *  what the study-debt badges count for this course. `docId` is the learnDocId. */
+export async function fetchCourseReviewQueue(
+  docId: string,
+  limit = 200,
+  signal?: AbortSignal,
+): Promise<ReviewQueueResponse> {
+  const params = new URLSearchParams({ scope: 'course', limit: String(limit), doc: docId })
+  const res = await fetch(`/api/learn/review/queue?${params}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ReviewQueueResponse>(res)
 }
 
@@ -59,8 +73,10 @@ export async function submitReviewGrade(
   conceptKey: string,
   grade: ReviewGrade,
   docId?: string,
+  signal?: AbortSignal,
 ): Promise<ReviewGradeResponse> {
   const res = await fetch('/api/learn/review/grade', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conceptKey, grade, doc: docId ?? null }),
@@ -81,8 +97,10 @@ export async function submitSkeletonReviewGrade(
     chapterScope?: string
     children?: { heading: string; essence?: string }[]
   },
+  signal?: AbortSignal,
 ): Promise<ReviewGradeResponse> {
   const res = await fetch('/api/learn/review/grade', {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ skeleton: true, doc: docId, sectionKey, grade, ...snapshot }),

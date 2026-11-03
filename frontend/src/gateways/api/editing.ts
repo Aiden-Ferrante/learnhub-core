@@ -34,10 +34,10 @@ export type SectionMaterial = {
 
 export type EditTarget = 'book' | 'version'
 
-export async function fetchSectionMaterial(doc: string, scope: string): Promise<SectionMaterial> {
+export async function fetchSectionMaterial(doc: string, scope: string, signal?: AbortSignal): Promise<SectionMaterial> {
   const res = await fetch(
     `/api/learn/section/material?doc=${encodeURIComponent(doc)}&scope=${encodeURIComponent(scope)}`,
-    { cache: 'no-store' },
+    { signal, cache: 'no-store' },
   )
   return parseJsonResponse<SectionMaterial>(res)
 }
@@ -47,12 +47,14 @@ export async function saveBlock(
   blockKey: string,
   markdown: string,
   target: EditTarget,
+  signal?: AbortSignal,
 ): Promise<{ blockKey: string; target: EditTarget; charCount: number }> {
   const res = await fetch(
     `/api/learn/section/material?doc=${encodeURIComponent(doc)}&block=${encodeURIComponent(
       blockKey,
     )}&target=${target}`,
     {
+      signal,
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown }),
@@ -65,18 +67,20 @@ export async function saveBlock(
 export async function revertBlock(
   doc: string,
   blockKey: string,
+  signal?: AbortSignal,
 ): Promise<{ blockKey: string; reverted: boolean }> {
   const res = await fetch(
     `/api/learn/section/material?doc=${encodeURIComponent(doc)}&block=${encodeURIComponent(blockKey)}`,
-    { method: 'DELETE' },
+    { signal, method: 'DELETE' },
   )
   return parseJsonResponse(res)
 }
 
 /** Sections whose material changed after their concepts were built — the rebuild cue.
  *  Derived from timestamps, so building a chapter clears it without anything resetting a flag. */
-export async function fetchStaleSections(doc: string): Promise<{ staleSections: string[] }> {
+export async function fetchStaleSections(doc: string, signal?: AbortSignal): Promise<{ staleSections: string[] }> {
   const res = await fetch(`/api/learn/material/stale?doc=${encodeURIComponent(doc)}`, {
+    signal,
     cache: 'no-store',
   })
   return parseJsonResponse(res)
@@ -109,8 +113,10 @@ export type UnplacedBlock = {
 export async function saveOutline(
   doc: string,
   sections: OutlineSection[],
+  signal?: AbortSignal,
 ): Promise<{ sections: Required<OutlineSection>[]; removed: string[] }> {
   const res = await fetch(`/api/learn/outline?doc=${encodeURIComponent(doc)}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sections }),
@@ -120,8 +126,9 @@ export async function saveOutline(
 
 /** Material this course keeps but files under no section — what a deleted section leaves
  *  behind. Surfaced so a cut is never silent. */
-export async function fetchUnplacedBlocks(doc: string): Promise<{ blocks: UnplacedBlock[] }> {
+export async function fetchUnplacedBlocks(doc: string, signal?: AbortSignal): Promise<{ blocks: UnplacedBlock[] }> {
   const res = await fetch(`/api/learn/version/unplaced?doc=${encodeURIComponent(doc)}`, {
+    signal,
     cache: 'no-store',
   })
   return parseJsonResponse(res)
@@ -131,10 +138,12 @@ export async function moveBlocks(
   doc: string,
   blocks: string[],
   sectionKey: string,
+  signal?: AbortSignal,
 ): Promise<{ moved: number }> {
   const res = await fetch(
     `/api/learn/version/blocks?doc=${encodeURIComponent(doc)}&section=${encodeURIComponent(sectionKey)}`,
     {
+      signal,
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ blocks }),
@@ -144,8 +153,9 @@ export async function moveBlocks(
 }
 
 /** Drop material from THIS course — distilling. The book keeps every word. */
-export async function removeBlocks(doc: string, blocks: string[]): Promise<{ removed: number }> {
+export async function removeBlocks(doc: string, blocks: string[], signal?: AbortSignal): Promise<{ removed: number }> {
   const res = await fetch(`/api/learn/version/blocks/remove?doc=${encodeURIComponent(doc)}`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ blocks }),
