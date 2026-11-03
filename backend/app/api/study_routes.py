@@ -66,11 +66,12 @@ def api_update_progress(
 @router.get("/api/review/queue")
 def api_review_queue(
     doc: str | None = Query(None),
-    scope: str = Query(..., min_length=1),
+    scope: str | None = Query(None),
     limit: int = Query(40, ge=1, le=200),
     session: str = Query("concepts"),
 ) -> JSONResponse:
-    """Concepts to review now for one chapter/section scope (studying is chapter-scoped).
+    """Cards to review now for one chapter/section scope. An omitted scope (or
+    ``scope=course``) is the whole course: every due concept, skeleton and chapter card.
     ``session=practice`` returns the separate practice-item queue instead."""
     return JSONResponse(build_review_queue(doc, scope, limit, session=session))
 
