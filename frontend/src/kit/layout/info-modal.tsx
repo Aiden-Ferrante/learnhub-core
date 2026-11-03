@@ -15,14 +15,14 @@ export function InfoModal() {
     <Dialog>
       <DialogTrigger asChild>
         <button className="group">
-          <Info className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          <Info className="h-5 w-5 text-muted-foreground group-hover:text-ink-accent transition-colors" />
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
         <DialogHeader className="pb-6 border-b border-border/10">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-brand" />
+              <GraduationCap className="h-5 w-5 text-ink-accent" />
             </div>
             <DialogTitle className="text-page font-semibold tracking-tight text-foreground">
               Learn Hub
@@ -39,7 +39,7 @@ export function InfoModal() {
           <div className="rounded-lg border bg-card p-5">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-brand" />
+                <Sparkles className="h-4 w-4 text-ink-accent" />
               </div>
               <h4 className="text-lg font-semibold text-foreground">What it does</h4>
             </div>
@@ -75,14 +75,14 @@ export function InfoModal() {
           <div className="rounded-lg border bg-card p-5">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-lg bg-brand/15 flex items-center justify-center">
-                <Info className="h-4 w-4 text-brand" />
+                <Info className="h-4 w-4 text-ink-accent" />
               </div>
               <h4 className="text-lg font-semibold text-foreground">How to Use</h4>
             </div>
             <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="w-6 h-6 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Upload className="h-3 w-3 text-brand" />
+                  <Upload className="h-3 w-3 text-ink-accent" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">1. Add a book</p>
@@ -91,7 +91,7 @@ export function InfoModal() {
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-6 h-6 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Sparkles className="h-3 w-3 text-brand" />
+                  <Sparkles className="h-3 w-3 text-ink-accent" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">2. Process into concepts</p>
@@ -100,7 +100,7 @@ export function InfoModal() {
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-6 h-6 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <BookOpen className="h-3 w-3 text-brand" />
+                  <BookOpen className="h-3 w-3 text-ink-accent" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">3. Study</p>
@@ -109,7 +109,7 @@ export function InfoModal() {
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-6 h-6 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Zap className="h-3 w-3 text-brand" />
+                  <Zap className="h-3 w-3 text-ink-accent" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">4. Track mastery</p>
