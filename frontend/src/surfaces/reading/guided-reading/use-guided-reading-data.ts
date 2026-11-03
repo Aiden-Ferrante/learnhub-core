@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
-import { qk, roots, useApi, useInvalidate } from "@/kit/data"
+import { useMemo } from "react"
+import { qk, useApi } from "@/kit/data"
 import { fetchGuidedReading } from "@/gateways/api/chapter"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { fetchConceptMastery, type ConceptMastery } from "@/gateways/api/progress"
@@ -42,13 +42,6 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
     { enabled: Boolean(chapterKey) },
   )
 
-  // The study drawers report answers through this; the grades' own mutations may already
-  // invalidate these roots, and a second invalidation is a cheap no-op refetch.
-  const invalidate = useInvalidate()
-  const refreshMastery = useCallback(() => {
-    void invalidate(roots.conceptMastery, roots.reviewQueue)
-  }, [invalidate])
-
   return {
     outline,
     outlineReady,
@@ -60,6 +53,5 @@ export function useGuidedReadingData(docId: string, chapterKey: string | null, t
     masteryByKey: masteryQ.data?.byConcept ?? NO_MASTERY,
     masteryQ,
     dueCount: dueQ.data?.counts?.due ?? 0,
-    refreshMastery,
   }
 }

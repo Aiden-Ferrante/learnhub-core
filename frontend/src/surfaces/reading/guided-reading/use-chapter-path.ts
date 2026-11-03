@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef } from "react"
 import { useToast } from "@/kit/hooks/use-toast"
-import { qk, roots, useApi, useApiMutation, useInvalidate } from "@/kit/data"
+import { qk, useApi, useApiMutation } from "@/kit/data"
 import { PATH_STAGES, doneMap } from "@/surfaces/reading/learn-path"
 import { fetchChapterProgress, updateChapterStage } from "@/gateways/api/chapter"
 
@@ -51,16 +51,9 @@ export function useChapterPath(chapterKey: string | null, docId: string) {
     if (lastMark.current) fire(lastMark.current)
   }, [fire])
 
-  // Drawer panels (walk, lock-in) write stages server-side; this re-reads them.
-  const invalidate = useInvalidate()
-  const loadProgress = useCallback(() => {
-    void invalidate(roots.chapterProgress)
-  }, [invalidate])
-
   return {
     stages,
     progress,
-    loadProgress,
     markStage,
     marking: mark.pending,
     markError: mark.error,

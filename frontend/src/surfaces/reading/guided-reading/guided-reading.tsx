@@ -328,8 +328,6 @@ export function GuidedReading({ course, scope, tree, onScopeChange, initialDrawe
           docId={docId}
           tree={tree}
           onClose={() => setDrawer(null)}
-          onRefreshMastery={data.refreshMastery}
-          onProgress={path.loadProgress}
         />
       )}
     </div>

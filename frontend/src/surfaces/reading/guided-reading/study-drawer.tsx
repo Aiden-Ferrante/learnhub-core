@@ -12,8 +12,8 @@ import { DRAWER_TITLES, type StudyDrawer } from "./lib"
 
 /** The study drawer: review / walk / lock-in / tutor / listen over the same reading
  *  surface. Anchored absolute inside the surface root (a fixed drawer would open
- *  under the app's nav shell). Cross-concern effects arrive as callbacks: answers refresh
- *  mastery, walk/lock-in completion reloads the path. */
+ *  under the app's nav shell). Each panel's grades are mutations that invalidate mastery, the
+ *  queues and the chapter path themselves, so the drawer passes no refresh callbacks. */
 export function StudyDrawerPanel({
   drawer,
   title,
@@ -21,8 +21,6 @@ export function StudyDrawerPanel({
   docId,
   tree,
   onClose,
-  onRefreshMastery,
-  onProgress,
 }: {
   drawer: Exclude<StudyDrawer, null>
   title: string
@@ -30,9 +28,6 @@ export function StudyDrawerPanel({
   docId: string
   tree: LearnTreeNode[]
   onClose: () => void
-  onRefreshMastery: () => void
-  /** Reload the chapter path (stages written server-side or by the panel itself). */
-  onProgress: () => void
 }) {
   return (
     <div className="absolute inset-y-0 right-0 z-40 flex w-[min(30rem,95vw)] flex-col border-l bg-card shadow-2xl">
@@ -53,19 +48,13 @@ export function StudyDrawerPanel({
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {drawer === "review" && chapterKey && (
-          <ReviewPanel scope={chapterKey} docId={docId} onAnswered={onRefreshMastery} />
+          <ReviewPanel scope={chapterKey} docId={docId} />
         )}
         {drawer === "walk" && (
-          <ChapterWalk
-            scope={chapterKey}
-            docId={docId}
-            tree={tree}
-            onAnswered={onRefreshMastery}
-            onComplete={onProgress} // walk grades the skeleton stage itself
-          />
+<ChapterWalk scope={chapterKey} docId={docId} tree={tree} />
         )}
-        {drawer === "lockin" && <LockInPanel scope={chapterKey} docId={docId} onDone={onProgress} />}
-        {drawer === "tutor" && <LessonPanel scope={chapterKey} docId={docId} onAnswered={onRefreshMastery} />}
+        {drawer === "lockin" && <LockInPanel scope={chapterKey} docId={docId} />}
+        {drawer === "tutor" && <LessonPanel scope={chapterKey} docId={docId} />}
         {drawer === "listen" && <AudiobookPanel scope={chapterKey} docId={docId} />}
       </div>
     </div>
