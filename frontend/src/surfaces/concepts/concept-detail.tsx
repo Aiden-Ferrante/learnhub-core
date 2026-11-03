@@ -19,13 +19,11 @@ const label = "text-micro font-medium uppercase tracking-label text-muted-foregr
 /** A focused single-concept lesson: explanation, source passage, a reveal-on-click
  *  self-test, and self-grading (feeds the spaced-repetition schedule). The grade is a
  *  write: it says "Scheduled" only once the server took it, and "Not saved · Retry" if not. */
-export function ConceptDetail({ concept: c, sectionTitle, docId, memory, onClose }: {
+export function ConceptDetail({ concept: c, sectionTitle, docId, memory }: {
   concept: ConceptLesson
   sectionTitle?: string
   docId?: string
   memory?: ConceptMastery
-  /** Back to the concept list (the breadcrumbs end at Concepts, so they can't). */
-  onClose: () => void
 }) {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
   const [lastGrade, setLastGrade] = useState<ReviewGrade | null>(null)
@@ -45,10 +43,6 @@ export function ConceptDetail({ concept: c, sectionTitle, docId, memory, onClose
 
   return (
     <div className="flex flex-col gap-4">
-      <Button variant="ghost" size="sm" className="self-start" onClick={onClose}>
-        All concepts
-      </Button>
-
       <Sheet as="article">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">

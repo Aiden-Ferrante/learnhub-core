@@ -86,7 +86,6 @@ export function ConceptsView({ course, tree, conceptKey, onSelect }: ConceptsVie
               sectionTitle={titles[selected.sectionKey || ""] || prettyScope(selected.sectionKey)}
               docId={doc}
               memory={selected.conceptKey ? byConcept[selected.conceptKey] : undefined}
-              onClose={() => onSelect(null)}
             />
           ) : (
             <>

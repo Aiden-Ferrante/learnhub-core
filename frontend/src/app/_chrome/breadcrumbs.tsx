@@ -1,11 +1,13 @@
 "use client"
 
+import { Suspense } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { useDocuments } from "@/surfaces/processing"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { scopeFromSegments } from "@/kit/lib/scope-url"
+import { fetchDocumentConcepts } from "@/gateways/api/concepts"
 import { fetchOutline } from "@/gateways/api/outline"
 import { fetchPack } from "@/gateways/api/packs"
 import { chaptersFromOutline, resolveChapterForScope } from "@/gateways/api/toc"
@@ -26,11 +28,21 @@ const SUBPAGE_LABELS: Record<string, string> = {
 
 type Crumb = { label: string; href?: string }
 
-/** "Library › <course> › <surface> [› <pack>]" on course routes; empty elsewhere. The
- *  single back affordance on every course route, so it shows at every width. Titles come
- *  from the shared query cache (outline, pack), the same entries the surfaces read. */
+/** "Library › <course> › <surface> [› <pack> | <concept>]" on course routes; empty
+ *  elsewhere. The single back affordance on every course route, so it shows at every
+ *  width. Titles come from the shared query cache (outline, pack, concepts), the same
+ *  entries the surfaces read. Suspense: it reads `?concept=` through useSearchParams. */
 export function Breadcrumbs() {
+  return (
+    <Suspense fallback={null}>
+      <CourseCrumbs />
+    </Suspense>
+  )
+}
+
+function CourseCrumbs() {
   const pathname = usePathname()
+  const search = useSearchParams()
   const { documents } = useDocuments()
 
   const segments = pathname.split("/").filter(Boolean)
@@ -51,6 +63,11 @@ export function Breadcrumbs() {
     enabled: Boolean(packKey),
   })
 
+  const conceptKey = sub === "concepts" ? search.get("concept") : null
+  const concepts = useApi(qk.concepts(learnDocId), (signal) => fetchDocumentConcepts(learnDocId, signal), {
+    enabled: Boolean(learnDocId && conceptKey),
+  })
+
   if (!onCourse) return null
 
   const crumbs: Crumb[] = [{ label: "Library", href: "/courses" }]
@@ -66,6 +83,10 @@ export function Breadcrumbs() {
   } else if (sub === "packs" && packKey) {
     crumbs.push({ label: SUBPAGE_LABELS.packs, href: `/courses/${segments[1]}/packs` })
     crumbs.push({ label: pack.data?.title || "Pack" })
+  } else if (sub === "concepts" && conceptKey) {
+    crumbs.push({ label: SUBPAGE_LABELS.concepts, href: `/courses/${segments[1]}/concepts` })
+    const concept = concepts.data?.concepts?.find((c) => c.conceptKey === conceptKey)
+    crumbs.push({ label: concept?.name || "Concept" })
   } else if (sub && SUBPAGE_LABELS[sub]) {
     crumbs.push({ label: SUBPAGE_LABELS[sub] })
   }
