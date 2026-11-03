@@ -1,17 +1,27 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, ExternalLink, PictureInPicture2 } from "lucide-react"
+import { ExternalLink, PictureInPicture2 } from "lucide-react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
+import { Button } from "@/kit/ui/button"
+import { EmptyState } from "@/kit/patterns/empty-state"
+import { ErrorNotice } from "@/kit/data"
 import { ChapterReader } from "@/surfaces/reading/chapter-reader"
-import { chaptersFromOutline, outlineToTree, resolveChapterForScope, resolveChapterFromOutline, topLevelChapters, type CourseChapter } from "@/gateways/api/toc"
+import {
+  chaptersFromOutline,
+  outlineToTree,
+  resolveChapterForScope,
+  resolveChapterFromOutline,
+  topLevelChapters,
+} from "@/gateways/api/toc"
 import { ReadingThemeToggle } from "@/surfaces/reading/reading-theme-toggle"
 import { ReadingControls } from "@/surfaces/reading/reading-controls"
 import { SyllabusTree } from "@/surfaces/library"
 import { useReadingTheme } from "@/surfaces/reading/use-reading-theme"
 import { useReadingPrefs } from "@/surfaces/reading/use-reading-prefs"
-import { useCourseChapters } from "@/surfaces/library"
-import { fetchOutline, type LearnTreeNode, type OutlineEntry } from "@/gateways/api/outline"
+import { outlineEntries, useChapterList, useOutline } from "@/surfaces/reading/use-reading-data"
+import { useViewportPin } from "@/surfaces/reading/use-viewport-pin"
+import { type LearnTreeNode } from "@/gateways/api/outline"
 import { type MasteryResponse } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library"
 
@@ -20,77 +30,68 @@ type BookReaderProps = {
   tree: LearnTreeNode[]
   loading: boolean
   mastery: MasteryResponse | null
-  onBack: () => void
   onSectionRead?: (sectionKey: string) => void
 }
 
+/** Floating always-on-top window where the browser has Document Picture-in-Picture, else
+ *  a plain pop-out window. */
+async function openFloating(url: string, popOut: () => void) {
+  const w = window as unknown as {
+    documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> }
+  }
+  if (!w.documentPictureInPicture) return popOut()
+  try {
+    const pip = await w.documentPictureInPicture.requestWindow({ width: 460, height: 760 })
+    pip.document.body.style.margin = "0"
+    const iframe = pip.document.createElement("iframe")
+    iframe.src = url
+    iframe.style.cssText = "border:0;width:100%;height:100vh"
+    pip.document.body.appendChild(iframe)
+  } catch {
+    popOut() // the browser refused the PiP window; fall back to a normal one
+  }
+}
+
 /** Chapter-scoped book reader: loads one chapter at a time (not the whole PDF), with a live
- *  "you are here" breadcrumb (in ChapterReader), the syllabus, and pop-out / floating windows. */
-export function BookReader({
-  course,
-  tree,
-  loading,
-  mastery,
-  onBack,
-  onSectionRead,
-}: BookReaderProps) {
+ *  "you are here" breadcrumb (in ChapterReader), the syllabus, and pop-out / floating
+ *  windows. The way back to the course is the breadcrumb (docs/ui-spec.md §2). */
+export function BookReader({ course, tree, loading, mastery, onSectionRead }: BookReaderProps) {
+  const docId = course.learnDocId ?? course.id
   const [theme] = useReadingTheme()
   const [prefs, setPrefs] = useReadingPrefs()
   const [focus, setFocus] = useState(false)
   const [chapterKey, setChapterKey] = useState<string | null>(null)
   const [sub, setSub] = useState<string | null>(null)
   const [pipOk, setPipOk] = useState(false)
-  const [outline, setOutline] = useState<OutlineEntry[]>([])
+  const outlineQ = useOutline(course.learnDocId)
+  const outline = outlineEntries(outlineQ)
 
-  // Canonical chapters (see useCourseChapters) — the outline/tree rules only bridge
-  // the moment before the fetch lands.
+  // Canonical chapters; the outline/tree rules only bridge the moment before the fetch lands.
   const chapterFallback = useMemo(() => {
     const fromOutline = chaptersFromOutline(outline)
     return fromOutline.length ? fromOutline : topLevelChapters(tree)
   }, [outline, tree])
-  const chapters = useCourseChapters(course.learnDocId ?? course.id, chapterFallback)
+  const { chapters, query: chaptersQ } = useChapterList(docId, chapterFallback)
   // Sidebar shows the full outline hierarchy when available (else the TOC tree).
   const sidebarTree = useMemo(() => (outline.length ? outlineToTree(outline) : tree), [outline, tree])
-  const lastKey = `txt2k:book-chapter:${course.learnDocId ?? course.id}`
+  const lastKey = `txt2k:book-chapter:${docId}`
 
   useEffect(() => {
     setPipOk(typeof window !== "undefined" && "documentPictureInPicture" in window)
   }, [])
 
-  // Pin the reader pane to the viewport (same trick as the PDF view and deep chapter)
-  // instead of a fixed 640px letterbox — the reader owns whatever height the screen has.
+  // Pin the reader pane to the viewport instead of a fixed letterbox.
   const paneRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = paneRef.current
-    if (!el) return
-    const size = () => {
-      window.scrollTo(0, 0)
-      const top = Math.max(0, Math.round(el.getBoundingClientRect().top))
-      el.style.height = `calc(100dvh - ${top}px - 12px)`
-    }
-    size()
-    window.addEventListener("resize", size)
-    return () => window.removeEventListener("resize", size)
-  }, [])
+  useViewportPin(paneRef)
 
-  useEffect(() => {
-    let active = true
-    fetchOutline(course.learnDocId)
-      .then((o) => active && !o.error && setOutline(o.outline || []))
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [course.learnDocId])
-
-  // Pick the chapter once the tree is known: restore the last one, else the first.
+  // Pick the chapter once the list is known: restore the last one, else the first.
   useEffect(() => {
     if (chapterKey || chapters.length === 0) return
     let restored: string | null = null
     try {
       restored = window.localStorage.getItem(lastKey)
     } catch {
-      /* ignore */
+      /* storage unavailable */
     }
     setChapterKey(restored && chapters.some((c) => c.key === restored) ? restored : chapters[0].key)
   }, [chapters, chapterKey, lastKey])
@@ -102,7 +103,7 @@ export function BookReader({
       try {
         window.localStorage.setItem(lastKey, key)
       } catch {
-        /* ignore */
+        /* storage unavailable */
       }
       onSectionRead?.(subScope || key)
     },
@@ -122,72 +123,53 @@ export function BookReader({
 
   const readerUrl = () =>
     `/reader?doc=${encodeURIComponent(course.learnDocId ?? "")}&scope=${encodeURIComponent(chapterKey ?? "")}`
-
-  const popOut = () =>
+  const popOut = () => {
     window.open(readerUrl(), "txt2k-reader", "width=900,height=1000,menubar=no,toolbar=no")
-
-  const popFloat = async () => {
-    const w = window as unknown as {
-      documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> }
-    }
-    if (!w.documentPictureInPicture) {
-      popOut()
-      return
-    }
-    try {
-      const pip = await w.documentPictureInPicture.requestWindow({ width: 460, height: 760 })
-      pip.document.body.style.margin = "0"
-      const iframe = pip.document.createElement("iframe")
-      iframe.src = readerUrl()
-      iframe.style.cssText = "border:0;width:100%;height:100vh"
-      pip.document.body.appendChild(iframe)
-    } catch {
-      popOut()
-    }
   }
+  const iconBtn = "h-8 w-8 text-muted-foreground hover:text-foreground"
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back to course
-        </button>
+        <span className="min-w-0 truncate text-sm font-medium" title={course.title}>
+          {course.title}
+        </span>
         <div className="flex items-center gap-2">
-          <span className="mr-1 truncate text-sm font-medium" title={course.title}>{course.title}</span>
           {pipOk && (
-            <button
+            <Button
               type="button"
-              onClick={popFloat}
+              variant="ghost"
+              size="icon"
+              className={iconBtn}
+              onClick={() => void openFloating(readerUrl(), popOut)}
               aria-label="Float reader (picture-in-picture)"
               title="Float (always-on-top)"
-              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <PictureInPicture2 className="h-4 w-4" />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            className={iconBtn}
             onClick={popOut}
             aria-label="Pop out reader"
             title="Pop out to a new window"
-            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <ExternalLink className="h-4 w-4" />
-          </button>
+          </Button>
           <ReadingThemeToggle />
-          <ReadingControls
-            prefs={prefs}
-            onChange={setPrefs}
-            focus={focus}
-            onToggleFocus={() => setFocus((f) => !f)}
-          />
+          <ReadingControls prefs={prefs} onChange={setPrefs} focus={focus} onToggleFocus={() => setFocus((f) => !f)} />
         </div>
       </div>
+
+      {outlineQ.status === "error" && (
+        <ErrorNotice compact title="Couldn't load the outline" error={outlineQ.error} onRetry={outlineQ.retry} />
+      )}
+      {chaptersQ.status === "error" && chapters.length > 0 && (
+        <ErrorNotice compact title="Couldn't load the chapter list" error={chaptersQ.error} onRetry={chaptersQ.retry} />
+      )}
 
       <div ref={paneRef} className="overflow-hidden rounded-lg border bg-card">
         <PanelGroup direction="horizontal">
@@ -219,9 +201,15 @@ export function BookReader({
                 theme={theme}
                 onChapterChange={(k) => goChapter(k, null)}
               />
+            ) : chaptersQ.status === "error" ? (
+              <ErrorNotice className="m-6" title="Couldn't load the chapters" error={chaptersQ.error} onRetry={chaptersQ.retry} />
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                {loading ? "Loading…" : "No chapters yet — process this document to read it here."}
+                {loading || chaptersQ.status === "loading" ? (
+                  "Loading…"
+                ) : (
+                  <EmptyState title="No chapters yet" description="Process this document to read it here." />
+                )}
               </div>
             )}
           </Panel>

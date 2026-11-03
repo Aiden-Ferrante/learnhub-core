@@ -1,6 +1,7 @@
 "use client"
 
 import { X } from "lucide-react"
+import { Button } from "@/kit/ui/button"
 import { ReviewPanel } from "@/surfaces/studying"
 import { ChapterWalk } from "@/surfaces/studying"
 import { LockInPanel } from "@/surfaces/studying"
@@ -9,7 +10,7 @@ import { AudiobookPanel } from "@/surfaces/reading/audiobook-panel"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { DRAWER_TITLES, type StudyDrawer } from "./lib"
 
-/** The study drawer — review / walk / lock-in / tutor / listen over the same reading
+/** The study drawer: review / walk / lock-in / tutor / listen over the same reading
  *  surface. Anchored absolute inside the surface root (a fixed drawer would open
  *  under the app's nav shell). Cross-concern effects arrive as callbacks: answers refresh
  *  mastery, walk/lock-in completion reloads the path. */
@@ -39,9 +40,16 @@ export function StudyDrawerPanel({
         <div className="text-xs font-medium text-muted-foreground">
           {DRAWER_TITLES[drawer]} · {title}
         </div>
-        <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+          aria-label="Close drawer"
+        >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {drawer === "review" && chapterKey && (

@@ -2,33 +2,35 @@
 
 import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
+import { Button } from "@/kit/ui/button"
+import { qk, useApi } from "@/kit/data"
 import { audiobookFileUrl, getAudiobookStatus } from "@/gateways/api/audiobook"
 
-/** Narration for the open chapter — read along to the generated audiobook file.
+/** Narration for the open chapter: read along to the generated audiobook file.
  *  `useNarration` owns availability + open state (the header's Narrate button toggles it);
  *  `NarrationBar` is the mini-player: position/speed persist per chapter (shared with the
- *  Listen drawer's keys). Generation stays an explicit act — the bar only appears when
- *  this chapter's audio already exists. */
+ *  Listen drawer's keys). Generation stays an explicit act: the bar only appears when
+ *  this chapter's audio already exists.
+ *
+ *  Availability reads the same `qk.audiobookStatus` entry the Listen drawer shows, so a
+ *  failed status read is reported (with Retry) there; here it only means no Narrate
+ *  button, the way an optional side control fails. */
 export function useNarration(chapterKey: string | null, docId: string) {
-  const [audioReady, setAudioReady] = useState(false)
-  const [playerOpen, setPlayerOpen] = useState(false)
+  const status = useApi(
+    qk.audiobookStatus(docId, chapterKey),
+    (signal) => getAudiobookStatus(chapterKey, docId, signal),
+    { enabled: Boolean(chapterKey) },
+  )
+  // The player is open for one chapter; switching chapters closes it.
+  const [openFor, setOpenFor] = useState<string | null>(null)
+  const audioReady = status.data?.status === "done"
+  const playerOpen = audioReady && openFor !== null && openFor === chapterKey
 
-  useEffect(() => {
-    setAudioReady(false)
-    setPlayerOpen(false)
-    if (!chapterKey) return
-    let alive = true
-    getAudiobookStatus(chapterKey, docId)
-      .then((st) => {
-        if (alive && st.status === "done") setAudioReady(true)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [chapterKey, docId])
-
-  return { audioReady, playerOpen, togglePlayer: () => setPlayerOpen((o) => !o) }
+  return {
+    audioReady,
+    playerOpen,
+    togglePlayer: () => setOpenFor((o) => (o === chapterKey ? null : chapterKey)),
+  }
 }
 
 export function NarrationBar({
@@ -97,17 +99,26 @@ export function NarrationBar({
           }
         }}
       />
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={cycleSpeed}
-        className="rounded border px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground hover:text-foreground"
+        className="h-6 px-1.5 text-xs tabular-nums text-muted-foreground"
         title="Playback speed"
       >
         {speed}×
-      </button>
-      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground"
+        onClick={onClose}
+        aria-label="Close narration"
+      >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   )
 }

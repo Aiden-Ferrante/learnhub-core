@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, use, useCallback, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { GuidedReading } from "@/surfaces/reading"
 import { CourseFallback } from "@/surfaces/library"
 import { useCourseData } from "@/surfaces/library"
@@ -14,7 +14,6 @@ type Drawer = (typeof DRAWERS)[number]
 
 function ChapterInner({ params }: { params: Params }) {
   const { courseId, scope: scopeSegments } = use(params)
-  const router = useRouter()
   const search = useSearchParams()
   const data = useCourseData(courseId)
 
@@ -47,7 +46,6 @@ function ChapterInner({ params }: { params: Params }) {
         course={data.course}
         scope={scope}
         tree={data.tree}
-        onBack={() => router.push(`/courses/${courseId}`)}
         onScopeChange={handleScopeChange}
         initialDrawer={initialDrawer}
       />

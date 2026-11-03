@@ -1,25 +1,20 @@
 "use client"
 
-import type { CourseChapter } from "@/gateways/api/chapter"
-import { numberKeyOf, resolveChapterForScope } from "@/gateways/api/toc"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  ArrowUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Search,
-  X,
-} from "lucide-react"
-import { MarkdownReader } from "@/surfaces/reading/markdown-reader"
+import { ArrowUp, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"
+import { EmptyState } from "@/kit/patterns/empty-state"
+import { qk, useApi, AsyncView, ApiError } from "@/kit/data"
+import type { CourseChapter } from "@/gateways/api/chapter"
+import { numberKeyOf } from "@/gateways/api/toc"
+import { fetchSectionContent } from "@/gateways/api/content"
+import { MarkdownReader } from "@/surfaces/reading/markdown-reader"
+import { ChapterFindBar } from "@/surfaces/reading/chapter-find-bar"
 import { useReadingTheme, type ReadingTheme } from "@/surfaces/reading/use-reading-theme"
 import { useReadingPrefs, type ReadingPrefs } from "@/surfaces/reading/use-reading-prefs"
 import { useInBookFind } from "@/surfaces/reading/use-in-book-find"
 import { cn } from "@/kit/lib/utils"
-import { fetchSectionContent, type SectionContentBlock } from "@/gateways/api/content"
-import { type LearnTreeNode, type OutlineEntry } from "@/gateways/api/outline"
 
 type ChapterReaderProps = {
   docId?: string
@@ -30,14 +25,12 @@ type ChapterReaderProps = {
   onChapterChange?: (key: string) => void
   /** Reports the live "you are here" area (current heading under the fold). */
   onAreaChange?: (area: string | null) => void
-  /** Reading prefs/theme — passed by the parent that owns the controls (useReadingPrefs isn't
+  /** Reading prefs/theme, passed by the parent that owns the controls (useReadingPrefs isn't
    *  cross-instance synced); falls back to the hooks when omitted (standalone window). */
   prefs?: ReadingPrefs
   theme?: ReadingTheme
   className?: string
 }
-
-
 
 /** Normalize a heading for matching (strip leading numbering, lowercase, collapse spaces). */
 function normHeading(s: string): string {
@@ -48,9 +41,24 @@ function normHeading(s: string): string {
     .trim()
 }
 
-/** The chapter-scoped reading surface: loads ONE chapter at a time (not the whole book), with a
- *  live "you are here" breadcrumb, prev/next chapter, and find. Reused by the embedded book
- *  reader and the popped-out /reader window. */
+const scrollStoreKey = (docId: string | undefined, chapterKey: string | null) =>
+  `txt2k:chapter-scroll:${docId ?? ""}:${chapterKey}`
+
+function ChapterSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading chapter">
+      <Skeleton className="h-7 w-1/2" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-11/12" />
+      <Skeleton className="h-4 w-5/6" />
+    </div>
+  )
+}
+
+/** The chapter-scoped reading surface: loads ONE chapter at a time (not the whole book) as a
+ *  keyed query, with a live "you are here" breadcrumb, prev/next chapter, and find. Reused by
+ *  the embedded book reader and the popped-out /reader window. */
 export function ChapterReader({
   docId,
   chapters,
@@ -62,10 +70,6 @@ export function ChapterReader({
   theme: themeProp,
   className,
 }: ChapterReaderProps) {
-  const [markdown, setMarkdown] = useState<string>("")
-  const [blocks, setBlocks] = useState<SectionContentBlock[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [area, setArea] = useState<string | null>(null)
   const [page, setPage] = useState<number | null>(null)
   const [progress, setProgress] = useState(0)
@@ -77,13 +81,22 @@ export function ChapterReader({
   const prefs = prefsProp ?? hookPrefs
   const contentRef = useRef<HTMLDivElement>(null)
   const find = useInBookFind(contentRef)
-  const findInputRef = useRef<HTMLInputElement>(null)
   const pendingSub = useRef<string | null>(null)
 
-  const index = useMemo(
-    () => chapters.findIndex((c) => c.key === chapterKey),
-    [chapters, chapterKey],
+  // The chapter's markdown (chapter + its descendants, rolled up). An `error` envelope is a
+  // failure like any other, so it lands in the error state with Retry.
+  const content = useApi(
+    qk.sectionContent(docId, chapterKey ?? ""),
+    async (signal) => {
+      const res = await fetchSectionContent(chapterKey ?? "", docId, signal)
+      if (res.error) throw new ApiError(422, res.error)
+      return { markdown: res.markdown || "", blocks: res.blocks || [] }
+    },
+    { enabled: Boolean(chapterKey) },
   )
+  const markdown = content.data?.markdown ?? ""
+
+  const index = useMemo(() => chapters.findIndex((c) => c.key === chapterKey), [chapters, chapterKey])
   const chapter = index >= 0 ? chapters[index] : null
   const prev = index > 0 ? chapters[index - 1] : null
   const next = index >= 0 && index < chapters.length - 1 ? chapters[index + 1] : null
@@ -91,34 +104,11 @@ export function ChapterReader({
   // heading (normalized) -> its 1-based page, so the breadcrumb can show the page you're on.
   const pageByHeading = useMemo(() => {
     const m = new Map<string, number>()
-    for (const b of blocks) {
+    for (const b of content.data?.blocks ?? []) {
       if (b.heading && b.pageStart != null) m.set(normHeading(b.heading), b.pageStart)
     }
     return m
-  }, [blocks])
-
-  // Load the current chapter's markdown (chapter + its descendants, rolled up).
-  useEffect(() => {
-    if (!chapterKey) return
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    pendingSub.current = subScope ?? null
-    fetchSectionContent(chapterKey, docId)
-      .then((res) => {
-        if (cancelled) return
-        if (res.error) setError(res.error)
-        else {
-          setMarkdown(res.markdown || "")
-          setBlocks(res.blocks || [])
-        }
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Failed to load chapter"))
-      .finally(() => !cancelled && setLoading(false))
-    return () => {
-      cancelled = true
-    }
-  }, [chapterKey, subScope, docId])
+  }, [content.data])
 
   const scrollToScope = useCallback((scope: string) => {
     const el = contentRef.current
@@ -167,7 +157,7 @@ export function ChapterReader({
       const top = el.scrollTop
       scrollSaveTimer.current = setTimeout(() => {
         try {
-          localStorage.setItem(`txt2k:chapter-scroll:${docId ?? ""}:${chapterKey}`, String(top))
+          localStorage.setItem(scrollStoreKey(docId, chapterKey), String(top))
         } catch {
           /* storage unavailable */
         }
@@ -175,9 +165,15 @@ export function ChapterReader({
     }
   }, [updateArea, docId, chapterKey])
 
-  // After a chapter renders: scroll to the requested sub-scope (or top) and seed the area.
+  // A new chapter or sub-scope request: remember where to land once the text is up.
   useEffect(() => {
-    if (loading || !markdown) return
+    pendingSub.current = subScope ?? null
+  }, [chapterKey, subScope, docId])
+
+  // After a chapter renders: scroll to the requested sub-scope (or the saved spot) and seed
+  // the area. Declared after the effect above so a sub-scope change is seen in one commit.
+  useEffect(() => {
+    if (!markdown) return
     const id = requestAnimationFrame(() => {
       const sub = pendingSub.current
       pendingSub.current = null
@@ -187,7 +183,7 @@ export function ChapterReader({
         // Resume where you left off in this chapter (or top on first visit).
         let saved = 0
         try {
-          saved = Number(localStorage.getItem(`txt2k:chapter-scroll:${docId ?? ""}:${chapterKey}`)) || 0
+          saved = Number(localStorage.getItem(scrollStoreKey(docId, chapterKey))) || 0
         } catch {
           saved = 0
         }
@@ -196,25 +192,25 @@ export function ChapterReader({
       updateArea()
     })
     return () => cancelAnimationFrame(id)
-  }, [loading, markdown, scrollToScope, updateArea, docId, chapterKey])
+  }, [markdown, subScope, scrollToScope, updateArea, docId, chapterKey])
 
-  useEffect(() => {
-    if (find.open) findInputRef.current?.focus()
-  }, [find.open])
+  const navBtn = "h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-30"
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
       {/* Sticky "you are here" bar + chapter nav */}
       <div className="relative flex items-center gap-2 border-b bg-card/80 px-3 py-2 backdrop-blur">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
+          className={navBtn}
           onClick={() => prev && onChapterChange?.(prev.key)}
           disabled={!prev}
           aria-label="Previous chapter"
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
         >
           <ChevronLeft className="h-4 w-4" />
-        </button>
+        </Button>
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
           <span className="truncate font-medium">{chapter?.title || "Chapter"}</span>
           {area && area !== chapter?.title && (
@@ -234,23 +230,27 @@ export function ChapterReader({
             {index + 1}/{chapters.length}
           </span>
         )}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
+          className={navBtn}
           onClick={() => next && onChapterChange?.(next.key)}
           disabled={!next}
           aria-label="Next chapter"
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
         >
           <ChevronRight className="h-4 w-4" />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
+          className={navBtn}
           onClick={find.open ? find.close : find.openFind}
           aria-label="Find in chapter"
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Search className="h-4 w-4" />
-        </button>
+        </Button>
         <div
           className="absolute inset-x-0 bottom-0 h-0.5 bg-brand transition-[width] duration-150"
           style={{ width: `${progress}%` }}
@@ -259,36 +259,7 @@ export function ChapterReader({
       </div>
 
       <div className="relative min-h-0 flex-1">
-        {find.open && (
-          <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-md">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              ref={findInputRef}
-              value={find.query}
-              onChange={(e) => find.search(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  e.shiftKey ? find.prev() : find.next()
-                }
-              }}
-              placeholder="Find in chapter"
-              className="w-36 bg-transparent text-sm focus-visible:outline-none placeholder:text-muted-foreground"
-            />
-            <span className="min-w-[3.5rem] text-right text-xs tabular-nums text-muted-foreground">
-              {find.query ? `${find.count ? find.active + 1 : 0}/${find.count}` : ""}
-            </span>
-            <button type="button" onClick={find.prev} disabled={find.count === 0} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40">
-              <ChevronUp className="h-4 w-4" />
-            </button>
-            <button type="button" onClick={find.next} disabled={find.count === 0} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40">
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            <button type="button" onClick={find.close} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        {find.open && <ChapterFindBar find={find} />}
 
         <div
           ref={contentRef}
@@ -298,39 +269,35 @@ export function ChapterReader({
             readingTheme === "paper" && "reading-surface-paper",
           )}
         >
-          {error ? (
-            <p className="text-sm text-destructive">{error}</p>
-          ) : loading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-7 w-1/2" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-11/12" />
-              <Skeleton className="h-4 w-5/6" />
-            </div>
-          ) : markdown.trim() ? (
-            <MarkdownReader
-              content={markdown}
-              theme={readingTheme}
-              proseSize={prefs.size}
-              measure={prefs.measure}
-            />
+          {chapterKey ? (
+            <AsyncView
+              q={content}
+              skeleton={<ChapterSkeleton />}
+              errorTitle="Couldn't load this chapter"
+              isEmpty={(d) => !d.markdown.trim()}
+              empty={<EmptyState title="This chapter has no text" />}
+            >
+              {(d) => (
+                <MarkdownReader content={d.markdown} theme={readingTheme} proseSize={prefs.size} measure={prefs.measure} />
+              )}
+            </AsyncView>
           ) : (
-            <p className="text-sm text-muted-foreground">This chapter has no text.</p>
+            <ChapterSkeleton />
           )}
         </div>
 
         {showTop && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
-            className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-full border bg-popover px-3 py-1.5 text-xs font-medium shadow-md hover:bg-muted"
+            className="absolute bottom-4 right-4 z-10 h-auto gap-1 rounded-full bg-popover px-3 py-1.5 text-xs shadow-md hover:bg-muted"
           >
             <ArrowUp className="h-3.5 w-3.5" /> Top
-          </button>
+          </Button>
         )}
       </div>
     </div>
   )
 }
-

@@ -1,5 +1,6 @@
 "use client"
 
+import { Button } from "@/kit/ui/button"
 import { cn } from "@/kit/lib/utils"
 
 export type RailItem = {
@@ -36,18 +37,20 @@ export function OutlineRail({
       </div>
       <div className="space-y-0.5">
         {items.map((it, j) => (
-          <button
+          <Button
             key={it.key}
             type="button"
+            variant={null}
+            size={null}
             title={it.number ? `${it.number} ${it.text}` : it.text}
             onClick={(e) => {
               e.stopPropagation()
               if (it.target >= 0) onJump(it.target)
             }}
             className={cn(
-              "block w-full truncate rounded px-2 py-1 text-left text-xs transition-colors",
+              "block h-auto w-full truncate rounded px-2 py-1 text-left text-xs font-normal transition-colors",
               j === activeIndex
-                ? "bg-brand/10 font-medium text-brand"
+                ? "bg-brand/10 font-medium text-ink-accent"
                 : cn(mutedCls, paper ? "hover:bg-paper-card" : "hover:bg-muted/50", "hover:opacity-100"),
               it.target < 0 && "cursor-default opacity-60",
             )}
@@ -55,7 +58,7 @@ export function OutlineRail({
           >
             {it.number && <span className="mr-1.5 tabular-nums opacity-60">{it.number}</span>}
             {it.text}
-          </button>
+          </Button>
         ))}
       </div>
     </nav>

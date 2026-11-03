@@ -3,6 +3,7 @@
 import { useState, type RefObject } from "react"
 import { BookOpen, Check, ChevronDown } from "lucide-react"
 import { Button } from "@/kit/ui/button"
+import { SectionCard } from "@/kit/patterns/section-card"
 import { MathText } from "@/surfaces/reading/markdown-reader"
 import type { GuidedReadingBriefing } from "@/gateways/api/chapter"
 import { KIND_CHIP } from "@/surfaces/concepts"
@@ -34,14 +35,15 @@ export function BriefingCard({
   const [allChips, setAllChips] = useState(false)
 
   return (
-    <div ref={containerRef} className={cn("mb-6 rounded-lg border p-4", cardCls)}>
+    <div ref={containerRef} className="mb-6">
+      <SectionCard className={cardCls}>
       {/* Once oriented, the briefing folds to one line — the prose is the point. */}
       <details open={!oriented}>
         <summary className="flex cursor-pointer list-none items-center gap-2">
           <BookOpen className={cn("h-4 w-4", mutedCls)} />
           <span className="text-sm font-semibold">Chapter briefing</span>
           {oriented ? (
-            <span className="flex items-center gap-1 text-xs text-status-mastered">
+            <span className="flex items-center gap-1 text-xs text-ink-ok">
               <Check className="h-3 w-3" /> oriented
             </span>
           ) : (
@@ -58,7 +60,7 @@ export function BriefingCard({
               <ul className="space-y-1 text-sm opacity-90">
                 {briefing.objectives.map((o, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-brand">•</span>
+                    <span className="text-ink-accent">•</span>
                     <MathText text={o} />
                   </li>
                 ))}
@@ -73,7 +75,7 @@ export function BriefingCard({
               <ul className="space-y-1 text-sm opacity-90">
                 {briefing.watchFor.map((w, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-status-due">•</span>
+                    <span className="text-ink-warn">•</span>
                     <MathText text={w} />
                   </li>
                 ))}
@@ -109,35 +111,40 @@ export function BriefingCard({
             {(allChips ? briefing.keyConcepts : briefing.keyConcepts.slice(0, 8)).map((c, i) => {
               const idx = conceptIndexByName.get(c.name.trim().toLowerCase())
               return (
-                <button
+                <Button
                   key={`${c.name}-${i}`}
                   type="button"
+                  variant={null}
+                  size={null}
                   data-concept={idx}
                   className={cn(
-                    "rounded-full border px-2 py-0.5 text-xs",
+                    "h-auto rounded-full border px-2 py-0.5 text-xs font-normal",
                     KIND_CHIP[c.kind] ?? "border-border text-muted-foreground",
                   )}
                   title={c.signal}
                 >
                   {c.name}
-                </button>
+                </Button>
               )
             })}
             {!allChips && briefing.keyConcepts.length > 8 && (
-              <button
+              <Button
                 type="button"
+                variant={null}
+                size={null}
                 onClick={(e) => {
                   e.stopPropagation()
                   setAllChips(true)
                 }}
-                className={cn("rounded-full border border-dashed px-2 py-0.5 text-xs", mutedCls, "hover:text-brand")}
+                className={cn("h-auto rounded-full border border-dashed px-2 py-0.5 text-xs font-normal", mutedCls, "hover:text-ink-accent")}
               >
                 +{briefing.keyConcepts.length - 8} more
-              </button>
+              </Button>
             )}
           </div>
         )}
       </details>
+      </SectionCard>
     </div>
   )
 }
