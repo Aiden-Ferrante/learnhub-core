@@ -10,6 +10,7 @@ import { InfoModal } from "@/kit/layout/info-modal"
 import { Toaster } from "@/kit/ui/toaster"
 import { UserMenu } from "@/app/_chrome/user-menu"
 import { ShortcutsHelp } from "@/app/_chrome/shortcuts-help"
+import { Providers } from "@/app/providers"
 
 export const metadata: Metadata = {
   title: "Learn Hub | Study from your textbooks",
@@ -26,6 +27,7 @@ export default function RootLayout({
     // in globals.css and tailwind.config's `sans`); dark only, with the fleet.
     <html lang="en" className="dark">
       <body>
+        <Providers>
           <DocumentProvider>
             {/* Two tiers, matching the rest of the fleet: which app above, this
                 app's own sections below. */}
@@ -60,6 +62,7 @@ export default function RootLayout({
             <ShortcutsHelp />
             <Toaster />
           </DocumentProvider>
+        </Providers>
       </body>
     </html>
   )

@@ -16,4 +16,4 @@ next-env.d.ts
 pnpm-lock.yaml
 
 # runtime data
-data/
+/data/
