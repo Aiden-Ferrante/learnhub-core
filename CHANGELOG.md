@@ -7,6 +7,37 @@ commit.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-03
+
+UI overhaul.
+
+### Changed
+- **One daily path.** The Library opens on a Today panel: one line per course, with one button
+  that picks Review, then the active pack's next step, then Continue reading. The course home
+  follows the same rule, then shows five tiles: Review, Exam packs, Read, Concepts and Skeleton
+  recall.
+- **Navigation.** Library · Plan · Admin (Upload, Process, Kit). Breadcrumbs cover every course
+  route and are the only back control. The exam pack's tab is in the URL.
+- **One visual system.** The study theme (graph paper, one sheet) is on every study screen,
+  through typed `kit/study` wrappers. Words use the ink tokens, not fill colours, and every button
+  is the kit Button. The exam clock bar now sits below the header instead of under it.
+- **Data layer.** Every read goes through react-query (`kit/data`: `qk`, `useApi`,
+  `useApiMutation`, `AsyncView`). Errors are visible with Retry everywhere. Grades and exam
+  answers only advance once saved, and a failed save shows "Not saved · Retry". A failed library
+  load says so instead of "Course not found".
+- **Counts reach zero.** Due counts include only what the review serves (concept, skeleton and
+  chapter cards). The new `/courses/[id]/review` reviews the whole course.
+- Large components split: none over about 400 lines.
+
+### Fixed
+- An exam sitting could be stranded when submit failed. Grade errors were swallowed, and one
+  concept-grade path said "Recorded" even when the grade failed. Switching chapters could show the
+  previous chapter's data. The library never retried after a failed first load.
+
+### Removed
+- The old practice session, old exam mode and Match game, the `/practice` route, the course
+  editor's Practice tab and the Fluency stat. The backend routes and stored rows are untouched.
+
 ## [0.24.0] - 2026-11-01
 
 Exam packs.
