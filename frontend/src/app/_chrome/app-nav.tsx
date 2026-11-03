@@ -1,69 +1,91 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarCheck2, GraduationCap, Upload, Zap } from "lucide-react"
+import { CalendarCheck2, ChevronDown, Layers, Library, Upload, Wrench, Zap } from "lucide-react"
 import { cn } from "@/kit/lib/utils"
-import { usePolling } from "@/kit/hooks/use-polling"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/kit/ui/dropdown-menu"
 import { fetchStudyDebt } from "@/gateways/api/progress"
+import { qk } from "@/kit/data/query-keys"
+import { useApi } from "@/kit/data/use-api"
 
-const LINKS = [
-  { href: "/courses", label: "Learn", icon: GraduationCap },
-  { href: "/study", label: "Study", icon: CalendarCheck2 },
-  { href: "/process", label: "Process", icon: Zap },
+const ADMIN = [
   { href: "/upload", label: "Upload", icon: Upload },
+  { href: "/process", label: "Process", icon: Zap },
+  { href: "/styleguide", label: "Kit", icon: Layers },
 ] as const
 
-/** The persistent top nav: section links with active state, plus the whole-library
- *  due-count badge on Study (the planner) so review pressure is visible from anywhere. */
-export function AppNav() {
-  const pathname = usePathname()
-  const [dueNow, setDueNow] = useState(0)
+const isUnder = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
-  usePolling(
-    () =>
-      fetchStudyDebt(7)
-        .then((d) => {
-          if (!d.error) setDueNow(d.dueNow)
-        })
-        .catch(() => {}),
-    5 * 60 * 1000,
-    { leading: true },
+// The .fleet-nav idiom: plain text links, the current one marked by weight and ink rather
+// than a fill, accent on hover.
+const linkClass = (active: boolean) =>
+  cn(
+    "flex items-center gap-1.5 rounded-sm text-meta transition-colors",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+    active ? "font-medium text-foreground" : "text-muted-foreground hover:text-ink-accent",
   )
 
+/** The persistent top nav (docs/ui-spec.md §2): Library · Plan (with the library-wide due
+ *  badge) · Admin ▾ (Upload, Process, Kit). The badge reads qk.studyDebt(7), the same
+ *  cache entry every grade invalidates, so it updates as soon as a review lands. */
+export function AppNav() {
+  const pathname = usePathname()
+  const debt = useApi(qk.studyDebt(7), (signal) => fetchStudyDebt(7, signal), { poll: 5 * 60 * 1000 })
+  const dueNow = debt.data?.dueNow ?? 0
+  const adminActive = ADMIN.some((a) => isUnder(pathname, a.href))
+
   return (
-    // The .fleet-nav idiom: plain text links, the current one marked by weight
-    // and ink rather than a fill, accent on hover. The filled `bg-muted` pill
-    // this used to draw is the same shape tier one uses for "which app you are
-    // in", one row above — two different questions wearing the same badge.
     <nav className="flex items-center gap-4" aria-label="Primary">
-      {LINKS.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`)
-        return (
-          <Link
-            key={href}
-            href={href}
-            title={label}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-1.5 rounded-sm text-meta transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-              active
-                ? "font-medium text-foreground"
-                : "text-muted-foreground hover:text-primary",
-            )}
+      <Link
+        href="/courses"
+        title="Library"
+        aria-current={isUnder(pathname, "/courses") ? "page" : undefined}
+        className={linkClass(isUnder(pathname, "/courses"))}
+      >
+        <Library className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Library</span>
+      </Link>
+      <Link
+        href="/study"
+        title={dueNow > 0 ? `Plan · ${dueNow} due` : "Plan"}
+        aria-current={isUnder(pathname, "/study") ? "page" : undefined}
+        className={linkClass(isUnder(pathname, "/study"))}
+      >
+        <CalendarCheck2 className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Plan</span>
+        {dueNow > 0 && (
+          <span
+            aria-live="polite"
+            aria-label={`${dueNow} due`}
+            className="ml-0.5 rounded-full bg-status-due/15 px-1.5 font-mono text-micro font-semibold tabular-nums text-ink-warn"
           >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{label}</span>
-            {href === "/study" && dueNow > 0 && (
-              <span aria-live="polite" className="ml-0.5 rounded-full bg-status-due/15 px-1.5 font-mono text-micro font-semibold tabular-nums text-status-due">
-                {dueNow}
-              </span>
-            )}
-          </Link>
-        )
-      })}
+            {dueNow}
+          </span>
+        )}
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={linkClass(adminActive)} aria-current={adminActive ? "page" : undefined}>
+          <Wrench className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Admin</span>
+          <ChevronDown className="h-3 w-3" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {ADMIN.map(({ href, label, icon: Icon }) => (
+            <DropdownMenuItem key={href} asChild>
+              <Link href={href} className="flex items-center gap-2 text-meta">
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </nav>
   )
 }

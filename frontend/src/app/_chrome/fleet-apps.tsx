@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
  *
  * The same row renders in shipyard, Mission Control and vault-dashboard, so
  * moving between them does not move the furniture. Tier two — this app's own
- * Learn / Study / Process / Upload — stays in `app-nav.tsx`. The split is the
+ * Library / Plan / Admin — stays in `app-nav.tsx`. The split is the
  * point: switching app and switching page are different acts.
  *
  * The list is duplicated from code/fleet-ui/apps.js rather than imported. The

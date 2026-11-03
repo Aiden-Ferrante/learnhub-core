@@ -442,7 +442,7 @@ export function CourseShelf({
           <GraduationCap className="h-4 w-4 text-brand" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold leading-tight">Learn</h2>
+          <h2 className="text-lg font-semibold leading-tight">Library</h2>
           <p className="text-sm text-muted-foreground">
             Your courses — each one built from a document you processed.
           </p>
