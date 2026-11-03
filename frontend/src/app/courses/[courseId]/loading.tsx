@@ -1,15 +1,17 @@
 import { SkeletonCard, SkeletonRow, SkeletonStatStrip } from "@/kit/patterns/skeletons"
+import { StudyPage } from "@/kit/study"
 
 export default function CourseLoading() {
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-4 px-6 pb-6 pt-6">
+    // Tracks app/courses/[courseId]/page.tsx: the same StudyPage column, hero, tiles, tree.
+    <StudyPage>
       <SkeletonCard />
-      <SkeletonStatStrip />
+      <SkeletonStatStrip tiles={5} className="sm:grid-cols-5" />
       <div className="space-y-2">
         <SkeletonRow />
         <SkeletonRow />
         <SkeletonRow />
       </div>
-    </main>
+    </StudyPage>
   )
 }

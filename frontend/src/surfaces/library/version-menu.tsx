@@ -15,6 +15,7 @@
 import { useState } from "react"
 import { Check, Layers, Loader2, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/kit/ui/button"
+import { ErrorNotice, roots, useApiMutation } from "@/kit/data"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,76 +46,59 @@ type VersionMenuProps = {
   bookKey: string
   versions: CourseVersion[]
   activeVersion: CourseVersion | null
-  /** Re-read the version set; a changed main swaps the course under the page. */
-  onChanged: () => void
 }
 
-export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: VersionMenuProps) {
-  const [busy, setBusy] = useState(false)
+/** A version change re-reads the set; a changed main flips the course's docKey, and every
+ *  course read keyed by it follows. */
+const VERSION_INVALIDATES = [roots.versions]
+
+type VersionAction = { kind: "switch"; docId: string } | { kind: "delete"; docId: string }
+
+export function VersionMenu({ bookKey, versions, activeVersion }: VersionMenuProps) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
-  const [error, setError] = useState<string | null>(null)
   // Which version's delete button is armed. Reset on close — an armed button that
   // survived the menu closing would fire on a click meant for something else.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+
+  const act = useApiMutation(
+    async (a: VersionAction): Promise<unknown> => (a.kind === "switch" ? setMainVersion(a.docId) : deleteVersion(a.docId)),
+    { invalidates: VERSION_INVALIDATES },
+  )
+  const create = useApiMutation(
+    async (name: string) => {
+      const made = await createVersion(bookKey, name)
+      // A new version is created not-main; opening it immediately is what the user meant
+      // by making one, so switch as part of the same action.
+      await setMainVersion(made.docId)
+    },
+    {
+      invalidates: VERSION_INVALIDATES,
+      onSuccess: () => {
+        setCreating(false)
+        setNewName("")
+      },
+    },
+  )
+  const busy = act.pending || create.pending
 
   // A book that only has its Default has nothing to switch between — but the button still
   // shows, because creating the second one is the whole point of it being there.
   const label = activeVersion?.name ?? "Default"
 
-  async function run(action: () => Promise<unknown>) {
-    setBusy(true)
-    setError(null)
-    try {
-      await action()
-      onChanged()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function submitNew() {
+  function submitNew() {
     const name = newName.trim()
-    if (!name) return
-    setBusy(true)
-    setError(null)
-    try {
-      const made = await createVersion(bookKey, name)
-      // A new version is created not-main; opening it immediately is what the user meant
-      // by making one, so switch as part of the same action.
-      await setMainVersion(made.docId)
-      setCreating(false)
-      setNewName("")
-      onChanged()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create the course")
-    } finally {
-      setBusy(false)
-    }
+    if (name) create.fire(name)
   }
 
   return (
     <>
       <DropdownMenu onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>
         <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-xs"
-            disabled={busy}
-          >
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Layers className="h-3.5 w-3.5" />
-            )}
+          <Button type="button" variant="ghost" size="sm" className="h-8 px-2" disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : <Layers />}
             {label}
-            {versions.length > 1 && (
-              <span className="tabular-nums text-muted-foreground/70">· {versions.length}</span>
-            )}
+            {versions.length > 1 && <span className="tabular-nums text-muted-foreground">· {versions.length}</span>}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
@@ -127,19 +111,21 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
               className="gap-2"
               onSelect={(e) => {
                 e.preventDefault()
-                if (!v.isMain) void run(() => setMainVersion(v.docId))
+                if (!v.isMain) act.fire({ kind: "switch", docId: v.docId })
               }}
             >
               <Check
                 className={`h-3.5 w-3.5 shrink-0 ${v.isMain ? "opacity-100" : "opacity-0"}`}
               />
               <span className="min-w-0 flex-1 truncate">{v.name}</span>
-              <span className="shrink-0 tabular-nums text-xs text-muted-foreground/70">
+              <span className="shrink-0 tabular-nums text-meta text-muted-foreground">
                 {v.blockCount}
               </span>
               {v.origin === "custom" && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   aria-label={
                     pendingDelete === v.docId
                       ? `Confirm deleting ${v.name}`
@@ -150,10 +136,10 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
                       ? "Click again to delete this course — its outline and its progress go with it"
                       : `Delete ${v.name}`
                   }
-                  className={`shrink-0 rounded p-0.5 ${
+                  className={`h-6 w-6 shrink-0 ${
                     pendingDelete === v.docId
-                      ? "bg-destructive/15 text-destructive"
-                      : "text-muted-foreground/60 hover:text-destructive"
+                      ? "bg-destructive/15 text-ink-danger"
+                      : "text-muted-foreground hover:text-ink-danger"
                   }`}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -167,11 +153,11 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
                       return
                     }
                     setPendingDelete(null)
-                    void run(() => deleteVersion(v.docId))
+                    act.fire({ kind: "delete", docId: v.docId })
                   }}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                  <Trash2 />
+                </Button>
               )}
             </DropdownMenuItem>
           ))}
@@ -181,7 +167,7 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
             onSelect={(e) => {
               e.preventDefault()
               setNewName("")
-              setError(null)
+              create.reset()
               setCreating(true)
             }}
           >
@@ -190,8 +176,8 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
           </DropdownMenuItem>
           {/* Switch/delete keep the menu open (onSelect preventDefault), so a failure has
               somewhere to be seen instead of vanishing silently. */}
-          {error && !creating && (
-            <p className="px-2 pb-1 pt-0.5 text-xs text-destructive">{error}</p>
+          {act.error && (
+            <ErrorNotice compact title="Not changed" error={act.error} className="px-2 pb-1 pt-0.5" />
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -214,17 +200,17 @@ export function VersionMenu({ bookKey, versions, activeVersion, onChanged }: Ver
               placeholder="Core ideas"
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void submitNew()
+                if (e.key === "Enter") submitNew()
               }}
             />
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {create.error && <ErrorNotice compact title="Not created" error={create.error} />}
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setCreating(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="button" onClick={() => void submitNew()} disabled={busy || !newName.trim()}>
-              {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            <Button type="button" onClick={submitNew} disabled={busy || !newName.trim()}>
+              {create.pending && <Loader2 className="animate-spin" />}
               Create
             </Button>
           </DialogFooter>
