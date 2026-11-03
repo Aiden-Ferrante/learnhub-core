@@ -1,9 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { CheckCircle, AlertCircle, Loader2, Trash2, FileText, Download, Info, Pencil } from "lucide-react"
-import { useDocuments } from "@/surfaces/processing/document-context"
-import { useShiftSelect } from "@/surfaces/processing/use-shift-select"
+/** The documents table on /upload: every card in the library with select (shift-click
+ *  ranges), rename, download and delete. The list comes from the DocumentProvider, so it
+ *  renders through AsyncView with the provider's load state: loading, "Couldn't load your
+ *  library · Retry", empty, or the rows. */
+
+import { useMemo, useState } from "react"
+import { FileText, Trash2 } from "lucide-react"
+import { Button } from "@/kit/ui/button"
+import { EmptyState } from "@/kit/patterns/empty-state"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,350 +19,182 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/kit/ui/alert-dialog"
-import { deleteLearnDocument, fetchLearnDeletion } from "@/gateways/api/pipeline"
-import { downloadDocument } from "@/kit/lib/utils"
-import { toast } from "@/kit/hooks/use-toast"
+import { AsyncView, ErrorNotice, type ApiQuery } from "@/kit/data"
+import { useDocuments, type Document } from "@/surfaces/processing/document-context"
+import { DocumentRow } from "@/surfaces/processing/document-row"
+import { useDeleteDocuments } from "@/surfaces/processing/use-delete-documents"
+import { useShiftSelect } from "@/surfaces/processing/use-shift-select"
+
+type DeleteTarget = { type: "single"; docId: string; docName: string } | { type: "multiple" }
+
+/** The provider's load state in the shape AsyncView reads. */
+function useDocumentsQuery(): ApiQuery<Document[]> {
+  const { documents, isInitialized, error, retry } = useDocuments()
+  return useMemo(
+    () => ({
+      data: isInitialized && !error ? documents : undefined,
+      status: error ? "error" : isInitialized ? "success" : "loading",
+      refreshing: false,
+      error,
+      retry,
+    }),
+    [documents, isInitialized, error, retry],
+  )
+}
 
 export function DocumentsTable() {
-  const { documents, deleteDocuments, renameDocument } = useDocuments()
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState("")
+  const q = useDocumentsQuery()
+  // Loading, error and empty sit padded inside the card; the table runs edge to edge.
+  return (
+    <div className={q.data?.length ? undefined : "p-4"}>
+      <AsyncView
+        q={q}
+        errorTitle="Couldn't load your library"
+        isEmpty={(d) => d.length === 0}
+        empty={
+          <EmptyState
+            icon={<FileText />}
+            title="No documents uploaded yet"
+            description="Upload a PDF or Markdown file (.pdf converts automatically, .md imports as is). Learn Hub builds a course from it."
+          />
+        }
+      >
+        {(documents) => <Table documents={documents} />}
+      </AsyncView>
+    </div>
+  )
+}
 
-  // Delete confirmation dialog state
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'single' | 'multiple', docId?: string, docName?: string } | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
-
-  // Use shift-select hook for document selection
-  const {
-    selectedItems: selectedDocuments,
-    setSelectedItems: setSelectedDocuments,
-    handleItemClick,
-    handleSelectAll,
-    isSelected
-  } = useShiftSelect({
+function Table({ documents }: { documents: Document[] }) {
+  const { renameDocument } = useDocuments()
+  const [target, setTarget] = useState<DeleteTarget | null>(null)
+  const { selectedItems, setSelectedItems, handleItemClick, handleSelectAll, isSelected } = useShiftSelect({
     items: documents,
     getItemId: (doc) => doc.id,
-    canSelect: () => true, // All documents can be selected in this table
-    onSelectionChange: (selectedIds) => {
-      // Optional: handle selection change if needed
-    }
+  })
+  const remove = useDeleteDocuments((outcome) => {
+    // Deleted cards leave the selection; failed ones stay selected, ready to try again.
+    setSelectedItems(selectedItems.filter((id) => !outcome.deleted.includes(id)))
+    setTarget(null)
   })
 
-  const handleDeleteSelected = () => {
-    if (selectedDocuments.length === 0) return
-    setDeleteTarget({ type: 'multiple' })
-    setShowDeleteDialog(true)
+  const idsFor = (t: DeleteTarget) => (t.type === "multiple" ? selectedItems : [t.docId])
+  const confirm = () => {
+    if (!target || remove.pending) return
+    const ids = idsFor(target)
+    if (ids.length > 0) remove.fire(ids)
   }
-  
-  // Delete the BOOK, then drop the card — never the other way round, and never the card
-  // alone. This used to be a one-line array filter that toasted success: the row vanished,
-  // the book stayed on disk with all its rows, and nothing anywhere said so. The shelf
-  // (course-shelf.tsx) has always done it correctly; this surface never adopted the pattern
-  // (finding B1).
-  //
-  // A card whose document is already gone still prunes: the backend answers 200 with
-  // `alreadyGone` rather than 404 (v0.17.0), which is what makes an orphan card deletable
-  // instead of stuck forever.
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget || deleteBusy) return
-    const ids = deleteTarget.type === 'multiple'
-      ? selectedDocuments
-      : deleteTarget.docId ? [deleteTarget.docId] : []
-    if (ids.length === 0) return
-
-    setDeleteBusy(true)
-    const deleted: string[] = []
-    const failed: string[] = []
-    for (const id of ids) {
-      const learnDocId = documents.find((d) => d.id === id)?.learnDocId
-      if (!learnDocId) { deleted.push(id); continue }   // never reached the backend at all
-      try {
-        // Read the impact, then delete with its token — the backend refuses otherwise.
-        const impact = await fetchLearnDeletion(learnDocId)
-        if (impact.error || !impact.token) throw new Error(impact.error || 'no deletion token')
-        const res = await deleteLearnDocument(learnDocId, impact.token)
-        if (res.error) throw new Error(res.error)
-        deleted.push(id)
-      } catch {
-        failed.push(id)
-      }
-    }
-
-    // Only the ones that actually went. A card left behind is the honest outcome for a
-    // delete that failed — it is the thing you point at to try again.
-    if (deleted.length > 0) deleteDocuments(deleted)
-    if (deleteTarget.type === 'multiple') setSelectedDocuments(failed)
-
-    if (failed.length === 0) {
-      toast({
-        title: deleted.length === 1 ? "Document deleted" : "Documents deleted",
-        description: deleteTarget.type === 'single'
-          ? `"${deleteTarget.docName}" has been deleted.`
-          : `Deleted ${deleted.length} document(s).`,
-        duration: 3000,
-      })
-    } else {
-      toast({
-        title: "Delete failed",
-        variant: "destructive",
-        description: deleted.length > 0
-          ? `Deleted ${deleted.length}, but ${failed.length} could not be removed and are still selected.`
-          : `Could not delete ${failed.length} document(s). Nothing was removed.`,
-        duration: 6000,
-      })
-    }
-
-    setDeleteBusy(false)
-    setShowDeleteDialog(false)
-    setDeleteTarget(null)
-  }
-  
-  const startRename = (id: string, name: string) => {
-    setEditingId(id)
-    setEditingName(name)
-  }
-
-  const commitRename = () => {
-    if (editingId) renameDocument(editingId, editingName)
-    setEditingId(null)
-    setEditingName("")
-  }
-
-  const cancelRename = () => {
-    setEditingId(null)
-    setEditingName("")
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "New":
-        return <span className="h-1.5 w-1.5 rounded-full bg-status-ready mr-2"></span>
-      case "Converting":
-        return <Loader2 className="h-3.5 w-3.5 text-status-building mr-2 animate-spin" />
-      case "Processed":
-        return <CheckCircle className="h-3.5 w-3.5 text-status-mastered mr-2" />
-      case "Error":
-        return <AlertCircle className="h-3.5 w-3.5 text-destructive mr-2" />
-      default:
-        return <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 mr-2"></span>
-    }
-  }
+  const lastFailure = remove.error ?? remove.data?.lastError ?? null
 
   return (
-    <div className="relative">
-      <div className="flex justify-between items-center p-6 bg-muted/10 border-b border-border/20">
-        <div className="flex items-center">
-          <div className="relative flex items-center">
-            <input
-              type="checkbox"
-              className="rounded border-border selection-accent mr-4 h-4 w-4"
-              checked={selectedDocuments.length === documents.length && documents.length > 0}
-              onChange={handleSelectAll}
-              disabled={documents.length === 0}
-            />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">
-                {selectedDocuments.length > 0 ? (
-                  <span className="text-brand">{selectedDocuments.length} selected</span>
-                ) : (
-                  <span className="text-foreground">Select all documents</span>
-                )}
-              </span>
-              {documents.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {documents.length} total document{documents.length !== 1 ? 's' : ''}
-                </span>
+    <div>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <label className="flex items-center gap-4">
+          <input
+            type="checkbox"
+            className="selection-accent h-4 w-4 rounded border-border"
+            checked={selectedItems.length === documents.length}
+            onChange={handleSelectAll}
+          />
+          <span className="flex flex-col">
+            <span className="text-meta font-medium">
+              {selectedItems.length > 0 ? (
+                <span className="text-ink-accent">{selectedItems.length} selected</span>
+              ) : (
+                "Select all documents"
               )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {selectedDocuments.length > 0 && (
-            <button 
-              onClick={handleDeleteSelected} 
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Delete Selected ({selectedDocuments.length})</span>
-            </button>
-          )}
-        </div>
+            </span>
+            <span className="text-micro text-muted-foreground">
+              {documents.length} total document{documents.length !== 1 ? "s" : ""}
+            </span>
+          </span>
+        </label>
+        {selectedItems.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 text-ink-danger"
+            onClick={() => setTarget({ type: "multiple" })}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete selected ({selectedItems.length})
+          </Button>
+        )}
       </div>
+      {lastFailure && (
+        <ErrorNotice
+          compact
+          className="border-b px-4 py-2"
+          title="Not deleted"
+          error={lastFailure}
+          onRetry={() => remove.data?.failed.length && remove.fire(remove.data.failed)}
+        />
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/20 bg-muted/5">
-              <th className="w-12 pl-6 py-3"></th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-left py-3">Name</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-left py-3">Status</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-right py-3 pr-4">Size (KB)</th>
-              <th className="text-xs font-semibold text-muted-foreground uppercase tracking-th text-center py-3 pr-6">Actions</th>
+            <tr className="border-b">
+              <th className="w-12 py-3 pl-4" />
+              <th className="py-3 text-left text-micro font-semibold uppercase tracking-th text-muted-foreground">Name</th>
+              <th className="py-3 text-left text-micro font-semibold uppercase tracking-th text-muted-foreground">Status</th>
+              <th className="py-3 pr-4 text-right text-micro font-semibold uppercase tracking-th text-muted-foreground">
+                Size (KB)
+              </th>
+              <th className="py-3 pr-4 text-center text-micro font-semibold uppercase tracking-th text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
-        <tbody>
-          {documents.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="py-16">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-6 border-2 border-dashed border-brand/20">
-                    <FileText className="h-12 w-12 text-brand" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-3">No documents uploaded yet</h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-md leading-relaxed">
-                    Get started by uploading a PDF (or markdown/text) — Learn Hub builds a course from it
-                  </p>
-                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full border border-border/30">
-                    <Info className="h-4 w-4" />
-                    <span>Supported: .md, .csv, .txt, .json, .pdf (auto-convert)</span>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          ) : (
-            documents.map((doc) => (
-               <tr key={doc.id} className={`transition-all duration-200 hover:bg-brand/5 cursor-pointer group border-b border-border/10 last:border-b-0 ${isSelected(doc.id) ? 'bg-brand/8 border-l-4 border-l-brand' : 'hover:border-l-4 hover:border-l-brand/40'}`}
-                   onClick={(e) => handleItemClick(doc, e)}>
-                <td className="pl-6 py-4" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    className="rounded border-border selection-accent h-4 w-4"
-                    checked={isSelected(doc.id)}
-                    onChange={() => handleItemClick(doc)}
-                  />
-                </td>
-                 <td className="py-4" onClick={editingId === doc.id ? (e) => e.stopPropagation() : undefined}>
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-brand flex-shrink-0" />
-                    {editingId === doc.id ? (
-                      <input
-                        type="text"
-                        autoFocus
-                        value={editingName}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={commitRename}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault()
-                            commitRename()
-                          } else if (e.key === "Escape") {
-                            e.preventDefault()
-                            cancelRename()
-                          }
-                        }}
-                        className="min-w-0 flex-1 max-w-[220px] rounded border border-input bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium text-foreground truncate max-w-[200px]" title={doc.name}>{doc.name}</span>
-                    )}
-                  </div>
-                </td>
-                <td className="py-4">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(doc.status)}
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      doc.status === 'Processed' ? 'bg-status-mastered/10 text-status-mastered' :
-                      doc.status === 'Converting' ? 'bg-status-building/10 text-status-building' :
-                      doc.status === 'Error' ? 'bg-destructive/10 text-destructive' :
-                      'bg-status-ready/10 text-status-ready'
-                    }`}>{doc.status}</span>
-                  </div>
-                </td>
-                <td className="py-4 text-right pr-4">
-                  <span className="text-xs font-mono bg-muted/50 px-2 py-1 rounded">{doc.size}</span>
-                </td>
-                <td className="py-4 pr-6">
-                  <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        startRename(doc.id, doc.name)
-                      }}
-                      className="p-2 text-muted-foreground hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
-                      aria-label={`Rename ${doc.name}`}
-                      title="Rename document"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        try {
-                          downloadDocument(doc.file, doc.name)
-                          toast({
-                            title: "Download Started",
-                            description: `"${doc.name}" is being downloaded.`,
-                            duration: 3000,
-                          })
-                        } catch (error) {
-                          console.error('Download failed:', error)
-                          toast({
-                            title: "Download Failed",
-                            description: `Failed to download "${doc.name}". Please try again.`,
-                            variant: "destructive",
-                            duration: 5000,
-                          })
-                        }
-                      }}
-                      className="p-2 text-muted-foreground hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
-                      aria-label={`Download ${doc.name}`}
-                      title="Download document"
-                    >
-                      <Download className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteTarget({ type: 'single', docId: doc.id, docName: doc.name })
-                        setShowDeleteDialog(true)
-                      }}
-                      className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                      aria-label={`Delete ${doc.name}`}
-                      title="Delete document"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
+          <tbody>
+            {documents.map((doc) => (
+              <DocumentRow
+                key={doc.id}
+                doc={doc}
+                selected={isSelected(doc.id)}
+                onSelect={(e) => handleItemClick(doc, e)}
+                onRename={(name) => renameDocument(doc.id, name)}
+                onDelete={() => setTarget({ type: "single", docId: doc.id, docName: doc.name })}
+              />
+            ))}
+          </tbody>
         </table>
       </div>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+
+      <AlertDialog open={target !== null} onOpenChange={(open) => !open && !remove.pending && setTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" />
-              Delete {deleteTarget?.type === 'multiple' ? 'Documents' : 'Document'}
+              <Trash2 className="h-5 w-5 text-ink-danger" />
+              Delete {target?.type === "multiple" ? "documents" : "document"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget?.type === 'multiple' ? (
+              {target?.type === "multiple" ? (
                 <>
-                  Are you sure you want to delete <strong>{selectedDocuments.length}</strong> selected document{selectedDocuments.length !== 1 ? 's' : ''}? 
-                  This action cannot be undone.
+                  Are you sure you want to delete <strong>{selectedItems.length}</strong> selected document
+                  {selectedItems.length !== 1 ? "s" : ""}? This action cannot be undone.
                 </>
               ) : (
                 <>
-                  Are you sure you want to delete <strong>"{deleteTarget?.docName}"</strong>? 
-                  This action cannot be undone.
+                  Are you sure you want to delete <strong>&ldquo;{target?.docName}&rdquo;</strong>? This action cannot
+                  be undone.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete}
+            <AlertDialogCancel disabled={remove.pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={remove.pending}
+              onClick={(e) => {
+                // Keep the dialog open until the delete settles.
+                e.preventDefault()
+                confirm()
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {remove.pending ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -365,4 +202,3 @@ export function DocumentsTable() {
     </div>
   )
 }
-

@@ -1,13 +1,15 @@
 "use client"
 
+import type React from "react"
 import { MeterBar } from "@/kit/patterns/meter-bar"
-import { useCallback, useEffect, useState } from "react"
 import { Cpu, ListChecks, Loader2, MemoryStick, Pause, Play, X } from "lucide-react"
 import { Button } from "@/kit/ui/button"
+import { SectionCard } from "@/kit/patterns/section-card"
 import { cancelChapterBuild, type BuildKind } from "@/gateways/api/pipeline"
-import { fetchSystemStatus, setQueuePaused, type SystemStatus } from "@/gateways/api/system"
+import { fetchSystemStatus, setQueuePaused, type RunningJobInfo, type SystemStatus } from "@/gateways/api/system"
+import { Skeleton } from "@/kit/ui/skeleton"
 import { cn } from "@/kit/lib/utils"
-import { usePolling } from "@/kit/hooks/use-polling"
+import { AsyncView, ErrorNotice, qk, roots, useApi, useApiMutation } from "@/kit/data"
 
 // Every kind the conductor can run. A kind missing from this map rendered as a blank
 // label on the running strip — which is how an audiobook job could occupy the machine
@@ -45,48 +47,63 @@ function etaLabel(startedAt?: number | null, done?: number, total?: number): str
   return m >= 90 ? `~${(m / 60).toFixed(1)} h left` : `~${m} min left`
 }
 
+/** What a queue write changes: this strip, and the build lists that show queue state. */
+const QUEUE_INVALIDATES = [roots.system, roots.jobs]
+
 /** The machine strip: what Ollama has loaded, unified-memory pressure, queue state,
- *  and the one running job with live progress + ETA. Read-only except pause/cancel. */
+ *  and the one running job with live progress + ETA. Read-only except pause/cancel.
+ *  Polls every 5 s. */
 export function MachineStrip() {
-  const [status, setStatus] = useState<SystemStatus | null>(null)
-  const [busy, setBusy] = useState(false)
+  const q = useApi(qk.system(), (signal) => fetchSystemStatus(signal), { poll: 5000 })
+  const pause = useApiMutation((paused: boolean) => setQueuePaused(paused), { invalidates: QUEUE_INVALIDATES })
+  const cancel = useApiMutation((r: RunningJobInfo) => cancelChapterBuild(r.docId, r.scope, r.kind), {
+    invalidates: QUEUE_INVALIDATES,
+  })
 
-  const load = useCallback(async () => {
-    try {
-      const s = await fetchSystemStatus()
-      if (!s.error) setStatus(s)
-    } catch {
-      // transient — the poll retries
-    }
-  }, [])
+  return (
+    <AsyncView
+      q={q}
+      error="inline"
+      errorTitle="Couldn't read the machine status"
+      skeleton={<Skeleton className="h-10 w-full" />}
+    >
+      {(status) => (
+        <StripView
+          status={status}
+          busy={pause.pending || cancel.pending}
+          onTogglePause={() => pause.fire(!status.queue.paused)}
+          onCancelRunning={() => status.queue.running && cancel.fire(status.queue.running)}
+          failure={
+            pause.error ? (
+              <ErrorNotice compact title="Queue not changed" error={pause.error} onRetry={() => pause.fire(!status.queue.paused)} />
+            ) : cancel.error ? (
+              <ErrorNotice
+                compact
+                title="Not cancelled"
+                error={cancel.error}
+                onRetry={() => status.queue.running && cancel.fire(status.queue.running)}
+              />
+            ) : null
+          }
+        />
+      )}
+    </AsyncView>
+  )
+}
 
-  usePolling(load, 5000, { leading: true })
-
-  const togglePause = async () => {
-    if (!status) return
-    setBusy(true)
-    try {
-      await setQueuePaused(!status.queue.paused)
-      await load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const cancelRunning = async () => {
-    const r = status?.queue.running
-    if (!r) return
-    setBusy(true)
-    try {
-      await cancelChapterBuild(r.docId, r.scope, r.kind)
-      await load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (!status) return null
-
+function StripView({
+  status,
+  busy,
+  onTogglePause,
+  onCancelRunning,
+  failure,
+}: {
+  status: SystemStatus
+  busy: boolean
+  onTogglePause: () => void
+  onCancelRunning: () => void
+  failure: React.ReactNode
+}) {
   const model = status.ollama.models[0]
   const mem = status.memory
   const memPct = mem ? Math.min(100, Math.round((mem.usedBytes / mem.totalBytes) * 100)) : 0
@@ -95,14 +112,14 @@ export function MachineStrip() {
   const warm = warmLeft(model?.expiresAt)
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-2 text-xs text-muted-foreground">
+    <SectionCard bodyClassName="p-0">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-2 text-micro text-muted-foreground">
         <span className="flex items-center gap-1.5" title="Model resident in Ollama right now">
           <Cpu className="h-3.5 w-3.5" />
           {status.ollama.ok ? (
             model ? (
               <>
-                <span className="text-foreground/90">{model.name}</span>
+                <span className="text-foreground">{model.name}</span>
                 {model.sizeVram ? <span>· {gb(model.sizeVram)} GB</span> : null}
                 {warm ? <span>· warm {warm}</span> : null}
               </>
@@ -110,7 +127,7 @@ export function MachineStrip() {
               "no model loaded"
             )
           ) : (
-            <span className="text-destructive">Ollama unreachable</span>
+            <span className="text-ink-danger">Ollama unreachable</span>
           )}
         </span>
 
@@ -147,8 +164,8 @@ export function MachineStrip() {
           type="button"
           variant={status.queue.paused ? "outline" : "ghost"}
           size="sm"
-          className={cn("ml-auto h-7 gap-1.5 px-2 text-xs", status.queue.paused && "text-status-due")}
-          onClick={togglePause}
+          className={cn("ml-auto h-7 gap-1.5 px-2 text-micro", status.queue.paused && "text-ink-warn")}
+          onClick={onTogglePause}
           disabled={busy}
           title={
             status.queue.paused
@@ -163,13 +180,13 @@ export function MachineStrip() {
 
       {running && (
         <div className="flex items-center gap-3 border-t px-3 py-2">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-ink-accent" />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <div className="flex flex-wrap items-baseline gap-x-2 text-meta">
               <span className="font-medium">
                 {KIND_LABEL[running.kind] ?? running.kind} · {running.chapterTitle ?? running.scope}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-micro text-muted-foreground">
                 {running.docTitle}
                 {running.phase && running.total
                   ? ` · ${running.phase} ${running.done}/${running.total}`
@@ -185,16 +202,16 @@ export function MachineStrip() {
               />
             )}
           </div>
-          {eta && <span className="shrink-0 text-xs text-muted-foreground">{eta}</span>}
+          {eta && <span className="shrink-0 text-micro text-muted-foreground">{eta}</span>}
           {running.cancelRequested ? (
-            <span className="shrink-0 text-xs text-muted-foreground">stopping after this section…</span>
+            <span className="shrink-0 text-micro text-muted-foreground">stopping after this section…</span>
           ) : (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
-              onClick={cancelRunning}
+              className="h-7 shrink-0 gap-1 px-2 text-micro text-muted-foreground hover:text-ink-danger"
+              onClick={onCancelRunning}
               disabled={busy}
               title="Stop after the current section — completed sections are kept"
             >
@@ -204,6 +221,7 @@ export function MachineStrip() {
           )}
         </div>
       )}
-    </div>
+      {failure && <div className="border-t px-3 py-2">{failure}</div>}
+    </SectionCard>
   )
 }
