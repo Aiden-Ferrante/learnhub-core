@@ -118,13 +118,15 @@ export type ApiMutation<V, R> = {
 /** A write. On success it invalidates `invalidates`, then calls `onSuccess`. Never
  *  advance UI before success: render `error` as "Not saved · Retry" instead.
  *
+ *  A write with no arguments infers `V = void`, so it is fired as `fire()`.
+ *
  *  @example
  *  const grade = useApiMutation(
  *    (v: { key: string; g: ReviewGrade }) => submitReviewGrade(v.key, v.g, docId),
  *    { invalidates: GRADE_INVALIDATES, onSuccess: () => next() },
  *  )
  */
-export function useApiMutation<V, R>(
+export function useApiMutation<V = void, R = unknown>(
   fn: (vars: V) => Promise<R>,
   opts: UseApiMutationOptions<V, R> = {},
 ): ApiMutation<V, R> {

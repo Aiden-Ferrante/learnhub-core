@@ -3,13 +3,12 @@
 import { useState } from "react"
 import { History, Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/kit/ui/button"
-import { AsyncView, ErrorNotice, roots, useApiMutation, type ApiQuery } from "@/kit/data"
+import { AsyncView, ErrorNotice, roots, useApiMutation, type ApiQuery, unwrap } from "@/kit/data"
 import { Sheet } from "@/kit/study"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { deleteManualSession, type SessionsResponse, type WorkingSession } from "@/gateways/api/planner"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { cn } from "@/kit/lib/utils"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 // The wash carries the session kind; the word stays foreground (fills never colour words).
 const KIND_BADGES: Record<string, string> = {

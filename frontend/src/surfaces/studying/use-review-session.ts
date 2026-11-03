@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { GRADE_INVALIDATES, qk, useApi, useApiMutation } from "@/kit/data"
+import { GRADE_INVALIDATES, qk, useApi, useApiMutation, unwrap } from "@/kit/data"
 import {
   fetchCourseReviewQueue,
   fetchReviewQueue,
@@ -10,7 +10,6 @@ import {
   type ReviewGrade,
   type ReviewQueueResponse,
 } from "@/gateways/api/review"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 /** The scope that asks for the whole-course queue (backend build_review_queue). */
 export const COURSE_SCOPE = "course"

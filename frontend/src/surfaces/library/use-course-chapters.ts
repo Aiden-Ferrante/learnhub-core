@@ -2,8 +2,7 @@
 
 import { useMemo } from "react"
 import { fetchCourseChapters, type CourseChapter } from "@/gateways/api/chapter"
-import { qk, useApi } from "@/kit/data"
-import { orThrow } from "@/surfaces/library/envelope"
+import { qk, useApi, orThrow } from "@/kit/data"
 
 /** THE chapter list for a course — the canonical /api/chapters derivation, the same one the
  *  dashboard tree and the Today plan use, so no reading surface can disagree with them.

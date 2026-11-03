@@ -6,9 +6,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { ApiError } from "@/gateways/api/http"
 import { deleteLearnDocument, fetchLearnDeletion } from "@/gateways/api/pipeline"
 import { fetchVersions } from "@/gateways/api/versions"
-import { ErrorNotice, qk, roots, useApi, useApiMutation } from "@/kit/data"
+import { ErrorNotice, qk, roots, useApi, useApiMutation, orThrow } from "@/kit/data"
 import type { Course } from "@/surfaces/library/courses"
-import { orThrow } from "@/surfaces/library/envelope"
 import { useDocuments } from "@/surfaces/processing"
 
 /** Delete one course: cascade the learn-service content (sections, concepts, reviews,

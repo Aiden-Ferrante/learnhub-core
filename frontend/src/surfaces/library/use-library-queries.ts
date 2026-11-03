@@ -6,8 +6,7 @@
 import { fetchStudyDebt } from "@/gateways/api/progress"
 import { fetchPacks, fetchToday } from "@/gateways/api/packs"
 import { fetchReadingPositions } from "@/gateways/api/user-settings"
-import { qk, useApi } from "@/kit/data"
-import { orThrow } from "@/surfaces/library/envelope"
+import { qk, useApi, orThrow } from "@/kit/data"
 
 /** Whole-library due rollup (the same read as the nav's Plan badge). */
 export function useStudyDebt() {

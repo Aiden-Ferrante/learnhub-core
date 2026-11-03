@@ -8,8 +8,7 @@ import { useMemo, useState } from "react"
 import { getExtractionStatus, startExtraction } from "@/gateways/api/pipeline"
 import { fetchConceptMastery } from "@/gateways/api/progress"
 import { submitReviewGrade } from "@/gateways/api/review"
-import { GRADE_INVALIDATES, qk, useApi, useApiMutation } from "@/kit/data"
-import { orThrow } from "@/surfaces/library/envelope"
+import { GRADE_INVALIDATES, qk, useApi, useApiMutation, orThrow } from "@/kit/data"
 
 export type ExtractState = "running" | "done" | "error"
 
@@ -94,6 +93,6 @@ export function useExtraction(scope: string, docId: string | null | undefined) {
     /** A failed status check while the poll keeps going; shown on the control's title. */
     statusError: started ? status.error : null,
     error: start.error,
-    run: () => start.fire(undefined),
+    run: () => start.fire(),
   }
 }

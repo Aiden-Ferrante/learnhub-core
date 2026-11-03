@@ -114,11 +114,11 @@ export function PackForm({ courseTitle, docId, tree, onOpen }: {
         <textarea className="study-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
 
-      {create.error && <ErrorNotice compact title="Couldn't start the build" error={create.error} onRetry={() => create.fire(undefined)} />}
+      {create.error && <ErrorNotice compact title="Couldn't start the build" error={create.error} onRetry={() => create.fire()} />}
       {preset.error && <ErrorNotice compact title="Preset not saved" error={preset.error} onRetry={() => preset.fire(format)} />}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={create.pending || picked.length === 0} onClick={() => create.fire(undefined)}>
+        <Button disabled={create.pending || picked.length === 0} onClick={() => create.fire()}>
           {create.pending ? "Starting…" : `Build pack from ${picked.length} chapter${picked.length === 1 ? "" : "s"}`}
         </Button>
         <Button variant="outline" size="sm" disabled={preset.pending} onClick={() => preset.fire(format)}>

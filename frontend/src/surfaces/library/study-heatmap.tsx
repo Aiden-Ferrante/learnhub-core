@@ -3,10 +3,9 @@
 import { useMemo } from "react"
 import { Skeleton } from "@/kit/ui/skeleton"
 import { fetchActivity, type ActivityDay } from "@/gateways/api/progress"
-import { AsyncView, qk, useApi } from "@/kit/data"
+import { AsyncView, qk, useApi, orThrow } from "@/kit/data"
 import { cn } from "@/kit/lib/utils"
 import { Sheet } from "@/kit/study"
-import { orThrow } from "@/surfaces/library/envelope"
 
 const WEEKS = 53
 const DAY_MS = 86_400_000

@@ -3,11 +3,10 @@
 import { useState } from "react"
 import { Check, Eye, GripVertical, Sparkles, X } from "lucide-react"
 import { Button } from "@/kit/ui/button"
-import { GRADE_INVALIDATES, useApiMutation } from "@/kit/data"
+import { GRADE_INVALIDATES, useApiMutation, unwrap } from "@/kit/data"
 import { submitSkeletonReviewGrade, type ReviewGrade } from "@/gateways/api/review"
 import { GradeButtons } from "@/surfaces/studying/grade-buttons"
 import { shuffled, type PracticeItem } from "@/surfaces/studying/skeleton-items"
-import { unwrap } from "@/surfaces/studying/envelope"
 import { cn } from "@/kit/lib/utils"
 
 /** What a structural recall grade writes: the FSRS skeleton item for `scope`, with the

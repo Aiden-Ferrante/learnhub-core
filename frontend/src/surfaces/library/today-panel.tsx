@@ -10,7 +10,7 @@ import { AsyncView, ErrorNotice } from "@/kit/data"
 import { SkeletonRow } from "@/kit/patterns/skeletons"
 import { Sheet } from "@/kit/study"
 import type { Course } from "@/surfaces/library/courses"
-import { shortTitle } from "@/surfaces/library/envelope"
+import { shortTitle } from "@/surfaces/library/short-title"
 import { useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useNextStep } from "@/surfaces/library/use-next-step"
 

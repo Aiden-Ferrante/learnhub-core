@@ -16,6 +16,7 @@ export {
   type UseApiOptions,
   type UseApiMutationOptions,
 } from "@/kit/data/use-api"
+export { orThrow, unwrap } from "@/kit/data/envelope"
 export { AsyncView } from "@/kit/data/async-view"
 export { ErrorNotice, errorMessage } from "@/kit/data/error-notice"
 export { QueryProvider, makeQueryClient } from "@/kit/data/query-provider"

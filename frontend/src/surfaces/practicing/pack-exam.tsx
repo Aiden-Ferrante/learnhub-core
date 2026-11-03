@@ -55,9 +55,9 @@ function StartSheet({ pack, setSitKey, onChanged }: { pack: Pack; setSitKey: (k:
         <p className="text-sm text-muted-foreground">
           {fmt.count} questions · {fmt.minutes} minutes · {fmt.closedBook ? "closed book" : "open book"}. Only questions you haven&apos;t seen. Nothing is marked until you submit.
         </p>
-        {start.error && <ErrorNotice compact title="Couldn't start the paper" error={start.error} onRetry={() => start.fire(undefined)} />}
+        {start.error && <ErrorNotice compact title="Couldn't start the paper" error={start.error} onRetry={() => start.fire()} />}
         <div>
-          <Button disabled={start.pending || !pack.units.some((u) => u.status === "ready")} onClick={() => start.fire(undefined)}>
+          <Button disabled={start.pending || !pack.units.some((u) => u.status === "ready")} onClick={() => start.fire()}>
             {start.pending ? "Starting…" : "Start the clock"}
           </Button>
         </div>

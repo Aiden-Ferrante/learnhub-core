@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { GRADE_INVALIDATES, qk, roots, useApi, useApiMutation } from "@/kit/data"
+import { GRADE_INVALIDATES, qk, roots, useApi, useApiMutation, unwrap } from "@/kit/data"
 import { fetchSkeleton, gradeSkeleton, type SkeletonGrade } from "@/gateways/api/chapter"
 import { buildChapterWalk, findNodeBySectionKey, numberSections, numberedSectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
 import { submitSkeletonReviewGrade, type ReviewGrade } from "@/gateways/api/review"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 // Self-grade scale for each recall step (mirrors the backend GRADE_VALUE). Fill tokens on
 // the border, ink tokens on the word, same language as the review grade scale.

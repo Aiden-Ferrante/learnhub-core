@@ -7,9 +7,8 @@
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
 import { displaySectionTitle } from "@/gateways/api/outline"
 import { fetchCourseStatus } from "@/gateways/api/pipeline"
-import { qk, useApi } from "@/kit/data"
+import { qk, useApi, orThrow } from "@/kit/data"
 import type { Course } from "@/surfaces/library/courses"
-import { orThrow } from "@/surfaces/library/envelope"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 import { useNextStep } from "@/surfaces/library/use-next-step"
 

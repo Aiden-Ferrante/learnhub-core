@@ -2,11 +2,10 @@
 
 import { CheckCircle2, Circle, PartyPopper, Repeat } from "lucide-react"
 import { Button } from "@/kit/ui/button"
-import { AsyncView, ErrorNotice, qk, roots, useApi, useApiMutation } from "@/kit/data"
+import { AsyncView, ErrorNotice, qk, roots, useApi, useApiMutation, unwrap } from "@/kit/data"
 import { Note } from "@/kit/study"
 import { fetchChapterProgress, updateChapterStage } from "@/gateways/api/chapter"
 import type { LearnTreeNode } from "@/gateways/api/outline"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 type LockInPanelProps = {
   scope: string | null
@@ -75,11 +74,11 @@ export function LockInPanel({ scope, docId, onDone }: LockInPanelProps) {
               </Note>
             ) : (
               <div className="flex flex-col gap-2">
-                <Button type="button" disabled={lock.pending} onClick={() => lock.fire(undefined)}>
+                <Button type="button" disabled={lock.pending} onClick={() => lock.fire()}>
                   Mark chapter complete
                 </Button>
                 {lock.error && (
-                  <ErrorNotice compact title="Not saved" error={lock.error} onRetry={() => lock.fire(undefined)} />
+                  <ErrorNotice compact title="Not saved" error={lock.error} onRetry={() => lock.fire()} />
                 )}
               </div>
             )}

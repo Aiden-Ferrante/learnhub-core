@@ -6,9 +6,8 @@ import { Input } from "@/kit/ui/input"
 import { Label } from "@/kit/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/kit/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kit/ui/select"
-import { ErrorNotice, roots, useApiMutation } from "@/kit/data"
+import { ErrorNotice, roots, useApiMutation, unwrap } from "@/kit/data"
 import { saveManualSession, type ManualSessionInput, type WorkingSession } from "@/gateways/api/planner"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 // Local-time form helpers.
 const toLocalDate = (sec: number) => {

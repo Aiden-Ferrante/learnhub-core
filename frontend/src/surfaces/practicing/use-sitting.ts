@@ -88,7 +88,7 @@ export function useSitting(sit: Sitting, onFinished: (key: string) => void) {
     if (finish.pending) return
     flush()
     retryUnsaved()
-    finish.fire(undefined)
+    finish.fire()
   }
 
   return {

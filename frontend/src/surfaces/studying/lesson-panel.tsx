@@ -2,13 +2,12 @@
 
 import { useState } from "react"
 import { Button } from "@/kit/ui/button"
-import { AsyncView, ErrorNotice, GRADE_INVALIDATES, qk, useApi, useApiMutation } from "@/kit/data"
+import { AsyncView, ErrorNotice, GRADE_INVALIDATES, qk, useApi, useApiMutation, unwrap } from "@/kit/data"
 import { Sheet } from "@/kit/study"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { KIND_BADGE, ConceptMarkdown } from "@/surfaces/concepts"
 import { fetchSectionConcepts } from "@/gateways/api/concepts"
 import { submitReviewGrade } from "@/gateways/api/review"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 /** Guided walkthrough: step a section's concepts in order, read each, then self-check —
  *  "Got it" (grade Good) or "Needs review" (grade Again) feeds the spaced-repetition

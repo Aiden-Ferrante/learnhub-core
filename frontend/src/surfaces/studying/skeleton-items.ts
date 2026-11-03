@@ -1,11 +1,10 @@
 "use client"
 
 import { useMemo } from "react"
-import { qk, useApi, type ApiQuery } from "@/kit/data"
+import { qk, useApi, type ApiQuery, unwrap } from "@/kit/data"
 import { fetchSkeleton } from "@/gateways/api/chapter"
 import { fetchSectionConcepts } from "@/gateways/api/concepts"
 import type { LearnTreeNode } from "@/gateways/api/outline"
-import { unwrap } from "@/surfaces/studying/envelope"
 
 /** Reserved scope for "the whole book". Real section keys are always `toc:*`
  *  (build_tree_from_outline enforces it), so this can never collide with one. */
