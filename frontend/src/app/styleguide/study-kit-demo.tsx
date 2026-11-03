@@ -7,7 +7,7 @@ import { useState } from "react"
 import { Inbox } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { EmptyState } from "@/kit/patterns/empty-state"
-import { AnswerGrid, Choice, Clock, Note, Sheet, Stepper, StudyPage, Tabs, Track } from "@/kit/study"
+import { AnswerGrid, Choice, Clock, GradeButtons, Note, Sheet, Stepper, StudyPage, Tabs, Track } from "@/kit/study"
 import { AsyncView, ErrorNotice, type ApiQuery } from "@/kit/data"
 import { ApiError } from "@/gateways/api/http"
 
@@ -112,6 +112,13 @@ export function StudyKitDemo() {
               { key: "8", flagged: true },
             ]}
           />
+        </Sheet>
+
+        <Sheet title="GradeButtons" description="The one recall scale: grid with hotkeys, compact, and the Not saved line.">
+          <div className="flex flex-col gap-4">
+            <GradeButtons onGrade={noop} pending={false} error={null} />
+            <GradeButtons compact onGrade={noop} pending={false} error={new ApiError(503, "Service Unavailable")} onRetry={noop} />
+          </div>
         </Sheet>
 
         <Sheet title="kit/data" description="AsyncView renders one query four ways; ErrorNotice in block and compact form.">

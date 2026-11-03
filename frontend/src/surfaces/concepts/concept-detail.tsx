@@ -2,26 +2,17 @@
 
 import { useState } from "react"
 import { Button } from "@/kit/ui/button"
-import { ErrorNotice, GRADE_INVALIDATES, useApiMutation } from "@/kit/data"
-import { Sheet } from "@/kit/study"
+import { GRADE_INVALIDATES, useApiMutation } from "@/kit/data"
+import { GradeButtons, Sheet } from "@/kit/study"
 import { cn } from "@/kit/lib/utils"
 import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
 import { ConceptMasteryDot } from "@/surfaces/concepts/concept-mastery-dot"
 import { prettyScope } from "@/surfaces/concepts/concept-format"
 import { KIND_BADGE } from "@/surfaces/concepts/kind-palette"
 import { SectionFigures } from "@/surfaces/reading"
-import { GRADES } from "@/surfaces/studying"
 import type { ConceptMastery } from "@/gateways/api/progress"
 import type { ConceptLesson } from "@/gateways/api/concepts"
 import { submitReviewGrade, type ReviewGrade } from "@/gateways/api/review"
-
-/** Again / Hard / Good / Easy in tokens: fill on the border and wash, ink on the word. */
-const GRADE_TONE: Record<ReviewGrade, string> = {
-  1: "border-destructive/40 text-ink-danger hover:bg-destructive/10",
-  2: "border-status-due/40 text-ink-warn hover:bg-status-due/10",
-  3: "border-status-mastered/40 text-ink-ok hover:bg-status-mastered/10",
-  4: "border-brand/40 text-ink-accent hover:bg-brand/10",
-}
 
 const label = "text-micro font-medium uppercase tracking-label text-muted-foreground"
 
@@ -122,16 +113,13 @@ export function ConceptDetail({ concept: c, sectionTitle, docId, memory, onClose
               {days > 0 ? `Scheduled · next in ${days} day${days === 1 ? "" : "s"}` : "Recorded"}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {GRADES.map(({ grade: g, label: text }) => (
-                <Button key={g} variant="outline" className={GRADE_TONE[g]} disabled={grade.pending} onClick={() => send(g)}>
-                  {text}
-                </Button>
-              ))}
-            </div>
-          )}
-          {grade.error && (
-            <ErrorNotice compact title="Not saved" error={grade.error} onRetry={lastGrade ? () => send(lastGrade) : undefined} />
+            <GradeButtons
+              hints={false}
+              onGrade={send}
+              pending={grade.pending}
+              error={grade.error}
+              onRetry={lastGrade ? () => send(lastGrade) : undefined}
+            />
           )}
         </Sheet>
       )}

@@ -5,7 +5,7 @@ import { Check, Eye, GripVertical, Sparkles, X } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { GRADE_INVALIDATES, useApiMutation, unwrap } from "@/kit/data"
 import { submitSkeletonReviewGrade, type ReviewGrade } from "@/gateways/api/review"
-import { GradeButtons } from "@/surfaces/studying/grade-buttons"
+import { GradeButtons } from "@/kit/study"
 import { shuffled, type PracticeItem } from "@/surfaces/studying/skeleton-items"
 import { cn } from "@/kit/lib/utils"
 

@@ -1,10 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/kit/ui/button"
-import { ErrorNotice, qk, useApiMutation } from "@/kit/data"
-import { Choice, Note, Sheet } from "@/kit/study"
-import { GRADES } from "@/surfaces/studying"
+import { qk, useApiMutation } from "@/kit/data"
+import { Choice, GradeButtons, Note, Sheet } from "@/kit/study"
 import { markWritten, type SitAnswer, type SitQuestion } from "@/gateways/api/packs"
 import { Prose, Walk, cite } from "@/surfaces/practicing/pack-shared"
 import { packWrites } from "@/surfaces/practicing/use-pack"
@@ -59,16 +57,13 @@ export function ResultQuestion({ index, q, sittingKey, packKey, answer: a, verdi
             {q.rubric && <div className="mt-1 text-xs text-muted-foreground">{q.rubric}</div>}
           </Note>
           {a.selfGrade == null && !marked && (
-            <div className="flex flex-wrap gap-2">
-              {GRADES.map((g) => (
-                <Button key={g.grade} variant="outline" size="sm" disabled={mark.pending} onClick={() => send(g.grade)}>
-                  {g.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          {mark.error && (
-            <ErrorNotice compact title="Not saved" error={mark.error} onRetry={lastGrade == null ? undefined : () => send(lastGrade)} />
+            <GradeButtons
+              compact
+              onGrade={send}
+              pending={mark.pending}
+              error={mark.error}
+              onRetry={lastGrade == null ? undefined : () => send(lastGrade)}
+            />
           )}
         </div>
       )}
