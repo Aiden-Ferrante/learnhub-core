@@ -109,38 +109,3 @@ export async function fetchConceptMastery(docId?: string, signal?: AbortSignal):
   const res = await fetch(`/api/learn/concept-mastery${qs}`, { signal, cache: 'no-store' })
   return parseJsonResponse<ConceptMasteryResponse>(res)
 }
-
-// ----- Reading position ("continue reading"), kept in user_settings.readingProgress -----
-
-/** { [courseId]: sectionKey }, the per-course "continue reading" position. */
-export type ReadingProgressMap = Record<string, string>
-
-/** The reading-position map (qk.readingProgress()). A failed request throws (ApiError);
- *  a missing map is {}. */
-export async function fetchReadingProgressMap(signal?: AbortSignal): Promise<ReadingProgressMap> {
-  const res = await fetch('/api/user-settings', { signal, cache: 'no-store' })
-  const data = await parseJsonResponse<{ settings?: { readingProgress?: unknown } }>(res)
-  const progress = data?.settings?.readingProgress
-  return progress && typeof progress === 'object' ? (progress as ReadingProgressMap) : {}
-}
-
-/** Save one course's reading position. The PUT merges top-level keys only, so this
- *  read-merge-writes the whole map to avoid clobbering other courses. Throws on failure. */
-export async function saveReadingProgressEntry(
-  courseId: string,
-  sectionKey: string,
-  signal?: AbortSignal,
-): Promise<ReadingProgressMap> {
-  const current = await fetchReadingProgressMap(signal)
-  if (current[courseId] === sectionKey) return current
-  const next = { ...current, [courseId]: sectionKey }
-  const res = await fetch('/api/user-settings', {
-    signal,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ readingProgress: next }),
-  })
-  await parseJsonResponse<Record<string, unknown>>(res)
-  return next
-}
-

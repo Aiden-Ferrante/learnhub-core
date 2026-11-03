@@ -63,23 +63,6 @@ export type AudiobookTimeline = {
   error?: string
 }
 
-/** Chunk→playback-time map for read-along highlighting. Null when unavailable. */
-export async function fetchAudiobookTimeline(
-  scope: string | null,
-  doc: string | undefined,
-  signal?: AbortSignal,
-): Promise<AudiobookTimeline | null> {
-  try {
-    const params = audiobookParams(scope, doc)
-    const res = await fetch(`/api/learn/audiobook/timeline?${params}`, { signal, cache: 'no-store' })
-    if (!res.ok) return null
-    const data = await parseJsonResponse<AudiobookTimeline>(res)
-    return data.error || !data.chunks?.length ? null : data
-  } catch {
-    return null
-  }
-}
-
 /** URL for the generated MP3 — for the <audio> player (inline) or download (?download=1). */
 export function audiobookFileUrl(
   scope: string | null,
@@ -89,16 +72,6 @@ export function audiobookFileUrl(
   const params = audiobookParams(scope, doc)
   if (download) params.set('download', '1')
   return `/api/learn/audiobook/file?${params}`
-}
-
-export async function fetchAudiobookVoices(signal?: AbortSignal): Promise<string[]> {
-  try {
-    const res = await fetch('/api/learn/audiobook/voices', { signal, cache: 'no-store' })
-    const data = await parseJsonResponse<{ voices?: string[] }>(res)
-    return data.voices || []
-  } catch {
-    return []
-  }
 }
 
 /** The read-along timeline for `useApi`: null when this narration has no sync data (the

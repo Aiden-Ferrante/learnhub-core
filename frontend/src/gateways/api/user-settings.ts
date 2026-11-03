@@ -24,8 +24,8 @@ export async function saveUserSettings(patch: UserSettings, signal?: AbortSignal
   await parseJsonResponse<unknown>(res)
 }
 
-/** courseId → the sectionKey to continue reading at. Throws ApiError (unlike the reading
- *  surface's best-effort `fetchReadingProgress`). */
+/** courseId → the sectionKey to continue reading at (qk.readingProgress()). The one
+ *  reading-position client; a missing map is {}. Throws ApiError. */
 export async function fetchReadingPositions(signal?: AbortSignal): Promise<Record<string, string>> {
   const settings = await fetchUserSettings(signal)
   const progress = settings.readingProgress

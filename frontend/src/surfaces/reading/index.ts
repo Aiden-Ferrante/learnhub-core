@@ -1,7 +1,7 @@
 /** Reading — the book on screen: chapter reader, guided reading, PDF view, narration.
  *
  *  This file is the surface's HUB: the only legal import surface from outside.
- *  Owns the reading surfaces + prefs/theme, read-along sync, reading progress,
+ *  Owns the reading surfaces + prefs/theme, read-along sync,
  *  and the chapter learning-path rail. Embeds studying's panels (study drawer).
  *  Depends on: studying, concepts, library, gateways/, kit/. */
 
@@ -17,4 +17,3 @@ export { useReadingTheme, type ReadingTheme } from "@/surfaces/reading/use-readi
 export { useReadingPrefs, type ReadingPrefs } from "@/surfaces/reading/use-reading-prefs"
 export { SectionFigures } from "@/surfaces/reading/section-figures"
 export { useOutline, useChapterList, outlineEntries } from "@/surfaces/reading/use-reading-data"
-export { fetchReadingProgress, saveReadingPosition, type ReadingProgress } from "@/surfaces/reading/reading-progress"

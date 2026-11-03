@@ -17,7 +17,8 @@ import {
   type OutlineSection,
 } from "@/gateways/api/editing"
 import { fetchOutline, fetchTocTree } from "@/gateways/api/outline"
-import { qk, roots, useApi, useApiMutation } from "@/kit/data"
+import { useMemo } from "react"
+import { qk, roots, useApi, useApiMutation, type ApiQuery } from "@/kit/data"
 
 /** A reshaped outline moves chapters, their numbers and what is filed under them. */
 const OUTLINE_INVALIDATES = [
@@ -35,16 +36,23 @@ const BLOCKS_INVALIDATES = [roots.unplacedBlocks, roots.sectionMaterial, roots.s
 /** A text edit changes what the reader shows and marks its chapter's concepts stale. */
 const TEXT_INVALIDATES = [roots.sectionMaterial, roots.staleSections, roots.sectionContent, roots.documentMarkdown]
 
-/** The stored outline as the editor edits it: a flat list with depth. */
-export function useOutlineSections(docId: string) {
-  return useApi(qk.outline(docId), async (signal): Promise<OutlineSection[]> => {
-    const data = await fetchOutline(docId, signal)
-    return (data.outline ?? []).map((e) => ({
-      sectionKey: e.sectionKey ?? undefined,
-      title: e.title ?? "",
-      depth: e.listDepth ?? 0,
-    }))
-  })
+/** The stored outline as the editor edits it: a flat list with depth. It shares the raw
+ *  `qk.outline` entry with the readers and breadcrumbs (one query function per key, or the
+ *  cache would hand one caller another's shape), and reshapes it here. */
+export function useOutlineSections(docId: string): ApiQuery<OutlineSection[]> {
+  const q = useApi(qk.outline(docId), (signal) => fetchOutline(docId, signal))
+  const data = useMemo(
+    () =>
+      q.data
+        ? (q.data.outline ?? []).map((e) => ({
+            sectionKey: e.sectionKey ?? undefined,
+            title: e.title ?? "",
+            depth: e.listDepth ?? 0,
+          }))
+        : undefined,
+    [q.data],
+  )
+  return { ...q, data }
 }
 
 export function useTocTree(docId: string) {
