@@ -101,3 +101,25 @@ export async function fetchAudiobookVoices(signal?: AbortSignal): Promise<string
   }
 }
 
+/** The read-along timeline for `useApi`: null when this narration has no sync data (the
+ *  route answers 404, or an empty chunk list), and a failed request THROWS (ApiError)
+ *  instead of reading as "no timeline", so the panel can say so and offer Retry. */
+export async function requestAudiobookTimeline(
+  scope: string | null,
+  doc: string | undefined,
+  signal?: AbortSignal,
+): Promise<AudiobookTimeline | null> {
+  const params = audiobookParams(scope, doc)
+  const res = await fetch(`/api/learn/audiobook/timeline?${params}`, { signal, cache: 'no-store' })
+  if (res.status === 404) return null
+  const data = await parseJsonResponse<AudiobookTimeline>(res)
+  return data.error || !data.chunks?.length ? null : data
+}
+
+/** The narrator's voice list for `useApi`; a failed request throws (ApiError). */
+export async function requestAudiobookVoices(signal?: AbortSignal): Promise<string[]> {
+  const res = await fetch('/api/learn/audiobook/voices', { signal, cache: 'no-store' })
+  const data = await parseJsonResponse<{ voices?: string[] }>(res)
+  return data.voices || []
+}
+

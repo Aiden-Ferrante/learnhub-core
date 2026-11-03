@@ -1,5 +1,5 @@
 /** Document content: markdown, per-section text blocks, and extracted figures. */
-import { parseJsonResponse } from './http'
+import { ApiError, onUnauthorized, parseJsonResponse } from './http'
 import type { OutlineEntry } from './outline'
 
 export type DocumentMeta = {
@@ -75,5 +75,20 @@ export async function fetchSectionFigures(docId: string, sectionKey: string, sig
 
 export function figureUrl(docId: string, order: number): string {
   return `/api/learn/figure?doc=${encodeURIComponent(docId)}&n=${order}`
+}
+
+/** URL of a course's original PDF (the native viewer and the HEAD probe use the same one). */
+export function originalPdfUrl(docId: string): string {
+  return `/api/learn/pdf?doc=${encodeURIComponent(docId)}`
+}
+
+/** Whether a course has its original PDF: a HEAD on the PDF route. 404 = no PDF (a
+ *  markdown/txt ingest); any other failure throws an ApiError so the screen can offer Retry. */
+export async function fetchOriginalPdfAvailable(docId: string, signal?: AbortSignal): Promise<boolean> {
+  const res = await fetch(originalPdfUrl(docId), { signal, method: 'HEAD', cache: 'no-store' })
+  if (res.ok) return true
+  if (res.status === 404) return false
+  if (res.status === 401) onUnauthorized()
+  throw new ApiError(res.status, res.statusText || "Couldn't check for the original PDF")
 }
 
