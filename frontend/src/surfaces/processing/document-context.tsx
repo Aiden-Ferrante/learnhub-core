@@ -10,6 +10,10 @@ import {
   type PreparedIngestFile,
 } from "@/surfaces/processing/convert-pdf"
 import { toast } from "@/kit/hooks/use-toast"
+import { fetchAppDocuments, saveAppDocuments } from "@/gateways/api/documents"
+import type { ApiError } from "@/gateways/api/http"
+import { qk } from "@/kit/data/query-keys"
+import { useApi } from "@/kit/data/use-api"
 
 export type DocumentAddInput = File | PreparedIngestFile
 
@@ -32,9 +36,14 @@ export type Document = {
 
 type DocumentContextType = {
   documents: Document[]
-  /** True once the initial server load has settled — lets deep links distinguish
-   *  "documents still loading" from "no such document". */
+  /** True once the initial server load has settled (loaded OR failed) — lets deep links
+   *  distinguish "documents still loading" from "no such document". Check `error` too:
+   *  a failed load is settled but is NOT "no such document". */
   isInitialized: boolean
+  /** The initial load's failure, until a retry succeeds. null when loaded or loading. */
+  error: ApiError | null
+  /** Retry the initial load (the "Couldn't load your library · Retry" button). */
+  retry: () => void
   /** Returns the cards it created, so a caller can settle one later by id. */
   addDocuments: (items: DocumentAddInput[]) => Document[]
   deleteDocuments: (documentIds: string[]) => void
@@ -64,7 +73,12 @@ const generateUUID = (): string => {
 
 export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const [documents, setDocuments] = useState<Document[]>([])
-  const [isInitialized, setIsInitialized] = useState(false)
+  // Seeded once from the query below; from then on this local list is the truth and the
+  // autosave writes it back. A later refetch must not clobber unsaved local edits, so the
+  // query never goes stale on its own (staleMs Infinity) and only seeds once.
+  const [seeded, setSeeded] = useState(false)
+  const docsQuery = useApi(qk.documents(), (signal) => fetchAppDocuments(signal), { staleMs: Infinity })
+  const isInitialized = seeded || (docsQuery.status === "error" && docsQuery.data === undefined)
   // Only enable the destructive autosave once the initial load SUCCEEDS. If the
   // first GET fails (e.g. a transient 401/500), documents stays [] and an autosave
   // would otherwise PUT an empty list and wipe the durable server copy.
@@ -99,62 +113,46 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-  // Load documents from the server; one-time import from the legacy
+  // Seed from the first successful server load; one-time import from the legacy
   // localStorage store when the server list is still empty.
   useEffect(() => {
-    if (isInitialized) return
-    let cancelled = false
-
-    const load = async () => {
+    if (seeded || !docsQuery.data) return
+    const serverDocs = docsQuery.data.documents
+    // Load succeeded — safe to let the autosave persist from here on.
+    canPersistRef.current = true
+    if (serverDocs.length > 0) {
+      setDocuments(reviveDocuments(serverDocs))
+    } else {
       try {
-        const res = await fetch('/api/documents')
-        if (!res.ok) throw new Error(`GET /api/documents -> ${res.status}`)
-        const data = await res.json()
-        const serverDocs = Array.isArray(data.documents) ? data.documents : []
-        // Load succeeded — safe to let the autosave persist from here on.
-        canPersistRef.current = true
-
-        if (serverDocs.length > 0) {
-          if (!cancelled) setDocuments(reviveDocuments(serverDocs))
-        } else {
-          const saved = localStorage.getItem('learnhub_documents')
-          if (saved) {
-            const parsed = JSON.parse(saved)
-            if (Array.isArray(parsed) && parsed.length > 0 && !cancelled) {
-              console.log(`Importing ${parsed.length} documents from localStorage`)
-              setDocuments(reviveDocuments(parsed))
-            }
-            // Remove so another account on this browser can't re-import them.
-            localStorage.removeItem('learnhub_documents')
+        const saved = localStorage.getItem('learnhub_documents')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDocuments(reviveDocuments(parsed))
           }
+          // Remove so another account on this browser can't re-import them.
+          localStorage.removeItem('learnhub_documents')
         }
       } catch (error) {
-        console.error('Error loading documents from server:', error)
-      } finally {
-        if (!cancelled) setIsInitialized(true)
+        console.error('Ignoring an unreadable legacy localStorage document list:', error)
       }
     }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [isInitialized])
+    setSeeded(true)
+  }, [docsQuery.data, seeded])
 
   // Persist documents to the server (debounced), but only after a SUCCESSFUL
   // load — never autosave (and risk wiping) on top of a failed initial fetch.
   useEffect(() => {
     if (!isInitialized || !canPersistRef.current) return
     const timer = setTimeout(() => {
-      fetch('/api/documents', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documents: serializeDocuments(documents) }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error(`PUT /api/documents -> ${res.status}`)
+      saveAppDocuments(serializeDocuments(documents)).catch((error) => {
+        // Not silent: the library would otherwise lose an edit with no sign of it.
+        toast({
+          title: "Library not saved",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
         })
-        .catch((error) => console.error('Error saving documents to server:', error))
+      })
     }, 800)
     return () => clearTimeout(timer)
   }, [documents, isInitialized])
@@ -248,6 +246,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       value={{
         documents,
         isInitialized,
+        error: seeded ? null : docsQuery.error,
+        retry: docsQuery.retry,
         addDocuments,
         deleteDocuments,
         renameDocument,
