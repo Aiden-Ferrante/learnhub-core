@@ -1,6 +1,7 @@
 "use client"
 
 import { BookOpen, Moon } from "lucide-react"
+import { Button } from "@/kit/ui/button"
 import { cn } from "@/kit/lib/utils"
 import { useReadingTheme, type ReadingTheme } from "@/surfaces/reading/use-reading-theme"
 
@@ -17,13 +18,15 @@ export function ReadingThemeToggle({ className }: { className?: string }) {
     label: string
     Icon: typeof BookOpen
   }) => (
-    <button
+    <Button
       type="button"
+      variant={null}
+      size={null}
       onClick={() => setTheme(value)}
       aria-pressed={theme === value}
       title={`${label} reading theme`}
       className={cn(
-        "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+        "h-auto gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
         theme === value
           ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
@@ -31,7 +34,7 @@ export function ReadingThemeToggle({ className }: { className?: string }) {
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
-    </button>
+    </Button>
   )
 
   return (
