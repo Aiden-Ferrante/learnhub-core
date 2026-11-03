@@ -25,32 +25,20 @@ from app.gateways.ledger import (
 )
 from app.gateways.llm import ollama_base_url, ollama_model, ollama_structured_completion
 from app.gateways.llm_schemas import (
-    AnswerVerdictSet,
-    AttemptSet,
     ConceptResult,
     ConceptVerdict,
-    ObjectiveSet,
     Orient,
-    ProblemSet,
-    RecallVerdictSet,
     ReadingGuide,
-    RetrieveSet,
     Skeleton,
 )
 
 __all__ = [
-    "AnswerVerdictSet",
-    "AttemptSet",
     "ConceptResult",
     "ConceptVerdict",
     "JobCancelled",
     "KINDS",
-    "ObjectiveSet",
     "Orient",
-    "ProblemSet",
-    "RecallVerdictSet",
     "ReadingGuide",
-    "RetrieveSet",
     "Skeleton",
     "cancel_build",
     "check_cancel",

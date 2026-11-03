@@ -100,7 +100,6 @@ def _upsert_review(conn, key, doc_id, section_key, st, is_new=False, extra=None)
 
 SKELETON_KEY_PREFIX = "skel-"
 CHAPTER_KEY_PREFIX = "chap-"
-PRACTICE_KEY_PREFIX = "prac-"
 PACK_KEY_PREFIX = "pack-"
 
 
@@ -130,12 +129,6 @@ def _resolve_pack(body: dict, key: str) -> tuple[str, dict]:
     if not body.get("doc") or not body.get("skill"):
         return key, {}
     return key, {"docId": body["doc"], "sectionKey": body.get("sectionKey")}
-
-
-def practice_review_key(item_key: str) -> str:
-    """Practice-item row key. Item keys are stable uuids (never content-derived), so no
-    rename carry-over machinery is ever needed — deleting the item cascades the row."""
-    return _typed_key(PRACTICE_KEY_PREFIX, item_key)
 
 
 def clean_skeleton_children(children: object) -> list[dict[str, str]]:
@@ -168,29 +161,6 @@ def _resolve_chapter(body: dict, key: str) -> tuple[str, dict]:
     return key, {}  # only ever re-graded from the queue; identity comes from the row
 
 
-def _resolve_practice(body: dict, key: str) -> tuple[str, dict]:
-    """A practice grade carries the ITEM key; identity (book doc + section) comes from
-    the item row itself, so the review row follows the BOOK like concept cards do."""
-    item_key = str(body.get("practiceKey") or "").strip()
-    if item_key:
-        with db() as conn:
-            item = conn.execute(
-                'SELECT doc_id AS "docId", section_key AS "sectionKey", prompt '
-                "FROM ext_practice WHERE key = %(k)s",
-                {"k": item_key},
-            ).fetchone()
-        if not item:
-            raise ValueError(f"unknown practice item {item_key}")
-        return practice_review_key(item_key), {
-            "docId": item["docId"],
-            "sectionKey": item["sectionKey"],
-            "heading": (item.get("prompt") or "")[:120] or None,
-        }
-    if key.startswith(PRACTICE_KEY_PREFIX):  # queue re-grade → identity from the row
-        return key, {}
-    raise ValueError("practiceKey is required for a practice grade")
-
-
 def _extra_skeleton(body: dict, info: dict) -> dict:
     return {
         "heading": str(body.get("heading") or "").strip() or None,
@@ -201,14 +171,6 @@ def _extra_skeleton(body: dict, info: dict) -> dict:
 
 def _extra_chapter(body: dict, info: dict) -> dict:
     return {}
-
-
-def _extra_practice(body: dict, info: dict) -> dict:
-    # heading = truncated prompt, for the calendar's item name. children stays None —
-    # the reveal reads answer/rubric LIVE from ext_practice, never a snapshot (the
-    # deliberate asymmetry with skeleton items: a book's structure is static, an item's
-    # worked solution is editable).
-    return {"heading": (info.get("heading") or "").strip() or None}
 
 
 def _name_structure(row: dict) -> str:
@@ -229,11 +191,10 @@ class _TypedItem:
     card_name: Callable[[dict], str]
     card_signal: Callable[[dict], str]
     card_extra: Callable[[dict], dict]                 # card fields beyond the common envelope
-    # study_events doc attribution: None = the review row's doc. Practice rows follow the
-    # BOOK (shared memory, like concepts) while the event belongs to the VERSION studied.
+    # study_events doc attribution: None = the review row's doc.
     event_doc: Callable[[dict, dict], str | None] | None = None
     # Alternative study_events kinds a caller may request for this item type (the same
-    # schedule reached through a different activity — practice items sat as an exam).
+    # schedule reached through a different activity — a pack skill graded in an exam).
     event_kinds: frozenset[str] = frozenset()
 
 
@@ -253,16 +214,6 @@ _TYPED: dict[str, _TypedItem] = {
         resolve=_resolve_chapter, extra=_extra_chapter,
         card_name=_name_structure, card_signal=lambda r: "",
         card_extra=lambda r: {"children": r.get("children") or []},
-    ),
-    "practice": _TypedItem(
-        item_type="practice", prefix=PRACTICE_KEY_PREFIX, body_flag="practice",
-        event_kind="practice", card_kind="practice",
-        lookup_cols=', doc_id AS "docId", section_key AS "sectionKey", heading',
-        resolve=_resolve_practice, extra=_extra_practice,
-        card_name=_name_structure, card_signal=lambda r: "",
-        card_extra=lambda r: {},
-        event_doc=lambda body, info: str(body.get("doc") or "").strip() or info.get("docId"),
-        event_kinds=frozenset({"practice", "exam"}),
     ),
     "pack": _TypedItem(
         item_type="pack", prefix=PACK_KEY_PREFIX, body_flag=None,
@@ -335,8 +286,8 @@ def _grade_typed_item(spec: _TypedItem, body: dict, concept_key: str, grade: int
 
     # Append to the mastery floor (best-effort; never breaks the grade flow).
     event_doc = spec.event_doc(body, info) if spec.event_doc else doc_id
-    # An exam grades the SAME items on the SAME schedule as practice — one engine, one
-    # denominator — but the activity heatmap should say which of the two you were doing.
+    # A pack exam grades the SAME skill row as Learn — one engine, one schedule — but the
+    # activity heatmap should say which of the two you were doing.
     # Only the kind's own alternatives are honoured, so a caller cannot invent a kind.
     requested = str(body.get("eventKind") or "").strip()
     kind = requested if requested in spec.event_kinds else spec.event_kind
@@ -434,7 +385,7 @@ def _card(c: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
 COURSE_SCOPE = "course"
 
 # The concept_reviews item types the course review serves. NULL item_type is a concept card.
-# Practice and pack rows are scheduled elsewhere (their own session / their pack's Today tab),
+# Pack rows are scheduled in their pack's Today tab,
 # so every due count that leads to the course review counts only these (calendar.py).
 COURSE_REVIEW_TYPES: frozenset[str] = frozenset({"concept", "skeleton", "chapter"})
 
@@ -458,17 +409,11 @@ def build_review_queue(
     A whole-course scope (``scope`` omitted, blank or ``"course"``, see is_course_scope)
     serves every DUE concept, skeleton and chapter card in the doc and no new cards: it
     backs /courses/[id]/review, whose job is to clear what the due badges count. New
-    concepts are introduced chapter by chapter, where they are read.
-
-    ``session="practice"`` returns ONLY practice-item cards — a separate session, never a
-    mixed queue: a ten-minute derivation must not land mid-run of twenty-second concept
-    cards. The default session excludes practice symmetrically."""
+    concepts are introduced chapter by chapter, where they are read."""
     now = time.time()
     whole_course = is_course_scope(scope)
     if whole_course:
         scope = None
-    if session == "practice":
-        return _build_practice_queue(doc, scope or "", limit, now)
     try:
         # A chapter scope spans ALL its sub-sections (the reader's reading-order span) —
         # exact-key matching misses everything under a chapter node. None = whole course.
@@ -492,7 +437,7 @@ def build_review_queue(
             for r in conn.execute(
                 "SELECT key, extract(epoch from due)::float8 AS due, state FROM concept_reviews "
                 "WHERE (%(doc)s::text IS NULL OR doc_id = %(doc)s) "
-                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter', 'practice', 'pack'))",
+                "AND (item_type IS NULL OR item_type NOT IN ('skeleton', 'chapter', 'pack'))",
                 {"doc": source_id_of(doc) if doc else None},
             ).fetchall():
                 reviews[r["key"]] = r
@@ -548,74 +493,6 @@ def build_review_queue(
     queue = (due + new)[:limit]
     return {
         "cards": queue,
-        "counts": {"due": len(due), "new": len(new), "later": later},
-    }
-
-
-def _practice_card(item: dict[str, Any], state: str, due: float | None) -> dict[str, Any]:
-    """A practice queue card. answer/rubric/payload are read LIVE from ext_practice at
-    queue-build time — nothing is ever snapshotted into the review row."""
-    return {
-        "itemType": "practice",
-        "conceptKey": practice_review_key(item["key"]),
-        "practiceKey": item["key"],
-        "name": (item.get("prompt") or "")[:120],
-        "kind": "practice",
-        "practiceKind": item.get("kind"),
-        "prompt": item.get("prompt"),
-        "answer": item.get("answer"),
-        "rubric": item.get("rubric"),
-        "payload": item.get("payload"),
-        "sectionKey": item.get("sectionKey"),
-        "docId": item.get("docId"),
-        "state": state,
-        "due": due,
-    }
-
-
-def _build_practice_queue(doc: str | None, scope: str, limit: int, now: float) -> dict[str, Any]:
-    """The separate practice session's queue: the scope's due practice items (earliest
-    first), then unseeded ones as new cards. Items follow the BOOK through concept_filter,
-    exactly like concept cards — every cut of a book shares one practice memory."""
-    try:
-        span = scope_section_keys(doc, scope)
-        pred, binds = concept_filter(doc, list(span) if span is not None else None)
-        with db() as conn:
-            items = conn.execute(
-                'SELECT key, kind, prompt, answer, rubric, payload, section_key AS "sectionKey", '
-                'doc_id AS "docId" '
-                f'FROM ext_practice WHERE {pred} ORDER BY section_key, "order"',
-                binds,
-            ).fetchall()
-            reviews = {
-                r["key"]: r
-                for r in conn.execute(
-                    "SELECT key, extract(epoch from due)::float8 AS due, state "
-                    "FROM concept_reviews WHERE item_type = 'practice' "
-                    "AND (%(doc)s::text IS NULL OR doc_id = %(doc)s)",
-                    {"doc": source_id_of(doc) if doc else None},
-                ).fetchall()
-            }
-        if doc:
-            for it in items:
-                it["docId"] = doc  # keep links pointing at the version being studied
-    except Exception as exc:  # noqa: BLE001
-        return {"cards": [], "counts": {"due": 0, "new": 0, "later": 0}, "error": str(exc)}
-
-    due: list[dict[str, Any]] = []
-    new: list[dict[str, Any]] = []
-    later = 0
-    for it in items:
-        r = reviews.get(practice_review_key(it["key"]))
-        if r is None:
-            new.append(_practice_card(it, "new", None))
-        elif float(r.get("due", 0)) <= now:
-            due.append(_practice_card(it, r.get("state", "review"), r.get("due")))
-        else:
-            later += 1
-    due.sort(key=lambda x: x.get("due") or 0)
-    return {
-        "cards": (due + new)[:limit],
         "counts": {"due": len(due), "new": len(new), "later": later},
     }
 
