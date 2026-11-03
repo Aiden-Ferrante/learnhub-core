@@ -106,7 +106,7 @@ export type UseApiMutationOptions<V, R> = {
 export type ApiMutation<V, R> = {
   /** Run and await; throws ApiError on failure (use in handlers that need the result). */
   run: (vars: V) => Promise<R>
-  /** Run without awaiting; failure lands in `error` (use for buttons). */
+  /** Run without awaiting; failure lands in `error` (use for buttons). Stable identity. */
   fire: (vars: V) => void
   pending: boolean
   error: ApiError | null
@@ -152,16 +152,13 @@ export function useApiMutation<V = void, R = unknown>(
     onError: (err, vars) => onError?.(err, vars),
   })
   const { mutateAsync, mutate, reset } = m
+  // run / fire keep one identity for the mutation's life (react-query's mutate is stable),
+  // so an effect may depend on them without re-firing every time pending/error change.
+  const run = useCallback((vars: V) => mutateAsync(vars), [mutateAsync])
+  const fire = useCallback((vars: V) => mutate(vars), [mutate])
   return useMemo(
-    () => ({
-      run: (vars: V) => mutateAsync(vars),
-      fire: (vars: V) => mutate(vars),
-      pending: m.isPending,
-      error: m.error ?? null,
-      data: m.data,
-      reset,
-    }),
-    [mutateAsync, mutate, reset, m.isPending, m.error, m.data],
+    () => ({ run, fire, pending: m.isPending, error: m.error ?? null, data: m.data, reset }),
+    [run, fire, reset, m.isPending, m.error, m.data],
   )
 }
 

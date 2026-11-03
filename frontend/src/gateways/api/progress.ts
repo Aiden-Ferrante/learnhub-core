@@ -55,16 +55,23 @@ export async function fetchActivity(doc?: string, signal?: AbortSignal): Promise
   return parseJsonResponse<ActivityResponse>(res)
 }
 
-// Record a passive engagement event (read/listen/…) so the dashboard reflects all study,
-// not just graded reviews. Fire-and-forget — never blocks the UI.
-export function recordEngagement(kind: string, scope: string | null, doc?: string, signal?: AbortSignal): void {
+/** Record a passive engagement event (read/listen/…) so the dashboard reflects all study,
+ *  not just graded reviews. Callers fire it as a mutation and never block on it; a failed
+ *  request throws (ApiError) so the caller can say so. A null scope records nothing. */
+export async function recordEngagement(
+  kind: string,
+  scope: string | null,
+  doc?: string,
+  signal?: AbortSignal,
+): Promise<void> {
   if (!scope) return
-  void fetch('/api/learn/engagement', {
+  const res = await fetch('/api/learn/engagement', {
     signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind, scope, doc: doc ?? null }),
-  }).catch(() => {})
+  })
+  await parseJsonResponse<unknown>(res)
 }
 
 // ----- Whole-library study debt (the one cross-course rollup) -----

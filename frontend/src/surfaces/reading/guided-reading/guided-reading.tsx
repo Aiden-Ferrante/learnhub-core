@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react"
 import { BookOpen } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { EmptyState } from "@/kit/patterns/empty-state"
-import { ErrorNotice } from "@/kit/data"
+import { ErrorNotice, roots, useApiMutation } from "@/kit/data"
 import { flattenChapterOutline, type LearnTreeNode } from "@/gateways/api/outline"
 import { recordEngagement } from "@/gateways/api/progress"
 import type { Course } from "@/surfaces/library"
@@ -120,9 +120,14 @@ export function GuidedReading({ course, scope, tree, onScopeChange, initialDrawe
   })
 
   const hasMarkdown = Boolean(chapter.data?.markdown)
+  // A passive "read" event for the heatmap: fired, never awaited; a failure shows below.
+  const engage = useApiMutation((v: { scope: string; doc?: string }) => recordEngagement("read", v.scope, v.doc), {
+    invalidates: [roots.activity],
+  })
+  const { fire: fireEngage } = engage
   useEffect(() => {
-    if (hasMarkdown && chapterKey) recordEngagement("read", chapterKey, docId)
-  }, [hasMarkdown, chapterKey, docId])
+    if (hasMarkdown && chapterKey) fireEngage({ scope: chapterKey, doc: docId })
+  }, [hasMarkdown, chapterKey, docId, fireEngage])
 
   const goChapter = (key: string) => {
     setChapterKey(key)
@@ -246,6 +251,14 @@ export function GuidedReading({ course, scope, tree, onScopeChange, initialDrawe
                   { title: "Couldn't load your mastery", q: data.masteryQ },
                 ]}
               />
+              {engage.error && chapterKey && (
+                <ErrorNotice
+                  compact
+                  title="Reading time not recorded"
+                  error={engage.error}
+                  onRetry={() => fireEngage({ scope: chapterKey, doc: docId })}
+                />
+              )}
               <ChapterBody
                 chapter={chapter}
                 chapterKey={chapterKey}
