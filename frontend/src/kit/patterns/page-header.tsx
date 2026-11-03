@@ -18,7 +18,7 @@ export function PageHeader({
     <div className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="flex items-center gap-3">
         {icon && (
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/15 text-brand">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/15 text-ink-accent">
             {icon}
           </div>
         )}

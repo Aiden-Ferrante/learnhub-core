@@ -1,15 +1,18 @@
 /** THE concept-kind palette — token-based (`--kind-*` in globals.css, themed for dark and
  *  paper) with one variant per shape. Three hand-rolled copies had diverged (definition was
  *  blue in one, sky in another, the token in a third); every kind-colored surface now reads
- *  from here so the mapping cannot drift again. */
+ *  from here so the mapping cannot drift again.
+ *
+ *  The hue lives in the wash and border only. The word is plain foreground: a kind fill
+ *  is not safe as text (spec §4), and there are no kind ink tokens. */
 
 /** Solid badge: kind label chips on cards, rows, and the review panel. */
 export const KIND_BADGE: Record<string, string> = {
-  definition: "bg-kind-definition/15 text-kind-definition",
-  theorem: "bg-kind-theorem/15 text-kind-theorem",
-  principle: "bg-kind-principle/15 text-kind-principle",
-  result: "bg-kind-result/15 text-kind-result",
-  method: "bg-kind-method/15 text-kind-method",
+  definition: "bg-kind-definition/15 text-foreground",
+  theorem: "bg-kind-theorem/15 text-foreground",
+  principle: "bg-kind-principle/15 text-foreground",
+  result: "bg-kind-result/15 text-foreground",
+  method: "bg-kind-method/15 text-foreground",
 }
 
 /** Left-edge accent — tells concept types apart while scanning a list. */
@@ -23,9 +26,9 @@ export const KIND_BORDER: Record<string, string> = {
 
 /** Outlined chip: rounded-full concept pills (briefing cloud, popover, recall rows). */
 export const KIND_CHIP: Record<string, string> = {
-  definition: "text-kind-definition border-kind-definition/30 bg-kind-definition/10",
-  theorem: "text-kind-theorem border-kind-theorem/30 bg-kind-theorem/10",
-  principle: "text-kind-principle border-kind-principle/30 bg-kind-principle/10",
-  result: "text-kind-result border-kind-result/30 bg-kind-result/10",
-  method: "text-kind-method border-kind-method/30 bg-kind-method/10",
+  definition: "text-foreground border-kind-definition/40 bg-kind-definition/15",
+  theorem: "text-foreground border-kind-theorem/40 bg-kind-theorem/15",
+  principle: "text-foreground border-kind-principle/40 bg-kind-principle/15",
+  result: "text-foreground border-kind-result/40 bg-kind-result/15",
+  method: "text-foreground border-kind-method/40 bg-kind-method/15",
 }
