@@ -1,43 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  Circle,
-  CircleCheckBig,
-  Loader2,
-  Search,
-  Sparkles,
-  TriangleAlert,
-} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronsDownUp, ChevronsUpDown, Search } from "lucide-react"
+import { numberSections, type LearnTreeNode } from "@/gateways/api/outline"
+import type { SectionMemory } from "@/gateways/api/progress"
+import { Button } from "@/kit/ui/button"
 import { Input } from "@/kit/ui/input"
 import { ScrollArea } from "@/kit/ui/scroll-area"
+import { ErrorNotice } from "@/kit/data"
+import { SkeletonRow } from "@/kit/patterns/skeletons"
 import { cn } from "@/kit/lib/utils"
-import { ConceptMasteryDot } from "@/surfaces/concepts"
-import { numberSections, numberedSectionTitle, type LearnTreeNode } from "@/gateways/api/outline"
-import { getExtractionStatus, startExtraction } from "@/gateways/api/pipeline"
-import { fetchConceptMastery, type SectionMemory } from "@/gateways/api/progress"
-import { submitReviewGrade } from "@/gateways/api/review"
-
-type ExtractState = "running" | "done" | "error"
-
-/** The LOCAL calendar day an epoch-seconds timestamp falls on.
- *
- *  Local, not UTC, and the difference is not cosmetic: the backend's heatmap buckets by UTC
- *  day, so from about 8pm Eastern onward UTC is already tomorrow. Bucketing the tick that
- *  way would silently un-tick everything reviewed during an evening session — verified
- *  against a real event at 16:05 UTC that a UTC "today" no longer matched. "Studied today"
- *  means the user's today; the heatmap's own day-boundary is a separate, known issue. */
-function localDay(seconds: number): string {
-  const d = new Date(seconds * 1000)
-  const month = `${d.getMonth() + 1}`.padStart(2, "0")
-  const day = `${d.getDate()}`.padStart(2, "0")
-  return `${d.getFullYear()}-${month}-${day}`
-}
+import { TreeRow, type RowContext } from "@/surfaces/library/syllabus-row"
+import { useConceptTicks } from "@/surfaces/library/use-syllabus-actions"
 
 type SyllabusTreeProps = {
   tree: LearnTreeNode[]
@@ -46,352 +20,69 @@ type SyllabusTreeProps = {
   masteryBySection?: Record<string, SectionMemory>
   loading?: boolean
   docId?: string | null
-  /** Collapse to top-level chapters only — no drilling into sub-sections. */
   /** Open a concept clicked in the tree (its detail view). Omit to hide concept leaves. */
   onSelectConcept?: (conceptKey: string) => void
-  /** Called after a concept is ticked, so the caller can re-pull due count + mastery.
-   *  Providing it is what turns the per-concept review ticks on. */
+  /** Called after a concept is ticked. Providing it is what turns the per-concept review
+   *  ticks on (the grade itself refreshes due counts and mastery through the cache). */
   onConceptReviewed?: () => void
   /** Grow with content (page scrolls) instead of scrolling inside a fixed box —
-   *  for the CourseHome outline; sidebars keep the internal ScrollArea. */
+   *  for the course-home outline; sidebars keep the internal ScrollArea. */
   autoHeight?: boolean
 }
 
-function ExtractButton({
-  scope,
-  state,
-  onExtract,
-  prominent,
-}: {
-  scope: string
-  state: ExtractState | undefined
-  onExtract: (scope: string) => void
-  /** Unbuilt CHAPTERS get a visible, labeled Build button (extraction is on-demand —
-   *  this is the syllabus's build trigger); sections keep the subtle hover icon. */
-  prominent?: boolean
-}) {
-  const title =
-    state === "running"
-      ? "Building this chapter's concepts… (runs in the background)"
-      : state === "done"
-        ? "Built — click to re-run"
-        : state === "error"
-          ? "Build failed — click to retry"
-          : "Build this chapter's concepts (background, a few minutes per chapter)"
-  if (prominent) {
-    return (
-      <button
-        type="button"
-        title={title}
-        aria-label={title}
-        onClick={(e) => {
-          e.stopPropagation()
-          if (state !== "running") onExtract(scope)
-        }}
-        className={cn(
-          "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-micro font-medium transition-colors",
-          state === "running"
-            ? "border-brand/40 text-brand"
-            : state === "error"
-              ? "border-destructive/50 text-destructive hover:bg-destructive/10"
-              : "border-border text-muted-foreground hover:border-brand/50 hover:text-brand",
-        )}
-      >
-        {state === "running" ? (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin" /> Building…
-          </>
-        ) : state === "error" ? (
-          <>
-            <TriangleAlert className="h-3 w-3" /> Retry
-          </>
-        ) : (
-          <>
-            <Sparkles className="h-3 w-3" /> Build
-          </>
-        )}
-      </button>
-    )
+function allSectionIdsOf(tree: LearnTreeNode[]): string[] {
+  const ids: string[] = []
+  const walk = (nodes: LearnTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.isSection) ids.push(n.id)
+      walk(n.children)
+    }
   }
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={(e) => {
-        e.stopPropagation()
-        onExtract(scope)
-      }}
-      className={cn(
-        "mt-0.5 shrink-0 transition-opacity",
-        state ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100",
-        state === "error" ? "text-destructive" : "text-muted-foreground hover:text-brand",
-      )}
-    >
-      {state === "running" ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : state === "done" ? (
-        <Check className="h-3.5 w-3.5 text-brand" />
-      ) : state === "error" ? (
-        <TriangleAlert className="h-3.5 w-3.5" />
-      ) : (
-        <Sparkles className="h-3.5 w-3.5" />
-      )}
-    </button>
-  )
+  walk(tree)
+  return ids
 }
 
+/** Default = everything open; only the user's COLLAPSED choices persist (per book), so
+ *  sections added by a later extraction still arrive expanded. */
+function useExpanded(tree: LearnTreeNode[], docId: string | null | undefined) {
+  const allIds = useMemo(() => allSectionIdsOf(tree), [tree])
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const storageKey = docId ? `txt2k:outline-collapsed:${docId}` : null
+  useEffect(() => {
+    if (!allIds.length) return
+    let collapsed: string[] = []
+    if (storageKey) {
+      try {
+        collapsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]")
+      } catch {
+        collapsed = [] // unreadable local preference: start fully open
+      }
+    }
+    const hidden = new Set(collapsed)
+    setExpanded(new Set(allIds.filter((id) => !hidden.has(id))))
+  }, [allIds, storageKey])
 
-/** Mark one concept reviewed today.
- *
- *  This records a REAL review at Good (3) — the same grade the review panel's Good button
- *  writes — so it moves the FSRS schedule, the retention figure and the due count. It is a
- *  shortcut for self-grading, not a "seen it" marker: the honest reading of a tick is
- *  "I recalled this", which is exactly what it claims of you in the review panel too. */
-function ReviewTick({
-  done,
-  busy,
-  onTick,
-}: {
-  done: boolean
-  busy: boolean
-  onTick: () => void
-}) {
-  const title = done
-    ? "Reviewed today — click to review again"
-    : "I recalled this — log a review (Good)"
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      aria-pressed={done}
-      disabled={busy}
-      onClick={(e) => {
-        e.stopPropagation()
-        onTick()
-      }}
-      className={cn(
-        "shrink-0 rounded p-0.5 transition-opacity",
-        done
-          ? "text-status-mastered opacity-100"
-          : "text-muted-foreground opacity-0 hover:text-brand group-hover/concept:opacity-100 focus:opacity-100",
-      )}
-    >
-      {busy ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : done ? (
-        <CircleCheckBig className="h-3.5 w-3.5" />
-      ) : (
-        <Circle className="h-3.5 w-3.5" />
-      )}
-    </button>
-  )
-}
-
-function nodeMatchesFilter(node: LearnTreeNode, filter: string): boolean {
-  const f = filter.toLowerCase()
-  if (`${node.label} ${node.title ?? ""}`.toLowerCase().includes(f)) return true
-  if (node.concepts?.some((c) => c.name.toLowerCase().includes(f))) return true
-  return node.children.some((c) => nodeMatchesFilter(c, f))
-}
-
-function TreeRow({
-  node,
-  depth,
-  filter,
-  selectedScope,
-  masteryBySection,
-  expanded,
-  onToggleExpand,
-  onSelect,
-  onExtract,
-  extractState,
-  numbers,
-  onSelectConcept,
-  reviewedToday,
-  gradingKey,
-  onTickConcept,
-}: {
-  node: LearnTreeNode
-  depth: number
-  filter: string
-  selectedScope: string | null
-  masteryBySection?: Record<string, SectionMemory>
-  expanded: Set<string>
-  onToggleExpand: (id: string) => void
-  onSelect: (node: LearnTreeNode) => void
-  onExtract?: (scope: string) => void
-  extractState?: Record<string, ExtractState>
-  numbers: Map<string, string>
-  onSelectConcept?: (conceptKey: string) => void
-  reviewedToday?: Set<string>
-  gradingKey?: string | null
-  onTickConcept?: (conceptKey: string) => void
-}) {
-  if (filter && !nodeMatchesFilter(node, filter)) return null
-
-  // Concept leaves render under their section like sub-entries — the concept layer made
-  // visible in the course's main navigation, not hidden behind the Concepts view.
-  const conceptLeaves = (onSelectConcept && node.concepts) || []
-  const hasChildren = node.children.length > 0 || conceptLeaves.length > 0
-  const isExpanded = expanded.has(node.id)
-  const isSelected = node.sectionKey != null && node.sectionKey === selectedScope
-  const isSection = node.isSection
-  // Mastery % for the completion gauge next to the concept count (0% = not started).
-  const sm = isSection && node.sectionKey ? masteryBySection?.[node.sectionKey] : undefined
-  const masteryPct = sm && sm.retention != null ? Math.round(sm.retention * 100) : null
-
-  const isChapter = depth === 0
-  return (
-    <li className={cn("list-none", isChapter && "mt-1 first:mt-0")}>
-      <div
-        className={cn(
-          "group flex items-start gap-1 rounded-md py-1 pl-1 pr-1 text-sm",
-          isChapter && "py-1.5",
-          isSelected && "bg-brand/15 text-foreground",
-          isSection && "cursor-pointer hover:bg-muted/60",
-        )}
-      >
-        {hasChildren ? (
-          <button
-            type="button"
-            className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleExpand(node.id)
-            }}
-            aria-label={isExpanded ? "Collapse" : "Expand"}
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </button>
-        ) : (
-          <span className="w-4 shrink-0" />
-        )}
-        {isSection ? (
-          <ConceptMasteryDot
-            state={node.sectionKey ? masteryBySection?.[node.sectionKey]?.state : undefined}
-            retention={node.sectionKey ? masteryBySection?.[node.sectionKey]?.retention : undefined}
-            className="mt-1"
-          />
-        ) : null}
-        <button
-          type="button"
-          className={cn(
-            "min-w-0 flex-1 text-left leading-snug",
-            !isSection && "text-muted-foreground text-xs pl-1",
-          )}
-          onClick={() => {
-            if (isSection && node.sectionKey) onSelect(node)
-          }}
-          disabled={!isSection}
-        >
-          {isSection ? (
-            <span className={cn("font-medium", isChapter && "text-title font-semibold")}>
-              {numberedSectionTitle(numbers.get(node.id), node.label, node.title)}
-            </span>
-          ) : (
-            <span className="break-words">{node.label}</span>
-          )}
-        </button>
-        {isSection && (node.conceptCount ?? 0) > 0 ? (
-          <span
-            className="shrink-0 rounded-full bg-brand/10 px-1.5 py-0.5 text-micro font-medium tabular-nums text-brand"
-            title={`${node.conceptCount} concept${node.conceptCount === 1 ? "" : "s"}`}
-          >
-            {node.conceptCount}
-          </span>
-        ) : null}
-        {isSection && (node.conceptCount ?? 0) > 0 && masteryPct != null ? (
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-1.5 py-0.5 text-micro font-medium tabular-nums",
-              masteryPct >= 90
-                ? "bg-status-mastered/10 text-status-mastered"
-                : masteryPct >= 70
-                  ? "bg-brand/10 text-brand"
-                  : masteryPct > 0
-                    ? "bg-status-due/10 text-status-due"
-                    : "bg-muted text-muted-foreground",
-            )}
-            title={`${masteryPct}% retention (${sm?.state ?? "new"})`}
-          >
-            {masteryPct}%
-          </span>
-        ) : null}
-        {isSection && node.sectionKey && onExtract ? (
-          <ExtractButton
-            scope={node.sectionKey}
-            state={extractState?.[node.sectionKey]}
-            onExtract={onExtract}
-            prominent={isChapter && (node.conceptCount ?? 0) === 0}
-          />
-        ) : null}
-      </div>
-      {hasChildren && isExpanded ? (
-        // Indent guide: each nesting level is a bordered container, so depth reads as a
-        // visible rail instead of accumulating invisible padding.
-        <ul className="ml-[0.95rem] border-l border-border/50 pl-1.5">
-          {conceptLeaves.map((c) =>
-            filter && !c.name.toLowerCase().includes(filter.toLowerCase()) ? null : (
-              <li key={c.key ?? c.name} className="list-none">
-                {/* A row, not a button: the tick is its own control and a button cannot
-                    nest inside a button. */}
-                <div className="group/concept flex w-full items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-xs text-muted-foreground hover:bg-brand/5">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
-                    onClick={() => c.key && onSelectConcept?.(c.key)}
-                    disabled={!c.key}
-                    title={c.kind ? `${c.kind} — open concept` : "open concept"}
-                  >
-                    <Sparkles className="h-3 w-3 shrink-0 text-brand/60" />
-                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  </button>
-                  {c.kind && (
-                    <span className="shrink-0 rounded bg-muted px-1 py-px text-micro opacity-0 transition-opacity group-hover/concept:opacity-100">
-                      {c.kind}
-                    </span>
-                  )}
-                  {onTickConcept && c.key ? (
-                    <ReviewTick
-                      done={reviewedToday?.has(c.key) ?? false}
-                      busy={gradingKey === c.key}
-                      onTick={() => onTickConcept(c.key as string)}
-                    />
-                  ) : null}
-                </div>
-              </li>
-            ),
-          )}
-          {node.children.map((child) => (
-            <TreeRow
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              filter={filter}
-              selectedScope={selectedScope}
-              masteryBySection={masteryBySection}
-              expanded={expanded}
-              onToggleExpand={onToggleExpand}
-              onSelect={onSelect}
-              onExtract={onExtract}
-              extractState={extractState}
-              numbers={numbers}
-              onSelectConcept={onSelectConcept}
-              reviewedToday={reviewedToday}
-              gradingKey={gradingKey}
-              onTickConcept={onTickConcept}
-            />
-          ))}
-        </ul>
-      ) : null}
-    </li>
-  )
+  const persist = (next: Set<string>) => {
+    if (!storageKey) return
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(allIds.filter((id) => !next.has(id))))
+    } catch {
+      // storage full/unavailable (not a request): expansion just won't persist
+    }
+  }
+  const toggle = (id: string) => {
+    const next = new Set(expanded)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setExpanded(next)
+    persist(next)
+  }
+  const setAll = (open: boolean) => {
+    const next = open ? new Set(allIds) : new Set<string>()
+    setExpanded(next)
+    persist(next)
+  }
+  return { expanded, toggle, setAll }
 }
 
 export function SyllabusTree({
@@ -406,178 +97,44 @@ export function SyllabusTree({
   autoHeight,
 }: SyllabusTreeProps) {
   const [filter, setFilter] = useState("")
-  const [extractState, setExtractState] = useState<Record<string, ExtractState>>({})
-  const [reviewedToday, setReviewedToday] = useState<Set<string>>(() => new Set())
-  const [gradingKey, setGradingKey] = useState<string | null>(null)
   const numbers = useMemo(() => numberSections(tree), [tree])
-
-  // Which concepts already carry a graded event today — so a tick survives a reload, and
-  // so a concept reviewed in the review panel shows as done here too. `lastSeen` is the
-  // event floor's per-concept max timestamp; an error envelope leaves the set empty, which
-  // reads as "not ticked" rather than inventing ticks.
+  const { expanded, toggle, setAll } = useExpanded(tree, docId)
   const ticksOn = Boolean(onConceptReviewed && docId)
-  useEffect(() => {
-    if (!ticksOn || !docId) return
-    let live = true
-    fetchConceptMastery(docId)
-      .then((data) => {
-        if (!live || data.error) return
-        const today = localDay(Date.now() / 1000)
-        const seen = new Set<string>()
-        for (const [key, m] of Object.entries(data.byConcept ?? {})) {
-          if (m.lastSeen && localDay(m.lastSeen) === today) seen.add(key)
-        }
-        setReviewedToday(seen)
-      })
-      .catch(() => {
-        /* transient — the ticks just start empty */
-      })
-    return () => {
-      live = false
-    }
-  }, [ticksOn, docId])
-
-  const handleTickConcept = useCallback(
-    async (conceptKey: string) => {
-      setGradingKey(conceptKey)
-      try {
-        const res = await submitReviewGrade(conceptKey, 3, docId ?? undefined)
-        if (res.error) return
-        setReviewedToday((prev) => new Set(prev).add(conceptKey))
-        onConceptReviewed?.()
-      } catch {
-        /* leave it unticked — a tick that lied about being recorded is the worse failure */
-      } finally {
-        setGradingKey(null)
-      }
-    },
-    [docId, onConceptReviewed],
-  )
-
-  const handleExtract = useCallback(
-    async (scope: string) => {
-      setExtractState((s) => ({ ...s, [scope]: "running" }))
-      try {
-        const started = await startExtraction(scope, docId ?? undefined)
-        if (started.status === "error") {
-          setExtractState((s) => ({ ...s, [scope]: "error" }))
-          return
-        }
-      } catch {
-        setExtractState((s) => ({ ...s, [scope]: "error" }))
-        return
-      }
-      const poll = async () => {
-        try {
-          const st = await getExtractionStatus(scope, docId ?? undefined)
-          if (st.status === "done") {
-            setExtractState((s) => ({ ...s, [scope]: "done" }))
-            return
-          }
-          if (st.status === "error") {
-            setExtractState((s) => ({ ...s, [scope]: "error" }))
-            return
-          }
-        } catch {
-          /* transient — keep polling */
-        }
-        window.setTimeout(poll, 8000)
-      }
-      window.setTimeout(poll, 8000)
-    },
-    [docId],
-  )
-  const allSectionIds = useMemo(() => {
-    const ids: string[] = []
-    const walk = (nodes: LearnTreeNode[]) => {
-      for (const n of nodes) {
-        if (n.isSection) ids.push(n.id)
-        walk(n.children)
-      }
-    }
-    walk(tree)
-    return ids
-  }, [tree])
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
-
-  // Default = everything open; only the user's COLLAPSED choices persist (per book), so
-  // sections added by a later extraction still arrive expanded.
-  const storageKey = docId ? `txt2k:outline-collapsed:${docId}` : null
-  useEffect(() => {
-    if (!allSectionIds.length) return
-    let collapsed: string[] = []
-    if (storageKey) {
-      try {
-        collapsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]")
-      } catch {
-        collapsed = []
-      }
-    }
-    const hidden = new Set(collapsed)
-    setExpanded(new Set(allSectionIds.filter((id) => !hidden.has(id))))
-  }, [allSectionIds, storageKey])
-
-  const persistCollapsed = (nextExpanded: Set<string>) => {
-    if (!storageKey) return
-    try {
-      window.localStorage.setItem(
-        storageKey,
-        JSON.stringify(allSectionIds.filter((id) => !nextExpanded.has(id))),
-      )
-    } catch {
-      /* storage full/unavailable — expansion just won't persist */
-    }
-  }
-
-  const handleToggleExpand = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      persistCollapsed(next)
-      return next
-    })
-  }
-
-  const setAllExpanded = (open: boolean) => {
-    const next = open ? new Set(allSectionIds) : new Set<string>()
-    setExpanded(next)
-    persistCollapsed(next)
-  }
+  const ticks = useConceptTicks(docId, ticksOn, onConceptReviewed)
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground p-4">Loading syllabus…</p>
+    return (
+      <div className="space-y-2 p-2" aria-busy="true" aria-label="Loading syllabus">
+        <SkeletonRow />
+        <SkeletonRow />
+      </div>
+    )
   }
 
   if (tree.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground p-4">
+      <p className="p-4 text-body text-muted-foreground">
         No outline yet — convert a PDF with bookmarks, then build chapters from the Process page.
       </p>
     )
   }
 
+  const ctx: RowContext = {
+    filter,
+    selectedScope,
+    masteryBySection,
+    expanded,
+    numbers,
+    docId,
+    onToggleExpand: toggle,
+    onSelect: (n) => onSelectScope(n.sectionKey, n),
+    onSelectConcept,
+    ticks: ticksOn ? ticks : undefined,
+  }
   const rows = (
     <ul>
       {tree.map((node) => (
-        <TreeRow
-          key={node.id}
-          node={node}
-          depth={0}
-          filter={filter}
-          selectedScope={selectedScope}
-          masteryBySection={masteryBySection}
-          expanded={expanded}
-          onToggleExpand={handleToggleExpand}
-          onSelect={(n) => onSelectScope(n.sectionKey, n)}
-          onExtract={handleExtract}
-          extractState={extractState}
-          numbers={numbers}
-          onSelectConcept={onSelectConcept}
-          reviewedToday={reviewedToday}
-          gradingKey={gradingKey}
-          onTickConcept={ticksOn ? handleTickConcept : undefined}
-        />
+        <TreeRow key={node.id} node={node} depth={0} ctx={ctx} />
       ))}
     </ul>
   )
@@ -591,35 +148,26 @@ export function SyllabusTree({
             placeholder="Filter sections & concepts…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="pl-9 h-9"
+            className="h-9 pl-9"
           />
         </div>
-        <>
-            <button
-              type="button"
-              className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Expand all"
-              aria-label="Expand all"
-              onClick={() => setAllExpanded(true)}
-            >
-              <ChevronsUpDown className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Collapse all"
-              aria-label="Collapse all"
-              onClick={() => setAllExpanded(false)}
-            >
-              <ChevronsDownUp className="h-4 w-4" />
-            </button>
-        </>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" title="Expand all" aria-label="Expand all" onClick={() => setAll(true)}>
+          <ChevronsUpDown />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" title="Collapse all" aria-label="Collapse all" onClick={() => setAll(false)}>
+          <ChevronsDownUp />
+        </Button>
       </div>
-      {autoHeight ? (
-        <div className="px-2 pb-2">{rows}</div>
-      ) : (
-        <ScrollArea className="flex-1 px-2 pb-2">{rows}</ScrollArea>
+      {ticksOn && ticks.mastery.error && (
+        <ErrorNotice
+          compact
+          title="Couldn't load today's reviews"
+          error={ticks.mastery.error}
+          onRetry={ticks.mastery.retry}
+          className="px-2"
+        />
       )}
+      {autoHeight ? <div className="px-2 pb-2">{rows}</div> : <ScrollArea className="flex-1 px-2 pb-2">{rows}</ScrollArea>}
     </div>
   )
 }
