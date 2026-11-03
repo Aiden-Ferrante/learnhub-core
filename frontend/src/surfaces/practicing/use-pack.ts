@@ -5,12 +5,13 @@ import { fetchPack, gradeSkill, type Pack } from "@/gateways/api/packs"
 
 /** Data hooks for one exam pack.
  *
- *  Why not PACK_INVALIDATES: a unit page and the Today review set are DRAWS. Each GET
- *  marks its questions as seen (backend packs.learn_unit / review_set), so refetching one
- *  burns unseen questions and swaps the cards under the learner. Both live under
- *  qk.pack(key), so a pack write must never invalidate that prefix. Writes here
- *  invalidate Today and the badges, and the pack itself is refreshed EXACTLY through its
- *  query's retry(). Draws are read with `staleMs: Infinity` so focus never refetches. */
+ *  A unit page and the Today review set are DRAWS: each GET marks its questions as seen
+ *  (backend packs.learn_unit / review_set), so refetching one burns unseen questions and
+ *  swaps the cards under the learner. qk keeps them under roots.packDraw, outside every
+ *  invalidation. Writes here still use the narrow `packWrites` (Today and the badges)
+ *  rather than PACK_INVALIDATES, so an open sitting is never refetched mid-answer; the
+ *  pack itself is refreshed through its query's retry(). Draws are read with
+ *  `staleMs: Infinity` so focus never refetches. */
 
 /** What a pack write (grade, progress, sitting) makes stale, minus the draws. */
 export const packWrites = (packKey: string): (readonly unknown[])[] => [qk.packToday(packKey), roots.packs, roots.activity]

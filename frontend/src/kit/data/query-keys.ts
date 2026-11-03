@@ -49,6 +49,8 @@ export const roots = {
   audiobook: ["audiobook"],
   packs: ["packs"],
   pack: ["pack"],
+  /** Pack DRAWS (a unit page, the Today review set). Kept OUT of `pack` on purpose. */
+  packDraw: ["pack-draw"],
   sitting: ["sitting"],
   pdf: ["pdf-available"],
 } as const satisfies Record<string, QueryKey>
@@ -116,11 +118,16 @@ export const qk = {
   // ── Exam packs ─────────────────────────────────────────────────────────
   packs: (doc: string) => [...roots.packs, doc],
   packPresets: (doc: string) => [...roots.packs, doc, "presets"],
-  /** One pack; packToday / packUnit / packReviewSet live under it. */
+  /** One pack; packToday lives under it. */
   pack: (key: string) => [...roots.pack, key],
   packToday: (key: string) => [...roots.pack, key, "today"],
-  packReviewSet: (key: string) => [...roots.pack, key, "review"],
-  packUnit: (key: string, unit: string) => [...roots.pack, key, "unit", unit],
+  /** A unit page and the Today review set are DRAWS: each GET marks its questions as seen
+   *  on the server (packs.learn_unit / review_set), so a refetch burns unseen questions
+   *  and swaps the cards under the learner. They live under `roots.packDraw`, never under
+   *  `roots.pack`, so no pack invalidation can refetch them. Read them with
+   *  `staleMs: Infinity`; refresh one only through its own retry(). */
+  packReviewSet: (key: string) => [...roots.packDraw, key, "review"],
+  packUnit: (key: string, unit: string) => [...roots.packDraw, key, "unit", unit],
   /** One sitting; sittingResults lives under it. */
   sitting: (key: string) => [...roots.sitting, key],
   sittingResults: (key: string) => [...roots.sitting, key, "results"],
@@ -139,6 +146,7 @@ export const GRADE_INVALIDATES: QueryKey[] = [
   roots.activity,
 ]
 
-/** What a pack grade / sitting answer changes: the pack (incl. Today, units), its
- *  sittings and the badges (pack rows do not count there, but the heatmap does). */
+/** What a pack grade / sitting answer changes: the pack (incl. Today), its sittings and
+ *  the badges (pack rows do not count there, but the heatmap does). The draws
+ *  (packUnit, packReviewSet) are outside every root here, so this never refetches them. */
 export const PACK_INVALIDATES: QueryKey[] = [roots.pack, roots.sitting, roots.packs, roots.activity]
