@@ -19,7 +19,6 @@ export default function PacksPage({ params }: { params: Promise<{ courseId: stri
       docId={data.docKey ?? data.course.id}
       tree={data.tree}
       onOpen={(key) => router.push(`/courses/${courseId}/packs/${key}`)}
-      onBack={() => router.push(`/courses/${courseId}`)}
     />
   )
 }
