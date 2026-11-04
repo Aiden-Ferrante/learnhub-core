@@ -96,6 +96,11 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Visual pass, next cycle (human, 2026-11-04).** "Make the visuals more pleasing." Chosen
+  feel: *calm reading room*: warmer dark, softer contrast, more breathing room, serif body
+  for reading, sans labels. Dark only. Screens: Library + course home, Reading, Exam packs,
+  Review + recall (all four). Opens after v0.25.1 is tagged.
+
 - **ESLint.** (v0.25.0.) There is no config or package, so `next lint` stops at a setup prompt.
 - **Dead backend.** (v0.25.0.) The practice-session and old-exam backend routes, and their
   `prac-` rows, are unused since the frontend was removed. Deleting the rows is a migration and
