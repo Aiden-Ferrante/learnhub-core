@@ -102,9 +102,8 @@ not add to it mid-build.
   Review + recall (all four). Opens after v0.25.1 is tagged.
 
 - **ESLint.** (v0.25.0.) There is no config or package, so `next lint` stops at a setup prompt.
-- **Dead backend.** (v0.25.0.) The practice-session and old-exam backend routes, and their
-  `prac-` rows, are unused since the frontend was removed. Deleting the rows is a migration and
-  needs the human's decision.
+- **Deploy split.** (v0.25.1.) The agent may build images but not `up -d` on prod. Hand the
+  human that one command, with `!`.
 - **Unused hook.** (v0.25.0.) `kit/hooks/use-polling.ts` has no importers.
 - **Prod browser verification.** (v0.25.0.) Decide on a sanctioned way for agents to sign in, or
   keep using the human's Chrome.
