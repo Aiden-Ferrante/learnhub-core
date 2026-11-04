@@ -10,6 +10,7 @@ reason on the receipt, and a chapter that cannot fill its share of a paper is ma
 from __future__ import annotations
 
 import math
+import os
 import re
 import uuid
 from typing import Any
@@ -28,9 +29,24 @@ from app.gateways.llm_schemas import (
     PackWorkedSet,
 )
 from app.process.content import load_section_blocks, source_id_of
-from app.process.extraction.practice import _author_model, _judge_model
 from app.process.packs import gen
 from app.process.packs.sandbox import run_snippets
+
+
+def _author_model(override: str | None = None) -> str | None:
+    """request model → LEARN_PRACTICE_MODEL → LEARN_EXTRACT_MODEL → llm.py's default.
+    (The env names predate packs; they were the practice authors' and are kept.)"""
+    return (
+        override
+        or os.environ.get("LEARN_PRACTICE_MODEL")
+        or os.environ.get("LEARN_EXTRACT_MODEL")
+        or None
+    )
+
+
+def _judge_model() -> str | None:
+    """LEARN_PRACTICE_JUDGE_MODEL judges; unset, the author judges its own items."""
+    return os.environ.get("LEARN_PRACTICE_JUDGE_MODEL") or None
 
 SUMMARY_HEADING = re.compile(r"\b(summary|key takeaways?|recap)\b", re.I)
 PROBLEM_HEADING = re.compile(r"\b(quiz|exercises?|problems?|review questions|self[- ]test)\b", re.I)

@@ -71,8 +71,7 @@ def api_review_queue(
     session: str = Query("concepts"),
 ) -> JSONResponse:
     """Cards to review now for one chapter/section scope. An omitted scope (or
-    ``scope=course``) is the whole course: every due concept, skeleton and chapter card.
-    ``session=practice`` returns the separate practice-item queue instead."""
+    ``scope=course``) is the whole course: every due concept, skeleton and chapter card."""
     return JSONResponse(build_review_queue(doc, scope, limit, session=session))
 
 

@@ -7,6 +7,17 @@ commit.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-04
+
+Retire practice data.
+
+### Removed
+- **The old practice and exam backend.** Routes (`/api/practice*`, `/api/exams*`), the
+  practice-item generator and its checks, the `practice` build job, the `prac-` review type,
+  the `session=practice` queue and the Fluency read model.
+- **Their data.** Migration `2026-11-03-retire-practice.sql` drops `ext_practice` (163 items) and
+  `exam_sessions` (empty), and deletes the 2 practice build jobs. Pack data is untouched.
+
 ## [0.25.0] - 2026-11-03
 
 UI overhaul.
