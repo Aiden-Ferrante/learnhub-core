@@ -1,6 +1,8 @@
 """Ollama chat completions over the native HTTP API (httpx, no framework).
 
-JSON-schema/Pydantic-constrained generation, keyless and fully local. Calls Ollama's
+JSON-schema/Pydantic-constrained generation. Local and keyless by default; a model named
+``claude:<model>`` is the one exception and goes to the host's Claude CLI instead (see
+``CLAUDE_PREFIX`` below). For Ollama it calls the
 **native** ``/api/chat`` endpoint (NOT the OpenAI-compat ``/v1`` shim) with ``format``
 set to a JSON schema, so the model is grammar-constrained to emit matching JSON.
 ``OLLAMA_BASE_URL`` is the native root (``http://host:11434``); a stale ``/v1`` suffix
