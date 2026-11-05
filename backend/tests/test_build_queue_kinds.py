@@ -36,6 +36,15 @@ def test_kinds_registry_shape():
 # C3 (v0.18.0) — an extraction where every section failed is a failed extraction
 # --------------------------------------------------------------------------- #
 
+def _fake_extract(result):
+    """Stand-in for the async `extract_concepts_document`. Faking the coroutine function,
+    not `asyncio.run`, keeps the real event loop in the path and leaves no coroutine
+    created and never awaited."""
+    async def fake(**_k):
+        return result
+    return fake
+
+
 def test_an_extraction_with_every_section_failed_reports_failure(monkeypatch):
     """`extract_concepts_document` sets `error` only when the RUN could not start, and
     reports per-section outcomes otherwise. So a chapter whose every section timed out or
@@ -45,8 +54,8 @@ def test_an_extraction_with_every_section_failed_reports_failure(monkeypatch):
 
     monkeypatch.setattr(b, "_scope_keys", lambda *_a, **_k: ["toc:1", "toc:2"])
     monkeypatch.setattr(b, "concept_count", lambda *_a, **_k: 0)
-    monkeypatch.setattr(b.asyncio, "run", lambda _c: {
-        "sections": 2, "errors": 2, "extracted": 0, "concepts": 0, "outcomes": []})
+    monkeypatch.setattr(b, "extract_concepts_document", _fake_extract({
+        "sections": 2, "errors": 2, "extracted": 0, "concepts": 0, "outcomes": []}))
 
     class Ctx:
         phase = None
@@ -64,8 +73,8 @@ def test_a_partly_failed_extraction_still_succeeds(monkeypatch):
 
     monkeypatch.setattr(b, "_scope_keys", lambda *_a, **_k: ["toc:1", "toc:2"])
     monkeypatch.setattr(b, "concept_count", lambda *_a, **_k: 0)
-    monkeypatch.setattr(b.asyncio, "run", lambda _c: {
-        "sections": 3, "errors": 1, "extracted": 2, "concepts": 7, "outcomes": []})
+    monkeypatch.setattr(b, "extract_concepts_document", _fake_extract({
+        "sections": 3, "errors": 1, "extracted": 2, "concepts": 7, "outcomes": []}))
 
     class Ctx:
         phase = None
