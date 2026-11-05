@@ -12,7 +12,7 @@ import {
   useQueryClient,
   type QueryKey,
 } from "@tanstack/react-query"
-import { ApiError, toApiError } from "@/gateways/api/http"
+import { ApiError, toApiError } from "@/kit/data/api-error"
 
 /** Never retry a 4xx (the request itself is wrong) or a network failure twice. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {

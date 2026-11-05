@@ -39,8 +39,9 @@ export type ReviewGradeResponse = {
   error?: string
 }
 
-// Recall grades: 1=Again, 2=Hard, 3=Good, 4=Easy.
-export type ReviewGrade = 1 | 2 | 3 | 4
+// Recall grades: 1=Again, 2=Hard, 3=Good, 4=Easy. The type lives with the grade scale in kit.
+import type { ReviewGrade } from '@/kit/study/grade-buttons'
+export type { ReviewGrade }
 
 // Due + new concepts to review for one chapter/section scope (studying is chapter-scoped).
 // `docId` must be the learnDocId (concepts/reviews are keyed by it).

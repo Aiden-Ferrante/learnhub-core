@@ -2,9 +2,12 @@
 
 import { Button } from "@/kit/ui/button"
 import { ErrorNotice } from "@/kit/data/error-notice"
-import type { ApiError } from "@/gateways/api/http"
-import type { ReviewGrade } from "@/gateways/api/review"
+import type { ApiError } from "@/kit/data/api-error"
 import { cn } from "@/kit/lib/utils"
+
+/** A recall grade: 1=Again, 2=Hard, 3=Good, 4=Easy. Defined here, with the scale, so the kit
+ *  needs nothing from gateways; gateways/api/review re-exports it for its submit calls. */
+export type ReviewGrade = 1 | 2 | 3 | 4
 
 /** THE recall grade scale (1=Again … 4=Easy) with its button styling. Review, skeleton
  *  recall, the concept detail and a pack's written-answer marks all render this one scale.

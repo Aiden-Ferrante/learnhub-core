@@ -3,7 +3,7 @@
 import { AlertTriangle, RotateCcw } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { cn } from "@/kit/lib/utils"
-import { toApiError, type ApiError } from "@/gateways/api/http"
+import { toApiError, type ApiError } from "@/kit/data/api-error"
 
 /** The sentence a person sees for a failed request: the service-down and not-found cases
  *  get fixed words, everything else shows the server's own message. */
