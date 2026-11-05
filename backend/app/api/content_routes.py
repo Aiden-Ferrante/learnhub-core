@@ -12,12 +12,12 @@ import os
 from pathlib import Path
 
 from app import tokens
-from app.process.content.documents import deletion_impact
-from app.supplemental.media.audiobook import list_audiobooks
+from app.supplemental.media import list_audiobooks
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.process.content import (
+    deletion_impact,
     chapter_units,
     create_version,
     delete_document,

@@ -40,6 +40,7 @@ from app.process.content.outline_edit import (
 from app.process.content.editing import edit_block, revert_block, section_material, stale_sections
 from app.process.content.documents import (
     create_stub,
+    deletion_impact,
     delete_document,
     document_overview,
     fetch_latest_document,
@@ -88,6 +89,7 @@ __all__ = [
     "chapter_units",
     "clean_heading_markup",
     "create_stub",
+    "deletion_impact",
     "delete_document",
     "document_overview",
     "fetch_blocks",

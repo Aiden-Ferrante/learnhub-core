@@ -32,7 +32,7 @@ APP = os.path.join(ROOT, "app")
 LAYERS = {
     "gateways": 0,
     "process.content": 1,
-    "process.ingestion": 2, "process.extraction": 2, "supplemental.study": 2, "supplemental.media": 2,
+    "process.ingestion": 2, "process.extraction": 2, "process.packs": 2, "supplemental.study": 2, "supplemental.media": 2,
     "conductor": 3,
     "api": 4,
 }

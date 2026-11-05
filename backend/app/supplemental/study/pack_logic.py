@@ -10,7 +10,7 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from app.process.packs import gen
+from app.process.packs import render_unseen
 
 
 def _question(item: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -25,7 +25,7 @@ def _question(item: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
 
 def _instance(item: dict[str, Any], seen: set[str], seed: int, choices: int):
     if item["qtype"] == "gen":
-        return gen.render_unseen(item["payload"]["spec"], seen, seed, choices)
+        return render_unseen(item["payload"]["spec"], seen, seed, choices)
     fp = f"item:{item['key']}"
     return None if fp in seen else {**item["payload"], "fingerprint": fp}
 

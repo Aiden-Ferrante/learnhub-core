@@ -16,7 +16,7 @@ from psycopg.types.json import Json
 
 from app.gateways import db, enqueue_build
 from app.process.content import resolve_doc_id, source_id_of
-from app.process.packs import gen
+from app.process.packs import render_unseen
 from app.supplemental.study.pack_logic import draw_paper, mark, public_question, today_plan
 from app.supplemental.study.reviews import grade_review, pack_review_key
 
@@ -155,7 +155,7 @@ def learn_unit(pack: str, unit: str) -> dict[str, Any]:
         rng = random.Random()
         for it in items:
             if it["qtype"] == "gen" and it["role"] == "exam" and len(test) < 3:
-                inst = gen.render_unseen(it["payload"]["spec"], seen, rng.randrange(1 << 30),
+                inst = render_unseen(it["payload"]["spec"], seen, rng.randrange(1 << 30),
                                          int(fmt.get("choices") or 5))
                 if inst:
                     seen.add(inst["fingerprint"])
@@ -345,7 +345,7 @@ def review_set(pack: str) -> dict[str, Any]:
             g = next((i for i in own if i["qtype"] == "gen"), None)
             m = next((i for i in own if i["qtype"] == "mcq"), None)
             if g:
-                inst = gen.render_unseen(g["payload"]["spec"], seen, rng.randrange(1 << 30))
+                inst = render_unseen(g["payload"]["spec"], seen, rng.randrange(1 << 30))
                 if inst:
                     seen.add(inst["fingerprint"])
                     shown.append(inst["fingerprint"])
