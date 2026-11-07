@@ -50,12 +50,19 @@ Chart. A project is a problem with a repo attached; one repo, one problem.
 ## What holds the fleet together (run before you close)
 
 - `bash fleet-ui/check.sh` — visual: every colour, type size and face from fleet.css; no `dark:`;
-  no `outline: none`; registry copies and built bundles know every app.
+  no `outline: none`; registry copies and built bundles know every app; then it **opens every
+  running app in a browser** (`tools/live_check.py`) and fails if any header differs in height,
+  edges, tabs or baseline, or a page scrolls sideways at 375px. A down app fails.
 - `python3 fleet/check_fleet.py` — structural: Makefile test targets resolve, streams have onerror,
   apps.js ⨝ apps.yaml, AI 101 section keys, agent docs current.
 - `python3 mission-control/scripts/check_freshness.py` — runtime: every `/health` conforms to
   `{ok, checks, freshness}`; `ok` covers only what the app owns.
 - The repo's own `make test`. A green suite over fixtures never closes a phase — open the real page.
+
+**Check inside the running app, always.** A grep, a type-check or a passing suite proves the source;
+only the rendered app proves the result. After any change a user can see: rebuild/restart, load the
+real page in a headless browser, measure what you claim (positions, sizes, text, console errors) and
+look at the screenshot — and for anything shared, compare it against the sibling apps, not alone.
 
 ## Never
 
