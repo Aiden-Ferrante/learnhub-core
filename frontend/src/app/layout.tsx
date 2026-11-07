@@ -40,7 +40,7 @@ export default function RootLayout({
                 {/* Tier heights pinned to the fleet's 38px + 49px (+1px header
                     border = 88px) — as MINIMUMS, like fleet.css: a wrapped tier
                     on a narrow screen grows instead of clipping. */}
-                <div className="flex min-h-[38px] items-center border-b border-border/60">
+                <div className="box-border flex min-h-[38px] items-center border-b border-border/60 pt-[0.4rem]">
                   <FleetApps />
                 </div>
               </div>
