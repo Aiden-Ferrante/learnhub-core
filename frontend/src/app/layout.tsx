@@ -58,7 +58,8 @@ export default function RootLayout({
                 </div>
               </div>
             </header>
-            {children}
+            {/* The calm reading room: page content takes the warm palette; the header keeps the fleet's. */}
+            <div className="room">{children}</div>
             <ShortcutsHelp />
             <Toaster />
           </DocumentProvider>

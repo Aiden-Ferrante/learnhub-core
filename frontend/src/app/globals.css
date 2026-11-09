@@ -545,3 +545,55 @@ body {
    to kit/patterns/section-card and the plain `rounded-lg border bg-card` the
    other twenty files use. Its five call sites now use that plain one, which is
    the same box shipyard draws. .build-gradient-text went with .gradient-text. */
+
+/* The calm reading room (v0.28.0; the human's brief 2026-11-04): a warmer dark, softer
+   contrast, more air, a serif body for reading and sans for labels. Dark only.
+
+   Scoped to the page content (layout.tsx wraps {children} in .room), never :root: the header
+   is shared chrome and stays on the fleet's zinc so it matches the sibling apps. The --fleet-*
+   aliases are restated here because a custom property resolves where it is declared, so
+   :root's `--fleet-bg: hsl(var(--background))` would keep reading the zinc ground. */
+.room {
+  --background: 30 9% 7%;
+  --foreground: 38 22% 86%;
+  --card: 30 8% 10.5%;
+  --card-foreground: 38 22% 86%;
+  --popover: 30 8% 10.5%;
+  --popover-foreground: 38 22% 86%;
+  --secondary: 30 6% 15%;
+  --secondary-foreground: 38 22% 86%;
+  --muted: 30 6% 15%;
+  --muted-foreground: 33 9% 62%;
+  --accent: 30 6% 15%;
+  --accent-foreground: 38 22% 86%;
+  --border: 30 7% 17%;
+  --input: 30 7% 17%;
+  --fleet-bg: hsl(var(--background));
+  --fleet-surface: hsl(var(--card));
+  --fleet-border: hsl(var(--border));
+  --fleet-text: hsl(var(--foreground));
+  --fleet-text-dim: hsl(36 14% 76%);
+  --fleet-text-faint: hsl(var(--muted-foreground));
+  min-height: calc(100vh - var(--fleet-header-h));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Graph paper, fainter: the study theme's grid stays, but recedes behind the work. */
+.room .study-page {
+  background-image: linear-gradient(color-mix(in srgb, var(--fleet-border) 22%, transparent) 1px, transparent 1px),
+                    linear-gradient(90deg, color-mix(in srgb, var(--fleet-border) 22%, transparent) 1px, transparent 1px);
+}
+
+/* More air: wider sheet margins, roomier rows, a longer line for reading. */
+.room .study-sheet { padding: 28px 32px; gap: 1rem; }
+.room .study-choice { padding: 12px 14px; }
+.room .study-note { padding: 12px 16px; }
+@media (max-width: 640px) { .room .study-sheet { padding: 20px 18px; } }
+
+/* Serif for what you read (paragraphs, lists, quotes, table cells), sans for what you scan
+   (headings, labels, buttons, choices). Code keeps its own face: it is set on the element, not inherited. */
+.room .markdown-reader :is(p, li, blockquote, td, dd) { font-family: var(--reading-serif); line-height: 1.75; }
+/* Reading text that is not a markdown document: a pack's chunk (.reading), a concept's statement (.concept-md). */
+.room .reading { font-family: var(--reading-serif); line-height: 1.7; }
+.room .concept-md { font-family: var(--reading-serif); }

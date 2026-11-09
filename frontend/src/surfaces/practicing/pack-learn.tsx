@@ -110,7 +110,7 @@ function UnitBody({ pack, unit, progress, onChanged }: {
           <p className="text-xs text-muted-foreground">
             {unit.chunk?.source === "book_summary" ? "Compressed from the book's summary and sections." : "The book has no summary here, so this is compressed from its sections."}
           </p>
-          <ul className="flex list-disc flex-col gap-2 pl-5 text-sm">
+          <ul className="reading flex list-disc flex-col gap-2.5 pl-5 text-sm">
             {unit.chunk?.points.map((p, i) => (
               <li key={i}>{p.text} <span className="font-mono text-micro text-muted-foreground">{cite(p.sectionKey)}</span></li>
             ))}
