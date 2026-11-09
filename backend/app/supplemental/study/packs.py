@@ -67,9 +67,16 @@ def set_scope_notes(key: str, notes: str) -> dict[str, Any]:
             return {"error": "no such pack"}
         if p["status"] == "building":
             return {"error": "the pack is still building; change the notes once it is ready"}
-        conn.execute("UPDATE exam_packs SET config = jsonb_set(config, '{scopeNotes}', to_jsonb(%(n)s::text)) "
-                     "WHERE key = %(k)s", {"n": (notes or "").strip(), "k": key})
-    enqueue_build(p["doc_id"], f"reweight:{key}", kind="pack", payload={"packKey": key, "reweight": True})
+        # 'building' now, not when the worker picks the job up: the page refetches on save and
+        # polls only while building, so a later flip would leave it showing the old receipt.
+        conn.execute("UPDATE exam_packs SET status = 'building', "
+                     "config = jsonb_set(config, '{scopeNotes}', to_jsonb(%(n)s::text)) WHERE key = %(k)s",
+                     {"n": (notes or "").strip(), "k": key})
+    job = enqueue_build(p["doc_id"], f"reweight:{key}", kind="pack", payload={"packKey": key, "reweight": True})
+    if job.get("error"):
+        with db() as conn:
+            conn.execute("UPDATE exam_packs SET status = 'ready' WHERE key = %(k)s", {"k": key})
+        return {"error": f"could not queue the reweight: {job['error']}"}
     return {"ok": True}
 
 
