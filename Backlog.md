@@ -101,6 +101,11 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **A detached July volume, `compose_learnhub_shared`** (v0.26.2, ~527 MB, no container). Delete
+  it or keep it: the human's call (`docker volume rm`).
+- **Two exhaustive-deps lint warnings** (chapter page, use-chapter-dom). They look deliberate.
+  Confirm, then disable them inline.
+
 - **Axler and Durrett are still in the library.** (v0.26.1.) They are now deletable from the
   Library. Whether to delete them is the human's call.
 - **`followMainVersion` is unverified live.** (v0.26.1.) Check it on the next real version switch.
@@ -116,24 +121,16 @@ not add to it mid-build.
   for reading, sans labels. Dark only. Screens: Library + course home, Reading, Exam packs,
   Review + recall (all four). Opens after v0.25.1 is tagged.
 
-- **ESLint.** (v0.25.0.) There is no config or package, so `next lint` stops at a setup prompt.
 - **Deploy split.** (v0.25.1.) The agent may build images but not `up -d` on prod. Hand the
   human that one command, with `!`.
-- **Unused hook.** (v0.25.0.) `kit/hooks/use-polling.ts` has no importers.
 - **Prod browser verification.** (v0.25.0.) Decide on a sanctioned way for agents to sign in, or
   keep using the human's Chrome.
 
 - **The human reads generated pack questions.** (v0.24.0, 2026-11-01.) Shipped without it; the
   repo's criterion for generated content is still owed.
-- **Reconvert Python Essentials 2.** (v0.24.0.) Its upload is in `Error` with no content.
 - **Agent docs are stale across the fleet and feedwall's source is behind its repo.** (v0.24.0.)
   Fix `fleet/agents` before rendering, or feedwall loses its current credentials note.
 
-- **333 MB of orphaned files, from deletes that predate v0.17.0.** One ingest directory
-  (3.5 MB, 2026-07-17) and four audiobook directories (121 MB, 178 MB, 26 MB, 5.7 MB), none
-  with a source row. Nothing creates these any more — the delete path removes both trees now —
-  so this is a one-off sweep, not a recurring leak. Worth a `scripts/` reaper that lists
-  orphans and removes them on `--apply`, in the shape of the other two scripts.
 - **A browser check that cannot fail is not a check.** (v0.17.0.) A card deleted from the
   Processing tab stays deleted whether or not the backend was called, because a card with no
   `learnDocId` is pruned client-side. Verifying it required arranging for a specific number to

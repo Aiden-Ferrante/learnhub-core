@@ -7,6 +7,17 @@ commit.
 
 ## [Unreleased]
 
+## [0.26.2] - 2026-11-09
+
+Sweep.
+
+### Added
+- **ESLint** (eslint 9, Next's core-web-vitals + TypeScript sets). `next lint` runs, with 0 errors.
+
+### Removed
+- The unused `use-polling` hook.
+- The failed Python Essentials 2 upload (no content), deleted through the app.
+
 ## [0.26.1] - 2026-11-09
 
 Numbers that count everything.
