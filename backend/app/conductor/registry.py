@@ -15,7 +15,7 @@ from app.conductor.ingest import run_convert
 from app.conductor.worker import ensure_worker, register_runner
 from app.process.extraction import author_guides_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
-from app.process.packs.author import build_pack
+from app.process.packs import build_pack
 from app.gateways import set_doc_resolver
 from app.supplemental.media import run_audiobook, warm_tts
 

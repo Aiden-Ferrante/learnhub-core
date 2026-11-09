@@ -28,7 +28,7 @@ _FURNITURE = re.compile(
     r"|\bthe (?:textbook|book|author|passage|chapter)(?:'s)? (?:says|said|states|claims|describes|"
     r"mentions|calls|recommends|explains|defines|uses|shows|gives|lists|warns)\b"
     r"|\b(?:does|did|do|would|will) the (?:textbook|book|author|text|passage|chapter)\b"
-    r"|\btextbook\b|\bthe authors?\b"
+    r"|\btextbook\b"
     r"|\b(?:table|figure|fig\.|listing) \d+(?:[-.]\d+)*\b",
     re.I,
 )
