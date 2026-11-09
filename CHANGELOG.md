@@ -7,6 +7,21 @@ commit.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-09
+
+Notes that steer the paper.
+
+### Added
+- **Scope notes after the build.** Results has a Scope notes panel. Saving reweights each skill
+  (0.5–3, one model call per chapter, no new questions) and shows what changed and why.
+
+### Changed
+- **A skill's weight sets how often it is drawn.** Before, it only set the order within a
+  chapter. A generator serves at most 5 questions a paper.
+
+### Fixed
+- Pack receipt writes cast to jsonb. A real-Postgres test now covers them.
+
 ## [0.26.2] - 2026-11-09
 
 Sweep.

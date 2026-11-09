@@ -101,6 +101,9 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Run the PG test tier before every close.** (v0.27.0.) `LEARN_PG_TESTS=1` caught what 195
+  stubbed tests could not. Consider making it part of `make test`.
+
 - **A detached July volume, `compose_learnhub_shared`** (v0.26.2, ~527 MB, no container). Delete
   it or keep it: the human's call (`docker volume rm`).
 - **Two exhaustive-deps lint warnings** (chapter page, use-chapter-dom). They look deliberate.
