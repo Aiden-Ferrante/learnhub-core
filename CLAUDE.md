@@ -81,7 +81,6 @@ grow one app into another's tier (helm is the scheduler; shipyard owns the chart
 | Content | `content-manager` | `:8955` | channels, productions, scripts |
 | Feed | `feedwall` | `:8975` | what the frontier said this week |
 | Control | `mission-control` | `:9090` | what is running |
-| Study | `studyloop` | `:8963` | the focus-block loop, concepts per hour |
 | — | `vaultwriter` | `:8799` | the one vault writer (library tier) |
 | — | `learnhub` API | `:8010` | Learn Hub's FastAPI behind the :3001 UI |
 
