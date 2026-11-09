@@ -23,9 +23,10 @@ def test_seen_items_are_excluded_and_the_paper_comes_up_short():
     assert [q["itemKey"] for q in qs] == ["b"] and short == 5
 
 
-def test_a_generator_serves_many_distinct_instances():
+def test_a_generator_serves_many_distinct_instances_up_to_its_capacity():
+    # v0.27.0: capped at GEN_SERVES (5), the capacity pool_capacity already credits it with.
     qs, short = draw_paper([item("g", "gen")], FMT, set(), 5)
-    assert short == 0 and len({q["fingerprint"] for q in qs}) == 6
+    assert short == 1 and len({q["fingerprint"] for q in qs}) == 5
 
 
 def test_two_sittings_share_no_instance():
@@ -61,3 +62,26 @@ def test_today_walks_stages_then_offers_the_exam():
     assert plan["now"]["stage"] == "steps"
     done = {**unit, "progress": {"chunk": True, "steps": True, "test": {"good": 1, "total": 1}}}
     assert today_plan({"config": {}}, [done], [], [], None)["now"]["kind"] == "exam"
+
+
+def test_weight_sets_how_often_a_skill_is_drawn():
+    """Scope notes weight 3 against 1: across many papers the heavy skill is drawn ~3x."""
+    from collections import Counter
+    pool = [{**item(f"h{i}", skill="heavy"), "weight": 3} for i in range(40)] + \
+           [{**item(f"l{i}", skill="light"), "weight": 1} for i in range(40)]
+    seen = Counter()
+    for seed in range(200):
+        qs, _ = draw_paper(pool, {**FMT, "count": 4}, set(), seed)
+        seen.update(q["skill"] for q in qs)
+    ratio = seen["heavy"] / seen["light"]
+    assert 2.2 < ratio < 4.0, ratio
+
+
+def test_equal_weights_draw_evenly():
+    from collections import Counter
+    pool = [item(f"a{i}", skill="a") for i in range(40)] + [item(f"b{i}", skill="b") for i in range(40)]
+    seen = Counter()
+    for seed in range(200):
+        qs, _ = draw_paper(pool, {**FMT, "count": 4}, set(), seed)
+        seen.update(q["skill"] for q in qs)
+    assert 0.8 < seen["a"] / seen["b"] < 1.25

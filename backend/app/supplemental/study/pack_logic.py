@@ -30,11 +30,22 @@ def _instance(item: dict[str, Any], seen: set[str], seed: int, choices: int):
     return None if fp in seen else {**item["payload"], "fingerprint": fp}
 
 
+GEN_SERVES = 5  # a generator's most questions on one paper: the same 5 the build receipt counts it as
+
+
+def weighted_pick(cands: list[dict[str, Any]], rng: random.Random) -> int:
+    """Index of one candidate, chosen with probability proportional to its weight."""
+    weights = [max(0.05, float(c.get("weight") or 1)) for c in cands]
+    return max(range(len(cands)), key=lambda i: rng.random() ** (1.0 / weights[i]))
+
+
 def draw_paper(items: list[dict[str, Any]], fmt: dict[str, Any], seen: set[str],
                seed: int) -> tuple[list[dict[str, Any]], int]:
     """(questions, how many short). Units take turns so a paper spreads across the chapters
-    picked, skills weighted by scope notes. A generator may serve several questions; a fixed
-    item serves one. When the pool runs dry the paper ends there."""
+    picked. Within a chapter, each pick is drawn in proportion to its skill's weight, so a
+    skill the scope notes weight 2 comes up about twice as often as one at 1. A generator may
+    serve up to GEN_SERVES questions with fresh numbers; a fixed item serves one. When the
+    pool runs dry the paper ends there."""
     count = int(fmt.get("count") or 20)
     choices = int(fmt.get("choices") or 5)
     want_written = round(count * float(fmt.get("writtenShare") or 0))
@@ -47,9 +58,7 @@ def draw_paper(items: list[dict[str, Any]], fmt: dict[str, Any], seen: set[str],
         units: dict[str, list[dict[str, Any]]] = {}
         for it in cands:
             units.setdefault(it["unit_key"], []).append(it)
-        for u in units.values():
-            rng.shuffle(u)
-            u.sort(key=lambda i: -float(i.get("weight") or 1))
+        served: dict[str, int] = {}
         taken = 0
         progress = True
         while taken < limit and progress:
@@ -57,16 +66,18 @@ def draw_paper(items: list[dict[str, Any]], fmt: dict[str, Any], seen: set[str],
             for u in units.values():
                 if taken >= limit or not u:
                     continue
-                it = u.pop(0)
+                it = u[weighted_pick(u, rng)]
                 body = _instance(it, used, rng.randrange(1 << 30), choices)
+                served[it["key"]] = served.get(it["key"], 0) + 1
+                if it["qtype"] != "gen" or not body or served[it["key"]] >= GEN_SERVES:
+                    u.remove(it)  # fixed items serve once; a generator until its cap or dry
                 if not body:
+                    progress = True  # this unit still has others to try
                     continue
                 used.add(body["fingerprint"])
                 out.append(_question(it, body))
                 taken += 1
                 progress = True
-                if it["qtype"] == "gen":
-                    u.append(it)  # fresh numbers, so it may serve again after the others
 
     take([i for i in pool if i["qtype"] == "written"], want_written)
     take([i for i in pool if i["qtype"] in ("gen", "mcq")], count - len(out))
