@@ -12,8 +12,22 @@ import type { Pack, Step } from "@/gateways/api/packs"
 
 export const cite = (key: string) => `§ ${key.replace(/^toc:/, "")}`
 
+const CODE_LINE = /^\s|[=()[\]{}:#]|^(print|for|if|elif|else|while|def|class|import|from|try|except|finally|return|del|pass|with|raise|assert)\b/
+
+/** A stem's program, kept as a program. Book problems store "question, blank line, code";
+ *  markdown would join the code's lines into one, so a trailing block whose every line reads
+ *  as code is fenced. */
+export function fenceTrailingCode(text: string): string {
+  const cut = text.search(/\n\s*\n/)
+  if (cut < 0 || text.includes("```")) return text
+  const rest = text.slice(cut).replace(/^\s*\n/, "")
+  const lines = rest.split("\n").filter((l) => l.trim())
+  if (lines.length === 0 || rest.includes("![") || !lines.every((l) => CODE_LINE.test(l))) return text
+  return `${text.slice(0, cut)}\n\n\`\`\`python\n${rest.replace(/\s+$/, "")}\n\`\`\``
+}
+
 export function Prose({ text }: { text: string }) {
-  return <MarkdownReader content={text} proseSize="sm" className="mx-0 max-w-none text-left" />
+  return <MarkdownReader content={fenceTrailingCode(text)} proseSize="sm" className="mx-0 max-w-none text-left" />
 }
 
 /** "3 of 5 chapters ready", plus why any chapter failed. Hidden once every chapter built. */
