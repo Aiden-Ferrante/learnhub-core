@@ -58,6 +58,21 @@ def create_pack(doc: str | None, title: str, chapters: list[dict[str, str]],
     return {"key": key}
 
 
+def set_scope_notes(key: str, notes: str) -> dict[str, Any]:
+    """Change a built pack's scope notes and queue the reweight: new skill weights, same
+    questions. Notes steer what a paper draws; they never add material."""
+    with db() as conn:
+        p = conn.execute("SELECT doc_id, status FROM exam_packs WHERE key = %(k)s", {"k": key}).fetchone()
+        if not p:
+            return {"error": "no such pack"}
+        if p["status"] == "building":
+            return {"error": "the pack is still building; change the notes once it is ready"}
+        conn.execute("UPDATE exam_packs SET config = jsonb_set(config, '{scopeNotes}', to_jsonb(%(n)s::text)) "
+                     "WHERE key = %(k)s", {"n": (notes or "").strip(), "k": key})
+    enqueue_build(p["doc_id"], f"reweight:{key}", kind="pack", payload={"packKey": key, "reweight": True})
+    return {"ok": True}
+
+
 def _units(conn, key: str) -> list[dict[str, Any]]:
     return conn.execute(
         'SELECT key, section_key AS "sectionKey", title, "order", status, receipt, progress, '

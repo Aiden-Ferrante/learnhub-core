@@ -1,7 +1,7 @@
 "use client"
 
 import { qk, roots, useApi, useApiMutation } from "@/kit/data"
-import { fetchPack, gradeSkill, type Pack } from "@/gateways/api/packs"
+import { fetchPack, gradeSkill, saveScopeNotes, type Pack } from "@/gateways/api/packs"
 
 /** Data hooks for one exam pack.
  *
@@ -16,7 +16,8 @@ import { fetchPack, gradeSkill, type Pack } from "@/gateways/api/packs"
 /** What a pack write (grade, progress, sitting) makes stale, minus the draws. */
 export const packWrites = (packKey: string): (readonly unknown[])[] => [qk.packToday(packKey), roots.packs, roots.activity]
 
-const building = (p: Pack | undefined) => Boolean(p?.units.some((u) => u.status === "queued" || u.status === "building"))
+const building = (p: Pack | undefined) =>
+  p?.status === "building" || Boolean(p?.units.some((u) => u.status === "queued" || u.status === "building"))
 
 /** The pack, polled every 5 s while any chapter is still building. */
 export function usePack(packKey: string) {
@@ -30,5 +31,12 @@ export function useGradeSkill(packKey: string, skill: string, onSaved?: (correct
   return useApiMutation((correct: boolean) => gradeSkill(packKey, skill, correct), {
     invalidates: packWrites(packKey),
     onSuccess: (_r, correct) => onSaved?.(correct),
+  })
+}
+
+/** Save new scope notes; the pack query then polls while the reweight runs. */
+export function useSaveScopeNotes(packKey: string) {
+  return useApiMutation((notes: string) => saveScopeNotes(packKey, notes), {
+    invalidates: [qk.pack(packKey), roots.packs],
   })
 }

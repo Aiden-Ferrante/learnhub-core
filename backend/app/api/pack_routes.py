@@ -62,6 +62,12 @@ def api_progress(key: str, unit: str, body: dict = Body(...)) -> JSONResponse:
     return _out(packs.set_progress(key, unit, body or {}))
 
 
+@router.post("/api/packs/{key}/notes")
+def api_notes(key: str, body: dict = Body(...)) -> JSONResponse:
+    """Change the scope notes of a built pack and reweight its skills (no rebuild)."""
+    return _out(packs.set_scope_notes(key, str(body.get("scopeNotes") or "")))
+
+
 @router.post("/api/packs/{key}/grade")
 def api_grade(key: str, body: dict = Body(...)) -> JSONResponse:
     return _out(packs.grade_learn(key, str(body.get("skill") or ""), bool(body.get("correct"))))

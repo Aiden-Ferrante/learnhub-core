@@ -5,7 +5,7 @@ import { AsyncView, qk, useApi } from "@/kit/data"
 import { Note, Sheet, Track } from "@/kit/study"
 import { fetchResults, type Bucket, type Pack } from "@/gateways/api/packs"
 import { EmptySheet } from "@/surfaces/practicing/pack-shared"
-import { PastSittings, BuildReceipt } from "@/surfaces/practicing/pack-receipt"
+import { PastSittings, BuildReceipt, ScopeNotes } from "@/surfaces/practicing/pack-receipt"
 import { ResultQuestion } from "@/surfaces/practicing/result-question"
 
 const pct = (good: number, total: number) => (total ? Math.round((good / total) * 100) : 0)
@@ -70,6 +70,7 @@ export function ResultsTab({ pack, sitting, onPick, onChanged }: {
         </AsyncView>
       )}
       <PastSittings pack={pack} onPick={onPick} />
+      <ScopeNotes pack={pack} />
       <BuildReceipt pack={pack} />
     </>
   )

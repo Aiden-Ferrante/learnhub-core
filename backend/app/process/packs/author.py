@@ -24,6 +24,7 @@ from app.gateways import (
     PackGeneratorSet,
     PackSkillSet,
     PackVerdictSet,
+    PackWeightSet,
     PackWorkedSet,
     db,
     ollama_structured_completion,
@@ -405,6 +406,66 @@ def build_pack(pack: str, on_progress=None) -> dict[str, Any]:
     return finalize_pack(pack)
 
 
+MIN_WEIGHT, MAX_WEIGHT = 0.5, 3.0
+
+
+def reweigh(skills: list[dict[str, Any]], notes: str, model: str | None) -> list[dict[str, Any]]:
+    """New weights for one chapter's skills from the learner's scope notes. Notes reweight;
+    they never add: a skill the model invents is ignored, and an empty note resets to 1."""
+    if not notes.strip():
+        return [{**s, "to": 1.0, "reason": "no scope notes"} for s in skills]
+    listing = "\n".join(f"- {s['skill']}: {s['label']}" for s in skills)
+    got = _ask(
+        "Weight each skill for an exam by the learner's scope notes: 1 is normal, up to 3 for "
+        "what the notes emphasize, down to 0.5 for what they de-emphasize or say is not on the "
+        "exam. Skills the notes do not touch stay at 1. Give a short reason for any change.",
+        f"Skills:\n{listing}\n\nScope notes:\n{notes}", PackWeightSet, model)
+    by = {w["skillId"]: w for w in got["weights"]}
+    out = []
+    for s in skills:
+        w = by.get(s["skill"]) or {}
+        to = min(MAX_WEIGHT, max(MIN_WEIGHT, float(w.get("weight") or 1.0)))
+        out.append({**s, "to": round(to, 2), "reason": (w.get("reason") or "")[:160]})
+    return out
+
+
+def reweight_pack(pack: str, on_progress=None) -> dict[str, Any]:
+    """The reweight job: new skill weights from the pack's current scope notes, written onto
+    its items. No content is regenerated, so it costs one model call per chapter."""
+    with db() as conn:
+        p = conn.execute("SELECT config FROM exam_packs WHERE key = %(k)s", {"k": pack}).fetchone()
+        if not p:
+            return {"error": "no such pack"}
+        notes = (p["config"] or {}).get("scopeNotes") or ""
+        units = conn.execute("SELECT key, title FROM pack_units WHERE pack_key = %(k)s AND status = 'ready' "
+                             'ORDER BY "order"', {"k": pack}).fetchall()
+        conn.execute("UPDATE exam_packs SET status = 'building' WHERE key = %(k)s", {"k": pack})
+    author = _author_model(None)
+    changes: list[dict[str, Any]] = []
+    failed: list[dict[str, str]] = []
+    for n, u in enumerate(units):
+        with db() as conn:
+            skills = conn.execute(
+                "SELECT skill, max(skill_label) AS label, max(weight) AS weight FROM pack_items "
+                "WHERE unit_key = %(u)s GROUP BY skill ORDER BY skill", {"u": u["key"]}).fetchall()
+        try:
+            for s in reweigh(skills, notes, author):
+                if abs(float(s["weight"] or 1) - s["to"]) > 1e-9:
+                    with db() as conn:
+                        conn.execute("UPDATE pack_items SET weight = %(w)s WHERE unit_key = %(u)s AND skill = %(s)s",
+                                     {"w": s["to"], "u": u["key"], "s": s["skill"]})
+                    changes.append({"unit": u["title"], "skill": s["label"], "from": float(s["weight"] or 1),
+                                    "to": s["to"], "reason": s["reason"]})
+        except Exception as e:  # noqa: BLE001  # one chapter must not sink the rest
+            failed.append({"title": u["title"], "error": str(e)[:200]})
+        if on_progress:
+            on_progress(n + 1, len(units), u["title"])
+    with db() as conn:
+        conn.execute("UPDATE exam_packs SET status = 'ready', receipt = receipt || %(r)s WHERE key = %(k)s",
+                     {"r": Json({"reweight": {"notes": notes, "changes": changes, "failed": failed}}), "k": pack})
+    return {"changes": len(changes), "failed": failed}
+
+
 def pack_totals(units: list[dict[str, Any]]) -> dict[str, Any]:
     """The pack receipt, summed over every chapter's own receipt. Computed from the stored
     units, not from this run, so re-running one failed chapter cannot shrink the totals."""
@@ -427,8 +488,8 @@ def finalize_pack(pack: str) -> dict[str, Any]:
                              'ORDER BY "order"', {"k": pack}).fetchall()
         totals = pack_totals(units)
         ok = any(u["status"] == "ready" for u in units)
-        conn.execute("UPDATE exam_packs SET status = %(s)s, receipt = %(r)s WHERE key = %(k)s",
-                     {"s": "ready" if ok else "failed", "r": Json(totals), "k": pack})
+        conn.execute("UPDATE exam_packs SET status = %(s)s, receipt = coalesce(receipt, '{}'::jsonb) || %(r)s "
+                     "WHERE key = %(k)s", {"s": "ready" if ok else "failed", "r": Json(totals), "k": pack})
     return totals
 
 

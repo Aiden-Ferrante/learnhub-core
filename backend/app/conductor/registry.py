@@ -15,7 +15,7 @@ from app.conductor.ingest import run_convert
 from app.conductor.worker import ensure_worker, register_runner
 from app.process.extraction import author_guides_sync
 from app.process.extraction import refresh_orient, refresh_skeleton
-from app.process.packs import build_pack
+from app.process.packs import build_pack, reweight_pack
 from app.gateways import set_doc_resolver
 from app.supplemental.media import run_audiobook, warm_tts
 
@@ -39,6 +39,8 @@ def _run_orient(job: dict[str, Any], ctx) -> dict[str, Any]:
 
 
 def _run_pack(job: dict[str, Any], ctx) -> dict[str, Any]:
+    if job.get("reweight"):
+        return reweight_pack(job["packKey"], on_progress=ctx.progress)
     return build_pack(job["packKey"], on_progress=ctx.progress)
 
 

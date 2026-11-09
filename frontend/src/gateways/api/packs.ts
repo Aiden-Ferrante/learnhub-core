@@ -60,6 +60,14 @@ export type Pack = {
   status: PackSummary['status']
   units: PackUnit[]
   sittings: SittingSummary[]
+  /** Pack-level receipt; `reweight` is the last scope-notes reweight. */
+  receipt?: { reweight?: Reweight } | null
+}
+
+export type Reweight = {
+  notes: string
+  changes: { unit: string; skill: string; from: number; to: number; reason: string }[]
+  failed: { title: string; error: string }[]
 }
 
 export type Step = { ask: string; show: string }
@@ -188,6 +196,9 @@ export const fetchUnit = (key: string, unit: string, signal?: AbortSignal) =>
   get<LearnUnit>(`/packs/${enc(key)}/units/${enc(unit)}`, signal)
 export const saveProgress = (key: string, unit: string, patch: UnitProgress, signal?: AbortSignal) =>
   post(`/packs/${enc(key)}/units/${enc(unit)}/progress`, patch, signal)
+/** Change a built pack's scope notes; the server reweights its skills in the background. */
+export const saveScopeNotes = (key: string, scopeNotes: string, signal?: AbortSignal) =>
+  post<{ ok: true }>(`/packs/${enc(key)}/notes`, { scopeNotes }, signal)
 export const gradeSkill = (key: string, skill: string, correct: boolean, signal?: AbortSignal) =>
   post(`/packs/${enc(key)}/grade`, { skill, correct }, signal)
 export const startSitting = (key: string, signal?: AbortSignal) =>

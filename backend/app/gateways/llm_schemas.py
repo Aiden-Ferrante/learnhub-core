@@ -115,6 +115,16 @@ class PackSkillSet(BaseModel):
     skills: List[PackSkill]
 
 
+class PackWeight(BaseModel):
+    skillId: str
+    weight: float = 1.0
+    reason: str = ""
+
+
+class PackWeightSet(BaseModel):
+    weights: List[PackWeight]
+
+
 class PackBookProblem(BaseModel):
     skillId: str
     sectionKey: str

@@ -9,12 +9,13 @@ Depends on: process/content, gateways.
 """
 
 from app.process.packs.answers import computed_answers, furniture
-from app.process.packs.author import build_pack
+from app.process.packs.author import build_pack, reweight_pack
 from app.process.packs.gen import harness, render, render_unseen
 from app.process.packs.sandbox import gate, run_snippets
 
 __all__ = [
     "build_pack",
+    "reweight_pack",
     "computed_answers",
     "furniture",
     "gate",

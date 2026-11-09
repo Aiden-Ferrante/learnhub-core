@@ -118,3 +118,13 @@ def test_an_unanswered_book_problem_with_a_program_gets_its_real_output(monkeypa
     out = build(monkeypatch, {**BASE, "PackBookProblemSet": {"problems": [prob]}})
     book = [i for i in out["items"] if i["origin"] == "book_problem"]
     assert book[0]["payload"]["computedAnswer"] == "3"
+
+
+def test_reweigh_clamps_ignores_invented_skills_and_resets_on_empty_notes(monkeypatch):
+    skills = [{"skill": "a", "label": "A", "weight": 1}, {"skill": "b", "label": "B", "weight": 2}]
+    monkeypatch.setattr(author, "_ask", lambda *a, **k: {"weights": [
+        {"skillId": "a", "weight": 9, "reason": "notes stress it"},
+        {"skillId": "zzz", "weight": 3, "reason": "invented"}]})
+    got = {s["skill"]: s["to"] for s in author.reweigh(skills, "focus on A", "m")}
+    assert got == {"a": author.MAX_WEIGHT, "b": 1.0}
+    assert {s["to"] for s in author.reweigh(skills, "  ", "m")} == {1.0}
