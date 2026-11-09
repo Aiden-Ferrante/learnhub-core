@@ -18,7 +18,8 @@ export function CourseHero({ course, step }: { course: Course; step: NextStep | 
     <Sheet as="div">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-page font-semibold tracking-tight">{course.title}</h1>
+          {/* The Desk bar above names the course; this heading names the page. */}
+          <h1 className="text-page font-semibold tracking-tight">Overview</h1>
           <p className="mt-0.5 text-meta text-muted-foreground">{course.description}</p>
         </div>
         {step && Icon ? (

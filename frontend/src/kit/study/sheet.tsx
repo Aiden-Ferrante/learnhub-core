@@ -33,7 +33,7 @@ export function Sheet({
             {title != null && <h2 className="text-title font-medium text-foreground">{title}</h2>}
             {description != null && <p className="text-meta text-muted-foreground">{description}</p>}
           </div>
-          {actions != null && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions != null && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
       {children}

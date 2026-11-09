@@ -7,6 +7,20 @@ commit.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-09
+
+The Desk.
+
+### Added
+- **The Desk: one frame for every course page.** A mode bar (Overview, Read, Review with its due
+  count, Packs, Concepts) and a chapter rail with each chapter's studied share and memory state.
+  The chapter you are reading is marked. The pages inside are unchanged.
+
+### Changed
+- The header spans the full width, to line up with the Desk.
+- The course home is headed "Overview", since the Desk bar already names the course.
+- Card header actions wrap, so the course overview no longer scrolls sideways on a phone.
+
 ## [0.29.0] - 2026-11-09
 
 Study Hall.

@@ -35,8 +35,8 @@ export default function RootLayout({
         <Providers>
           <DocumentProvider>
             <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
-              {/* 56px as a minimum, so a wrapped row on a phone grows instead of clipping. */}
-              <div className="container mx-auto flex min-h-[56px] items-center justify-between gap-4 px-6">
+              {/* Full width, like the Desk below it; 56px as a minimum so a wrapped row on a phone grows instead of clipping. */}
+              <div className="flex min-h-[56px] items-center justify-between gap-4 px-6">
                 <div className="flex min-w-0 items-center gap-3 sm:gap-6">
                   <HeaderBrand />
                   <AppNav />

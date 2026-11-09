@@ -101,10 +101,17 @@ not add to it mid-build.
 
 ## Carries forward
 
-- **The Desk** (next, v0.30.0; chosen 2026-11-09). One workspace per course: the book outline on
-  the left with per-chapter progress, Read / Review / Practice / Test switching in the middle,
-  the current section's concepts and tools on the right. Mockups: the "Study Hall dark" page of
-  https://claude.ai/artifact/E4AQgKt4SmVo8TUspL2iA1. The Library stays the landing page.
+- **The Desk's right column** (v0.30.0 non-goal). The mockup's context panel: this section's
+  concepts with known/due/new, where a review card lives in the book, the skills a test covers.
+  The reader's drawers (Review, Tutor, Listen) already hold some of this.
+
+- **Two left rails on the reader** (v0.30.0). The Desk's chapter rail sits beside the reader's
+  "In this chapter" rail. It works at 1483px but costs text width; consider nesting the
+  chapter's sections under the current chapter in the Desk rail (as in the mockup) and dropping
+  the reader's own rail and chapter picker.
+
+- **Review is still a small card in an empty page** (v0.30.0). The Desk frames it but does not
+  fill it; the mockup's grading row and card history belong to the right-column work.
 
 - **Card titles are still sans** (v0.29.0). Only page and section headings went serif; the review
   card's concept name and Sheet titles may want it too. Decide inside the Desk.

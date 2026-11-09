@@ -5,6 +5,7 @@
  *  screens, the syllabus tree, the next-step rule, and the course data hooks.
  *  Depends on: processing (document list), concepts (mastery dot), gateways/, kit/. */
 
+export { CourseDesk } from "@/surfaces/library/course-desk"
 export { CourseFallback } from "@/surfaces/library/course-guard"
 export { CourseHome } from "@/surfaces/library/course-home"
 export { CourseShelf } from "@/surfaces/library/course-shelf"
