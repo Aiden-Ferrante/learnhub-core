@@ -74,6 +74,11 @@ not add to it mid-build.
 
 ## ADR seeds
 
+- **Fleet metadata in a public repo.** (v0.26.0.) The 11/05 public cleanup removed PROJECT.yaml
+  and the agent docs from git. They now live on disk, gitignored. Shipyard and
+  `fleet/render_agent_docs.py` still write and read them. Decide whether that is the contract,
+  or whether fleet metadata moves into the fleet repo.
+
 - **Versioned-course due counts.** (v0.25.0.) Concept review rows sit under the source book's id,
   so a re-cut version's dues count under the source course.
 - **On-accent ink.** (v0.25.0.) `--primary-foreground` is zinc-950 and `--fleet-on-accent` is zinc-50.
@@ -99,8 +104,6 @@ not add to it mid-build.
 - **The converter loses quiz code.** (v0.26.0.) Of 130 unanswered PE book problems, 46 have no
   code in the stem and 20 have it flattened with line numbers ("1 2 3 print(...)"), so they stay
   self-marked. The fix is in conversion (or reconversion), not in packs.
-- **Two hub violations in `api/content_routes.py`** (deep imports of content and media). Older
-  than packs.
 - **Scripts that call the author must use the deployed model.** (v0.26.0.) The host has no
   `LEARN_PRACTICE_MODEL`, so set it as in compose, or run in the image.
 
