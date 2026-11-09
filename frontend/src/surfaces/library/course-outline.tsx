@@ -81,8 +81,8 @@ export function CourseOutline({
               Read the book
             </Link>
           </Button>
-          {data.bookKey && (
-            <VersionMenu bookKey={data.bookKey} versions={data.versions} activeVersion={data.activeVersion} />
+          {data.bookKey && data.course && (
+            <VersionMenu bookKey={data.bookKey} courseId={data.course.id} versions={data.versions} activeVersion={data.activeVersion} />
           )}
           <Button asChild variant="ghost" size="sm" className="h-8 px-2">
             <Link href={`${base}/edit`}>

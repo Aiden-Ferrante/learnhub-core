@@ -40,21 +40,24 @@ import {
   setMainVersion,
   type CourseVersion,
 } from "@/gateways/api/versions"
+import { followMainVersion } from "@/gateways/api/user-settings"
 
 type VersionMenuProps = {
   /** Any version id of the book — the API resolves it to the whole set. */
   bookKey: string
+  /** The course card's id, whose "Continue" follows the main version. */
+  courseId: string
   versions: CourseVersion[]
   activeVersion: CourseVersion | null
 }
 
 /** A version change re-reads the set; a changed main flips the course's docKey, and every
  *  course read keyed by it follows. */
-const VERSION_INVALIDATES = [roots.versions]
+const VERSION_INVALIDATES = [roots.versions, roots.readingProgress]
 
 type VersionAction = { kind: "switch"; docId: string } | { kind: "delete"; docId: string }
 
-export function VersionMenu({ bookKey, versions, activeVersion }: VersionMenuProps) {
+export function VersionMenu({ bookKey, courseId, versions, activeVersion }: VersionMenuProps) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
   // Which version's delete button is armed. Reset on close — an armed button that
@@ -62,7 +65,11 @@ export function VersionMenu({ bookKey, versions, activeVersion }: VersionMenuPro
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
 
   const act = useApiMutation(
-    async (a: VersionAction): Promise<unknown> => (a.kind === "switch" ? setMainVersion(a.docId) : deleteVersion(a.docId)),
+    async (a: VersionAction): Promise<unknown> => {
+      if (a.kind !== "switch") return deleteVersion(a.docId)
+      await setMainVersion(a.docId)
+      await followMainVersion(courseId, a.docId)
+    },
     { invalidates: VERSION_INVALIDATES },
   )
   const create = useApiMutation(
@@ -71,6 +78,7 @@ export function VersionMenu({ bookKey, versions, activeVersion }: VersionMenuPro
       // A new version is created not-main; opening it immediately is what the user meant
       // by making one, so switch as part of the same action.
       await setMainVersion(made.docId)
+      await followMainVersion(courseId, made.docId)
     },
     {
       invalidates: VERSION_INVALIDATES,

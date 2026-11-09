@@ -34,14 +34,34 @@ export async function fetchReadingPositions(signal?: AbortSignal): Promise<Recor
     : {}
 }
 
-/** Save one course's reading position (read-merge-write of the whole map, since the PUT
- *  merges top-level keys only). Throws ApiError. */
+/** The map key for one VERSION's position. A book's versions have their own outlines, so a
+ *  position belongs to the version it was read in; the bare courseId key is the card's
+ *  "Continue", which always means the course's main version. */
+export const versionPositionKey = (docId: string) => `v:${docId}`
+
+/** Save a reading position in the version being read, and as the card's Continue
+ *  (read-merge-write of the whole map, since the PUT merges top-level keys only). */
 export async function saveReadingPositionStrict(
   courseId: string,
+  docId: string,
   sectionKey: string,
   signal?: AbortSignal,
 ): Promise<void> {
   const current = await fetchReadingPositions(signal)
-  if (current[courseId] === sectionKey) return
-  await saveUserSettings({ readingProgress: { ...current, [courseId]: sectionKey } }, signal)
+  const vk = versionPositionKey(docId)
+  if (current[courseId] === sectionKey && current[vk] === sectionKey) return
+  await saveUserSettings({ readingProgress: { ...current, [courseId]: sectionKey, [vk]: sectionKey } }, signal)
+}
+
+/** After the main version changes, point the card's Continue at the new main's own
+ *  position, or clear it: a section key from another version's outline is not a place
+ *  in this one. */
+export async function followMainVersion(courseId: string, docId: string, signal?: AbortSignal): Promise<void> {
+  const current = await fetchReadingPositions(signal)
+  const next = { ...current }
+  const own = current[versionPositionKey(docId)]
+  if (own) next[courseId] = own
+  else delete next[courseId]
+  if (next[courseId] === current[courseId]) return
+  await saveUserSettings({ readingProgress: next }, signal)
 }

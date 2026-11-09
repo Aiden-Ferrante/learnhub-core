@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fetchTocTree, findNodeBySectionKey } from "@/gateways/api/outline"
 import { fetchMastery } from "@/gateways/api/progress"
 import { fetchVersions } from "@/gateways/api/versions"
-import { saveReadingPositionStrict } from "@/gateways/api/user-settings"
+import { saveReadingPositionStrict, versionPositionKey } from "@/gateways/api/user-settings"
 import { qk, roots, useApi, useApiMutation, useInvalidate, orThrow } from "@/kit/data"
 import { courseFromDocument, isCourseReady, type Course } from "@/surfaces/library/courses"
 import { useReadingPositions, useStudyDebt } from "@/surfaces/library/use-library-queries"
@@ -76,16 +76,18 @@ export function useCourseData(courseId: string) {
   // Positions written in this mount win over the cached map until it refetches.
   const [localPositions, setLocalPositions] = useState<Record<string, string>>({})
   const savePosition = useApiMutation(
-    (v: { courseId: string; sectionKey: string }) => saveReadingPositionStrict(v.courseId, v.sectionKey),
+    (v: { courseId: string; docId: string; sectionKey: string }) =>
+      saveReadingPositionStrict(v.courseId, v.docId, v.sectionKey),
     { serialKey: "reading-position", invalidates: [roots.readingProgress] },
   )
   const { fire: firePosition } = savePosition
   const persistReadingPosition = useCallback(
     (sectionKey: string) => {
-      setLocalPositions((prev) => ({ ...prev, [courseId]: sectionKey }))
-      firePosition({ courseId, sectionKey })
+      if (!docKey) return
+      setLocalPositions((prev) => ({ ...prev, [versionPositionKey(docKey)]: sectionKey }))
+      firePosition({ courseId, docId: docKey, sectionKey })
     },
-    [courseId, firePosition],
+    [courseId, docKey, firePosition],
   )
 
   const invalidate = useInvalidate()
@@ -111,7 +113,13 @@ export function useCourseData(courseId: string) {
   }, [invalidate])
 
   const tree = useMemo(() => (isLive ? (treeQuery.data?.tree ?? []) : []), [isLive, treeQuery.data])
-  const continueSectionKey: string | undefined = localPositions[courseId] ?? positionsQuery.data?.[courseId]
+  // This version's own position first. A position saved before positions were per version
+  // sits under the courseId; it is used only if that section exists in this outline.
+  const ownKey = docKey ? versionPositionKey(docKey) : undefined
+  const legacy = positionsQuery.data?.[courseId]
+  const continueSectionKey: string | undefined =
+    (ownKey ? (localPositions[ownKey] ?? positionsQuery.data?.[ownKey]) : undefined) ??
+    (legacy && findNodeBySectionKey(tree, legacy) ? legacy : undefined)
   const continueNode = continueSectionKey ? findNodeBySectionKey(tree, continueSectionKey) : null
 
   return {
