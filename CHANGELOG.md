@@ -7,6 +7,25 @@ commit.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-09
+
+Questions you can check.
+
+### Added
+- **Computed answers.** A book problem with no printed answer whose program runs as printed
+  shows the program's real output (or the exception it raises) on its Learn card: 34 on prod.
+- **A book-reference check.** Authored questions that point at the source ("according to the
+  textbook", "Table 2-1") are dropped at build time with the reason on the receipt, and every
+  author prompt forbids them. 87 existing ones were rewritten: 0 of 1,034 remain.
+- `scripts/repair_pack_items.py`, which brings packs built before this version up to these
+  checks (UPDATE only, dry-run by default).
+
+### Fixed
+- **The pack receipt** is summed from every chapter, so re-running one chapter no longer shrinks it.
+- **The sandbox's process limit now binds.** The child drops from root to `nobody`.
+- **Code in a question renders as code**, not one joined line.
+- `process.packs` is a registered hub with a facade: `check_hubs` went from 10 violations to 2.
+
 ## [0.25.1] - 2026-11-04
 
 Retire practice data.

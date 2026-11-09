@@ -96,6 +96,14 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **The converter loses quiz code.** (v0.26.0.) Of 130 unanswered PE book problems, 46 have no
+  code in the stem and 20 have it flattened with line numbers ("1 2 3 print(...)"), so they stay
+  self-marked. The fix is in conversion (or reconversion), not in packs.
+- **Two hub violations in `api/content_routes.py`** (deep imports of content and media). Older
+  than packs.
+- **Scripts that call the author must use the deployed model.** (v0.26.0.) The host has no
+  `LEARN_PRACTICE_MODEL`, so set it as in compose, or run in the image.
+
 - **Visual pass, next cycle (human, 2026-11-04).** "Make the visuals more pleasing." Chosen
   feel: *calm reading room*: warmer dark, softer contrast, more breathing room, serif body
   for reading, sans labels. Dark only. Screens: Library + course home, Reading, Exam packs,
@@ -110,8 +118,6 @@ not add to it mid-build.
 
 - **The human reads generated pack questions.** (v0.24.0, 2026-11-01.) Shipped without it; the
   repo's criterion for generated content is still owed.
-- **The `learn` container runs as root.** (v0.24.0.) The pack sandbox's process limit does not bind
-  there. Run snippets as an unprivileged user.
 - **Reconvert Python Essentials 2.** (v0.24.0.) Its upload is in `Error` with no content.
 - **Agent docs are stale across the fleet and feedwall's source is behind its repo.** (v0.24.0.)
   Fix `fleet/agents` before rendering, or feedwall loses its current credentials note.
