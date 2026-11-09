@@ -93,6 +93,23 @@ def gate(code: str) -> str | None:
     return None
 
 
+SANDBOX_USER = "nobody"
+
+
+def child_identity() -> dict:
+    """Who the child runs as. RLIMIT_NPROC does not bind uid 0, so when the service runs as
+    root (the learn container does) the child drops to ``nobody`` before it starts."""
+    import os
+    if os.geteuid() != 0:
+        return {}
+    import pwd
+    try:
+        pw = pwd.getpwnam(SANDBOX_USER)
+    except KeyError:
+        raise RuntimeError(f"sandbox user {SANDBOX_USER!r} is missing; refusing to run snippets as root")
+    return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": []}
+
+
 def run_snippets(codes: list[str], timeout: float = 8.0) -> list[dict]:
     """Each snippet's {stdout, exception?} or {refused}/{timeout}, same order as ``codes``.
     Refused snippets never reach the child. A child that dies fails every snippet it held."""
@@ -110,6 +127,7 @@ def run_snippets(codes: list[str], timeout: float = 8.0) -> list[dict]:
             done = subprocess.run(
                 [sys.executable, "-I", "-S", "-c", _RUNNER], input=body, text=True,
                 capture_output=True, timeout=timeout, env={"PYTHONHASHSEED": "0"}, cwd="/tmp",
+                **child_identity(),
             )
             ran = json.loads(done.stdout) if done.returncode == 0 else None
         except (subprocess.TimeoutExpired, json.JSONDecodeError):
