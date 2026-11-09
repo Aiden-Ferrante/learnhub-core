@@ -443,6 +443,18 @@ def reweight_pack(pack: str, on_progress=None) -> dict[str, Any]:
     author = _author_model(None)
     changes: list[dict[str, Any]] = []
     failed: list[dict[str, str]] = []
+    try:
+        _reweight_units(units, notes, author, changes, failed, on_progress)
+    finally:  # a crash must not leave the pack stuck in 'building'
+        with db() as conn:
+            conn.execute("UPDATE exam_packs SET status = 'ready', receipt = coalesce(receipt, '{}'::jsonb) "
+                         "|| %(r)s::jsonb WHERE key = %(k)s",
+                         {"r": Json({"reweight": {"notes": notes, "changes": changes, "failed": failed}}), "k": pack})
+    return {"changes": len(changes), "failed": failed}
+
+
+def _reweight_units(units: list[dict[str, Any]], notes: str, author: str | None,
+                    changes: list[dict[str, Any]], failed: list[dict[str, str]], on_progress) -> None:
     for n, u in enumerate(units):
         with db() as conn:
             skills = conn.execute(
@@ -460,10 +472,6 @@ def reweight_pack(pack: str, on_progress=None) -> dict[str, Any]:
             failed.append({"title": u["title"], "error": str(e)[:200]})
         if on_progress:
             on_progress(n + 1, len(units), u["title"])
-    with db() as conn:
-        conn.execute("UPDATE exam_packs SET status = 'ready', receipt = receipt || %(r)s WHERE key = %(k)s",
-                     {"r": Json({"reweight": {"notes": notes, "changes": changes, "failed": failed}}), "k": pack})
-    return {"changes": len(changes), "failed": failed}
 
 
 def pack_totals(units: list[dict[str, Any]]) -> dict[str, Any]:
@@ -488,7 +496,7 @@ def finalize_pack(pack: str) -> dict[str, Any]:
                              'ORDER BY "order"', {"k": pack}).fetchall()
         totals = pack_totals(units)
         ok = any(u["status"] == "ready" for u in units)
-        conn.execute("UPDATE exam_packs SET status = %(s)s, receipt = coalesce(receipt, '{}'::jsonb) || %(r)s "
+        conn.execute("UPDATE exam_packs SET status = %(s)s, receipt = coalesce(receipt, '{}'::jsonb) || %(r)s::jsonb "
                      "WHERE key = %(k)s", {"s": "ready" if ok else "failed", "r": Json(totals), "k": pack})
     return totals
 
