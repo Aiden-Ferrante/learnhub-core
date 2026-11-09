@@ -18,6 +18,7 @@ import { DeleteCourseDialog } from "@/surfaces/library/delete-course-dialog"
 import { GroupDialog, type GroupDialogState } from "@/surfaces/library/group-dialog"
 import { GroupPanel } from "@/surfaces/library/group-panel"
 import { TodayPanel } from "@/surfaces/library/today-panel"
+import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
 import { useReadingPositions, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
@@ -176,6 +177,8 @@ export function CourseShelf() {
           </div>
         </div>
       )}
+
+      {!selectedGroupId && <UnlistedBooks courses={courses} onDelete={setDeleteTarget} />}
 
       <GroupDialog state={dialog} groups={groups.state.groups} onClose={() => setDialog(null)} onSubmit={submitDialog} />
       <DeleteCourseDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} />

@@ -35,7 +35,7 @@ export function DeleteCourseDialog({ target, onClose }: { target: Course | null;
       return course
     },
     {
-      invalidates: [roots.studyDebt, roots.versions, roots.packs, roots.mastery],
+      invalidates: [roots.studyDebt, roots.versions, roots.packs, roots.mastery, roots.learnDocuments],
       onSuccess: (course) => {
         deleteDocuments([course.id])
         onClose()
