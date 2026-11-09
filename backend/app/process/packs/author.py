@@ -18,8 +18,8 @@ from typing import Any
 from psycopg.types.json import Json
 
 from app.gateways import db
-from app.gateways.llm import ollama_structured_completion
-from app.gateways.llm_schemas import (
+from app.gateways import (
+    ollama_structured_completion,
     PackBookProblemSet,
     PackChunk,
     PackConceptSet,
