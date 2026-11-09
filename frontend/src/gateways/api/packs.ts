@@ -75,6 +75,8 @@ export type LearnQuestion = {
   choices?: string[]
   answer?: number | string | null
   printedAnswer?: string
+  /** A program in the problem, run in the sandbox: its real output, or "Raises X". */
+  computedAnswer?: string
   explain?: string
   steps?: Step[]
 }

@@ -65,7 +65,16 @@ export function QuestionCard({ q, packKey, onAnswered }: { q: LearnQuestion; pac
             <div><Button variant="outline" size="sm" onClick={() => setShown(true)}>Show answer</Button></div>
           ) : (
             <>
-              <Note>{q.printedAnswer || "The book prints no answer here, so check this one against the section cited."}</Note>
+              {q.printedAnswer ? (
+                <Note>{q.printedAnswer}</Note>
+              ) : q.computedAnswer ? (
+                <Note>
+                  <span className="block text-xs text-muted-foreground">Running the program gives</span>
+                  <pre className="whitespace-pre-wrap font-mono text-sm">{q.computedAnswer}</pre>
+                </Note>
+              ) : (
+                <Note>The book prints no answer here, so check this one against the section cited.</Note>
+              )}
               {!selfMarked && (
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" disabled={grade.pending} onClick={() => send(false)}>I missed it</Button>

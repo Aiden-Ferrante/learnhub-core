@@ -30,6 +30,7 @@ from app.gateways.llm_schemas import (
 )
 from app.process.content import load_section_blocks, source_id_of
 from app.process.packs import gen
+from app.process.packs.answers import computed_answers, furniture, snippet_of
 from app.process.packs.sandbox import run_snippets
 
 
@@ -56,7 +57,9 @@ TOTAL = 45000
 RULES = (
     "Use ONLY the supplied textbook sections. Never add a fact, example or topic they do not "
     "contain. Every output names the sectionKey it came from and an `evidence` field: at "
-    "least four consecutive words copied exactly from that section."
+    "least four consecutive words copied exactly from that section. Ask about the subject, "
+    "never about the source: do not mention the textbook, the text, the book, the author, a "
+    "chapter, a section, a figure, a table or a numbered step in any stem, choice or answer."
 )
 
 
@@ -145,7 +148,7 @@ def confirmed_index(problem: dict[str, Any]) -> int:
     choices = problem.get("choices") or []
     if 0 <= int(problem.get("answerIndex", -1)) < len(choices):
         return int(problem["answerIndex"])
-    code = problem.get("code")
+    code = snippet_of(problem.get("stem") or "", problem.get("code") or "")
     if code and choices:
         out = (run_snippets([code])[0].get("stdout") or "").strip()
         hits = [i for i, c in enumerate(choices) if c.strip() == out]
@@ -207,6 +210,13 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
         if x["skillId"] not in skills:
             dropped.append({"kind": kind, "what": x.get("stem", "")[:80], "reason": "unknown skill"})
             return False
+        if x.get("origin") != "book_problem":
+            text = " ".join([x.get("stem", ""), *(x.get("choices") or []), str(x.get("answer") or "")])
+            hit = furniture(text)
+            if hit:
+                dropped.append({"kind": kind, "what": x.get("stem", "")[:80],
+                                "reason": f"points at the book: {hit!r}"})
+                return False
         return True
 
     book: list[dict[str, Any]] = []
@@ -217,13 +227,19 @@ def author_unit(unit: dict[str, Any], sections: list[Any], fmt: dict[str, Any], 
             "only if a program in the problem can be run as printed to get the answer.\n\nSkills:\n"
             + listing, _passages(split["problems"]), PackBookProblemSet, author)
         for p in got["problems"]:
+            p["origin"] = "book_problem"  # the book's own wording is quoted, not authored
             if known("book problem", p) and keep("book problem", p["stem"], p):
-                idx = confirmed_index(p)
                 book.append(p)
-                add(p["skillId"], "learn", "book_problem", "mcq" if idx >= 0 else "written",
-                    p["sectionKey"], p["evidence"],
-                    {"stem": p["stem"], "choices": p.get("choices") or [], "answer": idx if idx >= 0 else None,
-                     "printedAnswer": p.get("printedAnswer") or ""})
+        open_ = [p for p in book if not p.get("printedAnswer") and not p.get("choices")]
+        ran = dict(zip(map(id, open_), computed_answers([(p["stem"], p.get("code") or "") for p in open_])))
+        for p in book:
+            idx = confirmed_index(p)
+            body = {"stem": p["stem"], "choices": p.get("choices") or [],
+                    "answer": idx if idx >= 0 else None, "printedAnswer": p.get("printedAnswer") or ""}
+            if ran.get(id(p)):
+                body["computedAnswer"] = ran[id(p)]
+            add(p["skillId"], "learn", "book_problem", "mcq" if idx >= 0 else "written",
+                p["sectionKey"], p["evidence"], body)
 
     worked = _ask("Write one worked example per skill, using the book's own examples where it has "
                   "them, split into 3 to 6 steps. Each step asks what to do next, then shows it.\n\n"
@@ -369,7 +385,6 @@ def build_pack(pack: str, on_progress=None) -> dict[str, Any]:
     fmt = config.get("format") or {}
     share = math.ceil(int(fmt.get("count") or 20) / max(1, len(units)))
     author, judge = _author_model(None), _judge_model()
-    totals = {"kept": 0, "dropped": 0, "thin": [], "failed": []}
     for n, u in enumerate(units):
         if u["status"] == "ready":
             continue
@@ -381,20 +396,37 @@ def build_pack(pack: str, on_progress=None) -> dict[str, Any]:
                 raise RuntimeError("chapter has no readable sections")
             built = author_unit(u, sections, fmt, config.get("scopeNotes") or "", share, author, judge)
             _store_unit(pack, u["key"], built)
-            totals["kept"] += built["receipt"]["kept"]
-            totals["dropped"] += built["receipt"]["droppedCount"]
-            if built["receipt"]["thin"]:
-                totals["thin"].append(u["title"])
         except Exception as e:  # noqa: BLE001  # one chapter must not sink the pack
-            totals["failed"].append({"title": u["title"], "error": str(e)[:200]})
             with db() as conn:
                 conn.execute("UPDATE pack_units SET status = 'failed', receipt = %(r)s WHERE key = %(u)s",
                              {"r": Json({"error": str(e)[:200]}), "u": u["key"]})
         if on_progress:
             on_progress(n + 1, len(units), u["title"])
+    return finalize_pack(pack)
+
+
+def pack_totals(units: list[dict[str, Any]]) -> dict[str, Any]:
+    """The pack receipt, summed over every chapter's own receipt. Computed from the stored
+    units, not from this run, so re-running one failed chapter cannot shrink the totals."""
+    totals: dict[str, Any] = {"kept": 0, "dropped": 0, "thin": [], "failed": []}
+    for u in units:
+        r = u.get("receipt") or {}
+        if u["status"] == "ready":
+            totals["kept"] += int(r.get("kept") or 0)
+            totals["dropped"] += int(r.get("droppedCount") or 0)
+            if r.get("thin"):
+                totals["thin"].append(u["title"])
+        elif u["status"] == "failed":
+            totals["failed"].append({"title": u["title"], "error": str(r.get("error") or "")[:200]})
+    return totals
+
+
+def finalize_pack(pack: str) -> dict[str, Any]:
     with db() as conn:
-        ok = conn.execute("SELECT count(*) AS n FROM pack_units WHERE pack_key = %(k)s AND status = 'ready'",
-                          {"k": pack}).fetchone()["n"]
+        units = conn.execute('SELECT title, status, receipt FROM pack_units WHERE pack_key = %(k)s '
+                             'ORDER BY "order"', {"k": pack}).fetchall()
+        totals = pack_totals(units)
+        ok = any(u["status"] == "ready" for u in units)
         conn.execute("UPDATE exam_packs SET status = %(s)s, receipt = %(r)s WHERE key = %(k)s",
                      {"s": "ready" if ok else "failed", "r": Json(totals), "k": pack})
     return totals

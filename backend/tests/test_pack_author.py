@@ -96,3 +96,25 @@ def test_the_judge_drops_and_a_broken_judge_is_counted(monkeypatch):
     built = build(monkeypatch, bad)
     assert not [i for i in built["items"] if i["role"] == "exam"]
     assert any(d["reason"] == "judge: key wrong" for d in built["receipt"]["dropped"])
+
+
+def test_an_authored_item_that_points_at_the_book_is_dropped(monkeypatch):
+    concept = {"PackSkillSet": {"skills": [{"id": "c", "label": "Idea", "sectionKey": "s1", "style": "conceptual",
+                                            "weight": 1, "evidence": QUOTE}]},
+               "PackConceptSet": {"mcqs": [], "written": [
+                   {"skillId": "c", "sectionKey": "s1", "stem": "What does the textbook say about rounding?",
+                    "answer": "down", "rubric": "r", "evidence": QUOTE},
+                   {"skillId": "c", "sectionKey": "s1", "stem": "Which way does 7 // 2 round?",
+                    "answer": "down", "rubric": "r", "evidence": QUOTE}]}}
+    out = build(monkeypatch, {**BASE, **concept}, sections=[sec("s1", "Floor division")])
+    stems = [i["payload"]["stem"] for i in out["items"] if i["qtype"] == "written"]
+    assert stems == ["Which way does 7 // 2 round?"]
+    assert any("points at the book" in d["reason"] for d in out["receipt"]["dropped"])
+
+
+def test_an_unanswered_book_problem_with_a_program_gets_its_real_output(monkeypatch):
+    prob = {"skillId": "floor", "sectionKey": "q1", "stem": "What is printed?\n\nprint(7 // 2)", "choices": [],
+            "answerIndex": -1, "printedAnswer": "", "code": "", "evidence": QUOTE}
+    out = build(monkeypatch, {**BASE, "PackBookProblemSet": {"problems": [prob]}})
+    book = [i for i in out["items"] if i["origin"] == "book_problem"]
+    assert book[0]["payload"]["computedAnswer"] == "3"
