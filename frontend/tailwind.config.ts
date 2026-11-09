@@ -10,17 +10,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Both stacks are the fleet's, hand-synced from fleet-ui/fleet.css
-      // (--fleet-font-sans / --fleet-font-mono). Copied rather than @import-ed
-      // for the same reason the app registry is duplicated in _chrome: this
-      // builds in Docker, and reaching outside the build context breaks the
-      // image rather than the page. Keep the two in step.
-      //
-      // Inter was here as a "Channel brand" decision. A different typeface is
-      // the strongest signal there is that you have left the site, and this is
-      // the admin tier, where the promise is the opposite one.
+      // Study Hall (v0.29.0): Inter and Newsreader come from next/font in layout.tsx as
+      // CSS variables; mono stays the Geist Mono copy declared in globals.css.
       fontFamily: {
-        'sans': ['Geist', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Noto Sans', 'Arial', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'],
+        'sans': ['var(--font-sans)', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'],
+        'serif': ['var(--font-serif)', 'Newsreader', 'Georgia', 'Iowan Old Style', 'serif'],
         'mono': ['Geist Mono', 'ui-monospace', 'SF Mono', 'Cascadia Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       letterSpacing: {
@@ -138,21 +132,24 @@ const config: Config = {
       // Untouched on purpose: the @tailwindcss/typography `prose-*` chain, which
       // the reading surface drives from user preference and which carries its
       // own scale (see app/styleguide/page.tsx).
+      // THE TYPE SCALE, Study Hall (v0.29.0): one step up from the fleet's dense instrument
+      // scale, so body text is 15px and a page title 30px. Tailwind's own names stay aliased
+      // onto the six steps so the ~380 existing call sites move with it.
       fontSize: {
-        micro: ["0.6875rem", { lineHeight: "1.4" }],    /* 11px   — chips, counts, meta */
-        meta: ["0.78125rem", { lineHeight: "1.45" }],   /* 12.5px — secondary lines */
-        body: ["0.875rem", { lineHeight: "1.6" }],      /* 14px   — descriptions, prose in chrome */
-        title: ["0.9375rem", { lineHeight: "1.35" }],   /* 15px   — card titles */
-        section: ["1.1875rem", { lineHeight: "1.25" }], /* 19px   — a section heading */
-        page: ["1.625rem", { lineHeight: "1.15" }],     /* 26px   — the name of the surface */
+        micro: ["0.75rem", { lineHeight: "1.45" }],     /* 12px   — chips, counts, meta */
+        meta: ["0.84375rem", { lineHeight: "1.5" }],    /* 13.5px — secondary lines */
+        body: ["0.9375rem", { lineHeight: "1.6" }],     /* 15px   — descriptions, prose in chrome */
+        title: ["1rem", { lineHeight: "1.4" }],         /* 16px   — card titles */
+        section: ["1.3125rem", { lineHeight: "1.3" }],  /* 21px   — a section heading (serif) */
+        page: ["1.875rem", { lineHeight: "1.15" }],     /* 30px   — the name of the surface (serif) */
 
-        xs: ["0.6875rem", { lineHeight: "1.4" }],       /* -> micro */
-        sm: ["0.78125rem", { lineHeight: "1.45" }],     /* -> meta */
-        base: ["0.875rem", { lineHeight: "1.6" }],      /* -> body */
-        lg: ["0.9375rem", { lineHeight: "1.35" }],      /* -> title */
-        xl: ["1.1875rem", { lineHeight: "1.25" }],      /* -> section */
-        "2xl": ["1.625rem", { lineHeight: "1.15" }],    /* -> page */
-        "3xl": ["1.625rem", { lineHeight: "1.15" }],    /* -> page; nothing lives between section and page */
+        xs: ["0.75rem", { lineHeight: "1.45" }],        /* -> micro */
+        sm: ["0.84375rem", { lineHeight: "1.5" }],      /* -> meta */
+        base: ["0.9375rem", { lineHeight: "1.6" }],     /* -> body */
+        lg: ["1rem", { lineHeight: "1.4" }],            /* -> title */
+        xl: ["1.3125rem", { lineHeight: "1.3" }],       /* -> section */
+        "2xl": ["1.875rem", { lineHeight: "1.15" }],    /* -> page */
+        "3xl": ["1.875rem", { lineHeight: "1.15" }],    /* -> page */
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -1,7 +1,7 @@
-/* study:begin — the study theme: the look of the midterm artifacts, dark like everything else.
-   Graph paper behind, one working sheet at a time, accent for "you can act here", ok and danger
-   only when something is marked, mono for numbers. Type sizes come from the app, not from here.
-   learnhub carries a byte-identical copy of this block; check.sh compares them. */
+/* study:begin — the study theme, forked from fleet.css's study block on 2026-11-09 when
+   LearnHub left the fleet kit (v0.29.0). One working sheet at a time, accent for "you can act
+   here", ok and danger only when something is marked, mono for numbers. It reads the --fleet-*
+   aliases, whose values globals.css sets to Study Hall. No longer compared against fleet.css. */
 .study-page { min-height: 100vh; background-color: var(--fleet-bg);
   background-image: linear-gradient(color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px),
                     linear-gradient(90deg, color-mix(in srgb, var(--fleet-border) 45%, transparent) 1px, transparent 1px);

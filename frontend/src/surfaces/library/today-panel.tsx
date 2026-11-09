@@ -1,7 +1,7 @@
 "use client"
 
 /** The Library Today panel (docs/ui-spec.md §3): one line per course that has anything
- *  due, each with ONE primary button picked by the shared next-step rule, and a Plan link
+ *  due, each with one button picked by the shared next-step rule; only the first is primary, and a Plan link
  *  at the right. Nothing else goes in the panel. */
 
 import Link from "next/link"
@@ -40,7 +40,8 @@ function TodayLine({ course, dueNow }: { course: Course; dueNow: number }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-2">
       <span className="min-w-0 truncate text-body font-medium">{shortTitle(course.title)}</span>
-      <Button asChild size="sm">
+      {/* Outline by default; the first line's button is the one primary (globals.css .today-list). */}
+      <Button asChild size="sm" variant="outline" className="today-cta">
         <Link href={step.href}>{step.label}</Link>
       </Button>
     </li>
@@ -66,7 +67,7 @@ export function TodayPanel({ courses }: { courses: Course[] }) {
             <>
               {/* Lines render themselves (or nothing), so emptiness is read off the DOM:
                   an empty list shows the caught-up line beside it. */}
-              <ul className="peer divide-y divide-border">
+              <ul className="today-list peer divide-y divide-border">
                 {studyable.map((c) => (
                   <TodayLine key={c.id} course={c} dueNow={dueByDoc.get(c.learnDocId as string) ?? 0} />
                 ))}

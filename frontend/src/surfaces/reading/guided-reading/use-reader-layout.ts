@@ -26,11 +26,11 @@ export function useConceptHighlight(): [boolean, (v: boolean) => void] {
   return [on, set]
 }
 
-/** True when the screen has real margin for margin notes (≥ 1440px). */
+/** True when the screen has real margin for margin notes (≥ 1600px: at 1440 the notes ran ~10px past the pane beside the outline rail). */
 export function useWideScreen(): boolean {
   const [wide, setWide] = useState(false)
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1440px)")
+    const mq = window.matchMedia("(min-width: 1600px)")
     const sync = () => setWide(mq.matches)
     sync()
     mq.addEventListener("change", sync)

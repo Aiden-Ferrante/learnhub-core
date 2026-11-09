@@ -14,7 +14,7 @@ export type DomainStatus =
  *  own, so their words take the dim ink and the hue stays in the dot and wash. */
 const TONES: Record<DomainStatus, { dot: string; text: string; bg: string }> = {
   mastered: { dot: "bg-status-mastered", text: "text-ink-ok", bg: "bg-status-mastered/10" },
-  ready: { dot: "bg-status-ready", text: "text-ink-accent", bg: "bg-status-ready/10" },
+  ready: { dot: "bg-status-ready", text: "text-ink-dim", bg: "bg-status-ready/10" },
   due: { dot: "bg-status-due", text: "text-ink-warn", bg: "bg-status-due/10" },
   fading: { dot: "bg-status-fading", text: "text-ink-dim", bg: "bg-status-fading/10" },
   building: { dot: "bg-status-building", text: "text-ink-dim", bg: "bg-status-building/10" },

@@ -32,7 +32,7 @@ export function MarginNotes({
           variant={null}
           size={null}
           className={cn(
-            "absolute hidden h-auto w-52 whitespace-normal rounded-md border border-transparent p-1.5 text-left font-normal transition-colors min-[1440px]:block",
+            "absolute hidden h-auto w-52 whitespace-normal rounded-md border border-transparent p-1.5 text-left font-normal transition-colors min-[1600px]:block",
             paper ? "hover:border-paper-border hover:bg-paper-card" : "hover:border-border hover:bg-card",
           )}
           style={{ top: n.top, left: `calc(50% + ${HALF_MEASURE[measure]} + 28px)` }}

@@ -1,38 +1,39 @@
-@import "./fleet-study.css";
+@import "./study.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* The fleet's faces, copied from fleet-ui/fonts (the Docker build cannot
-   reach the sibling repo; check.sh compares the bytes by sha256). */
-@font-face { font-family: "Geist"; src: url("/fleet-fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+/* Study Hall (v0.29.0): Inter for what you scan and Newsreader for what you read, both
+   self-hosted by next/font in layout.tsx (--font-sans, --font-serif). Mono stays Geist Mono,
+   the copy already in /fleet-fonts. */
 @font-face { font-family: "Geist Mono"; src: url("/fleet-fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
 :root {
-  /* Dark only, with the fleet (anchored 2026-09-04 on chart problem 486ccc778f75). */
+  /* Dark only (the fleet anchor's rule 1 still binds; LearnHub is exempt from its kit and
+     header since 2026-11-09). The --fleet-* names stay as aliases because the study
+     theme (study.css) and ~75 call sites read them; their values are Study Hall's. */
   color-scheme: dark;
-  /* The fleet tokens the study theme reads, aliased onto this app's own palette. */
   --fleet-bg: hsl(var(--background));
   --fleet-surface: hsl(var(--card));
   --fleet-border: hsl(var(--border));
   --fleet-text: hsl(var(--foreground));
-  --fleet-text-dim: hsl(240 5% 84%);
+  --fleet-text-dim: hsl(38 25% 78%);
   --fleet-text-faint: hsl(var(--muted-foreground));
-  --fleet-accent: oklch(0.65 0.19 250);
-  --fleet-accent-text: oklch(0.80 0.15 250);
-  --fleet-on-accent: hsl(0 0% 98%);
-  --fleet-ok: oklch(0.72 0.17 155);
-  --fleet-ok-text: oklch(0.80 0.15 155);
-  --fleet-warn: oklch(0.78 0.15 80);
-  --fleet-warn-text: oklch(0.84 0.14 80);
-  --fleet-danger: oklch(0.65 0.21 25);
-  --fleet-danger-text: oklch(0.78 0.16 25);
-  /* The app header's height (layout.tsx: 38px + 49px tiers + a 1px border), the one
-     legal sticky offset. fleet-study.css's .study-bar sticks below it. */
-  --fleet-header-h: 88px;
+  --fleet-accent: hsl(var(--primary));
+  --fleet-accent-text: hsl(16 72% 72%);   /* terracotta for words, lighter than the fill */
+  --fleet-on-accent: hsl(var(--primary-foreground));
+  --fleet-ok: hsl(101 24% 56%);
+  --fleet-ok-text: hsl(101 32% 70%);
+  --fleet-warn: hsl(32 70% 60%);
+  --fleet-warn-text: hsl(32 70% 69%);
+  --fleet-danger: hsl(8 62% 58%);
+  --fleet-danger-text: hsl(8 75% 73%);
+  /* LearnHub's own one-row header (layout.tsx: 56px + a 1px border), the one legal sticky
+     offset. study.css's .study-bar sticks below it. */
+  --fleet-header-h: 57px;
   /* The paper reader's serif — a reading register, not the app's face. */
-  --reading-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --reading-serif: var(--font-serif), Georgia, "Iowan Old Style", serif;
 }
 
 /* Ground and ink come from --background / --foreground below, and from nowhere
@@ -108,42 +109,42 @@ body {
      unchanged, so every existing utility keeps working. The light block that
      used to sit above this is gone with the dual mode (2026-09-04). */
   :root {
-    --background: 240 10% 4%;     /* zinc-950 */
-    --foreground: 240 5% 96%;     /* zinc-100 */
+    /* Study Hall dark (v0.29.0). A warm near-black, cream ink, one terracotta accent. */
+    --background: 34 19% 7%;      /* #16130f */
+    --foreground: 39 42% 88%;     /* #ede4d3 */
 
-    --card: 240 6% 10%;           /* zinc-900 */
-    --card-foreground: 240 5% 96%;
+    --card: 33 18% 10%;           /* #1e1a15 */
+    --card-foreground: 39 42% 88%;
 
-    --popover: 240 6% 10%;
-    --popover-foreground: 240 5% 96%;
+    --popover: 33 18% 10%;
+    --popover-foreground: 39 42% 88%;
 
-    --primary: 205 100% 50%;      /* fleet accent, full strength on dark */
-    --primary-foreground: 240 10% 4%;
+    --primary: 16 62% 61%;        /* #d9805f terracotta; dark ink on it */
+    --primary-foreground: 19 44% 7%;
 
-    --secondary: 240 4% 16%;      /* zinc-800 */
-    --secondary-foreground: 240 5% 96%;
+    --secondary: 30 20% 14%;      /* #2a231c */
+    --secondary-foreground: 39 42% 88%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%; /* zinc-400 — the fleet's faint ink */
+    --muted: 30 20% 14%;
+    --muted-foreground: 36 15% 60%; /* #a89c8a — 6.6:1 on the card */
 
-    --accent: 240 4% 16%;
-    --accent-foreground: 240 5% 96%;
+    --accent: 30 20% 14%;
+    --accent-foreground: 39 42% 88%;
 
-    --destructive: 360 89% 62%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 8 62% 58%;
+    --destructive-foreground: 19 44% 7%;
 
-    --border: 240 4% 16%;         /* zinc-800 */
-    --input: 240 4% 16%;
-    --ring: 205 100% 50%;
+    --border: 32 17% 17%;         /* #332c24 */
+    --input: 32 17% 17%;
+    --ring: 16 62% 61%;
 
-    /* Instrument, not app store: the fleet's tighter corners. */
     --radius: 0.5rem;
 
     /* Brand tracks the fleet's accent. --brand is a deprecated alias kept for
        the ~50 legacy `text-brand` call-sites. */
-    --brand-accent: 205 100% 50%;
-    --brand-accent-dark: 209 100% 43%;
-    --brand-accent-light: 207 100% 66%;
+    --brand-accent: 16 62% 61%;
+    --brand-accent-dark: 16 55% 50%;
+    --brand-accent-light: 16 72% 72%;
     --brand: var(--brand-accent);
     --brand-dark: var(--brand-accent-dark);
     --brand-light: var(--brand-accent-light);
@@ -154,12 +155,12 @@ body {
        mastered/ready/error sit on the fleet's ok/accent/danger hues; due and
        fading are warm and distinct from each other; building is the fleet's
        first categorical hue (a state of the pipeline, not a judgement). */
-    --status-mastered: 150 70% 45%;
-    --status-ready: 205 100% 50%;
-    --status-due: 40 81% 54%;
-    --status-fading: 16 85% 58%;
-    --status-building: 290 60% 72%;
-    --status-error: 360 89% 62%;
+    --status-mastered: 101 26% 56%;
+    --status-ready: 39 28% 74%;   /* cream: available, not a call to act */
+    --status-due: 32 70% 62%;
+    --status-fading: 350 42% 64%;
+    --status-building: 260 28% 70%;
+    --status-error: 8 62% 58%;
 
     /* Concept-kind hues — a categorical scale whose only job is being
        distinguishable from each other. Kept off the four status hues. */
@@ -546,54 +547,33 @@ body {
    other twenty files use. Its five call sites now use that plain one, which is
    the same box shipyard draws. .build-gradient-text went with .gradient-text. */
 
-/* The calm reading room (v0.28.0; the human's brief 2026-11-04): a warmer dark, softer
-   contrast, more air, a serif body for reading and sans for labels. Dark only.
-
-   Scoped to the page content (layout.tsx wraps {children} in .room), never :root: the header
-   is shared chrome and stays on the fleet's zinc so it matches the sibling apps. The --fleet-*
-   aliases are restated here because a custom property resolves where it is declared, so
-   :root's `--fleet-bg: hsl(var(--background))` would keep reading the zinc ground. */
-.room {
-  --background: 30 9% 7%;
-  --foreground: 38 22% 86%;
-  --card: 30 8% 10.5%;
-  --card-foreground: 38 22% 86%;
-  --popover: 30 8% 10.5%;
-  --popover-foreground: 38 22% 86%;
-  --secondary: 30 6% 15%;
-  --secondary-foreground: 38 22% 86%;
-  --muted: 30 6% 15%;
-  --muted-foreground: 33 9% 62%;
-  --accent: 30 6% 15%;
-  --accent-foreground: 38 22% 86%;
-  --border: 30 7% 17%;
-  --input: 30 7% 17%;
-  --fleet-bg: hsl(var(--background));
-  --fleet-surface: hsl(var(--card));
-  --fleet-border: hsl(var(--border));
-  --fleet-text: hsl(var(--foreground));
-  --fleet-text-dim: hsl(36 14% 76%);
-  --fleet-text-faint: hsl(var(--muted-foreground));
-  min-height: calc(100vh - var(--fleet-header-h));
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-}
-
-/* Graph paper, fainter: the study theme's grid stays, but recedes behind the work. */
-.room .study-page {
-  background-image: linear-gradient(color-mix(in srgb, var(--fleet-border) 22%, transparent) 1px, transparent 1px),
-                    linear-gradient(90deg, color-mix(in srgb, var(--fleet-border) 22%, transparent) 1px, transparent 1px);
-}
+/* Study Hall: a plain ground, no graph paper. */
+.study-page { background-image: none; }
 
 /* More air: wider sheet margins, roomier rows, a longer line for reading. */
-.room .study-sheet { padding: 28px 32px; gap: 1rem; }
-.room .study-choice { padding: 12px 14px; }
-.room .study-note { padding: 12px 16px; }
-@media (max-width: 640px) { .room .study-sheet { padding: 20px 18px; } }
+.study-sheet { padding: 28px 32px; gap: 1rem; }
+.study-choice { padding: 12px 14px; }
+.study-note { padding: 12px 16px; }
+@media (max-width: 640px) { .study-sheet { padding: 20px 18px; } }
 
 /* Serif for what you read (paragraphs, lists, quotes, table cells), sans for what you scan
    (headings, labels, buttons, choices). Code keeps its own face: it is set on the element, not inherited. */
-.room .markdown-reader :is(p, li, blockquote, td, dd) { font-family: var(--reading-serif); line-height: 1.75; }
+.markdown-reader :is(p, li, blockquote, td, dd) { font-family: var(--reading-serif); line-height: 1.75; }
 /* Reading text that is not a markdown document: a pack's chunk (.reading), a concept's statement (.concept-md). */
-.room .reading { font-family: var(--reading-serif); line-height: 1.7; }
-.room .concept-md { font-family: var(--reading-serif); }
+.reading { font-family: var(--reading-serif); line-height: 1.7; }
+.concept-md { font-family: var(--reading-serif); }
+
+/* Study Hall headings: the name of a surface and its section titles are set in the reading
+   serif; card titles, labels and buttons stay in Inter. */
+:is(h1, h2, h3):is(.text-page, .text-2xl, .text-3xl, .text-section, .text-xl) {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+/* Library Today: one primary action, the first line's; the rest stay outline. */
+.today-list > li:nth-child(1 of :not([hidden])) .today-cta {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}

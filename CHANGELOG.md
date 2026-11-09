@@ -7,6 +7,23 @@ commit.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-09
+
+Study Hall.
+
+### Changed
+- **LearnHub has its own look.** "Study Hall dark": a warm near-black ground, cream ink, one
+  terracotta accent with dark ink on it. Inter for what you scan, Newsreader for what you read
+  and for page and section titles, both self-hosted by next/font. Dark only.
+- **Its own one-row header** (56px) replaces the fleet's two-tier header and app tabs.
+- **Roomier type**: body 15px, page titles 30px (was 14 and 26).
+- **Library Today** has one primary button, the first line's; the rest are outline.
+- **"Ready" chips** are quiet cream, so the accent means "act here" only.
+- **No graph paper** behind study screens.
+
+### Fixed
+- The reader no longer scrolls sideways at 1440–1600px wide: margin notes appear from 1600px.
+
 ## [0.28.0] - 2026-11-09
 
 Calm reading room.

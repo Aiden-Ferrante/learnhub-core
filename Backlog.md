@@ -101,8 +101,17 @@ not add to it mid-build.
 
 ## Carries forward
 
-- **Should the header be warm too?** (v0.28.0.) The room theme stops at the shared fleet header
-  on purpose. Warming it is a fleet-wide call.
+- **The Desk** (next, v0.30.0; chosen 2026-11-09). One workspace per course: the book outline on
+  the left with per-chapter progress, Read / Review / Practice / Test switching in the middle,
+  the current section's concepts and tools on the right. Mockups: the "Study Hall dark" page of
+  https://claude.ai/artifact/E4AQgKt4SmVo8TUspL2iA1. The Library stays the landing page.
+
+- **Card titles are still sans** (v0.29.0). Only page and section headings went serif; the review
+  card's concept name and Sheet titles may want it too. Decide inside the Desk.
+
+- **Other repos' agent docs were re-rendered** (v0.29.0). Running `fleet/render_agent_docs.py`
+  refreshed the stale fleet block in shipyard, helm, mission-control, feedwall and
+  content-operation (studyloop row removed). Those edits sit uncommitted in those repos.
 
 - **Run the PG test tier before every close.** (v0.27.0.) `LEARN_PG_TESTS=1` caught what 195
   stubbed tests could not. Consider making it part of `make test`.

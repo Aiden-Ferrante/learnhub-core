@@ -104,10 +104,8 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    // 88px, not 65: the layout renders the two-tier header on this page too, and
-    // the fleet pins it at 38 + 49 + 1. The old number was 23px short, which is
-    // exactly the scrollbar this page had on a viewport-height screen.
-    <main className="flex min-h-[calc(100vh-88px)] items-center justify-center p-4">
+    // The layout renders the header on this page too; subtract its height (globals.css).
+    <main className="flex min-h-[calc(100vh-var(--fleet-header-h))] items-center justify-center p-4">
       <Suspense>
         <LoginForm />
       </Suspense>
