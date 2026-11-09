@@ -7,6 +7,17 @@ commit.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-09
+
+Calm reading room.
+
+### Changed
+- **A warmer, calmer dark** across the Library, course home, Reading, Exam packs and Review:
+  a warm ground, softer ink (13.9:1), a fainter study grid and roomier sheets. The header stays
+  on the fleet's palette.
+- **Serif for reading.** Markdown body text, pack chunks and concept statements use the
+  reading serif. Headings, labels and controls stay sans.
+
 ## [0.27.0] - 2026-11-09
 
 Notes that steer the paper.

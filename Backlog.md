@@ -101,6 +101,9 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Should the header be warm too?** (v0.28.0.) The room theme stops at the shared fleet header
+  on purpose. Warming it is a fleet-wide call.
+
 - **Run the PG test tier before every close.** (v0.27.0.) `LEARN_PG_TESTS=1` caught what 195
   stubbed tests could not. Consider making it part of `make test`.
 
@@ -118,11 +121,6 @@ not add to it mid-build.
   self-marked. The fix is in conversion (or reconversion), not in packs.
 - **Scripts that call the author must use the deployed model.** (v0.26.0.) The host has no
   `LEARN_PRACTICE_MODEL`, so set it as in compose, or run in the image.
-
-- **Visual pass, next cycle (human, 2026-11-04).** "Make the visuals more pleasing." Chosen
-  feel: *calm reading room*: warmer dark, softer contrast, more breathing room, serif body
-  for reading, sans labels. Dark only. Screens: Library + course home, Reading, Exam packs,
-  Review + recall (all four). Opens after v0.25.1 is tagged.
 
 - **Deploy split.** (v0.25.1.) The agent may build images but not `up -d` on prod. Hand the
   human that one command, with `!`.
