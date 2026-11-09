@@ -30,6 +30,7 @@ PACKAGES = [
     ("process/ingestion", "PDF in"),
     ("process/content", "the book itself"),
     ("process/extraction", "LLM generation passes"),
+    ("process/packs", "exam packs built from a textbook"),
     ("supplemental/study", "learning state"),
     ("supplemental/media", "audiobooks"),
     ("conductor", "wires job kinds to domain runners + the auto-chain"),

@@ -17,9 +17,7 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-from app.gateways import db
 from app.gateways import (
-    ollama_structured_completion,
     PackBookProblemSet,
     PackChunk,
     PackConceptSet,
@@ -27,6 +25,8 @@ from app.gateways import (
     PackSkillSet,
     PackVerdictSet,
     PackWorkedSet,
+    db,
+    ollama_structured_completion,
 )
 from app.process.content import load_section_blocks, source_id_of
 from app.process.packs import gen

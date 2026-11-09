@@ -49,3 +49,11 @@ coverage/
 
 # ---- Agent worktrees (Claude Code) ----
 .claude/worktrees/
+
+# Machine-local agent config (removed from the public repo 2026-11-05, kept on disk so
+# shipyard and the fleet tools still find this checkout).
+/PROJECT.yaml
+/.mcp.json
+/CLAUDE.md
+/AGENTS.md
+frontend/.claude/

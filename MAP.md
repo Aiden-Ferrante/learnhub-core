@@ -171,7 +171,17 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
 | [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
 | [`grounding.py`](backend/app/process/extraction/grounding.py) | Does a concept's `source_sentence` actually appear in its own section — the check the extraction gate only implies |
-| [`practice.py`](backend/app/process/extraction/practice.py) | Practice-item pool: per-section LLM authoring (retrieve + problem) with furniture-tell filtering + refusal receipts, `concept_filter` reads, regenerate-preserves-edits, CRUD |
+
+### process/packs/ — exam packs built from a textbook
+
+> Exam packs — a textbook turned into Learn items and an exam pool. — [`__init__.py`](backend/app/process/packs/__init__.py) is the facade: import this package, not its modules.
+
+| File | Purpose |
+|---|---|
+| [`author.py`](backend/app/process/packs/author.py) | Build a pack per chapter: chunk, skills, Learn items, exam pool; ungrounded output is dropped with its reason |
+| [`gen.py`](backend/app/process/packs/gen.py) | Generator specs: one skill, new numbers on every seed; a snippet's printed output is the answer |
+| [`sandbox.py`](backend/app/process/packs/sandbox.py) | Runs a generator's Python snippets in a limited child process behind an AST gate |
+| [`answers.py`](backend/app/process/packs/answers.py) | _(describe me)_ |
 
 ### supplemental/study/ — learning state
 
@@ -186,7 +196,8 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`calendar.py`](backend/app/supplemental/study/calendar.py) | Cross-course review calendar — when everything comes due |
 | [`manual.py`](backend/app/supplemental/study/manual.py) | Manual study-time blocks — the user's corrections layer over the derived sessions |
 | [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | Which review rows belong to a course version — the retention/coverage split, in SQL |
-| [`exams.py`](backend/app/supplemental/study/exams.py) | Exam sittings: the one assembly over the pool that STORES a row — stratified draw, questions frozen at creation, answers resumable, self-graded through the one engine, per-section results + resit comparison |
+| [`pack_logic.py`](backend/app/supplemental/study/pack_logic.py) | Exam-pack decisions with no database: draw a paper, mark it, say what to do today |
+| [`packs.py`](backend/app/supplemental/study/packs.py) | Exam packs, the stored side: reads and writes packs; marked answers go to FSRS per skill |
 
 ### supplemental/media/ — audiobooks
 
@@ -223,7 +234,7 @@ Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, rou
 | [`media_routes.py`](backend/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
 | [`process_routes.py`](backend/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
 | [`progress_routes.py`](backend/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
-| [`practice_routes.py`](backend/app/api/practice_routes.py) | Practice items: pool read, prepare enqueue + status poll, item CRUD (grading stays on /api/review/grade) |
+| [`pack_routes.py`](backend/app/api/pack_routes.py) | Exam packs: thin routes over supplemental/study/packs |
 
 <!-- GEN:backend END -->
 

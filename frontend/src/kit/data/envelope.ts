@@ -1,4 +1,4 @@
-import { ApiError } from "@/gateways/api/http"
+import { ApiError } from "@/kit/data/api-error"
 
 /** Several learn routes answer 2xx with `{ error: "..." }` instead of a non-2xx status.
  *  Inside useApi / useApiMutation that body would count as success, so a surface runs the
