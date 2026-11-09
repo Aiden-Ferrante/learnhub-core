@@ -102,3 +102,24 @@ def test_descendant_leaves_terminates_on_cycle():
     # forever; the repeated node is treated as a leaf so the walk terminates.
     children = {"toc:1": ["toc:1.1"], "toc:1.1": ["toc:1"]}
     assert descendant_leaves("toc:1", children) == ["toc:1"]
+
+
+def test_a_chapter_counts_its_own_concepts_and_every_descendant(monkeypatch):
+    """Planted violation: a concept on a non-leaf section. Before v0.26.1 the chapter's
+    rollup read its leaves only, so this concept counted overall and in no section."""
+    from app.supplemental.study import mastery
+
+    forest = [_section("toc:1", children=[_section("toc:1.1", children=[_section("toc:1.1.1")]), _section("toc:1.2")])]
+    monkeypatch.setattr(mastery, "get_toc_tree", lambda doc: (forest, [], None))
+    monkeypatch.setattr(mastery, "_concepts_by_section",
+                        lambda doc: {"toc:1": ["c-chapter"], "toc:1.1": ["c-mid"], "toc:1.1.1": ["c-leaf"], "toc:1.2": ["c-2"]})
+    monkeypatch.setattr(mastery, "_retention_by_key", lambda doc, now: {"c-chapter": 0.9})
+    by = mastery.compute_mastery(now=0, doc="d")["bySection"]
+    assert by["toc:1"]["total"] == 4 and by["toc:1"]["reviewed"] == 1
+    assert by["toc:1.1"]["total"] == 2
+    assert by["toc:1.1.1"]["total"] == 1
+
+
+def test_subtree_terminates_on_cycle():
+    from app.supplemental.study.mastery import subtree
+    assert subtree("toc:1", {"toc:1": ["toc:1.1"], "toc:1.1": ["toc:1"]}) == ["toc:1", "toc:1.1"]

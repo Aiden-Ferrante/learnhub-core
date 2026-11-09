@@ -331,10 +331,22 @@ def descendant_leaves(
     return out
 
 
+def subtree(key: str, children: dict[str, list[str]], _seen: frozenset[str] = frozenset()) -> list[str]:
+    """The section and every section under it. A chapter's own prose carries concepts too,
+    so a rollup over leaves alone hides them (v0.23.0 verify: 22 of 29 counted)."""
+    if key in _seen:
+        return []
+    seen = _seen | {key}
+    out = [key]
+    for k in children.get(key) or []:
+        out.extend(subtree(k, children, seen))
+    return out
+
+
 def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[str, Any]:
     """Per-section memory state: {coverage, retention, state, total, reviewed, fading}
-    for every TOC section, with internal sections summarizing their descendant leaves'
-    concepts. ``overall`` is the whole course's summary. Needs only ext_concepts +
+    for every TOC section, with internal sections summarizing their own concepts and every
+    descendant's. ``overall`` is the whole course's summary. Needs only ext_concepts +
     concept_reviews — the event floor doesn't participate (retention already encodes
     time and outcomes through FSRS)."""
     now = time.time() if now is None else now
@@ -352,10 +364,9 @@ def compute_mastery(now: float | None = None, doc: str | None = None) -> dict[st
 
     by_section: dict[str, dict[str, Any]] = {}
     for k in labels:
-        leaves = descendant_leaves(k, children)
         keys: list[str] = []
-        for lk in leaves:
-            keys.extend(section_concepts.get(lk, []))
+        for sk in dict.fromkeys(subtree(k, children)):
+            keys.extend(section_concepts.get(sk, []))
         by_section[k] = summarize_memory(keys, retention)
 
     all_keys = [key for keys in section_concepts.values() for key in keys]
