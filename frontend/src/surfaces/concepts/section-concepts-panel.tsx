@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { Check, CheckCircle2 } from "lucide-react"
-import { ConceptMarkdown } from "@/surfaces/concepts/concept-markdown"
 import { MathText } from "@/surfaces/reading"
 import { Button } from "@/kit/ui/button"
 import { Skeleton } from "@/kit/ui/skeleton"

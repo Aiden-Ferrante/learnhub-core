@@ -95,7 +95,7 @@ export function InfoModal() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-1">2. Process into concepts</p>
-                  <p className="text-xs text-muted-foreground">Learn Hub extracts the chapter's concepts and builds its study material</p>
+                  <p className="text-xs text-muted-foreground">Learn Hub extracts the chapter&apos;s concepts and builds its study material</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">

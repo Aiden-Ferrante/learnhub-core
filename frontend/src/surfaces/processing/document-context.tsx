@@ -85,7 +85,10 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const canPersistRef = useRef(false)
 
   // Reconstruct File objects from serialized documents (server or localStorage)
+  // A stored card is untyped JSON: localStorage from older builds or the server's row.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reviveDocuments = (parsed: any[]): Document[] =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     parsed.map((doc: any) => {
       let file: File
       if (doc.content) {

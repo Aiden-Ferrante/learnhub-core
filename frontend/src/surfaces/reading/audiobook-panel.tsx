@@ -156,7 +156,6 @@ export function AudiobookPanel({ scope, docId }: AudiobookPanelProps) {
 
       {ready && (
         <SectionCard bodyClassName="space-y-2 p-3">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio
             ref={audioRef}
             controls
