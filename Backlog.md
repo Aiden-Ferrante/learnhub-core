@@ -101,6 +101,10 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Axler and Durrett are still in the library.** (v0.26.1.) They are now deletable from the
+  Library. Whether to delete them is the human's call.
+- **`followMainVersion` is unverified live.** (v0.26.1.) Check it on the next real version switch.
+
 - **The converter loses quiz code.** (v0.26.0.) Of 130 unanswered PE book problems, 46 have no
   code in the stem and 20 have it flattened with line numbers ("1 2 3 print(...)"), so they stay
   self-marked. The fix is in conversion (or reconversion), not in packs.
@@ -125,18 +129,6 @@ not add to it mid-build.
 - **Agent docs are stale across the fleet and feedwall's source is behind its repo.** (v0.24.0.)
   Fix `fleet/agents` before rendering, or feedwall loses its current credentials note.
 
-- **Per-section mastery ignores items and concepts on non-leaf sections.** (v0.23.0 verify,
-  2026-09-09.) `mastery.py` rolls a section up from `descendant_leaves` only, so anything
-  attached to a chapter or sub-chapter node counts overall but in no section: prod chapter 2
-  shows 22 problem items and 0 attempted where 29 exist and 2 were graded. Latent since
-  v0.19.0; surfaced by a book whose chapters carry their own prose. One-line fix, but it is
-  a mastery-axis change and belongs to its own light cycle with a planted violation.
-
-- **Two documents have no card, so they cannot be deleted from the Processing tab at all.**
-  (v0.17.0.) `Axler-Measure-Integration` and `Durrett-Probability`. The tab lists
-  `app_documents`, so a document with no card is unreachable from it — the orphan problem from
-  the other direction, and not in v0.17.0's finding list. (The two `converting` zombies that
-  were also in this state were deleted 2026-08-26 via the API.)
 - **333 MB of orphaned files, from deletes that predate v0.17.0.** One ingest directory
   (3.5 MB, 2026-07-17) and four audiobook directories (121 MB, 178 MB, 26 MB, 5.7 MB), none
   with a source row. Nothing creates these any more — the delete path removes both trees now —
@@ -187,8 +179,5 @@ not add to it mid-build.
   later fixed — so the lock failed *because* the bug was gone. Regenerating a frozen
   expectation is only honest when you can show the divergence is precisely the intended
   change, and when a property test replaces what the blob was implicitly guarding.
-- **Reading position is keyed to the course card**, so it is shared across versions; a shelf
-  card still shows the book's original section count rather than the active version's.
-  Named in v0.15.0's "Not verified" and still true.
 - **`app_documents` cards resolve their own `learn_doc_id`**, so setting a version as main
   does not yet change what a shelf card opens. (ARCHITECTURE.md, book/course seam.)

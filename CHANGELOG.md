@@ -7,6 +7,18 @@ commit.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-09
+
+Numbers that count everything.
+
+### Fixed
+- **Per-section mastery** counts a section's own concepts as well as its descendants': 227
+  concepts on prod were counted overall but in no section.
+- **Books without a course card** are listed in the Library and can be deleted through the
+  usual impact read.
+- **Reading position is per version.** Each version keeps its own, and the card's Continue
+  follows the main version.
+
 ## [0.26.0] - 2026-11-09
 
 Questions you can check.
