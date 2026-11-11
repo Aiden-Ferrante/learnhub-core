@@ -1,6 +1,6 @@
 "use client"
 
-/** The Library (docs/ui-spec.md §3): the Today panel on top, then the course grid with its
+/** The Library (docs/ui-spec.md §3; Bookshelf since v0.31.0): the Today strip on top, then the course grid with its
  *  group sidebar. Admin entry points (Upload, Process) sit in the header, quietly. */
 
 import { useMemo, useState } from "react"
@@ -17,7 +17,7 @@ import { courseFromDocument, type Course } from "@/surfaces/library/courses"
 import { DeleteCourseDialog } from "@/surfaces/library/delete-course-dialog"
 import { GroupDialog, type GroupDialogState } from "@/surfaces/library/group-dialog"
 import { GroupPanel } from "@/surfaces/library/group-panel"
-import { TodayPanel } from "@/surfaces/library/today-panel"
+import { TodayStrip } from "@/surfaces/library/up-next"
 import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
 import { useReadingPositions, useStudyDebt } from "@/surfaces/library/use-library-queries"
@@ -94,7 +94,6 @@ export function CourseShelf() {
     <>
       <PageHeader
         title="Library"
-        description="Your courses, each one built from a document you processed."
         actions={
           <>
             <Button asChild variant="ghost" size="sm">
@@ -113,7 +112,7 @@ export function CourseShelf() {
         }
       />
 
-      <TodayPanel courses={courses} />
+      <TodayStrip />
 
       {courses.length === 0 ? (
         <FirstCourse />
@@ -141,7 +140,7 @@ export function CourseShelf() {
             {visibleCourses.length === 0 && query.trim() && (
               <p className="text-body text-muted-foreground">No courses match “{query}”.</p>
             )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
               {visibleCourses.map((course) => (
                 <CourseCard
                   key={course.id}
@@ -160,7 +159,7 @@ export function CourseShelf() {
               ))}
               {!selectedGroupId && (
                 <Link href="/upload" className="group block rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Sheet as="div" className="h-full min-h-[140px] items-center justify-center border-dashed text-muted-foreground transition-colors group-hover:border-brand/50 group-hover:text-foreground">
+                  <Sheet as="div" className="h-full min-h-[280px] items-center justify-center border-dashed text-muted-foreground transition-colors group-hover:border-brand/50 group-hover:text-foreground">
                     <Plus className="h-6 w-6" />
                     <span className="text-body font-medium">New course</span>
                     <span className="text-meta">Upload &amp; process a document</span>

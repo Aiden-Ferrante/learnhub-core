@@ -7,6 +7,27 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-11
+
+Bookshelf.
+
+### Changed
+- **Neutral black palette.** The warm brown ground and cream ink are now near-black, grey and
+  near-white. Terracotta stays as the one action colour.
+- **Library is a bookshelf.** Each course is a cover in its own colour, with initials, due count,
+  serif title, studied bar and Continue.
+- **Today strip.** One row with what is due (a coloured dot for each course) and one button,
+  replacing the Today panel.
+
+### Added
+- **Up next (`/session`).** One ordered session across courses: reviews, then exam-pack steps, then
+  where you left off. Each step is striped in its course colour, with one Start.
+- **Course colours** (`coverColor`), also shown as a dot on the Desk's course title.
+
+### Fixed
+- Covers load their studied share only when on screen, so the shelf no longer exhausts the API's
+  database pool.
+
 ## [0.30.0] - 2026-11-09
 
 The Desk.

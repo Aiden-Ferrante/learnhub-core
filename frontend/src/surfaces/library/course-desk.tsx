@@ -13,6 +13,7 @@ import type { SectionMemory } from "@/gateways/api/progress"
 import { chapterHref, scopeFromSegments } from "@/kit/lib/scope-url"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { cn } from "@/kit/lib/utils"
+import { coverColor } from "@/surfaces/library/cover"
 import { useCourseData } from "@/surfaces/library/use-course-data"
 
 type Mode = "overview" | "read" | "review" | "packs" | "concepts" | null
@@ -76,8 +77,9 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
     <div className="desk">
       <div className="border-b border-border bg-card/60">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2.5">
-          <Link href={base} className="min-w-0 max-w-[28rem] truncate font-serif text-section font-semibold text-foreground">
-            {title}
+          <Link href={base} className="flex min-w-0 max-w-[28rem] items-center gap-2.5 font-serif text-section font-semibold text-foreground">
+            <span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: coverColor(title) }} />
+            <span className="truncate">{title}</span>
           </Link>
           <nav aria-label="Course" className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1">
             {modes.map((m) => (
