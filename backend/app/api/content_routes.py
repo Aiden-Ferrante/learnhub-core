@@ -181,6 +181,34 @@ def api_document_pdf(doc: str | None = None):
     return FileResponse(str(path), media_type="application/pdf")
 
 
+@router.get("/api/document/cover")
+def api_document_cover(doc: str | None = None):
+    """The book's cover: page 1 of the original PDF as a 360px-wide JPEG, rendered once and
+    cached beside the PDF. 404 for documents with no original PDF (the shelf then shows the
+    course's colour instead)."""
+    doc_id = source_id_of(resolve_doc_id(doc))
+    if not doc_id or set(doc_id) - set("0123456789abcdef-"):
+        return JSONResponse({"error": "doc required"}, status_code=400)
+    folder = Path(os.environ.get("SHARED_DIR", "/shared")) / "ingest" / doc_id
+    pdf, cover = folder / "original.pdf", folder / "cover.jpg"
+    if not cover.exists():
+        if not pdf.exists():
+            return JSONResponse({"error": "no original PDF for this document"}, status_code=404)
+        import fitz  # PyMuPDF; imported here so the route module stays light
+
+        try:
+            with fitz.open(str(pdf)) as book:
+                page = book[0]
+                zoom = 360 / max(page.rect.width, 1)
+                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+                tmp = folder / "cover.jpg.tmp"
+                pix.save(str(tmp), output="jpeg", jpg_quality=82)
+                tmp.replace(cover)
+        except Exception as exc:  # a broken PDF has no cover, not a 500
+            return JSONResponse({"error": f"cover render failed: {exc}"}, status_code=404)
+    return FileResponse(str(cover), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=604800"})
+
+
 @router.get("/api/section/{key:path}/content")
 def api_section_content(key: str, doc: str | None = None) -> JSONResponse:
     data = fetch_section_content(key, doc)

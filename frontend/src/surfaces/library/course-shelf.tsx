@@ -20,7 +20,7 @@ import { GroupPanel } from "@/surfaces/library/group-panel"
 import { TodayStrip } from "@/surfaces/library/up-next"
 import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
-import { useReadingPositions, useStudyDebt } from "@/surfaces/library/use-library-queries"
+import { useReadingPositions, useShelfMastery, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
 
 function FirstCourse() {
@@ -53,6 +53,11 @@ export function CourseShelf() {
   const dueByDoc = useMemo(
     () => new Map((debt.data?.courses ?? []).map((c) => [c.doc, c.dueNow])),
     [debt.data],
+  )
+
+  // Studied share for every cover, in one read (19 per-card reads exhausted the API pool).
+  const shelfMastery = useShelfMastery(
+    useMemo(() => courses.filter((c) => c.status === "ready" && c.learnDocId).map((c) => c.learnDocId as string), [courses]),
   )
 
   const groups = useCourseGroups()
@@ -140,11 +145,12 @@ export function CourseShelf() {
             {visibleCourses.length === 0 && query.trim() && (
               <p className="text-body text-muted-foreground">No courses match “{query}”.</p>
             )}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-5 gap-y-6">
               {visibleCourses.map((course) => (
                 <CourseCard
                   key={course.id}
                   course={course}
+                  mastery={course.learnDocId && shelfMastery.data ? (shelfMastery.data.overall[course.learnDocId] ?? null) : undefined}
                   dueNow={course.learnDocId ? (dueByDoc.get(course.learnDocId) ?? 0) : 0}
                   continueKey={positions.data?.[course.id] ?? null}
                   groups={groups.state.groups}
@@ -159,7 +165,7 @@ export function CourseShelf() {
               ))}
               {!selectedGroupId && (
                 <Link href="/upload" className="group block rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Sheet as="div" className="h-full min-h-[280px] items-center justify-center border-dashed text-muted-foreground transition-colors group-hover:border-brand/50 group-hover:text-foreground">
+                  <Sheet as="div" className="aspect-[3/4] items-center justify-center border-dashed text-muted-foreground transition-colors group-hover:border-brand/50 group-hover:text-foreground">
                     <Plus className="h-6 w-6" />
                     <span className="text-body font-medium">New course</span>
                     <span className="text-meta">Upload &amp; process a document</span>

@@ -14,9 +14,9 @@ export function coverMonogram(title: string): string {
 }
 
 /** Each course's own colour (v0.31.0), picked from the title so it never changes. Six muted
- *  hues, none of them the green, amber or rose that mean memory state, and none the
+ *  hues (softened in v0.31.1 to sit on the neutral black), none of them the green, amber or rose that mean memory state, and none the
  *  terracotta that means "act here". Used on the shelf cover, the Up next steps and the Desk. */
-export const COURSE_COLORS = ["#6E9BD1", "#9C88CF", "#55A9A3", "#5DB3CF", "#B47BB0", "#7F87D9"] as const
+export const COURSE_COLORS = ["#7F9CC0", "#9A8FC0", "#77A8A2", "#7FAFC2", "#B08AAE", "#8C92C9"] as const
 
 export function coverColor(title: string): string {
   let h = 0

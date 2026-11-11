@@ -195,3 +195,4 @@ not add to it mid-build.
   change, and when a property test replaces what the blob was implicitly guarding.
 - **`app_documents` cards resolve their own `learn_doc_id`**, so setting a version as main
   does not yet change what a shelf card opens. (ARCHITECTURE.md, book/course seam.)
+- **Cold study-debt (from v0.31.1).** After an API restart, `/api/study-debt` takes about 37 s on first read (2 ms warm), so the Library's Today strip says "Checking what is due…" that long. Warm it on startup, or make it cheaper.

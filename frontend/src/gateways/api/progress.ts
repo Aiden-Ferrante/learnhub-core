@@ -49,6 +49,18 @@ export async function fetchMastery(doc?: string, signal?: AbortSignal): Promise<
   return parseJsonResponse<MasteryResponse>(res)
 }
 
+/** Whole-book summaries for many courses in one call (the Library shelf). null = unreadable. */
+export async function fetchMasteryOverall(
+  docs: string[],
+  signal?: AbortSignal,
+): Promise<{ overall: Record<string, SectionMemory | null>; error?: string }> {
+  const res = await fetch(`/api/learn/mastery/overall?docs=${encodeURIComponent(docs.join(','))}`, {
+    signal,
+    cache: 'no-store',
+  })
+  return parseJsonResponse(res)
+}
+
 export async function fetchActivity(doc?: string, signal?: AbortSignal): Promise<ActivityResponse> {
   const qs = doc ? `?doc=${encodeURIComponent(doc)}` : ''
   const res = await fetch(`/api/learn/activity${qs}`, { signal, cache: 'no-store' })

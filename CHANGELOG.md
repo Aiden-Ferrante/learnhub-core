@@ -7,6 +7,24 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-11-11
+
+Book covers.
+
+### Changed
+- **Course cards are books.** A 3:4 cover from page 1 of the PDF, or a quiet tile in the course
+  colour. A due badge, studied share along the cover's edge, Continue on hover, and the title
+  underneath. Smaller: 5 per row beside the sidebar (3 before).
+- Course colours are softened to sit on the black.
+
+### Added
+- `GET /api/document/cover`: page 1 of the original PDF as a cached JPEG.
+- `GET /api/mastery/overall?docs=`: every course's summary in one read.
+
+### Fixed
+- The shelf makes one mastery read instead of one per card, which had exhausted the API's
+  database pool.
+
 ## [0.31.0] - 2026-11-11
 
 Bookshelf.

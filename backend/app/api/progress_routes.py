@@ -33,6 +33,18 @@ def api_mastery(doc: str | None = None) -> JSONResponse:
     return JSONResponse(data, status_code=503 if data.get("error") else 200)
 
 
+@router.get("/api/mastery/overall")
+def api_mastery_overall(docs: str = Query("")) -> JSONResponse:
+    """Each course's whole-book summary in one call, for the Library shelf: ``{doc: overall}``.
+    Computed one book after another so a shelf of covers holds one pooled connection at a
+    time; 19 parallel /api/mastery reads exhausted the pool of 8 (v0.31.1)."""
+    out: dict[str, object] = {}
+    for doc in [d for d in docs.split(",") if d][:100]:
+        data = compute_mastery(doc=doc)
+        out[doc] = None if data.get("error") else data.get("overall")
+    return JSONResponse({"overall": out})
+
+
 @router.get("/api/concept-mastery")
 def api_concept_mastery(doc: str | None = Query(None)) -> JSONResponse:
     return JSONResponse(compute_concept_mastery(doc=doc))

@@ -3,7 +3,7 @@
 /** The reads the Library and the course home share, each through the one cache, so the
  *  shelf, the Today panel, the course home and the nav badge never disagree. */
 
-import { fetchMastery, fetchStudyDebt } from "@/gateways/api/progress"
+import { fetchMasteryOverall, fetchStudyDebt } from "@/gateways/api/progress"
 import { fetchPacks, fetchToday } from "@/gateways/api/packs"
 import { fetchReadingPositions } from "@/gateways/api/user-settings"
 import { qk, useApi, orThrow } from "@/kit/data"
@@ -33,9 +33,11 @@ export function usePackToday(packKey: string | undefined, enabled = true) {
   })
 }
 
-/** One course's memory rollup (studied share), for its shelf cover. Same cache as the Desk. */
-export function useCourseMastery(docId: string | undefined) {
-  return useApi(qk.mastery(docId ?? ""), (signal) => fetchMastery(docId as string, signal).then(orThrow), {
-    enabled: !!docId,
+/** Every shelf course's studied share in one read. Keyed under the mastery root, so it
+ *  refreshes whenever a review invalidates mastery. */
+export function useShelfMastery(docIds: string[]) {
+  const key = [...docIds].sort().join(",")
+  return useApi([...qk.mastery("shelf"), key], (signal) => fetchMasteryOverall(key.split(","), signal).then(orThrow), {
+    enabled: key.length > 0,
   })
 }
