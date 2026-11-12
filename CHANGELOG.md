@@ -7,6 +7,11 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.2] — 2026-11-12 — Framed cards
+
+### Changed
+- Library cards are framed again (bordered panel), with the book cover about 30% smaller inside.
+
 ## [0.31.1] - 2026-11-11
 
 Book covers.

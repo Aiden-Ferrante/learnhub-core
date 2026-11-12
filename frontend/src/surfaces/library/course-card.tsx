@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; 
   empty: { label: "Not processed", status: "neutral" },
 }
 
-/** One course on the shelf, as a cover in its own colour (v0.31.0). The title is a stretched link to the course home, so the whole
+/** One course on the shelf: a framed card with the book cover at about 70% of the card (v0.31.2). The title is a stretched link to the course home, so the whole
  *  card opens it; the menu and the reading button sit above that link. */
 export function CourseCard({
   course,
@@ -60,9 +60,9 @@ export function CourseCard({
   const [coverFailed, setCoverFailed] = useState(false)
   const showCover = ready && !!course.learnDocId && !coverFailed
   return (
-    <article className="group relative flex flex-col gap-2">
+    <article className="group relative flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/30">
       {/* The cover: page 1 of the book's PDF, or (no PDF) a quiet tile in the course colour. */}
-      <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-colors group-hover:border-foreground/30">
+      <div className="relative mx-auto aspect-[3/4] w-[76%] overflow-hidden rounded-md border border-border bg-background shadow-sm">
         {showCover ? (
           // eslint-disable-next-line @next/next/no-img-element -- a same-origin proxy, sized by CSS
           <img
