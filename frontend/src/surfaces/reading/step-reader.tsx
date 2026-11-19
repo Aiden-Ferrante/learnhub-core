@@ -230,6 +230,8 @@ export function StepReader({
               SIZES[size].className,
               "prose-p:text-foreground prose-li:text-foreground",
               "prose-headings:font-serif prose-h3:mt-12 prose-h3:text-[1.3em] prose-h4:text-[1.1em]",
+              // Long display equations scroll inside their own box, never the page.
+              "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
             )}
           />
         )}
