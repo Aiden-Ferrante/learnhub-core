@@ -6,7 +6,8 @@
  *  - ChapterCards: Progress, Study activity, then one card per top-level chapter (number,
  *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
- *  - ChapterDashboard: one chapter's own page — Read / Review / Practice, then its sections.
+ *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, its sections, its
+ *    concepts. Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
  *
  *  Due counts come from ONE whole-course review queue, bucketed by chapter through the tree,
  *  never one request per card (that exhausted the API's pool in v0.31.1). Lives on its own
@@ -23,6 +24,7 @@ import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
+import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 import { useCourseHome } from "@/surfaces/library/use-course-home"
@@ -91,6 +93,94 @@ function Bar({ value, color, className }: { value: number; color: string; classN
   )
 }
 
+function ExamLine({ rec }: { rec: ExamRecord | undefined }) {
+  if (!rec) return <span className="text-meta text-muted-foreground">Exam not taken</span>
+  if (rec.passed) return <span className="text-meta font-medium text-ink-ok">✓ Exam passed · {rec.best}%</span>
+  return <span className="text-meta text-ink-warn">Exam {rec.last}% · needs {PASS_MARK}%</span>
+}
+
+function DemoControls({ onScore, label }: { onScore: (score: number) => void; label: string }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-meta text-muted-foreground">
+      <span>Demo · {label}:</span>
+      {[92, 84, 61].map((score) => (
+        <button
+          key={score}
+          type="button"
+          onClick={() => onScore(score)}
+          className="rounded-md border border-border px-2 py-0.5 tabular-nums hover:border-muted-foreground/50 hover:text-foreground"
+        >
+          score {score}%
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ComprehensiveCard({
+  exams,
+  examChapters,
+  numbers,
+  color,
+}: {
+  exams: ReturnType<typeof useDemoExams>
+  examChapters: LearnTreeNode[]
+  numbers: Map<string, string>
+  color: string
+}) {
+  const passed = examChapters.filter((c) => exams.chapters[c.sectionKey!]?.passed)
+  const label = (keys: string[]) =>
+    examChapters
+      .filter((c) => keys.includes(c.sectionKey!))
+      .map((c) => numbers.get(c.id))
+      .join(", ")
+  const comp = exams.comprehensive
+  const fresh = passed.filter((c) => !comp?.covered.includes(c.sectionKey!)).length
+  const complete =
+    passed.length === examChapters.length && examChapters.length > 0 && comp?.passed && fresh === 0
+  const locked = passed.length === 0
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 rounded-2xl border bg-card p-5",
+        locked ? "border-dashed border-border" : "border-border",
+      )}
+      style={!locked ? { borderColor: color } : undefined}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">Comprehensive exam</span>
+        <span className="text-meta text-muted-foreground">
+          {passed.length} of {examChapters.length} chapters passed
+        </span>
+      </div>
+      {locked ? (
+        <p className="font-semibold text-muted-foreground">🔒 Pass any chapter exam to unlock it.</p>
+      ) : (
+        <>
+          <p className="font-semibold">
+            {complete ? "✓ Course complete" : `Covers chapter${passed.length === 1 ? "" : "s"} ${label(passed.map((c) => c.sectionKey!))}`}
+          </p>
+          <p className="text-meta text-muted-foreground">
+            {comp
+              ? comp.passed
+                ? `Passed at ${comp.best}% for chapters ${label(comp.covered)}${fresh ? ` · ${fresh} newly passed chapter${fresh === 1 ? "" : "s"} not yet covered` : ""}`
+                : `Last try ${comp.last}% · needs ${PASS_MARK}%`
+              : `Pass mark ${PASS_MARK}% · grows as you pass chapters`}
+          </p>
+          <button
+            type="button"
+            className="mt-1 self-start rounded-lg bg-primary px-3.5 py-2 text-meta font-semibold text-primary-foreground"
+          >
+            {comp ? "Retake comprehensive exam" : "Take comprehensive exam"}
+          </button>
+          <DemoControls label="comprehensive result" onScore={exams.sitComprehensive} />
+        </>
+      )}
+    </div>
+  )
+}
+
 function TrialNote({ courseId }: { courseId: string }) {
   return (
     <p className="text-meta text-muted-foreground">
@@ -109,6 +199,8 @@ export function ChapterCards({ data }: { data: CourseData }) {
   const due = useDueByChapter(course.learnDocId, chapters)
   const by = data.mastery?.bySection ?? {}
   const home = useCourseHome(course, data)
+  const exams = useDemoExams(course.id)
+  const examChapters = chapters.filter((c) => numbers.get(c.id))
   const router = useRouter()
   // A chapter square in the Progress strip opens that chapter's dashboard, like its card.
   const openChapter = (scope: string) => {
@@ -121,6 +213,13 @@ export function ChapterCards({ data }: { data: CourseData }) {
       <TrialNote courseId={course.id} />
       {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
       {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
+      <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
+      <p className="-mb-3 text-meta text-muted-foreground">
+        Exam results on this page are a design demo, saved in this browser only ·{" "}
+        <button type="button" onClick={exams.reset} className="underline underline-offset-2 hover:text-foreground">
+          reset
+        </button>
+      </p>
       {data.loading && chapters.length === 0 ? (
         <p className="text-muted-foreground">Loading chapters…</p>
       ) : (
@@ -148,6 +247,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
                 <span className="flex flex-col gap-1.5">
                   <span className="text-meta tabular-nums text-muted-foreground">{share}% studied</span>
                   <Bar value={share} color={color} />
+                  {num ? <ExamLine rec={exams.chapters[c.sectionKey!]} /> : <span className="text-meta text-muted-foreground/60">No exam</span>}
                 </span>
               </Link>
             )
@@ -165,6 +265,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const due = useDueByChapter(course.learnDocId, chapters)
   const chapter = chapters.find((c) => c.sectionKey === chapterKey)
   const by = data.mastery?.bySection ?? {}
+  const exams = useDemoExams(course.id)
 
   if (!chapter) {
     return (
@@ -178,6 +279,14 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   }
 
   const m = by[chapterKey]
+  const hasExam = Boolean(numbers.get(chapter.id))
+  const rec = exams.chapters[chapterKey]
+  const concepts: { key?: string | null; name: string; kind?: string | null }[] = []
+  const gather = (node: LearnTreeNode) => {
+    concepts.push(...(node.concepts ?? []))
+    node.children.forEach(gather)
+  }
+  gather(chapter)
   const share = pct(m)
   const n = due.get(chapterKey) ?? 0
   const sections = chapter.children.filter((s) => s.isSection && s.sectionKey)
@@ -244,12 +353,37 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             {n > 0 ? "Review now" : "Open review"}
           </Link>
         </div>
-        <div className="relative flex flex-col gap-1.5 rounded-[14px] border border-border bg-card p-[18px]">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Practice</span>
-          <span className="flex-1 font-semibold">Exam packs for this course</span>
-          <Link href={`/courses/${course.id}/packs`} className={action}>
-            Start practice
-          </Link>
+        <div
+          className="relative flex flex-col gap-1.5 rounded-[14px] border bg-card p-[18px]"
+          style={{ borderColor: rec?.passed ? "var(--status-mastered)" : undefined }}
+        >
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam</span>
+          {hasExam ? (
+            <>
+              <span className="flex-1 font-semibold">
+                {rec?.passed
+                  ? `Passed · best ${rec.best}%`
+                  : rec
+                    ? `Last try ${rec.last}% · needs ${PASS_MARK}%`
+                    : `Pass ${PASS_MARK}% to complete this chapter`}
+              </span>
+              <span className="text-meta text-muted-foreground">
+                {rec ? `${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"} · ` : ""}every retake has new questions
+              </span>
+              <button
+                type="button"
+                className={cn(
+                  "mt-2 self-start rounded-lg px-3.5 py-2 text-meta font-semibold",
+                  rec?.passed ? "border border-border" : "bg-primary text-primary-foreground",
+                )}
+              >
+                {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
+              </button>
+              <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
+            </>
+          ) : (
+            <span className="flex-1 font-semibold text-muted-foreground">No exam for this part of the book</span>
+          )}
         </div>
       </div>
 
@@ -285,6 +419,26 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             })}
           </div>
         )}
+      </section>
+
+      <section>
+        <details>
+          <summary className="flex cursor-pointer list-none items-baseline gap-3">
+            <h2 className="m-0 font-serif text-[22px] font-semibold">Concepts</h2>
+            <span className="text-meta text-muted-foreground">{concepts.length} in this chapter · show</span>
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {concepts.map((c, i) => (
+              <Link
+                key={`${c.key ?? c.name}-${i}`}
+                href={`/courses/${course.id}/concepts${c.key ? `?concept=${encodeURIComponent(c.key)}` : ""}`}
+                className="rounded-full border border-border px-3 py-1 text-meta hover:border-muted-foreground/50"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        </details>
       </section>
     </div>
   )

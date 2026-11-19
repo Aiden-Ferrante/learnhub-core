@@ -60,6 +60,7 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
 
   const base = `/courses/${courseId}`
   const mode = modeOf(path, base)
+  const hubTrial = path.startsWith(`${base}/chapters`)
   const scope = scopeOf(path, base)
   const chapters = data.tree.filter((n) => n.sectionKey)
   const current = scope ? chapters.find((c) => contains(c, scope)) : undefined
@@ -79,10 +80,12 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
     <div className="desk">
       <div className="border-b border-border bg-card/60">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2.5">
-          <Link href={base} className="flex min-w-0 max-w-[28rem] items-center gap-2.5 font-serif text-section font-semibold text-foreground">
+          <Link href={hubTrial ? `${base}/chapters` : base} className="flex min-w-0 max-w-[28rem] items-center gap-2.5 font-serif text-section font-semibold text-foreground">
             <span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: coverColor(title) }} />
             <span className="truncate">{title}</span>
           </Link>
+          {/* TRIAL (v0.31.4, chapter hubs): the cards are the navigation, so no tab bar there. */}
+          {!hubTrial && (
           <nav aria-label="Course" className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1">
             {modes.map((m) => (
               <Link
@@ -103,6 +106,7 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
               </Link>
             ))}
           </nav>
+          )}
         </div>
       </div>
 
