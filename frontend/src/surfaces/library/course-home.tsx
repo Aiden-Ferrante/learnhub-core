@@ -29,6 +29,7 @@ export function CourseHome({
   const home = useCourseHome(course, data)
   return (
     <>
+      {data.isLive && <CourseStats course={course} data={data} home={home} onOpenSection={onOpenSection} />}
       <CourseHero course={course} step={home.next.step} />
       <StudyTiles courseId={course.id} data={data} home={home} />
       {data.positionError && (
@@ -41,7 +42,6 @@ export function CourseHome({
         onOpenSection={onOpenSection}
         onOpenConcept={onOpenConcept}
       />
-      {data.isLive && <CourseStats course={course} data={data} home={home} onOpenSection={onOpenSection} />}
     </>
   )
 }
