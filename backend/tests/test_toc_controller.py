@@ -597,3 +597,27 @@ def test_assess_names_dotted_tops():
         ["Module 1: Intro", "1.1 Programming", "1.2 Python", "1.3 Install", "Module 2: Types"])]
     quality, why = assess_bookmarks(raw, 10)
     assert quality == "messy" and any(w.startswith("dotted-tops: 3") for w in why)
+
+
+def test_nest_groups_appendices():
+    entries, log = nest_flat_sections([
+        _o("toc:4", 0, "Functions", "4"),
+        _o("toc:4.1", 1, "Def", "4.1"),
+        _o("toc:appendices", 0, "Appendices"),
+        _o("toc:appendix-a", 0, "Appendix A: LAB Hints"),
+        _o("toc:appendix-a-1", 1, "Lab 1"),
+        _o("toc:appendix-b", 0, "Appendix B: LAB Sample Solutions"),
+        _o("toc:index", 0, "Index"),
+    ])
+    assert [e["listDepth"] for e in entries] == [0, 1, 0, 1, 2, 1, 0]
+
+
+def test_module_title_parses_its_number():
+    from app.process.content.outline import build_outline_from_bookmarks
+    out = build_outline_from_bookmarks([
+        {"level": 1, "title": "Module 1: Introduction to Python", "page": 1},
+        {"level": 1, "title": "1.1 Introduction to programming", "page": 2},
+    ])
+    assert out[0]["sectionKey"] == "toc:1" and out[0]["title"] == "Introduction to Python"
+    nested, _ = nest_flat_sections(out)
+    assert [e["listDepth"] for e in nested] == [0, 1]

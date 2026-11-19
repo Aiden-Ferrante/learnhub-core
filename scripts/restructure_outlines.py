@@ -13,6 +13,14 @@ uses, and UPDATEs only what differs: depth, parent, kind, page end, number label
 reason. Section keys, and so node ids (``doc_id::section_key``), never change; nothing is
 inserted or deleted.
 
+A second pass, ``rekey``: a top-level container that carries a number but a slug key
+("Module 1: …" stored as ``toc:module-1-…``) is re-keyed to ``toc:N`` with the container
+prefix dropped from its title — exactly what the converter now produces for a fresh upload.
+Key-based chapter logic (``chapter_key_of``, scope ancestry, pack scopes) reads ``toc:1.2``
+as inside ``toc:1``; with a slug key the module owns its sections in the tree but not in
+those queries. The node is copied under the new id, every reference is repointed, then the
+old row goes; one transaction per document.
+
 Modes:
   python scripts/restructure_outlines.py            # dry run: print what would change
   python scripts/restructure_outlines.py --apply    # write it
@@ -26,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 
 for _cand in (os.path.join(os.path.dirname(__file__), "..", "backend"), "/app", "."):
@@ -41,6 +50,9 @@ from app.process.content.toc_controller import (  # noqa: E402
     nest_flat_sections,
 )
 
+_CONTAINER_PREFIX = re.compile(
+    r"^\s*(?:module|part|unit|chapter|week|lesson|book)\s+\d+\s*[.:)\u2013\u2014-]?\s*", re.IGNORECASE
+)
 _FIELDS = ("parent_id", "kind", "number_label", "depth", "page_end", "hidden_reason")
 
 
@@ -99,6 +111,62 @@ def plan_doc(conn, doc_id: str, page_count: int) -> tuple[list[dict], list[str]]
     return updates, problems
 
 
+_KEY_TABLES = ("raw_content", "raw_elements", "ext_concepts", "ext_guides", "concept_reviews",
+               "study_events", "pack_units", "pack_items")
+_FK_TABLES = ("raw_elements", "ext_concepts", "ext_orient", "ext_skeleton", "ext_guides",
+              "version_blocks")
+
+
+def plan_rekeys(conn, doc_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT section_key, number_label, title FROM raw_structure "
+        "WHERE doc_id = %s AND depth = 0 AND number_label ~ '^[0-9]+$' "
+        "AND section_key !~ '^toc:[0-9]'",
+        (doc_id,),
+    ).fetchall()
+    taken = {
+        (r["section_key"] if isinstance(r, dict) else r[0])
+        for r in conn.execute("SELECT section_key FROM raw_structure WHERE doc_id = %s", (doc_id,))
+    }
+    out = []
+    for r in rows:
+        sk, num, title = (r["section_key"], r["number_label"], r["title"]) if isinstance(r, dict) else r
+        new = f"toc:{num}"
+        if new in taken:
+            continue
+        clean = _CONTAINER_PREFIX.sub("", title or "").strip() or title
+        out.append({"old": sk, "new": new, "title": clean, "was": title})
+    return out
+
+
+def _has_column(conn, table: str, column: str) -> bool:
+    return bool(conn.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() "
+        "AND table_name = %s AND column_name = %s", (table, column)).fetchone())
+
+
+def apply_rekey(conn, doc_id: str, rk: dict) -> None:
+    old_id, new_id = f"{doc_id}::{rk['old']}", f"{doc_id}::{rk['new']}"
+    conn.execute(
+        """
+        INSERT INTO raw_structure (id, doc_id, parent_id, section_key, kind, number_label, title,
+            depth, "order", page_start, page_end, hidden_reason)
+        SELECT %(new_id)s, doc_id, parent_id, %(new)s, kind, number_label, %(title)s, depth,
+            "order", page_start, page_end, hidden_reason
+        FROM raw_structure WHERE id = %(old_id)s
+        """,
+        {"new_id": new_id, "new": rk["new"], "title": rk["title"], "old_id": old_id},
+    )
+    conn.execute("UPDATE raw_structure SET parent_id = %s WHERE parent_id = %s", (new_id, old_id))
+    for t in _FK_TABLES:
+        conn.execute(f"UPDATE {t} SET structure_id = %s WHERE structure_id = %s", (new_id, old_id))
+    for t in _KEY_TABLES:
+        scoped = " AND doc_id = %s" if _has_column(conn, t, "doc_id") else ""
+        params = (rk["new"], rk["old"], doc_id) if scoped else (rk["new"], rk["old"])
+        conn.execute(f"UPDATE {t} SET section_key = %s WHERE section_key = %s{scoped}", params)
+    conn.execute("DELETE FROM raw_structure WHERE id = %s", (old_id,))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
@@ -109,10 +177,14 @@ def main() -> int:
     with db() as conn:
         for doc_id, name, page_count in _docs(conn):
             updates, problems = plan_doc(conn, doc_id, page_count)
-            if not updates and not problems:
+            rekeys = plan_rekeys(conn, doc_id)
+            if not updates and not problems and not rekeys:
                 continue
             failing += 1
-            print(f"\n== {name[:70]}  ({doc_id})  {len(updates)} node(s) change")
+            print(f"\n== {name[:70]}  ({doc_id})  {len(updates)} node(s) change, "
+                  f"{len(rekeys)} re-key(s)")
+            for rk in rekeys:
+                print(f"   re-key {rk['old']} → {rk['new']}  title {rk['was']!r} → {rk['title']!r}")
             for u in updates:
                 change = ", ".join(f"{k} {u['old'][k]!r}→{v!r}" for k, v in u["set"].items()
                                    if k != "parent_id")
@@ -130,6 +202,11 @@ def main() -> int:
                             {**u["set"], "id": u["id"]},
                         )
                 print("   applied")
+            if args.apply and rekeys:
+                with conn.transaction():
+                    for rk in rekeys:
+                        apply_rekey(conn, doc_id, rk)
+                print("   re-keyed")
 
     if args.check:
         print(f"\ncheck-outlines: {failing} document(s) {'fail' if failing else 'clean'}")

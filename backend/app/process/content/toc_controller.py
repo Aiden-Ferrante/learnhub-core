@@ -247,6 +247,8 @@ def demote_part_containers(entries: list[dict]) -> tuple[list[dict], dict[str, s
 _CONTAINER_TITLE_RE = re.compile(
     r"^\s*(?:module|part|unit|chapter|week|lesson|book)\s+(\d+)\b", re.IGNORECASE
 )
+_APPENDICES_RE = re.compile(r"^\s*appendices\s*$", re.IGNORECASE)
+_APPENDIX_RE = re.compile(r"^\s*appendix\s+[A-Z0-9]+\b", re.IGNORECASE)
 _TRAILING_TITLES = {
     "exercises", "problems", "summary", "chapter summary", "further reading",
     "questions", "review questions", "key terms", "problem set",
@@ -293,6 +295,25 @@ def nest_flat_sections(entries: list[dict]) -> tuple[list[dict], str | None]:
             if not e.get("numberKey"):
                 e["numberKey"] = n
         i = j
+
+    # "Appendices" with its Appendix A, B, … bookmarked beside it.
+    for i, e in enumerate(out):
+        if int(e.get("listDepth") or 0) != 0 or not _APPENDICES_RE.match(e.get("title") or ""):
+            continue
+        if i + 1 < len(out) and int(out[i + 1].get("listDepth") or 0) > 0:
+            continue  # already has children
+        j = i + 1
+        while j < len(out):
+            f = out[j]
+            d = int(f.get("listDepth") or 0)
+            if d == 0 and not _APPENDIX_RE.match(f.get("title") or ""):
+                break
+            f["listDepth"] = d + 1
+            if d == 0:
+                adopted += 1
+            j += 1
+        if j > i + 1:
+            containers += 1
 
     last_top: dict | None = None
     for k, e in enumerate(out):

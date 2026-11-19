@@ -11,7 +11,7 @@ import re
 from app.process.content.pages import _heading_text_norm
 from app.process.content.sections import SectionBlock, _slug_key
 
-_OUTLINE_NUM = re.compile(r"^\s*(?:chapter|part|appendix|section)?\s*(\d+(?:\.\d+)*)\s*[.:)]?\s+(.*)$", re.IGNORECASE)
+_OUTLINE_NUM = re.compile(r"^\s*(?:chapter|part|appendix|section|module|unit|lesson|week)?\s*(\d+(?:\.\d+)*)\s*[.:)]?\s+(.*)$", re.IGNORECASE)
 
 
 def _parse_outline_number(title: str) -> tuple[str | None, str]:
