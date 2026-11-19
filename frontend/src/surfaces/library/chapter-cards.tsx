@@ -203,7 +203,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
     <div className="flex flex-col gap-6">
       {data.isLive && (
         // Side by side on a laptop: less scrolling past empty width (v0.31.5).
-        <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
           <CourseStats data={data} home={home} onOpenSection={openChapter} />
           <StudyHeatmap doc={course.learnDocId} />
         </div>
