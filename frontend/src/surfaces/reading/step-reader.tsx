@@ -232,6 +232,7 @@ export function StepReader({
               "prose-headings:font-serif prose-h3:mt-12 prose-h3:text-[1.3em] prose-h4:text-[1.1em]",
               // Long display equations scroll inside their own box, never the page.
               "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
+              "[&_.katex]:inline-block [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:overflow-y-hidden [&_.katex]:align-middle",
             )}
           />
         )}
