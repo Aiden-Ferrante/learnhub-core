@@ -44,7 +44,30 @@ function openingParagraph(markdown: string, sectionKey: string): string | null {
   return null
 }
 
-export type SectionDigestData = { concepts: ConceptLesson[]; brief: string | null }
+/** Words in the section's own text: from its heading to the next top-level section's heading. */
+function sectionWords(markdown: string, sectionKey: string, nextKey: string | undefined): number {
+  const lines = markdown.split("\n")
+  const at = (key: string | undefined) => {
+    if (!key) return -1
+    const num = numberOf(key)
+    if (!/^\d+(\.\d+)*$/.test(num)) return -1
+    return lines.findIndex((l) => new RegExp(`^#{1,6}\\s+${num.replace(/\./g, "\\.")}(\\s|$)`).test(l))
+  }
+  const start = at(sectionKey)
+  if (start < 0) return 0
+  const end = at(nextKey)
+  return lines
+    .slice(start + 1, end > start ? end : undefined)
+    .join(" ")
+    .replace(/\[(?:pp?\.|v\d{2}\.|beyond)[^\]]*\]/g, "")
+    .split(/\s+/)
+    .filter((w) => /[a-z0-9]/i.test(w)).length
+}
+
+/** Reading minutes at ~230 words a minute, never under 1. */
+export const minutesOf = (words: number) => Math.max(1, Math.round(words / 230))
+
+export type SectionDigestData = { concepts: ConceptLesson[]; brief: string | null; words: number }
 
 /** Every top-level section's concepts and opening paragraph, from one chapter read. */
 export function useChapterDigest(docId: string | undefined, chapter: LearnTreeNode | undefined) {
@@ -55,7 +78,14 @@ export function useChapterDigest(docId: string | undefined, chapter: LearnTreeNo
   return useMemo(() => {
     const out = new Map<string, SectionDigestData>()
     const sections = (chapter?.children ?? []).filter((s) => s.sectionKey)
-    for (const s of sections) out.set(s.sectionKey!, { concepts: [], brief: openingParagraph(q.data?.markdown ?? "", s.sectionKey!) })
+    const md = q.data?.markdown ?? ""
+    sections.forEach((s, i) =>
+      out.set(s.sectionKey!, {
+        concepts: [],
+        brief: openingParagraph(md, s.sectionKey!),
+        words: sectionWords(md, s.sectionKey!, sections[i + 1]?.sectionKey ?? undefined),
+      }),
+    )
     for (const c of q.data?.concepts ?? []) {
       const s = sections.find((x) => c.sectionKey && contains(x, c.sectionKey))
       if (s) out.get(s.sectionKey!)!.concepts.push(c)

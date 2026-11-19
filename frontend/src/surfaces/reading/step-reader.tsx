@@ -2,34 +2,37 @@
 
 /** TRIAL (v0.31.5): read a chapter one step at a time, from the chapter path.
  *
- *  Human decisions 2026-11-19: laptop first; concepts are tap-to-reveal (no margin notes);
- *  "Check understanding" closes each step and is optional, with Skip. One slim toolbar, a
- *  ~68-character serif column, the step's title once, source tags quieted to small markers.
+ *  Human decisions 2026-11-19: laptop first; "Check understanding" closes each step and is
+ *  optional, with Skip. Then, on A Philosophy of Software Design: bigger text, no concepts
+ *  panel ("I want to just read the material and have it be broken down").
  *
- *  Content is the section scope of the existing guided-reading API (markdown + concepts), so
- *  this changes how a step reads, not what is in it. */
+ *  A step is cut into short parts (~250 words, at headings or paragraph ends) shown one at a
+ *  time with Continue. The book's text is unchanged: same words, same order, only paced.
+ *  Content is the section scope of the existing guided-reading API. */
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Components } from "react-markdown"
 import { fetchGuidedReading } from "@/gateways/api/chapter"
-import type { ConceptLesson } from "@/gateways/api/concepts"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { qk, useApi } from "@/kit/data"
+import { useReadSteps } from "@/kit/lib/read-steps"
 import { cn } from "@/kit/lib/utils"
 import { MarkdownReader } from "@/surfaces/reading/markdown-reader"
 import { ReviewPanel } from "@/surfaces/studying"
 
 const SIZES = [
-  { label: "A", className: "text-[18px]" },
-  { label: "A+", className: "text-[20px]" },
+  { label: "A", className: "text-[20px]" },
+  { label: "A+", className: "text-[22px]" },
 ] as const
 const SIZE_KEY = "lh-step-reader-size"
 const SOURCE_TAG = /\[((?:pp?\.|v\d{2}\.|beyond)[^\]]*)\]/g
+const PART_WORDS = 250
+const WPM = 230
 
 export type Step = { node: LearnTreeNode; title: string }
 
-/** Drop the section's own heading (the toolbar names the step), quiet the provenance lines
+/** Drop the section's own heading (the page names the step), quiet the provenance lines
  *  ("*Topics List … · [pp.11–92 · v06.03]*") and turn inline source tags into marker links. */
 function prepare(markdown: string): string {
   const lines = markdown.split("\n")
@@ -40,25 +43,57 @@ function prepare(markdown: string): string {
     .replace(SOURCE_TAG, (_m, tag: string) => `[${tag}](#src)`)
 }
 
-const norm = (t: string) =>
-  t.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ").trim().replace(/s\b/g, "")
+const wordsIn = (t: string) =>
+  t.replace(/\[[^\]]*\]\(#src\)/g, "").split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length
 
-/** Find the concept a bold term names: exact (plural-insensitive), else a concept whose name
- *  starts with the term ("K-means" → "K-means algorithm"), else one the term starts with. */
-function useConceptIndex(concepts: ConceptLesson[]) {
-  return useMemo(() => {
-    const list = concepts.map((c) => ({ c, n: norm(c.name) }))
-    return (term: string): ConceptLesson | undefined => {
-      if (/:\s*$/.test(term)) return undefined // labels like "Step 1:" are not concepts
-      const t = norm(term)
-      if (t.length < 3 || t.split(" ").length > 5) return undefined
-      return (
-        list.find((x) => x.n === t)?.c ??
-        list.find((x) => x.n.startsWith(`${t} `))?.c ??
-        list.find((x) => t.startsWith(`${x.n} `) || t === x.n)?.c
-      )
+/** Markdown blocks: blank-line separated, but a fenced code or $$ math block stays whole. */
+function blocksOf(md: string): string[] {
+  const out: string[] = []
+  let cur: string[] = []
+  let fence: string | null = null
+  for (const line of md.split("\n")) {
+    const t = line.trim()
+    if (fence) {
+      cur.push(line)
+      if (t.startsWith(fence)) fence = null
+      continue
     }
-  }, [concepts])
+    if (/^(```|~~~)/.test(t)) fence = t.slice(0, 3)
+    else if (t === "$$" || (t.startsWith("$$") && !t.slice(2).includes("$$"))) fence = "$$"
+    if (!t && !fence) {
+      if (cur.length) out.push(cur.join("\n"))
+      cur = []
+    } else cur.push(line)
+  }
+  if (cur.length) out.push(cur.join("\n"))
+  return out
+}
+
+/** Cut a step into parts of about PART_WORDS: at a heading, or at the end of a paragraph once
+ *  the part is long enough. Never after a line ending in ":" (it introduces what follows),
+ *  never before a list item, quote or table that continues the block before it. A short
+ *  tail joins the part before it. */
+function partsOf(md: string): string[] {
+  const parts: string[][] = []
+  let cur: string[] = []
+  let words = 0
+  for (const b of blocksOf(md)) {
+    const t = b.trim()
+    const heading = /^#{1,6}\s/.test(t)
+    const continues = /^([-*+]\s|\d+[.)]\s|>|\||\$\$|!\[)/.test(t) || /:\s*$/.test(cur[cur.length - 1]?.trim() ?? "")
+    if (cur.length && ((heading && words >= 80) || (!heading && !continues && words >= PART_WORDS))) {
+      parts.push(cur)
+      cur = []
+      words = 0
+    }
+    cur.push(b)
+    if (!heading) words += wordsIn(b)
+  }
+  if (cur.length) {
+    if (parts.length && words < 80) parts[parts.length - 1].push(...cur)
+    else parts.push(cur)
+  }
+  return parts.map((p) => p.join("\n\n"))
 }
 
 /** All the text inside rendered markdown children (for deciding how to render a block). */
@@ -71,45 +106,33 @@ function nodeText(children: React.ReactNode): string {
   return ""
 }
 
-function textOf(children: React.ReactNode): string {
-  if (typeof children === "string") return children
-  if (Array.isArray(children)) return children.map(textOf).join("")
-  return ""
-}
-
-/** A bold term that names one of the step's concepts: tap to reveal its meaning. */
-const WIDE = "(min-width: 1024px)"
-
-/** On a laptop a tapped term opens in the concepts panel; on a narrow screen, in a popover. */
-function ConceptTerm({
-  concept,
-  onPick,
-  children,
-}: {
-  concept: ConceptLesson
-  onPick: (c: ConceptLesson) => void
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className="relative">
-      <button
-        type="button"
-        onClick={() => (window.matchMedia(WIDE).matches ? onPick(concept) : setOpen((v) => !v))}
-        aria-expanded={open}
-        className="cursor-pointer font-semibold text-foreground underline decoration-primary/60 decoration-dotted underline-offset-4 hover:decoration-primary"
-      >
+const components: Components = {
+  a: ({ href, children }) =>
+    href === "#src" ? (
+      <sup className="mx-0.5 align-super font-sans text-[10px] text-muted-foreground/60 no-underline">{children}</sup>
+    ) : (
+      <a href={href} target="_blank" rel="noreferrer">
         {children}
-      </button>
-      {open && (
-        <span className="absolute left-0 top-full z-20 mt-2 block w-[min(26rem,80vw)] rounded-lg border border-border bg-card p-3 font-sans text-sm font-normal leading-relaxed text-foreground shadow-lg">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{concept.kind}</span>
-          {concept.signal}
-        </span>
-      )}
-    </span>
-  )
+      </a>
+    ),
+  // Only the provenance lines (made into quotes by prepare()) are quieted; the book's own
+  // quote blocks ("Check yourself", "Important") read normally.
+  blockquote: ({ children }) =>
+    /^\s*Topics List\b/.test(nodeText(children)) ? (
+      <div className="not-prose my-4 font-sans text-xs text-muted-foreground/80 [&_p]:m-0">{children}</div>
+    ) : (
+      <blockquote>{children}</blockquote>
+    ),
 }
+
+const PROSE = cn(
+  "max-w-none font-serif leading-[1.8]",
+  "prose-p:text-foreground prose-li:text-foreground prose-p:my-[1.1em]",
+  "prose-headings:font-serif prose-h2:mt-10 prose-h2:text-[1.3em] prose-h3:mt-10 prose-h3:text-[1.2em] prose-h4:text-[1.05em]",
+  // Long display equations scroll inside their own box, never the page.
+  "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
+  "[&_.katex]:inline-block [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:overflow-y-hidden [&_.katex]:align-middle",
+)
 
 export function StepReader({
   docId,
@@ -133,18 +156,18 @@ export function StepReader({
   const step = steps[index]
   const key = step.node.sectionKey!
   const q = useApi(qk.guidedReading(docId, key), (signal) => fetchGuidedReading(docId, key, signal))
-  const concepts = useMemo(() => q.data?.concepts ?? [], [q.data])
-  const index_ = useConceptIndex(concepts)
+  const conceptCount = q.data?.concepts?.length ?? 0
+  const { markRead } = useReadSteps(docId)
   const [size, setSize] = useState(0)
   const [check, setCheck] = useState<"offer" | "open" | "skipped">("offer")
-  const [picked, setPicked] = useState<string | null>(null)
-  const idOf = (c: ConceptLesson) => c.conceptKey ?? c.name
-  const pick = (c: ConceptLesson) => {
-    setPicked(idOf(c))
-    requestAnimationFrame(() =>
-      document.getElementById(`concept-${idOf(c)}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-    )
-  }
+  const [shown, setShown] = useState(1)
+  const partRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const parts = useMemo(() => partsOf(prepare(q.data?.markdown ?? "")), [q.data])
+  const partWords = useMemo(() => parts.map(wordsIn), [parts])
+  const allShown = shown >= parts.length
+  const minutesLeft = Math.max(1, Math.round(partWords.slice(shown - 1).reduce((a, b) => a + b, 0) / WPM))
+  const totalMinutes = Math.max(1, Math.round(partWords.reduce((a, b) => a + b, 0) / WPM))
 
   useEffect(() => {
     const v = Number(localStorage.getItem(SIZE_KEY) ?? 0)
@@ -152,63 +175,43 @@ export function StepReader({
   }, [])
   useEffect(() => {
     onOpen(key)
-    setPicked(null)
-    // "Check understanding" on the path links here with #check: open the check at once.
+    // "Check understanding" on the path links here with #check: the whole step, check open.
     if (window.location.hash === "#check") {
+      setShown(Number.MAX_SAFE_INTEGER)
       setCheck("open")
       requestAnimationFrame(() => document.getElementById("check")?.scrollIntoView({ block: "start" }))
     } else {
+      setShown(1)
       setCheck("offer")
       window.scrollTo({ top: 0 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per step
   }, [key])
+  useEffect(() => {
+    if (q.data && allShown) markRead(key)
+  }, [q.data, allShown, key, markRead])
 
-  const components: Components = useMemo(
-    () => ({
-      strong: ({ children }) => {
-        const c = index_(textOf(children))
-        return c ? (
-          <ConceptTerm concept={c} onPick={pick}>
-            {children}
-          </ConceptTerm>
-        ) : (
-          <strong>{children}</strong>
-        )
-      },
-      a: ({ href, children }) =>
-        href === "#src" ? (
-          <sup className="mx-0.5 align-super font-sans text-[10px] text-muted-foreground/70 no-underline">{children}</sup>
-        ) : (
-          <a href={href} target="_blank" rel="noreferrer">
-            {children}
-          </a>
-        ),
-      // Only the provenance lines (made into quotes by prepare()) are quieted; the book's own
-      // quote blocks ("Check yourself", "Important") read normally.
-      blockquote: ({ children }) =>
-        /^\s*Topics List\b/.test(nodeText(children)) ? (
-          <div className="not-prose my-4 font-sans text-xs text-muted-foreground/80 [&_p]:m-0">{children}</div>
-        ) : (
-          <blockquote>{children}</blockquote>
-        ),
-    }),
-    [index_],
-  )
+  const more = () => {
+    const i = shown
+    setShown(i + 1)
+    requestAnimationFrame(() => partRefs.current[i]?.scrollIntoView({ block: "start", behavior: "smooth" }))
+  }
 
   const next = index + 1 < steps.length ? index + 1 : null
   const prev = index > 0 ? index - 1 : null
-  const markdown = useMemo(() => prepare(q.data?.markdown ?? ""), [q.data])
+  const offerCheck = check === "offer" && conceptCount > 0
 
   return (
     <div className="pb-24">
       <div className="sticky top-[var(--fleet-header-h)] z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[calc(62ch+24rem)] items-center gap-4 px-4 py-2.5 text-meta">
+        <div className="mx-auto flex max-w-[56rem] items-center gap-4 px-4 py-2.5 text-meta">
           <Link href={pathHref} className="shrink-0 text-muted-foreground hover:text-foreground">
             ← {chapterNumber ? `Chapter ${chapterNumber}` : chapterTitle}
           </Link>
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
             Step {index + 1} of {steps.length}
+            {parts.length > 1 && ` · part ${Math.min(shown, parts.length)} of ${parts.length}`}
+            {parts.length > 0 && !allShown && ` · ${minutesLeft} min left`}
           </span>
           <div className="flex shrink-0 items-center gap-1" aria-label="Steps">
             {steps.map((s, i) => (
@@ -235,93 +238,111 @@ export function StepReader({
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-[calc(62ch+24rem)] items-start gap-12 px-4 lg:grid-cols-[minmax(0,62ch)_20rem]">
-      <article className="min-w-0 pt-10">
-        <p className="mb-2 font-sans text-xs uppercase tracking-widest text-muted-foreground">
+      <article className={cn("mx-auto max-w-[calc(30em+2rem)] px-4 pt-12", SIZES[size].className)}>
+        <p className="mb-3 font-sans text-xs uppercase tracking-widest text-muted-foreground">
           {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}Step {index + 1}
+          {parts.length > 0 && ` · ${totalMinutes} min read`}
         </p>
-        <h1 className="m-0 mb-8 font-serif text-[34px] font-semibold leading-tight">{step.title}</h1>
+        <h1 className="m-0 mb-10 font-serif text-[1.9em] font-semibold leading-tight">{step.title}</h1>
 
         {q.status === "loading" && !q.data ? (
           <p className="text-muted-foreground">Loading this step…</p>
         ) : q.error && !q.data ? (
           <p className="text-ink-warn">Couldn&apos;t load this step. {String(q.error.message ?? "")}</p>
         ) : (
-          <MarkdownReader
-            content={markdown}
-            measure="narrow"
-            proseSize="lg"
-            components={components}
-            className={cn(
-              "max-w-none font-serif leading-[1.75]",
-              SIZES[size].className,
-              "prose-p:text-foreground prose-li:text-foreground",
-              "prose-headings:font-serif prose-h3:mt-12 prose-h3:text-[1.3em] prose-h4:text-[1.1em]",
-              // Long display equations scroll inside their own box, never the page.
-              "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
-              "[&_.katex]:inline-block [&_.katex]:max-w-full [&_.katex]:overflow-x-auto [&_.katex]:overflow-y-hidden [&_.katex]:align-middle",
-            )}
-          />
+          parts.slice(0, shown).map((part, i) => (
+            <div
+              key={i}
+              ref={(el) => {
+                partRefs.current[i] = el
+              }}
+              className={cn("scroll-mt-28", i > 0 && "mt-10 border-t border-border/50 pt-8")}
+            >
+              <MarkdownReader content={part} measure="narrow" proseSize="lg" components={components} className={cn(PROSE, "text-[1em]")} />
+            </div>
+          ))
         )}
 
-        <section id="check" className="mt-16 scroll-mt-24 rounded-2xl border border-border bg-card p-6 font-sans">
-          {check === "open" ? (
-            <>
-              <div className="mb-4 flex items-baseline justify-between gap-4">
-                <h2 className="m-0 text-lg font-semibold">Check understanding</h2>
-                <button
-                  type="button"
-                  onClick={() => setCheck("skipped")}
-                  className="text-meta text-muted-foreground hover:text-foreground"
-                >
-                  Done
-                </button>
-              </div>
-              <ReviewPanel scope={key} docId={docId} />
-            </>
-          ) : (
-            <>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">End of step {index + 1}</p>
-              <h2 className="mt-1 text-lg font-semibold">
-                {check === "skipped" ? "Ready for the next step" : `Check your understanding · ${concepts.length} concepts`}
-              </h2>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                {check === "offer" && concepts.length > 0 && (
+        {q.data && !allShown && (
+          <div className="mt-10 flex items-center gap-4 font-sans">
+            <button
+              type="button"
+              onClick={more}
+              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Continue ↓
+            </button>
+            <span className="text-meta tabular-nums text-muted-foreground">
+              Part {shown + 1} of {parts.length} · {Math.max(1, Math.round(partWords[shown] / WPM))} min
+            </span>
+            <button
+              type="button"
+              onClick={() => setShown(parts.length)}
+              className="ml-auto text-meta text-muted-foreground hover:text-foreground"
+            >
+              Show the rest
+            </button>
+          </div>
+        )}
+
+        {q.data && allShown && (
+          <section id="check" className="mt-16 scroll-mt-24 rounded-2xl border border-border bg-card p-6 font-sans text-base">
+            {check === "open" ? (
+              <>
+                <div className="mb-4 flex items-baseline justify-between gap-4">
+                  <h2 className="m-0 text-lg font-semibold">Check understanding</h2>
                   <button
                     type="button"
-                    onClick={() => setCheck("open")}
-                    className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+                    onClick={() => setCheck("skipped")}
+                    className="text-meta text-muted-foreground hover:text-foreground"
                   >
-                    Check understanding
+                    Done
                   </button>
-                )}
-                {next != null ? (
-                  <Link
-                    href={stepHref(next)}
-                    className={cn(
-                      "rounded-lg px-4 py-2.5 text-sm font-semibold",
-                      check === "offer" && concepts.length > 0
-                        ? "border border-border text-muted-foreground hover:text-foreground"
-                        : "bg-primary text-primary-foreground",
-                    )}
-                  >
-                    {check === "offer" && concepts.length > 0 ? "Skip · next step →" : `Next: ${steps[next].title} →`}
-                  </Link>
-                ) : (
-                  <Link
-                    href={pathHref}
-                    className={cn(
-                      "rounded-lg px-4 py-2.5 text-sm font-semibold",
-                      check === "offer" && concepts.length > 0 ? "border border-border" : "bg-primary text-primary-foreground",
-                    )}
-                  >
-                    {check === "offer" && concepts.length > 0 ? "Skip · back to the chapter" : "Back to the chapter exam"}
-                  </Link>
-                )}
-              </div>
-            </>
-          )}
-        </section>
+                </div>
+                <ReviewPanel scope={key} docId={docId} />
+              </>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">End of step {index + 1}</p>
+                <h2 className="mt-1 text-lg font-semibold">
+                  {offerCheck ? `Check your understanding · ${conceptCount} concepts` : "Step read"}
+                </h2>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  {offerCheck && (
+                    <button
+                      type="button"
+                      onClick={() => setCheck("open")}
+                      className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+                    >
+                      Check understanding
+                    </button>
+                  )}
+                  {next != null ? (
+                    <Link
+                      href={stepHref(next)}
+                      className={cn(
+                        "rounded-lg px-4 py-2.5 text-sm font-semibold",
+                        offerCheck ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {offerCheck ? "Skip · next step →" : `Next: ${steps[next].title} →`}
+                    </Link>
+                  ) : (
+                    <Link
+                      href={pathHref}
+                      className={cn(
+                        "rounded-lg px-4 py-2.5 text-sm font-semibold",
+                        offerCheck ? "border border-border" : "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {offerCheck ? "Skip · back to the chapter" : "Back to the chapter exam"}
+                    </Link>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {prev != null && (
           <p className="mt-6 font-sans text-meta text-muted-foreground">
@@ -331,50 +352,6 @@ export function StepReader({
           </p>
         )}
       </article>
-
-      {/* Laptop: the step's concepts beside the text, so the width works for you (v0.31.5). */}
-      <aside className="sticky top-[calc(var(--fleet-header-h)+3.5rem)] hidden max-h-[calc(100vh_-_var(--fleet-header-h)_-_5rem)] flex-col gap-3 overflow-y-auto pt-10 font-sans lg:flex">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          In this step · {concepts.length} concepts
-        </p>
-        <p className="text-meta text-muted-foreground">Tap an underlined term in the text, or a concept here.</p>
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {concepts.map((c) => {
-            const open = picked === idOf(c)
-            return (
-              <li key={idOf(c)} id={`concept-${idOf(c)}`}>
-                <button
-                  type="button"
-                  onClick={() => setPicked(open ? null : idOf(c))}
-                  className={cn(
-                    "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                    open ? "bg-card ring-1 ring-border" : "hover:bg-muted/50",
-                  )}
-                >
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className={cn("font-medium", open ? "text-foreground" : "text-foreground/85")}>{c.name}</span>
-                    <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">{c.kind}</span>
-                  </span>
-                  {open && <span className="mt-1.5 block leading-relaxed text-foreground/90">{c.signal}</span>}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        {concepts.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setCheck("open")
-              requestAnimationFrame(() => document.getElementById("check")?.scrollIntoView({ block: "start" }))
-            }}
-            className="mt-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:border-muted-foreground/50"
-          >
-            Check understanding
-          </button>
-        )}
-      </aside>
-      </div>
     </div>
   )
 }
