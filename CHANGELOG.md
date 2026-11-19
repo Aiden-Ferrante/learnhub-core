@@ -11,8 +11,8 @@ commit.
 
 ### Changed
 - **A course is its chapters.** The course page is one card per chapter (number, title,
-  studied share, a red badge for what is due, the chapter-exam state), under the comprehensive
-  exam, Progress and Study activity. The Overview / Read / Review / Packs / Concepts mode bar is
+  studied share, a red badge for what is due, the chapter-exam state), under Progress, Study
+  activity and the comprehensive exam. The Overview / Read / Review / Packs / Concepts mode bar is
   gone; each card opens its chapter's hub.
 - **Chapter hub** (`/courses/[id]/chapters/[key]`): Read (continue or start), Review (due
   badge, the chapter's review), Chapter exam, the sections with studied share and NEXT, and the

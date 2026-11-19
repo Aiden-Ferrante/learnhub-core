@@ -4,7 +4,7 @@
  *  "Chapter dashboard" boards on the LearnHub design canvas (2026-11-12), refined with the
  *  human on 2026-11-19. Replaced the tabbed Overview / Read / Review / Packs / Concepts.
  *
- *  - ChapterCards: the comprehensive exam, Progress, Study activity, then one card per top-level chapter (number,
+ *  - ChapterCards: Progress, Study activity, the comprehensive exam, then one card per top-level chapter (number,
  *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
  *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, its sections, its
@@ -201,9 +201,9 @@ export function ChapterCards({ data }: { data: CourseData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
       {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
       {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
+      <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
       <p className="-mb-3 text-meta text-muted-foreground">
         Exams are a preview: results come from the demo buttons and are saved in this browser only ·{" "}
         <button type="button" onClick={exams.reset} className="underline underline-offset-2 hover:text-foreground">
