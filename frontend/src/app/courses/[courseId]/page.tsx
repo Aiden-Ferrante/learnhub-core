@@ -1,14 +1,14 @@
 "use client"
 
+/** /courses/[id] — the course as chapter hubs (v0.31.4): one card per chapter, the
+ *  comprehensive exam, progress and activity. Each card opens /courses/[id]/chapters/[key]. */
+
 import { use } from "react"
-import { useRouter } from "next/navigation"
-import { CourseFallback, CourseHome, useCourseData } from "@/surfaces/library"
-import { chapterHref } from "@/kit/lib/scope-url"
+import { ChapterCards, CourseFallback, useCourseData } from "@/surfaces/library"
 import { StudyPage } from "@/kit/study"
 
 export default function CourseHomePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)
-  const router = useRouter()
   const data = useCourseData(courseId)
 
   if (!data.course) {
@@ -21,17 +21,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
 
   return (
     <StudyPage>
-      <CourseHome
-        course={data.course}
-        data={data}
-        onOpenSection={(scope) => {
-          data.persistReadingPosition(scope)
-          router.push(chapterHref(courseId, scope))
-        }}
-        onOpenConcept={(conceptKey) =>
-          router.push(`/courses/${courseId}/concepts?concept=${encodeURIComponent(conceptKey)}`)
-        }
-      />
+      <ChapterCards data={data} />
     </StudyPage>
   )
 }

@@ -8,7 +8,6 @@
 export { ChapterCards, ChapterDashboard, chaptersHref } from "@/surfaces/library/chapter-cards"
 export { CourseDesk } from "@/surfaces/library/course-desk"
 export { CourseFallback } from "@/surfaces/library/course-guard"
-export { CourseHome } from "@/surfaces/library/course-home"
 export { CourseShelf } from "@/surfaces/library/course-shelf"
 export { TodayStrip, UpNextPlan, useUpNext } from "@/surfaces/library/up-next"
 export { StudyHeatmap } from "@/surfaces/library/study-heatmap"

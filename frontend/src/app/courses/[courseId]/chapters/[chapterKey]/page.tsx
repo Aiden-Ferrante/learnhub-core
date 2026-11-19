@@ -1,6 +1,6 @@
 "use client"
 
-/** /courses/[id]/chapters/[chapterKey] — TRIAL (v0.31.4): one chapter's own dashboard. */
+/** /courses/[id]/chapters/[chapterKey] — one chapter's hub (v0.31.4). */
 
 import { use } from "react"
 import { ChapterDashboard, CourseFallback, useCourseData } from "@/surfaces/library"

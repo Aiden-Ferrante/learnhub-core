@@ -1,9 +1,9 @@
 "use client"
 
-/** The Desk (v0.30.0): one workspace per course. Every course route renders inside it, so
- *  moving between reading, review, packs and concepts keeps the same frame: a mode bar on top
- *  and the book's chapters down the left with how much of each you have studied. The page
- *  itself (course home, reader, review, packs, concepts) stays what it was. */
+/** The Desk (v0.30.0): one workspace per course. Every course route renders inside it: the
+ *  course title on top (back to the chapter cards) and the book's chapters down the left with
+ *  how much of each you have studied. The mode bar (Overview / Read / Review / Packs /
+ *  Concepts) was removed in v0.31.4: the chapter hubs are the navigation now. */
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -15,20 +15,6 @@ import { cleanCourseTitle } from "@/kit/lib/course-title"
 import { cn } from "@/kit/lib/utils"
 import { coverColor } from "@/surfaces/library/cover"
 import { useCourseData } from "@/surfaces/library/use-course-data"
-
-type Mode = "overview" | "read" | "review" | "packs" | "concepts" | null
-
-function modeOf(path: string, base: string): Mode {
-  const rest = path.slice(base.length)
-  if (rest === "" || rest === "/") return "overview"
-  // /chapters is the chapter-cards Overview trial (v0.31.4); /chapter/… is the reader.
-  if (rest.startsWith("/chapters")) return "overview"
-  if (rest.startsWith("/chapter") || rest.startsWith("/read")) return "read"
-  if (rest.startsWith("/review")) return "review"
-  if (rest.startsWith("/packs")) return "packs"
-  if (rest.startsWith("/concepts")) return "concepts"
-  return null
-}
 
 /** The section key the reader is on, read off the address bar (the reader keeps it there). */
 function scopeOf(path: string, base: string): string | null {
@@ -59,8 +45,6 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
   if (!data.course) return <>{children}</>
 
   const base = `/courses/${courseId}`
-  const mode = modeOf(path, base)
-  const hubTrial = path.startsWith(`${base}/chapters`)
   const scope = scopeOf(path, base)
   const chapters = data.tree.filter((n) => n.sectionKey)
   const current = scope ? chapters.find((c) => contains(c, scope)) : undefined
@@ -68,45 +52,14 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
   const overall = pct(data.mastery?.overall)
   const title = cleanCourseTitle(data.course.title).title
 
-  const modes: { key: Exclude<Mode, null>; label: string; href: string; badge?: number }[] = [
-    { key: "overview", label: "Overview", href: base },
-    { key: "read", label: "Read", href: chapterHref(courseId, data.continueSectionKey ?? null) },
-    { key: "review", label: "Review", href: `${base}/review`, badge: data.reviewDue || undefined },
-    { key: "packs", label: "Packs", href: `${base}/packs` },
-    { key: "concepts", label: "Concepts", href: `${base}/concepts` },
-  ]
-
   return (
     <div className="desk">
       <div className="border-b border-border bg-card/60">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2.5">
-          <Link href={hubTrial ? `${base}/chapters` : base} className="flex min-w-0 max-w-[28rem] items-center gap-2.5 font-serif text-section font-semibold text-foreground">
+          <Link href={base} className="flex min-w-0 max-w-[28rem] items-center gap-2.5 font-serif text-section font-semibold text-foreground">
             <span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: coverColor(title) }} />
             <span className="truncate">{title}</span>
           </Link>
-          {/* TRIAL (v0.31.4, chapter hubs): the cards are the navigation, so no tab bar there. */}
-          {!hubTrial && (
-          <nav aria-label="Course" className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1">
-            {modes.map((m) => (
-              <Link
-                key={m.key}
-                href={m.href}
-                aria-current={mode === m.key ? "page" : undefined}
-                className={cn(
-                  "flex min-h-9 items-center gap-1.5 rounded-full px-4 text-meta font-medium transition-colors",
-                  mode === m.key
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {m.label}
-                {m.badge != null && (
-                  <span className={cn("text-micro tabular-nums", mode === m.key ? "" : "text-ink-warn")}>{m.badge}</span>
-                )}
-              </Link>
-            ))}
-          </nav>
-          )}
         </div>
       </div>
 

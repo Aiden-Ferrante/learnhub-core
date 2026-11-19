@@ -1,17 +1,17 @@
 "use client"
 
-/** TRIAL (v0.31.4): the course Overview as chapter cards, from the "Overview D · Cards only"
- *  and "Chapter dashboard" boards on the LearnHub design canvas (2026-11-12).
+/** The course page as chapter hubs (v0.31.4), from the "Overview D · Cards only" and
+ *  "Chapter dashboard" boards on the LearnHub design canvas (2026-11-12), refined with the
+ *  human on 2026-11-19. Replaced the tabbed Overview / Read / Review / Packs / Concepts.
  *
- *  - ChapterCards: Progress, Study activity, then one card per top-level chapter (number,
+ *  - ChapterCards: the comprehensive exam, Progress, Study activity, then one card per top-level chapter (number,
  *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
  *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, its sections, its
  *    concepts. Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
  *
  *  Due counts come from ONE whole-course review queue, bucketed by chapter through the tree,
- *  never one request per card (that exhausted the API's pool in v0.31.1). Lives on its own
- *  route beside the current Overview so the two can be compared. */
+ *  never one request per card (that exhausted the API's pool in v0.31.1). */
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -44,8 +44,9 @@ function pct(m: SectionMemory | undefined): number {
   return m && m.total > 0 ? Math.round(m.coverage * 100) : 0
 }
 
+/** The course page (the cards) or one chapter's hub. */
 export function chaptersHref(courseId: string, chapterKey?: string): string {
-  return `/courses/${courseId}/chapters${chapterKey ? `/${encodeURIComponent(chapterKey)}` : ""}`
+  return chapterKey ? `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}` : `/courses/${courseId}`
 }
 
 /** Top-level chapters, and the number the outline shows for each (none for front matter). */
@@ -181,16 +182,6 @@ function ComprehensiveCard({
   )
 }
 
-function TrialNote({ courseId }: { courseId: string }) {
-  return (
-    <p className="text-meta text-muted-foreground">
-      Trial layout ·{" "}
-      <Link href={`/courses/${courseId}`} className="underline underline-offset-2 hover:text-foreground">
-        back to the current Overview
-      </Link>
-    </p>
-  )
-}
 
 export function ChapterCards({ data }: { data: CourseData }) {
   const course = data.course!
@@ -210,12 +201,11 @@ export function ChapterCards({ data }: { data: CourseData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <TrialNote courseId={course.id} />
+      <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
       {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
       {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
-      <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
       <p className="-mb-3 text-meta text-muted-foreground">
-        Exam results on this page are a design demo, saved in this browser only ·{" "}
+        Exams are a preview: results come from the demo buttons and are saved in this browser only ·{" "}
         <button type="button" onClick={exams.reset} className="underline underline-offset-2 hover:text-foreground">
           reset
         </button>
@@ -254,6 +244,14 @@ export function ChapterCards({ data }: { data: CourseData }) {
           })}
         </div>
       )}
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-meta text-muted-foreground">
+        <Link href={`/courses/${course.id}/review`} className="hover:text-foreground">
+          Review everything due{data.reviewDue ? ` (${data.reviewDue})` : ""}
+        </Link>
+        <Link href={`/courses/${course.id}/concepts`} className="hover:text-foreground">All concepts</Link>
+        <Link href={`/courses/${course.id}/packs`} className="hover:text-foreground">Practice packs</Link>
+        <Link href={`/courses/${course.id}/edit`} className="hover:text-foreground">Edit material</Link>
+      </p>
     </div>
   )
 }
@@ -309,7 +307,6 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
           <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
             ← All chapters
           </Link>
-          <TrialNote courseId={course.id} />
         </div>
         <div className="flex items-center gap-[18px]">
           {numbers.get(chapter.id) && (
