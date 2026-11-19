@@ -12,7 +12,7 @@
  *  path and is always takeable; the path shows readiness, it does not lock. */
 
 import Link from "next/link"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
@@ -28,6 +28,7 @@ import {
 } from "@/surfaces/library/chapter-cards"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams } from "@/surfaces/library/demo-exams"
+import { SectionDigest, useChapterDigest } from "@/surfaces/library/section-digest"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 
 const STEP_DONE = 80
@@ -70,6 +71,10 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
   const due = useDueByChapter(course.learnDocId, sections)
   const exams = useDemoExams(course.id)
   const by = data.mastery?.bySection ?? {}
+  const digest = useChapterDigest(course.learnDocId, chapter)
+  // A step's title opens its digest (concepts, in brief), never the reading; the current step
+  // starts open. Reading is behind "Read this step" only (human, 2026-11-19).
+  const [opened, setOpened] = useState<Record<string, boolean>>({})
 
   if (!chapter) {
     return (
@@ -131,6 +136,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
             const isCurrent = current?.node === s
             const n = due.get(s.sectionKey!) ?? 0
             const share = pct(by[s.sectionKey!])
+            const isOpen = opened[s.id] ?? isCurrent
             return (
               <li key={s.id} className="relative flex gap-4 pb-6 last:pb-0">
                 {/* the path line */}
@@ -147,40 +153,38 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
                 </span>
                 <div className="min-w-0 flex-1 pt-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <Link
-                      href={chapterStepHref(course.id, chapterKey, i)}
-                      className={cn("font-semibold hover:text-primary", !isCurrent && !isDone && "text-muted-foreground")}
+                    <button
+                      type="button"
+                      onClick={() => setOpened((o) => ({ ...o, [s.id]: !isOpen }))}
+                      aria-expanded={isOpen}
+                      className={cn("text-left font-semibold hover:text-primary", !isCurrent && !isDone && "text-muted-foreground")}
                     >
+                      <span className={cn("mr-1.5 inline-block text-muted-foreground transition-transform", isOpen && "rotate-90")}>›</span>
                       {plainTitle(s)}
-                    </Link>
+                    </button>
                     {n > 0 && (
                       <span className="rounded-full bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
                         {n} to review
                       </span>
                     )}
-                    {!isCurrent && (
+                    {!isOpen && (
                       <span className="text-meta text-muted-foreground">
                         {isDone ? "understood" : share > 0 ? `${share}%` : `${step.concepts.length} concepts`}
                       </span>
                     )}
                   </div>
-                  {isCurrent && (
+                  {isOpen && (
                     <div className="mt-3 flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
-                      <div>
-                        <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-                          You will learn · {step.concepts.length}
-                        </p>
-                        <p className="text-sm leading-relaxed text-foreground/90">
-                          {step.concepts.slice(0, 6).map((c) => c.name).join(" · ")}
-                          {step.concepts.length > 6 && <span className="text-muted-foreground"> · +{step.concepts.length - 6} more</span>}
-                        </p>
-                      </div>
+                      <SectionDigest digest={digest.bySection.get(s.sectionKey!)} loading={digest.loading} />
                       <div className="flex flex-wrap items-center gap-3">
                         <Link
                           href={chapterStepHref(course.id, chapterKey, i)}
-                          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+                          className={cn(
+                            "rounded-lg px-4 py-2.5 text-sm font-semibold",
+                            isCurrent ? "bg-primary text-primary-foreground" : "border border-border hover:border-muted-foreground/50",
+                          )}
                         >
-                          {share > 0 || reading ? "Continue reading" : "Read this step"}
+                          {isCurrent && (share > 0 || reading) ? "Continue reading" : "Read this step"}
                         </Link>
                         <Link
                           href={`${chapterStepHref(course.id, chapterKey, i)}#check`}

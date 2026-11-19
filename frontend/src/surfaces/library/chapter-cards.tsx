@@ -7,8 +7,8 @@
  *  - ChapterCards: Progress, Study activity, the comprehensive exam, then one card per top-level chapter (number,
  *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
- *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, its sections, its
- *    concepts. Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
+ *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, then its sections,
+ *    each opening to its key concepts and an "in brief" line (no reading). Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
  *
  *  Due counts come from ONE whole-course review queue, bucketed by chapter through the tree,
  *  never one request per card (that exhausted the API's pool in v0.31.1). */
@@ -25,6 +25,7 @@ import { cn } from "@/kit/lib/utils"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
+import { SectionDigest, useChapterDigest } from "@/surfaces/library/section-digest"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 import { useCourseHome } from "@/surfaces/library/use-course-home"
@@ -269,6 +270,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const chapter = chapters.find((c) => c.sectionKey === chapterKey)
   const by = data.mastery?.bySection ?? {}
   const exams = useDemoExams(course.id)
+  const digest = useChapterDigest(course.learnDocId, chapter)
 
   if (!chapter) {
     return (
@@ -284,12 +286,6 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const m = by[chapterKey]
   const hasExam = Boolean(numbers.get(chapter.id))
   const rec = exams.chapters[chapterKey]
-  const concepts: { key?: string | null; name: string; kind?: string | null }[] = []
-  const gather = (node: LearnTreeNode) => {
-    concepts.push(...(node.concepts ?? []))
-    node.children.forEach(gather)
-  }
-  gather(chapter)
   const share = pct(m)
   const n = due.get(chapterKey) ?? 0
   const sections = chapter.children.filter((s) => s.isSection && s.sectionKey)
@@ -397,6 +393,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
 
       <section>
         <h2 className="mb-1.5 font-serif text-[22px] font-semibold">Sections</h2>
+        <p className="mb-3 text-meta text-muted-foreground">Open a section for its key concepts. Reading starts from Read above.</p>
         {sections.length === 0 ? (
           <p className="text-muted-foreground">This chapter has no sections.</p>
         ) : (
@@ -404,50 +401,38 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             {sections.map((s) => {
               const sm = by[s.sectionKey!]
               const sp = sm && sm.total > 0 ? pct(sm) : null
+              const d = digest.bySection.get(s.sectionKey!)
               return (
-                <Link
-                  key={s.id}
-                  href={chapterHref(course.id, s.sectionKey!)}
-                  onClick={() => data.persistReadingPosition(s.sectionKey!)}
-                  className="flex items-center gap-4 rounded-md border-t border-border/60 px-3.5 py-3 hover:bg-muted/40"
-                >
-                  <span className="w-10 shrink-0 tabular-nums text-muted-foreground">{numbers.get(s.id) ?? ""}</span>
-                  <span className="min-w-0 flex-1">
-                    {plainTitle(s)}
-                    {s === nextSection && (
-                      <span className="ml-2.5 text-[11px] font-semibold tracking-wider text-primary">NEXT</span>
-                    )}
-                  </span>
-                  <span className="hidden w-36 sm:block">{sp != null && <Bar value={sp} color={color} />}</span>
-                  <span className="w-11 text-right text-meta tabular-nums text-muted-foreground">
-                    {sp != null ? `${sp}%` : ""}
-                  </span>
-                </Link>
+                // A section opens to its key concepts and an "in brief" line; reading lives
+                // only behind Read (human, 2026-11-19).
+                <details key={s.id} className="group rounded-md border-t border-border/60 open:bg-card/60">
+                  <summary className="flex cursor-pointer list-none items-center gap-4 px-3.5 py-3 hover:bg-muted/40">
+                    <span className="car w-3 text-muted-foreground transition-transform group-open:rotate-90">›</span>
+                    <span className="w-10 shrink-0 tabular-nums text-muted-foreground">{numbers.get(s.id) ?? ""}</span>
+                    <span className="min-w-0 flex-1">
+                      {plainTitle(s)}
+                      {s === nextSection && (
+                        <span className="ml-2.5 text-[11px] font-semibold tracking-wider text-primary">NEXT</span>
+                      )}
+                    </span>
+                    <span className="hidden text-meta text-muted-foreground sm:inline">
+                      {d?.concepts.length ? `${d.concepts.length} concepts` : ""}
+                    </span>
+                    <span className="hidden w-36 sm:block">{sp != null && <Bar value={sp} color={color} />}</span>
+                    <span className="w-11 text-right text-meta tabular-nums text-muted-foreground">
+                      {sp != null ? `${sp}%` : ""}
+                    </span>
+                  </summary>
+                  <div className="px-3.5 pb-5 pl-[4.25rem] pt-1">
+                    <SectionDigest digest={d} loading={digest.loading} />
+                  </div>
+                </details>
               )
             })}
           </div>
         )}
       </section>
 
-      <section>
-        <details>
-          <summary className="flex cursor-pointer list-none items-baseline gap-3">
-            <h2 className="m-0 font-serif text-[22px] font-semibold">Concepts</h2>
-            <span className="text-meta text-muted-foreground">{concepts.length} in this chapter · show</span>
-          </summary>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {concepts.map((c, i) => (
-              <Link
-                key={`${c.key ?? c.name}-${i}`}
-                href={`/courses/${course.id}/concepts${c.key ? `?concept=${encodeURIComponent(c.key)}` : ""}`}
-                className="rounded-full border border-border px-3 py-1 text-meta hover:border-muted-foreground/50"
-              >
-                {c.name}
-              </Link>
-            ))}
-          </div>
-        </details>
-      </section>
     </div>
   )
 }
