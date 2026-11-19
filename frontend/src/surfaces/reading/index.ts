@@ -7,6 +7,7 @@
 
 export { ChapterReader } from "@/surfaces/reading/chapter-reader"
 export { GuidedReading } from "@/surfaces/reading/guided-reading"
+export { StepReader, type Step } from "@/surfaces/reading/step-reader"
 export { PdfBookView } from "@/surfaces/reading/pdf-book-view"
 export { ReadingThemeToggle } from "@/surfaces/reading/reading-theme-toggle"
 export { MathText, MarkdownReader } from "@/surfaces/reading/markdown-reader"

@@ -44,6 +44,16 @@ function conceptsOf(node: LearnTreeNode): Concept[] {
   return out
 }
 
+/** A chapter's steps: its sections that carry concepts, in order. Shared by the path and the
+ *  step reader so both count the same steps. */
+export function chapterSteps(chapter: LearnTreeNode): LearnTreeNode[] {
+  return chapter.children.filter((s) => s.isSection && s.sectionKey && conceptsOf(s).length > 0)
+}
+
+export function chapterStepHref(courseId: string, chapterKey: string, index: number): string {
+  return `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}/step/${index + 1}`
+}
+
 export function chapterPathHref(courseId: string, chapterKey: string): string {
   return `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}/path`
 }
@@ -136,8 +146,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <Link
-                    href={chapterHref(course.id, s.sectionKey!)}
-                    onClick={() => data.persistReadingPosition(s.sectionKey!)}
+                    href={chapterStepHref(course.id, chapterKey, i)}
                     className={cn("font-semibold hover:text-primary", !isCurrent && !isDone && "text-muted-foreground")}
                   >
                     {plainTitle(s)}
@@ -166,14 +175,13 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <Link
-                        href={chapterHref(course.id, s.sectionKey!)}
-                        onClick={() => data.persistReadingPosition(s.sectionKey!)}
+                        href={chapterStepHref(course.id, chapterKey, i)}
                         className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
                       >
                         {share > 0 || reading ? "Continue reading" : "Read this step"}
                       </Link>
                       <Link
-                        href={chapterHref(course.id, s.sectionKey!, { drawer: "review" })}
+                        href={`${chapterStepHref(course.id, chapterKey, i)}#check`}
                         className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-muted-foreground/50"
                       >
                         Check understanding
