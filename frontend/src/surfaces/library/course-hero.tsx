@@ -20,7 +20,16 @@ export function CourseHero({ course, step }: { course: Course; step: NextStep | 
         <div className="min-w-0 flex-1">
           {/* The Desk bar above names the course; this heading names the page. */}
           <h1 className="text-page font-semibold tracking-tight">Overview</h1>
-          <p className="mt-0.5 text-meta text-muted-foreground">{course.description}</p>
+          <p className="mt-0.5 text-meta text-muted-foreground">
+            {course.description}
+            {/* TRIAL (v0.31.4): the chapter-cards Overview, side by side with this one. */}
+            <Link
+              href={`/courses/${course.id}/chapters`}
+              className="ml-3 underline underline-offset-2 hover:text-foreground"
+            >
+              Try chapter cards
+            </Link>
+          </p>
         </div>
         {step && Icon ? (
           <Button asChild>
