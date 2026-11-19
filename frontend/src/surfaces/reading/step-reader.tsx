@@ -138,10 +138,11 @@ export function StepReader({
   const [size, setSize] = useState(0)
   const [check, setCheck] = useState<"offer" | "open" | "skipped">("offer")
   const [picked, setPicked] = useState<string | null>(null)
+  const idOf = (c: ConceptLesson) => c.conceptKey ?? c.name
   const pick = (c: ConceptLesson) => {
-    setPicked(c.name)
+    setPicked(idOf(c))
     requestAnimationFrame(() =>
-      document.getElementById(`concept-${c.name}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+      document.getElementById(`concept-${idOf(c)}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
     )
   }
 
@@ -339,12 +340,12 @@ export function StepReader({
         <p className="text-meta text-muted-foreground">Tap an underlined term in the text, or a concept here.</p>
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {concepts.map((c) => {
-            const open = picked === c.name
+            const open = picked === idOf(c)
             return (
-              <li key={c.conceptKey ?? c.name} id={`concept-${c.name}`}>
+              <li key={idOf(c)} id={`concept-${idOf(c)}`}>
                 <button
                   type="button"
-                  onClick={() => setPicked(open ? null : c.name)}
+                  onClick={() => setPicked(open ? null : idOf(c))}
                   className={cn(
                     "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
                     open ? "bg-card ring-1 ring-border" : "hover:bg-muted/50",
