@@ -8,6 +8,7 @@ import { ErrorNotice } from "@/kit/data"
 import { CourseHero } from "@/surfaces/library/course-hero"
 import { CourseOutline } from "@/surfaces/library/course-outline"
 import { CourseStats } from "@/surfaces/library/course-stats"
+import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { Course } from "@/surfaces/library/courses"
 import { StudyTiles } from "@/surfaces/library/study-tiles"
 import type { CourseData } from "@/surfaces/library/use-course-data"
@@ -29,9 +30,10 @@ export function CourseHome({
   const home = useCourseHome(course, data)
   return (
     <>
-      {data.isLive && <CourseStats course={course} data={data} home={home} onOpenSection={onOpenSection} />}
       <CourseHero course={course} step={home.next.step} />
+      {data.isLive && <CourseStats data={data} home={home} onOpenSection={onOpenSection} />}
       <StudyTiles courseId={course.id} data={data} home={home} />
+      {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
       {data.positionError && (
         <ErrorNotice compact title="Reading position not saved" error={data.positionError} />
       )}

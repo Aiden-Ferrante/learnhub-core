@@ -8,8 +8,6 @@ import { ErrorNotice } from "@/kit/data"
 import { StatTile } from "@/kit/patterns/stat-tile"
 import { Sheet } from "@/kit/study"
 import { ChapterStateStrip } from "@/surfaces/library/chapter-state-strip"
-import type { Course } from "@/surfaces/library/courses"
-import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 import type { CourseHomeData } from "@/surfaces/library/use-course-home"
 
@@ -38,15 +36,13 @@ function PipelineLine({ pipeline }: { pipeline: CoursePipelineStatus }) {
   )
 }
 
-/** The bottom of the course home, compact: the numbers, the pipeline line and the chapter
- *  strip in one sheet, then the activity heatmap. */
+/** The course's Progress sheet: the numbers, the pipeline line and the chapter strip.
+ *  The study heatmap sits separately, below the study cards (v0.31.3). */
 export function CourseStats({
-  course,
   data,
   home,
   onOpenSection,
 }: {
-  course: Course
   data: CourseData
   home: CourseHomeData
   onOpenSection: (scope: string) => void
@@ -66,27 +62,24 @@ export function CourseStats({
   const pipelineQ = home.pipeline
 
   return (
-    <>
-      <Sheet title="Progress">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatTile label="Sections" value={sections} />
-          <StatTile label="Concepts" value={home.conceptCount ?? "—"} />
-          <StatTile label="Covered" value={overall ? `${overall.reviewed}/${overall.total}` : "—"} />
-          <StatTile
-            label="Retention"
-            value={overall?.retention != null ? `${Math.round(overall.retention * 100)}%` : "—"}
-          />
-        </div>
-        {masteryQ.error && (
-          <ErrorNotice compact title="Couldn't load your progress" error={masteryQ.error} onRetry={masteryQ.retry} />
-        )}
-        {pipelineQ.data?.exists && <PipelineLine pipeline={pipelineQ.data} />}
-        {pipelineQ.error && (
-          <ErrorNotice compact title="Couldn't load the course status" error={pipelineQ.error} onRetry={pipelineQ.retry} />
-        )}
-        <ChapterStateStrip rows={chapterRows} bySection={mastery?.bySection ?? {}} onOpen={onOpenSection} />
-      </Sheet>
-      <StudyHeatmap doc={course.learnDocId} />
-    </>
+    <Sheet title="Progress">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile label="Sections" value={sections} />
+        <StatTile label="Concepts" value={home.conceptCount ?? "—"} />
+        <StatTile label="Covered" value={overall ? `${overall.reviewed}/${overall.total}` : "—"} />
+        <StatTile
+          label="Retention"
+          value={overall?.retention != null ? `${Math.round(overall.retention * 100)}%` : "—"}
+        />
+      </div>
+      {masteryQ.error && (
+        <ErrorNotice compact title="Couldn't load your progress" error={masteryQ.error} onRetry={masteryQ.retry} />
+      )}
+      {pipelineQ.data?.exists && <PipelineLine pipeline={pipelineQ.data} />}
+      {pipelineQ.error && (
+        <ErrorNotice compact title="Couldn't load the course status" error={pipelineQ.error} onRetry={pipelineQ.retry} />
+      )}
+      <ChapterStateStrip rows={chapterRows} bySection={mastery?.bySection ?? {}} onOpen={onOpenSection} />
+    </Sheet>
   )
 }
