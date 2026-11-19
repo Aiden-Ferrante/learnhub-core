@@ -31,16 +31,16 @@ import { useCourseHome } from "@/surfaces/library/use-course-home"
 
 const COURSE_LIMIT = 200
 
-function contains(node: LearnTreeNode, key: string): boolean {
+export function contains(node: LearnTreeNode, key: string): boolean {
   return node.sectionKey === key || node.children.some((c) => contains(c, key))
 }
 
 /** The heading without a leading number or dash: the card and header show the number big. */
-function plainTitle(node: LearnTreeNode): string {
+export function plainTitle(node: LearnTreeNode): string {
   return displaySectionTitle(node.label, node.title).replace(/^\s*\d+(\.\d+)*\s*[.:)]?\s*/, "").replace(/^[\s–—-]+/, "")
 }
 
-function pct(m: SectionMemory | undefined): number {
+export function pct(m: SectionMemory | undefined): number {
   return m && m.total > 0 ? Math.round(m.coverage * 100) : 0
 }
 
@@ -50,15 +50,15 @@ export function chaptersHref(courseId: string, chapterKey?: string): string {
 }
 
 /** Top-level chapters, and the number the outline shows for each (none for front matter). */
-function useChapters(tree: LearnTreeNode[]) {
+export function useChapters(tree: LearnTreeNode[]) {
   return useMemo(() => {
     const numbers = numberSections(tree)
     return { chapters: tree.filter((n) => n.isSection && n.sectionKey), numbers }
   }, [tree])
 }
 
-/** Due cards per chapter key, from one whole-course queue. */
-function useDueByChapter(docId: string | undefined, chapters: LearnTreeNode[]) {
+/** Due cards per node key (chapters, or a chapter's sections), from one whole-course queue. */
+export function useDueByChapter(docId: string | undefined, chapters: LearnTreeNode[]) {
   const q = useApi(
     qk.courseReview(docId ?? ""),
     (signal) => fetchCourseReviewQueue(docId ?? "", COURSE_LIMIT, signal),
@@ -74,7 +74,7 @@ function useDueByChapter(docId: string | undefined, chapters: LearnTreeNode[]) {
   }, [q.data, chapters])
 }
 
-function Badge({ count }: { count: number }) {
+export function Badge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
     <span
@@ -86,7 +86,7 @@ function Badge({ count }: { count: number }) {
   )
 }
 
-function Bar({ value, color, className }: { value: number; color: string; className?: string }) {
+export function Bar({ value, color, className }: { value: number; color: string; className?: string }) {
   return (
     <div className={cn("h-1 overflow-hidden rounded-full bg-muted", className)}>
       <div className="h-full" style={{ width: `${value}%`, background: color }} />
@@ -100,7 +100,7 @@ function ExamLine({ rec }: { rec: ExamRecord | undefined }) {
   return <span className="text-meta text-ink-warn">Exam {rec.last}% · needs {PASS_MARK}%</span>
 }
 
-function DemoControls({ onScore, label }: { onScore: (score: number) => void; label: string }) {
+export function DemoControls({ onScore, label }: { onScore: (score: number) => void; label: string }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-meta text-muted-foreground">
       <span>Demo · {label}:</span>
@@ -306,6 +306,12 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
         <div className="flex items-center justify-between gap-4">
           <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
             ← All chapters
+          </Link>
+          <Link
+            href={`/courses/${course.id}/chapters/${encodeURIComponent(chapterKey)}/path`}
+            className="text-meta text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Try the path layout
           </Link>
         </div>
         <div className="flex items-center gap-[18px]">

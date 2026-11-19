@@ -6,6 +6,7 @@
  *  Depends on: processing (document list), concepts (mastery dot), gateways/, kit/. */
 
 export { ChapterCards, ChapterDashboard, chaptersHref } from "@/surfaces/library/chapter-cards"
+export { ChapterPath } from "@/surfaces/library/chapter-path"
 export { CourseDesk } from "@/surfaces/library/course-desk"
 export { CourseFallback } from "@/surfaces/library/course-guard"
 export { CourseShelf } from "@/surfaces/library/course-shelf"

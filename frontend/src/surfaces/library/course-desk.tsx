@@ -64,6 +64,8 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
       </div>
 
       <div className="flex">
+        {/* The path trial (v0.31.5) drops the rail: the chapter cards already list chapters. */}
+        {!/\/chapters\/[^/]+\/path$/.test(path) && (
         <nav
           aria-label="Chapters"
           className="sticky top-[var(--fleet-header-h)] hidden h-[calc(100vh_-_var(--fleet-header-h))] w-64 shrink-0 overflow-y-auto border-r border-border bg-card/40 py-4 lg:block"
@@ -106,6 +108,7 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
             </ol>
           )}
         </nav>
+        )}
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
