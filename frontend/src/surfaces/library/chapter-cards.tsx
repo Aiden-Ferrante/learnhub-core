@@ -183,7 +183,9 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const sections = chapter.children.filter((s) => s.isSection && s.sectionKey)
   const here = data.continueSectionKey && contains(chapter, data.continueSectionKey) ? data.continueNode : null
   const readTarget = here?.sectionKey ?? sections[0]?.sectionKey ?? chapterKey
-  const readLabel = here
+  const readLabel = here?.sectionKey === chapterKey
+    ? "Pick up where you left off"
+    : here
     ? `Continue at ${[numbers.get(here.id), plainTitle(here)].filter(Boolean).join(" ")}`
     : "Start this chapter"
   const nextSection = sections.find((s) => contains(s, readTarget))
