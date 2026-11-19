@@ -178,7 +178,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
                       >
                         Check understanding
                       </Link>
-                      {share > 0 && <span className="text-meta tabular-nums text-muted-foreground">{share}% of {STEP_DONE}%</span>}
+                      {share > 0 && <span className="text-meta tabular-nums text-muted-foreground">{share}% understood · done at {STEP_DONE}%</span>}
                     </div>
                   </div>
                 )}
