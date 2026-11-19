@@ -101,6 +101,12 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Real chapter exams** (v0.31.4 → v0.32.0, decided 2026-11-19). Pass/fail stored on the
+  server; a chapter exam is a one-chapter pack, the comprehensive a pack over passed chapters;
+  new questions per retake; existing packs stay as practice. Replace `demo-exams.ts`.
+- **Orphaned pieces after the mode bar went** (v0.31.4). `use-next-step`, `use-course-home`'s
+  next-step rule and the syllabus tree may now have fewer callers; audit and remove what is dead.
+
 - **Doubled names in the chapter rail** (v0.31.3, pre-existing). "Introduction Introduction",
   "Appendices Appendices": a section whose first block repeats its title shows both.
 - **Key-derived chapters** (v0.31.3). `chapter_key_of`, `scope.is_ancestor_section_key` and

@@ -7,6 +7,27 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.4] — 2026-11-19 — Chapter hubs
+
+### Changed
+- **A course is its chapters.** The course page is one card per chapter (number, title,
+  studied share, a red badge for what is due, the chapter-exam state), under the comprehensive
+  exam, Progress and Study activity. The Overview / Read / Review / Packs / Concepts mode bar is
+  gone; each card opens its chapter's hub.
+- **Chapter hub** (`/courses/[id]/chapters/[key]`): Read (continue or start), Review (due
+  badge, the chapter's review), Chapter exam, the sections with studied share and NEXT, and the
+  chapter's concepts.
+- Course-wide review, all concepts, practice packs and editing are a link row under the cards.
+
+### Added
+- **Exam preview.** Chapter exams (pass 80%, unlimited retakes, a pass stays a pass; numbered
+  chapters only) and a comprehensive exam that unlocks with the first passed chapter and covers
+  exactly the passed ones. Results come from demo buttons and live in the browser only; real
+  exams are v0.32.0.
+
+### Removed
+- The tabbed Overview (hero, study tiles, course outline tree).
+
 ## [0.31.3] — 2026-11-19 — Grouped outlines
 
 ### Fixed
