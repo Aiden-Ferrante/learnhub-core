@@ -3,8 +3,8 @@
 /** TRIAL (v0.31.4): the course Overview as chapter cards, from the "Overview D · Cards only"
  *  and "Chapter dashboard" boards on the LearnHub design canvas (2026-11-12).
  *
- *  - ChapterCards: Progress, then one card per top-level chapter (number, title, studied
- *    share, a red phone-app badge for what is due in it), then Study activity. The human
+ *  - ChapterCards: Progress, Study activity, then one card per top-level chapter (number,
+ *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
  *  - ChapterDashboard: one chapter's own page — Read / Review / Practice, then its sections.
  *
@@ -120,6 +120,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
     <div className="flex flex-col gap-6">
       <TrialNote courseId={course.id} />
       {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
+      {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
       {data.loading && chapters.length === 0 ? (
         <p className="text-muted-foreground">Loading chapters…</p>
       ) : (
@@ -153,7 +154,6 @@ export function ChapterCards({ data }: { data: CourseData }) {
           })}
         </div>
       )}
-      {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
     </div>
   )
 }
