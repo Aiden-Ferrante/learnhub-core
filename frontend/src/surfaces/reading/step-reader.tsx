@@ -40,11 +40,23 @@ function prepare(markdown: string): string {
     .replace(SOURCE_TAG, (_m, tag: string) => `[${tag}](#src)`)
 }
 
+const norm = (t: string) =>
+  t.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ").trim().replace(/s\b/g, "")
+
+/** Find the concept a bold term names: exact (plural-insensitive), else a concept whose name
+ *  starts with the term ("K-means" → "K-means algorithm"), else one the term starts with. */
 function useConceptIndex(concepts: ConceptLesson[]) {
   return useMemo(() => {
-    const m = new Map<string, ConceptLesson>()
-    for (const c of concepts) m.set(c.name.trim().toLowerCase(), c)
-    return m
+    const list = concepts.map((c) => ({ c, n: norm(c.name) }))
+    return (term: string): ConceptLesson | undefined => {
+      const t = norm(term)
+      if (t.length < 3 || t.split(" ").length > 5) return undefined
+      return (
+        list.find((x) => x.n === t)?.c ??
+        list.find((x) => x.n.startsWith(`${t} `))?.c ??
+        list.find((x) => t.startsWith(`${x.n} `) || t === x.n)?.c
+      )
+    }
   }, [concepts])
 }
 
@@ -124,7 +136,7 @@ export function StepReader({
   const components: Components = useMemo(
     () => ({
       strong: ({ children }) => {
-        const c = index_.get(textOf(children).trim().toLowerCase())
+        const c = index_(textOf(children))
         return c ? <ConceptTerm concept={c}>{children}</ConceptTerm> : <strong>{children}</strong>
       },
       a: ({ href, children }) =>
@@ -149,7 +161,7 @@ export function StepReader({
   return (
     <div className="pb-24">
       <div className="sticky top-[var(--fleet-header-h)] z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[68ch] items-center gap-4 px-4 py-2.5 text-meta">
+        <div className="mx-auto flex max-w-[62ch] items-center gap-4 px-4 py-2.5 text-meta">
           <Link href={pathHref} className="shrink-0 text-muted-foreground hover:text-foreground">
             ← {chapterNumber ? `Chapter ${chapterNumber}` : chapterTitle}
           </Link>
@@ -181,7 +193,7 @@ export function StepReader({
         </div>
       </div>
 
-      <article className="mx-auto max-w-[68ch] px-4 pt-10">
+      <article className="mx-auto max-w-[62ch] px-4 pt-10">
         <p className="mb-2 font-sans text-xs uppercase tracking-widest text-muted-foreground">
           {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}Step {index + 1}
         </p>
