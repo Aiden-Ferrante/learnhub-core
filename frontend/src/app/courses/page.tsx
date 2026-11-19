@@ -5,7 +5,7 @@ import { StudyPage } from "@/kit/study"
 
 export default function CoursesPage() {
   return (
-    <StudyPage>
+    <StudyPage wide>
       <CourseShelf />
     </StudyPage>
   )

@@ -53,10 +53,12 @@ function CourseCrumbs() {
   const sub = segments[2]
 
   const chapterScope = sub === "chapter" ? scopeFromSegments(segments.slice(3)) : null
+  // /courses/[id]/chapters/[chapterKey][/path | /step/[n]] — the chapter hubs (v0.31.4+).
+  const hubKey = sub === "chapters" && segments[3] ? decodeURIComponent(segments[3]) : null
   const outline = useApi(
     qk.outline(learnDocId),
     (signal) => fetchOutline(learnDocId, signal),
-    { enabled: Boolean(learnDocId && chapterScope), staleMs: 5 * 60 * 1000 },
+    { enabled: Boolean(learnDocId && (chapterScope || hubKey)), staleMs: 5 * 60 * 1000 },
   )
   const packKey = sub === "packs" && segments[3] ? decodeURIComponent(segments[3]) : null
   const pack = useApi(qk.pack(packKey ?? ""), (signal) => fetchPack(packKey ?? "", signal), {
@@ -74,12 +76,31 @@ function CourseCrumbs() {
   const title = doc ? cleanCourseTitle(doc.name).title : null
   if (title) crumbs.push({ label: title, href: `/courses/${segments[1]}` })
 
+  const hubHref = (key: string) => `/courses/${segments[1]}/chapters/${encodeURIComponent(key)}`
+  // "6 · Unsupervised Learning: Clustering": the number comes from a numeric key (toc:6).
+  const chapterLabel = (c: { key: string; title: string } | undefined) => {
+    if (!c) return null
+    const n = /^toc:(\d+)$/.exec(c.key)?.[1]
+    const t = c.title.replace(/^\s*\d+\s*[.:]?\s*/, "")
+    return n ? `${n} · ${t}` : t
+  }
+
   if (sub === "chapter") {
     const entries = outline.data?.outline ?? []
     const chapters = chaptersFromOutline(entries)
     const { chapterKey } = chapterScope ? resolveChapterForScope(chapters, [], chapterScope) : { chapterKey: null }
     const chapter = chapters.find((c) => c.key === chapterKey)
-    crumbs.push({ label: chapter?.title || SUBPAGE_LABELS.chapter })
+    // The reader's chapter crumb leads back to that chapter's hub.
+    crumbs.push({ label: chapterLabel(chapter) || SUBPAGE_LABELS.chapter, href: chapterKey ? hubHref(chapterKey) : undefined })
+    crumbs.push({ label: "Reading" })
+  } else if (sub === "chapters" && hubKey) {
+    const chapter = chaptersFromOutline(outline.data?.outline ?? []).find((c) => c.key === hubKey)
+    crumbs.push({ label: chapterLabel(chapter) || "Chapter", href: hubHref(hubKey) })
+    if (segments[4] === "path") crumbs.push({ label: "Path" })
+    if (segments[4] === "step") {
+      crumbs.push({ label: "Path", href: `${hubHref(hubKey)}/path` })
+      crumbs.push({ label: `Step ${segments[5] ?? ""}`.trim() })
+    }
   } else if (sub === "packs" && packKey) {
     crumbs.push({ label: SUBPAGE_LABELS.packs, href: `/courses/${segments[1]}/packs` })
     crumbs.push({ label: pack.data?.title || "Pack" })

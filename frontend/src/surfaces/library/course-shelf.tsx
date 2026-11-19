@@ -145,7 +145,7 @@ export function CourseShelf() {
             {visibleCourses.length === 0 && query.trim() && (
               <p className="text-body text-muted-foreground">No courses match “{query}”.</p>
             )}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-5 gap-y-6">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-5 gap-y-6">
               {visibleCourses.map((course) => (
                 <CourseCard
                   key={course.id}
