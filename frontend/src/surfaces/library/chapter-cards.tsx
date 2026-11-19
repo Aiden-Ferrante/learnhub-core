@@ -33,6 +33,11 @@ function contains(node: LearnTreeNode, key: string): boolean {
   return node.sectionKey === key || node.children.some((c) => contains(c, key))
 }
 
+/** The heading without a leading number or dash: the card and header show the number big. */
+function plainTitle(node: LearnTreeNode): string {
+  return displaySectionTitle(node.label, node.title).replace(/^\s*\d+(\.\d+)*\s*[.:)]?\s*/, "").replace(/^[\s–—-]+/, "")
+}
+
 function pct(m: SectionMemory | undefined): number {
   return m && m.total > 0 ? Math.round(m.coverage * 100) : 0
 }
@@ -137,7 +142,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
                   {num ?? "·"}
                 </span>
                 <span className="flex-1 text-[15px] font-semibold leading-snug">
-                  {displaySectionTitle(c.label, c.title)}
+                  {plainTitle(c)}
                 </span>
                 <span className="flex flex-col gap-1.5">
                   <span className="text-meta tabular-nums text-muted-foreground">{share}% studied</span>
@@ -179,7 +184,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const here = data.continueSectionKey && contains(chapter, data.continueSectionKey) ? data.continueNode : null
   const readTarget = here?.sectionKey ?? sections[0]?.sectionKey ?? chapterKey
   const readLabel = here
-    ? `Continue at ${[numbers.get(here.id), displaySectionTitle(here.label, here.title)].filter(Boolean).join(" ")}`
+    ? `Continue at ${[numbers.get(here.id), plainTitle(here)].filter(Boolean).join(" ")}`
     : "Start this chapter"
   const nextSection = sections.find((s) => contains(s, readTarget))
 
@@ -203,7 +208,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
           )}
           <div>
             <h1 className="m-0 font-serif text-[32px] font-semibold leading-tight">
-              {displaySectionTitle(chapter.label, chapter.title)}
+              {plainTitle(chapter)}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {share}% studied
@@ -264,7 +269,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                 >
                   <span className="w-10 shrink-0 tabular-nums text-muted-foreground">{numbers.get(s.id) ?? ""}</span>
                   <span className="min-w-0 flex-1">
-                    {displaySectionTitle(s.label, s.title).replace(/^[\s–—-]+/, "")}
+                    {plainTitle(s)}
                     {s === nextSection && (
                       <span className="ml-2.5 text-[11px] font-semibold tracking-wider text-primary">NEXT</span>
                     )}

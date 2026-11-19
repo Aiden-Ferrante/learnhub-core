@@ -21,6 +21,8 @@ type Mode = "overview" | "read" | "review" | "packs" | "concepts" | null
 function modeOf(path: string, base: string): Mode {
   const rest = path.slice(base.length)
   if (rest === "" || rest === "/") return "overview"
+  // /chapters is the chapter-cards Overview trial (v0.31.4); /chapter/… is the reader.
+  if (rest.startsWith("/chapters")) return "overview"
   if (rest.startsWith("/chapter") || rest.startsWith("/read")) return "read"
   if (rest.startsWith("/review")) return "review"
   if (rest.startsWith("/packs")) return "packs"
