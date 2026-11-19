@@ -142,20 +142,18 @@ const FULL_NUMBER = /^\d+(\.\d+)*$/
  * "Keep real, fill gaps": use the source's own number where it has one (a full
  * dotted key like `1.2.3`, or a single segment like a chapter `1`), and
  * synthesize a positional number (`1.1`, `1.2`, …) only for slug-keyed /
- * unnumbered sections, so the outline is *always* numbered. Non-section nodes
+ * unnumbered sections at a level where the book numbers nothing. Where the book
+ * DOES number its siblings (Module 1–4 beside Welcome, Introduction, Appendices),
+ * an unnumbered section gets no number, and neither does anything under it —
+ * like a printed TOC (v0.31.3, human decision 2026-11-19). Non-section nodes
  * (entity leaves) are skipped and get no number.
  */
 export function numberSections(nodes: LearnTreeNode[]): Map<string, string> {
   const out = new Map<string, string>()
-  const walk = (list: LearnTreeNode[], parent: string) => {
+  const walk = (list: LearnTreeNode[], parent: string, synthOk = true) => {
     const sections = list.filter((n) => n.isSection)
-    // Integer segments already claimed by the source at this level, so a
-    // synthesized sibling never collides with a real chapter number.
-    const claimed = new Set<number>()
-    for (const n of sections) {
-      const lab = (n.label ?? "").trim()
-      if (/^\d+$/.test(lab)) claimed.add(parseInt(lab, 10))
-    }
+    // Any sibling carrying the book's own number (1, 2.3, …) means this level is numbered.
+    const bookNumbersThisLevel = sections.some((n) => FULL_NUMBER.test((n.label ?? "").trim()))
     let synth = 0
     for (const n of sections) {
       const lab = (n.label ?? "").trim()
@@ -164,14 +162,17 @@ export function numberSections(nodes: LearnTreeNode[]): Map<string, string> {
         num = lab // the book's own full number, e.g. 1.2.3
       } else if (/^\d+$/.test(lab)) {
         num = parent ? `${parent}.${lab}` : lab // the book's own single segment
-      } else {
-        do {
-          synth++
-        } while (claimed.has(synth)) // fill the next free gap
+      } else if (synthOk && !bookNumbersThisLevel) {
+        synth++ // nothing at this level is numbered, so no real number to collide with
         num = parent ? `${parent}.${synth}` : `${synth}`
+      } else {
+        // Unnumbered beside numbered siblings: front/back matter. No number here or below,
+        // except the book's own full numbers.
+        if (n.children?.length) walk(n.children, "", false)
+        continue
       }
       out.set(n.id, num)
-      if (n.children?.length) walk(n.children, num)
+      if (n.children?.length) walk(n.children, num, synthOk)
     }
   }
   walk(nodes, "")
