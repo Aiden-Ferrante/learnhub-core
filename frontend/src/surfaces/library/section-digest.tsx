@@ -20,6 +20,10 @@ function contains(node: LearnTreeNode, key: string): boolean {
   return node.sectionKey === key || node.children.some((c) => contains(c, key))
 }
 
+/** "## 2.1 Title", or "## SECTION 1.1 - Title" (PE1's style). */
+const headingRe = (num: string) =>
+  new RegExp(`^#{1,6}\\s+(?:(?:section|chapter|module|unit)\\s+)?${num.replace(/\./g, "\\.")}(\\s|$)`, "i")
+
 const numberOf = (key: string) => key.replace(/^toc:/, "").replace(/~\d+$/, "")
 
 /** The first real paragraph after the section's own heading: prose, not a heading,
@@ -28,7 +32,7 @@ function openingParagraph(markdown: string, sectionKey: string): string | null {
   const num = numberOf(sectionKey)
   if (!/^\d+(\.\d+)*$/.test(num)) return null
   const lines = markdown.split("\n")
-  const at = lines.findIndex((l) => new RegExp(`^#{1,6}\\s+${num.replace(/\./g, "\\.")}(\\s|$)`).test(l))
+  const at = lines.findIndex((l) => headingRe(num).test(l))
   if (at < 0) return null
   for (const raw of lines.slice(at + 1)) {
     const l = raw.trim()
@@ -51,7 +55,7 @@ function sectionWords(markdown: string, sectionKey: string, nextKey: string | un
     if (!key) return -1
     const num = numberOf(key)
     if (!/^\d+(\.\d+)*$/.test(num)) return -1
-    return lines.findIndex((l) => new RegExp(`^#{1,6}\\s+${num.replace(/\./g, "\\.")}(\\s|$)`).test(l))
+    return lines.findIndex((l) => headingRe(num).test(l))
   }
   const start = at(sectionKey)
   if (start < 0) return 0

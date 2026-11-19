@@ -53,7 +53,7 @@ function CourseCrumbs() {
   const sub = segments[2]
 
   const chapterScope = sub === "chapter" ? scopeFromSegments(segments.slice(3)) : null
-  // /courses/[id]/chapters/[chapterKey][/path | /step/[n]] — the chapter hubs (v0.31.4+).
+  // /courses/[id]/chapters/[chapterKey][/step/[n]] — the chapter hubs (v0.31.4+).
   const hubKey = sub === "chapters" && segments[3] ? decodeURIComponent(segments[3]) : null
   const outline = useApi(
     qk.outline(learnDocId),
@@ -96,11 +96,7 @@ function CourseCrumbs() {
   } else if (sub === "chapters" && hubKey) {
     const chapter = chaptersFromOutline(outline.data?.outline ?? []).find((c) => c.key === hubKey)
     crumbs.push({ label: chapterLabel(chapter) || "Chapter", href: hubHref(hubKey) })
-    if (segments[4] === "path") crumbs.push({ label: "Path" })
-    if (segments[4] === "step") {
-      crumbs.push({ label: "Path", href: `${hubHref(hubKey)}/path` })
-      crumbs.push({ label: `Step ${segments[5] ?? ""}`.trim() })
-    }
+    if (segments[4] === "step") crumbs.push({ label: `Step ${segments[5] ?? ""}`.trim() })
   } else if (sub === "packs" && packKey) {
     crumbs.push({ label: SUBPAGE_LABELS.packs, href: `/courses/${segments[1]}/packs` })
     crumbs.push({ label: pack.data?.title || "Pack" })

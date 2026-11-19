@@ -7,8 +7,8 @@
  *  - ChapterCards: Progress, Study activity, the comprehensive exam, then one card per top-level chapter (number,
  *    title, studied share, a red phone-app badge for what is due in it). The human
  *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
- *  - ChapterDashboard: one chapter's hub — Read / Review / Chapter exam, then its sections,
- *    each opening to its key concepts and an "in brief" line (no reading). Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
+ *  - The chapter page itself (ChapterDashboard) lives in chapter-path.tsx since 2026-11-19.
+ *    Exam results are a browser-only design demo (demo-exams.ts) until v0.32.0.
  *
  *  Due counts come from ONE whole-course review queue, bucketed by chapter through the tree,
  *  never one request per card (that exhausted the API's pool in v0.31.1). */
@@ -20,12 +20,10 @@ import { displaySectionTitle, numberSections, type LearnTreeNode } from "@/gatew
 import type { SectionMemory } from "@/gateways/api/progress"
 import { fetchCourseReviewQueue } from "@/gateways/api/review"
 import { qk, useApi } from "@/kit/data"
-import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
-import { SectionDigest, useChapterDigest } from "@/surfaces/library/section-digest"
 import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { CourseData } from "@/surfaces/library/use-course-data"
 import { useCourseHome } from "@/surfaces/library/use-course-home"
@@ -258,181 +256,6 @@ export function ChapterCards({ data }: { data: CourseData }) {
         <Link href={`/courses/${course.id}/packs`} className="hover:text-foreground">Practice packs</Link>
         <Link href={`/courses/${course.id}/edit`} className="hover:text-foreground">Edit material</Link>
       </p>
-    </div>
-  )
-}
-
-export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapterKey: string }) {
-  const course = data.course!
-  const color = coverColor(course.title)
-  const { chapters, numbers } = useChapters(data.tree)
-  const due = useDueByChapter(course.learnDocId, chapters)
-  const chapter = chapters.find((c) => c.sectionKey === chapterKey)
-  const by = data.mastery?.bySection ?? {}
-  const exams = useDemoExams(course.id)
-  const digest = useChapterDigest(course.learnDocId, chapter)
-
-  if (!chapter) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
-          ← All chapters
-        </Link>
-        <p className="text-muted-foreground">{data.loading ? "Loading…" : "This chapter is not in the outline."}</p>
-      </div>
-    )
-  }
-
-  const m = by[chapterKey]
-  const hasExam = Boolean(numbers.get(chapter.id))
-  const rec = exams.chapters[chapterKey]
-  const share = pct(m)
-  const n = due.get(chapterKey) ?? 0
-  const sections = chapter.children.filter((s) => s.isSection && s.sectionKey)
-  const here = data.continueSectionKey && contains(chapter, data.continueSectionKey) ? data.continueNode : null
-  const readTarget = here?.sectionKey ?? sections[0]?.sectionKey ?? chapterKey
-  const readLabel = here?.sectionKey === chapterKey
-    ? "Pick up where you left off"
-    : here
-    ? `Continue at ${[numbers.get(here.id), plainTitle(here)].filter(Boolean).join(" ")}`
-    : "Start this chapter"
-  const nextSection = sections.find((s) => contains(s, readTarget))
-
-  const action =
-    "mt-2 self-start rounded-lg border border-border px-3.5 py-2 text-meta font-semibold hover:border-muted-foreground/50"
-
-  return (
-    <div className="flex flex-col gap-9">
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-4">
-          <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
-            ← All chapters
-          </Link>
-          <Link
-            href={`/courses/${course.id}/chapters/${encodeURIComponent(chapterKey)}/path`}
-            className="text-meta text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Try the path layout
-          </Link>
-        </div>
-        <div className="flex items-center gap-[18px]">
-          {numbers.get(chapter.id) && (
-            <span className="font-serif text-[56px] font-semibold leading-none" style={{ color }}>
-              {numbers.get(chapter.id)}
-            </span>
-          )}
-          <div>
-            <h1 className="m-0 font-serif text-[32px] font-semibold leading-tight">
-              {plainTitle(chapter)}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {share}% studied
-              {m && m.total > 0 ? ` · ${m.reviewed} of ${m.total} concepts` : ""}
-              {m?.state ? ` · ${m.state}` : ""}
-            </p>
-          </div>
-        </div>
-        <Bar value={share} color={color} className="mt-1.5 h-[5px] max-w-[420px]" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="relative flex flex-col gap-1.5 rounded-[14px] border border-border bg-card p-[18px]">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Read</span>
-          <span className="flex-1 font-semibold">{readLabel}</span>
-          <Link
-            href={chapterHref(course.id, readTarget)}
-            onClick={() => data.persistReadingPosition(readTarget)}
-            className="mt-2 self-start rounded-lg bg-primary px-3.5 py-2 text-meta font-semibold text-primary-foreground"
-          >
-            {here ? "Continue reading" : "Start reading"}
-          </Link>
-        </div>
-        <div className="relative flex flex-col gap-1.5 rounded-[14px] border border-border bg-card p-[18px]">
-          <Badge count={n} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Review</span>
-          <span className="flex-1 font-semibold">
-            {n > 0 ? `${n} card${n === 1 ? "" : "s"} due` : "Nothing due in this chapter"}
-          </span>
-          <Link href={chapterHref(course.id, chapterKey, { drawer: "review" })} className={action}>
-            {n > 0 ? "Review now" : "Open review"}
-          </Link>
-        </div>
-        <div
-          className="relative flex flex-col gap-1.5 rounded-[14px] border bg-card p-[18px]"
-          style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : undefined }}
-        >
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam</span>
-          {hasExam ? (
-            <>
-              <span className="flex-1 font-semibold">
-                {rec?.passed
-                  ? `Passed · best ${rec.best}%`
-                  : rec
-                    ? `Last try ${rec.last}% · needs ${PASS_MARK}%`
-                    : `Pass ${PASS_MARK}% to complete this chapter`}
-              </span>
-              <span className="text-meta text-muted-foreground">
-                {rec ? `${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"} · ` : ""}every retake has new questions
-              </span>
-              <button
-                type="button"
-                className={cn(
-                  "mt-2 self-start rounded-lg px-3.5 py-2 text-meta font-semibold",
-                  rec?.passed ? "border border-border" : "bg-primary text-primary-foreground",
-                )}
-              >
-                {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
-              </button>
-              <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
-            </>
-          ) : (
-            <span className="flex-1 font-semibold text-muted-foreground">No exam for this part of the book</span>
-          )}
-        </div>
-      </div>
-
-      <section>
-        <h2 className="mb-1.5 font-serif text-[22px] font-semibold">Sections</h2>
-        <p className="mb-3 text-meta text-muted-foreground">Open a section for its key concepts. Reading starts from Read above.</p>
-        {sections.length === 0 ? (
-          <p className="text-muted-foreground">This chapter has no sections.</p>
-        ) : (
-          <div>
-            {sections.map((s) => {
-              const sm = by[s.sectionKey!]
-              const sp = sm && sm.total > 0 ? pct(sm) : null
-              const d = digest.bySection.get(s.sectionKey!)
-              return (
-                // A section opens to its key concepts and an "in brief" line; reading lives
-                // only behind Read (human, 2026-11-19).
-                <details key={s.id} className="group rounded-md border-t border-border/60 open:bg-card/60">
-                  <summary className="flex cursor-pointer list-none items-center gap-4 px-3.5 py-3 hover:bg-muted/40">
-                    <span className="car w-3 text-muted-foreground transition-transform group-open:rotate-90">›</span>
-                    <span className="w-10 shrink-0 tabular-nums text-muted-foreground">{numbers.get(s.id) ?? ""}</span>
-                    <span className="min-w-0 flex-1">
-                      {plainTitle(s)}
-                      {s === nextSection && (
-                        <span className="ml-2.5 text-[11px] font-semibold tracking-wider text-primary">NEXT</span>
-                      )}
-                    </span>
-                    <span className="hidden text-meta text-muted-foreground sm:inline">
-                      {d?.concepts.length ? `${d.concepts.length} concepts` : ""}
-                    </span>
-                    <span className="hidden w-36 sm:block">{sp != null && <Bar value={sp} color={color} />}</span>
-                    <span className="w-11 text-right text-meta tabular-nums text-muted-foreground">
-                      {sp != null ? `${sp}%` : ""}
-                    </span>
-                  </summary>
-                  <div className="px-3.5 pb-5 pl-[4.25rem] pt-1">
-                    <SectionDigest digest={d} loading={digest.loading} />
-                  </div>
-                </details>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
     </div>
   )
 }

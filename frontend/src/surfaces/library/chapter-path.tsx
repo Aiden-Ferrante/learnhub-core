@@ -1,6 +1,9 @@
 "use client"
 
-/** TRIAL (v0.31.5): a chapter as a guided path that ends at its exam.
+/** The chapter page (v0.31.5): the chapter dashboard (Read / Review / Chapter exam) on top of
+ *  the chapter as a guided path that ends at its exam. The human, 2026-11-19, after trying both:
+ *  "the path layout looks good! I also like the chapter dashboard as it is" → dashboard row
+ *  kept, the path replaced its Sections list, the separate /path page redirects here.
  *
  *  The human, 2026-11-19: "The exam should be the destination, we should break down a chapter
  *  into [steps] to make it easy to digest, and we want the reading to be guided and very clean.
@@ -19,6 +22,7 @@ import { useReadSteps } from "@/kit/lib/read-steps"
 import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
 import {
+  Badge,
   Bar,
   chaptersHref,
   contains,
@@ -59,11 +63,12 @@ export function chapterStepHref(courseId: string, chapterKey: string, index: num
   return `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}/step/${index + 1}`
 }
 
+/** Where the step reader goes back to: the chapter page (the path is part of it since 2026-11-19). */
 export function chapterPathHref(courseId: string, chapterKey: string): string {
-  return `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}/path`
+  return chaptersHref(courseId, chapterKey)
 }
 
-export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey: string }) {
+export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapterKey: string }) {
   const course = data.course!
   const color = coverColor(course.title)
   const { chapters, numbers } = useChapters(data.tree)
@@ -78,12 +83,17 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
   const by = data.mastery?.bySection ?? {}
   const digest = useChapterDigest(course.learnDocId, chapter)
   // A step opens to its digest (in brief, concepts), never the reading; the current step
-  // starts open. Reading is behind "Start reading" only (human, 2026-11-19).
+  // starts open. Reading is behind Read / "Start reading" only (human, 2026-11-19).
   const [opened, setOpened] = useState<Record<string, boolean>>({})
 
   if (!chapter) {
     return (
-      <p className="text-muted-foreground">{data.loading ? "Loading…" : "This chapter is not in the outline."}</p>
+      <div className="flex flex-col gap-3">
+        <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
+          ← All chapters
+        </Link>
+        <p className="text-muted-foreground">{data.loading ? "Loading…" : "This chapter is not in the outline."}</p>
+      </div>
     )
   }
 
@@ -99,47 +109,135 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
     ? steps.find((s) => contains(s.node, data.continueSectionKey!) && !complete(s))
     : undefined
   const current = reading ?? steps.find((s) => !complete(s))
+  const currentIndex = current ? steps.indexOf(current) : -1
   const hasExam = Boolean(numbers.get(chapter.id))
   const rec = exams.chapters[chapterKey]
   const wordsOf = (s: LearnTreeNode) => digest.bySection.get(s.sectionKey!)?.words ?? 0
   const totalWords = steps.reduce((a, s) => a + wordsOf(s.node), 0)
   const conceptCount = steps.reduce((a, x) => a + x.concepts.length, 0)
-  const dueCount = Array.from(due.values()).reduce((a, b) => a + b, 0)
+  const m = by[chapterKey]
+  const n = due.get(chapterKey) ?? Array.from(due.values()).reduce((a, b) => a + b, 0)
   const ready = done === steps.length && steps.length > 0
+  const card = "relative flex flex-col gap-1.5 rounded-[14px] border border-border bg-card p-[18px]"
+  const action =
+    "mt-2 self-start rounded-lg border border-border px-3.5 py-2 text-meta font-semibold hover:border-muted-foreground/50"
 
   return (
-    <div className="flex flex-col gap-10">
-      <header className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4 text-meta text-muted-foreground">
-          <Link href={chaptersHref(course.id)} className="hover:text-foreground">
-            ← All chapters
-          </Link>
-          <span>
-            Trial ·{" "}
-            <Link href={chaptersHref(course.id, chapterKey)} className="underline underline-offset-2 hover:text-foreground">
-              current hub
-            </Link>
-          </span>
-        </div>
-        <div className="flex items-end gap-5">
+    <div className="flex flex-col gap-9">
+      <header className="flex flex-col gap-2.5">
+        <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
+          ← All chapters
+        </Link>
+        <div className="flex items-center gap-[18px]">
           {numbers.get(chapter.id) && (
-            <span className="font-serif text-[64px] font-semibold leading-[0.85]" style={{ color }}>
+            <span className="font-serif text-[56px] font-semibold leading-none" style={{ color }}>
               {numbers.get(chapter.id)}
             </span>
           )}
-          <div className="min-w-0">
-            <h1 className="m-0 font-serif text-[34px] font-semibold leading-tight">{plainTitle(chapter)}</h1>
+          <div>
+            <h1 className="m-0 font-serif text-[32px] font-semibold leading-tight">{plainTitle(chapter)}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {steps.length} steps
               {totalWords > 0 && ` · about ${minutesOf(totalWords)} min of reading`}
               {conceptCount > 0 && ` · ${conceptCount} concepts`}
+              {m && m.total > 0 ? ` · ${pct(m)}% studied` : ""}
             </p>
           </div>
         </div>
+        <div className="mt-1.5 flex max-w-[520px] items-center gap-3">
+          <Bar value={steps.length ? (done / steps.length) * 100 : 0} color={color} className="h-[5px] flex-1" />
+          <span className="shrink-0 text-meta tabular-nums text-muted-foreground">
+            {done} of {steps.length} steps
+          </span>
+        </div>
       </header>
 
-      <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-w-0 flex-col gap-8">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className={card}>
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Read</span>
+          {current ? (
+            <>
+              <span className="text-meta text-muted-foreground">
+                {reading ? "Continue" : currentIndex === 0 && done === 0 ? "Start" : "Next"} · Step {currentIndex + 1} of {steps.length}
+              </span>
+              <span className="flex-1 font-semibold">{plainTitle(current.node)}</span>
+            </>
+          ) : (
+            <span className="flex-1 font-semibold">{steps.length ? "Every step read" : "Nothing to read here"}</span>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {steps.length > 0 && (
+              <Link
+                href={chapterStepHref(course.id, chapterKey, Math.max(currentIndex, 0))}
+                className="rounded-lg bg-primary px-3.5 py-2 text-meta font-semibold text-primary-foreground"
+              >
+                {reading ? "Continue reading" : current ? "Start reading" : "Read again"}
+              </Link>
+            )}
+            <Link
+              href={chapterHref(course.id, chapterKey)}
+              onClick={() => data.persistReadingPosition(chapterKey)}
+              className="text-meta text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Whole chapter at once
+            </Link>
+          </div>
+        </div>
+        <div className={card}>
+          <Badge count={n} />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Review</span>
+          <span className="flex-1 font-semibold">
+            {n > 0 ? `${n} card${n === 1 ? "" : "s"} due` : "Nothing due in this chapter"}
+          </span>
+          <Link href={chapterHref(course.id, chapterKey, { drawer: "review" })} className={action}>
+            {n > 0 ? "Review now" : "Open review"}
+          </Link>
+        </div>
+        <div
+          id="exam"
+          className={cn(card, "scroll-mt-28 border-2")}
+          style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : color }}
+        >
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam ★</span>
+          {hasExam ? (
+            <>
+              <span className="flex-1 font-semibold">
+                {rec?.passed
+                  ? `Passed · best ${rec.best}%`
+                  : rec
+                    ? `Last try ${rec.last}% · needs ${PASS_MARK}%`
+                    : ready
+                      ? "You're ready"
+                      : `Pass ${PASS_MARK}% to complete this chapter`}
+              </span>
+              <span className="text-meta text-muted-foreground">
+                {done} of {steps.length} steps complete
+                {rec ? ` · ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}` : ""} · new questions every retake
+              </span>
+              <button
+                type="button"
+                className={cn(
+                  "mt-2 self-start rounded-lg px-3.5 py-2 text-meta font-semibold",
+                  rec?.passed || !ready ? "border border-border" : "bg-primary text-primary-foreground",
+                )}
+              >
+                {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
+              </button>
+              <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
+            </>
+          ) : (
+            <span className="flex-1 font-semibold text-muted-foreground">No exam for this part of the book</span>
+          )}
+        </div>
+      </div>
+
+      <section className="flex flex-col gap-6">
+        <div>
+          <h2 className="m-0 font-serif text-[22px] font-semibold">Your path</h2>
+          <p className="mt-1 text-meta text-muted-foreground">
+            Read each step, check your understanding, then take the exam. Open a step for its key concepts.
+          </p>
+        </div>
           <ol className="m-0 flex list-none flex-col p-0">
             {steps.map((step, i) => {
               const s = step.node
@@ -249,6 +347,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
 
             {/* the destination */}
             <li className="relative flex items-center gap-5 pt-2">
+              <a href="#exam" className="absolute inset-0" aria-label="Go to the chapter exam" />
               <span
                 aria-hidden
                 className="relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 text-base"
@@ -280,54 +379,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
               ))}
             </p>
           )}
-        </div>
-
-        <aside className="lg:sticky lg:top-[calc(var(--fleet-header-h)+1.5rem)]">
-          <div
-            className="rounded-2xl border-2 bg-card p-6"
-            style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : color }}
-          >
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">Destination · chapter exam</p>
-            {hasExam ? (
-              <>
-                <p className="mt-2 font-serif text-2xl font-semibold leading-snug">
-                  {rec?.passed ? `Passed · ${rec.best}%` : ready ? "You're ready" : `Pass ${PASS_MARK}% to finish`}
-                </p>
-                <Bar value={steps.length ? (done / steps.length) * 100 : 0} color={color} className="mt-4 h-1.5" />
-                <p className="mt-2 text-meta text-muted-foreground">
-                  {done} of {steps.length} steps complete
-                  {rec && !rec.passed ? ` · last try ${rec.last}%` : ""}
-                </p>
-                <button
-                  type="button"
-                  className={cn(
-                    "mt-5 w-full rounded-lg px-4 py-3 text-sm font-semibold",
-                    rec?.passed || !ready ? "border border-border" : "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
-                </button>
-                <p className="mt-2 text-center text-[11px] text-muted-foreground">Always open · every retake has new questions</p>
-                <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
-                  {[
-                    [totalWords > 0 ? `${minutesOf(totalWords)}m` : "–", "reading"],
-                    [String(conceptCount), "concepts"],
-                    [String(dueCount), "to review"],
-                  ].map(([v, l]) => (
-                    <div key={l} className="flex flex-col">
-                      <dt className="order-2 text-[10px] uppercase tracking-widest text-muted-foreground">{l}</dt>
-                      <dd className="m-0 font-serif text-xl font-semibold tabular-nums">{v}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
-              </>
-            ) : (
-              <p className="mt-1 font-semibold text-muted-foreground">No exam for this part of the book</p>
-            )}
-          </div>
-        </aside>
-      </div>
+              </section>
     </div>
   )
 }

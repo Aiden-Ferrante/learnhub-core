@@ -1,28 +1,18 @@
 "use client"
 
-/** /courses/[id]/chapters/[chapterKey]/path — TRIAL (v0.31.5): the chapter as a guided path. */
+/** /courses/[id]/chapters/[chapterKey]/path — the v0.31.5 trial address of the chapter path;
+ *  the path is part of the chapter page now (2026-11-19). */
 
-import { use } from "react"
-import { ChapterPath, CourseFallback, useCourseData } from "@/surfaces/library"
-import { StudyPage } from "@/kit/study"
+import { use, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
-export default function ChapterPathPage({
+export default function ChapterPathRedirect({
   params,
 }: {
   params: Promise<{ courseId: string; chapterKey: string }>
 }) {
   const { courseId, chapterKey } = use(params)
-  const data = useCourseData(courseId)
-  if (!data.course) {
-    return (
-      <StudyPage>
-        <CourseFallback isInitialized={data.isInitialized} />
-      </StudyPage>
-    )
-  }
-  return (
-    <StudyPage wide>
-      <ChapterPath data={data} chapterKey={decodeURIComponent(chapterKey)} />
-    </StudyPage>
-  )
+  const router = useRouter()
+  useEffect(() => router.replace(`/courses/${courseId}/chapters/${chapterKey}`), [router, courseId, chapterKey])
+  return null
 }
