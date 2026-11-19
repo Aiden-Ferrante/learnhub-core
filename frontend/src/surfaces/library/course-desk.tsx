@@ -1,55 +1,20 @@
 "use client"
 
-/** The Desk (v0.30.0): one workspace per course. Every course route renders inside it: the
- *  course title on top (back to the chapter cards) and the book's chapters down the left with
- *  how much of each you have studied. The mode bar (Overview / Read / Review / Packs /
- *  Concepts) was removed in v0.31.4: the chapter hubs are the navigation now. */
+/** The Desk (v0.30.0): the frame every course route renders inside — now just the course
+ *  title on top, back to the chapter cards. The mode bar went in v0.31.4 and the chapter rail
+ *  down the left in v0.31.5 (human, 2026-11-19): the chapter cards and hubs are the navigation. */
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import type React from "react"
-import type { LearnTreeNode } from "@/gateways/api/outline"
-import type { SectionMemory } from "@/gateways/api/progress"
-import { chapterHref, scopeFromSegments } from "@/kit/lib/scope-url"
 import { cleanCourseTitle } from "@/kit/lib/course-title"
-import { cn } from "@/kit/lib/utils"
 import { coverColor } from "@/surfaces/library/cover"
 import { useCourseData } from "@/surfaces/library/use-course-data"
 
-/** The section key the reader is on, read off the address bar (the reader keeps it there). */
-function scopeOf(path: string, base: string): string | null {
-  const rest = path.slice(base.length)
-  if (!rest.startsWith("/chapter/")) return null
-  return scopeFromSegments(rest.slice("/chapter/".length).split("/").map(decodeURIComponent))
-}
-
-function contains(node: LearnTreeNode, key: string): boolean {
-  return node.sectionKey === key || node.children.some((c) => contains(c, key))
-}
-
-/** Studied share as a whole percent: how many of the chapter's concepts you have reviewed. */
-function pct(m: SectionMemory | undefined): number | null {
-  return m && m.total > 0 ? Math.round(m.coverage * 100) : null
-}
-
-const STATE_DOT: Record<string, string> = {
-  solid: "bg-status-mastered",
-  shaky: "bg-status-due",
-  fading: "bg-status-fading",
-  new: "border border-muted-foreground/60",
-}
-
 export function CourseDesk({ courseId, children }: { courseId: string; children: React.ReactNode }) {
-  const path = usePathname() ?? ""
   const data = useCourseData(courseId)
   if (!data.course) return <>{children}</>
 
   const base = `/courses/${courseId}`
-  const scope = scopeOf(path, base)
-  const chapters = data.tree.filter((n) => n.sectionKey)
-  const current = scope ? chapters.find((c) => contains(c, scope)) : undefined
-  const by = data.mastery?.bySection ?? {}
-  const overall = pct(data.mastery?.overall)
   const title = cleanCourseTitle(data.course.title).title
 
   return (
@@ -63,54 +28,7 @@ export function CourseDesk({ courseId, children }: { courseId: string; children:
         </div>
       </div>
 
-      <div className="flex">
-        {/* The path trial (v0.31.5) drops the rail: the chapter cards already list chapters. */}
-        {!/\/chapters\/[^/]+\/path$/.test(path) && (
-        <nav
-          aria-label="Chapters"
-          className="sticky top-[var(--fleet-header-h)] hidden h-[calc(100vh_-_var(--fleet-header-h))] w-64 shrink-0 overflow-y-auto border-r border-border bg-card/40 py-4 lg:block"
-        >
-          <div className="flex items-baseline justify-between px-5 pb-2 text-micro uppercase tracking-label text-muted-foreground">
-            <span>Chapters</span>
-            {overall != null && <span className="normal-case tracking-normal">{overall}% studied</span>}
-          </div>
-          {data.loading && chapters.length === 0 ? (
-            <p className="px-5 text-meta text-muted-foreground">Loading the book…</p>
-          ) : (
-            <ol className="flex flex-col">
-              {chapters.map((c, i) => {
-                const m = by[c.sectionKey as string]
-                const p = pct(m)
-                const here = current?.id === c.id
-                return (
-                  <li key={c.id}>
-                    <Link
-                      href={chapterHref(courseId, c.sectionKey)}
-                      aria-current={here ? "location" : undefined}
-                      title={m ? `${m.reviewed} of ${m.total} concepts studied` : undefined}
-                      className={cn(
-                        "grid grid-cols-[14px_1fr_auto] items-center gap-2.5 px-5 py-2 text-meta transition-colors",
-                        here ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn("h-2.5 w-2.5 rounded-full", here ? "bg-primary" : STATE_DOT[m?.state ?? "new"])}
-                      />
-                      <span className="min-w-0 truncate">
-                        <span className="tabular-nums">{c.label || i + 1}</span> {c.title}
-                      </span>
-                      <span className="text-micro tabular-nums">{p != null ? `${p}%` : ""}</span>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ol>
-          )}
-        </nav>
-        )}
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+      <div className="min-w-0">{children}</div>
     </div>
   )
 }
