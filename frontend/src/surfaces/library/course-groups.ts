@@ -208,3 +208,42 @@ export function toggleMembership(
   else delete membership[courseId]
   return { ...state, membership }
 }
+
+/** Tag a course into a group (no-op when it is already there). */
+export function addToGroup(state: GroupsState, courseId: string, groupId: string): GroupsState {
+  const current = state.membership[courseId] ?? []
+  if (current.includes(groupId)) return state
+  return { ...state, membership: { ...state.membership, [courseId]: [...current, groupId] } }
+}
+
+/** Take a course out of a group and out of every group under it (it was showing there
+ *  because of one of them). No-op when it is in none of them. */
+export function removeFromGroup(
+  state: GroupsState,
+  courseId: string,
+  groupId: string,
+): GroupsState {
+  const scope = new Set(descendantGroupIds(groupId, state.groups))
+  const current = state.membership[courseId] ?? []
+  const next = current.filter((g) => !scope.has(g))
+  if (next.length === current.length) return state
+  const membership = { ...state.membership }
+  if (next.length) membership[courseId] = next
+  else delete membership[courseId]
+  return { ...state, membership }
+}
+
+/** Drag a course onto a group: from All courses it is added; from inside another group it
+ *  moves (out of the group you were viewing, into the target). */
+export function dropCourse(
+  state: GroupsState,
+  courseId: string,
+  fromGroupId: string | null,
+  toGroupId: string,
+): GroupsState {
+  if (fromGroupId === toGroupId) return state
+  const added = addToGroup(state, courseId, toGroupId)
+  // Moving into a group nested inside the one being viewed keeps it visible there anyway.
+  if (!fromGroupId || descendantGroupIds(fromGroupId, state.groups).includes(toGroupId)) return added
+  return removeFromGroup(added, courseId, fromGroupId)
+}

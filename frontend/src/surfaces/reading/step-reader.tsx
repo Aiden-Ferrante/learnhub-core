@@ -204,7 +204,7 @@ export function StepReader({
   return (
     <div className="pb-24">
       <div className="sticky top-[var(--fleet-header-h)] z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[56rem] items-center gap-4 px-4 py-2.5 text-meta">
+        <div className="mx-auto flex max-w-[88rem] items-center gap-4 px-8 py-2.5 text-meta">
           <Link href={pathHref} className="shrink-0 text-muted-foreground hover:text-foreground">
             ← {chapterNumber ? `Chapter ${chapterNumber}` : chapterTitle}
           </Link>
@@ -238,7 +238,7 @@ export function StepReader({
         </div>
       </div>
 
-      <article className={cn("mx-auto max-w-[calc(30em+2rem)] px-4 pt-12", SIZES[size].className)}>
+      <article className={cn("mx-auto max-w-[88rem] px-8 pt-12", SIZES[size].className)}>
         <p className="mb-3 font-sans text-xs uppercase tracking-widest text-muted-foreground">
           {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}Step {index + 1}
           {parts.length > 0 && ` · ${totalMinutes} min read`}

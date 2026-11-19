@@ -6,7 +6,7 @@ import { AsyncView, ErrorNotice } from "@/kit/data"
 import { SkeletonRow } from "@/kit/patterns/skeletons"
 import { Sheet } from "@/kit/study"
 import { deleteGroup, moveGroup } from "@/surfaces/library/course-groups"
-import { GroupSidebar } from "@/surfaces/library/group-sidebar"
+import { GroupSidebar, type CourseDrag } from "@/surfaces/library/group-sidebar"
 import type { CourseGroupsApi } from "@/surfaces/library/use-course-groups"
 
 // Group-sidebar width bounds (px): wide enough for nested group names, never so wide the
@@ -25,6 +25,8 @@ export function GroupPanel({
   onSelect,
   onNewGroup,
   onRenameGroup,
+  courseDrag,
+  onDropCourse,
 }: {
   groups: CourseGroupsApi
   totalCount: number
@@ -32,6 +34,8 @@ export function GroupPanel({
   onSelect: (groupId: string | null) => void
   onNewGroup: () => void
   onRenameGroup: (groupId: string, currentName: string) => void
+  courseDrag: CourseDrag | null
+  onDropCourse: (groupId: string | null) => void
 }) {
   const [width, setWidth] = useState(SIDEBAR_DEFAULT)
   const resizeStart = useRef<{ x: number; width: number } | null>(null)
@@ -75,6 +79,8 @@ export function GroupPanel({
                 if (selectedGroupId === id) onSelect(null)
               }}
               onMoveGroup={(dragId, target) => groups.update((s) => moveGroup(s, dragId, target))}
+              courseDrag={courseDrag}
+              onDropCourse={onDropCourse}
             />
           )}
         </AsyncView>

@@ -118,24 +118,25 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const m = by[chapterKey]
   const n = due.get(chapterKey) ?? Array.from(due.values()).reduce((a, b) => a + b, 0)
   const ready = done === steps.length && steps.length > 0
-  const card = "relative flex flex-col gap-1.5 rounded-[14px] border border-border bg-card p-[18px]"
+  const card = "relative flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm"
+  const label = "block text-[10px] uppercase tracking-widest text-muted-foreground"
   const action =
-    "mt-2 self-start rounded-lg border border-border px-3.5 py-2 text-meta font-semibold hover:border-muted-foreground/50"
+    "shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-semibold hover:border-muted-foreground/50"
 
   return (
-    <div className="flex flex-col gap-9">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2.5">
         <Link href={chaptersHref(course.id)} className="text-meta text-muted-foreground hover:text-foreground">
           ← All chapters
         </Link>
         <div className="flex items-center gap-[18px]">
           {numbers.get(chapter.id) && (
-            <span className="font-serif text-[56px] font-semibold leading-none" style={{ color }}>
+            <span className="font-serif text-[40px] font-semibold leading-none" style={{ color }}>
               {numbers.get(chapter.id)}
             </span>
           )}
           <div>
-            <h1 className="m-0 font-serif text-[32px] font-semibold leading-tight">{plainTitle(chapter)}</h1>
+            <h1 className="m-0 font-serif text-[26px] font-semibold leading-tight">{plainTitle(chapter)}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {steps.length} steps
               {totalWords > 0 && ` · about ${minutesOf(totalWords)} min of reading`}
@@ -152,43 +153,43 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className={card}>
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Read</span>
-          {current ? (
-            <>
-              <span className="text-meta text-muted-foreground">
-                {reading ? "Continue" : currentIndex === 0 && done === 0 ? "Start" : "Next"} · Step {currentIndex + 1} of {steps.length}
-              </span>
-              <span className="flex-1 font-semibold">{plainTitle(current.node)}</span>
-            </>
-          ) : (
-            <span className="flex-1 font-semibold">{steps.length ? "Every step read" : "Nothing to read here"}</span>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-            {steps.length > 0 && (
-              <Link
-                href={chapterStepHref(course.id, chapterKey, Math.max(currentIndex, 0))}
-                className="rounded-lg bg-primary px-3.5 py-2 text-meta font-semibold text-primary-foreground"
-              >
-                {reading ? "Continue reading" : current ? "Start reading" : "Read again"}
-              </Link>
-            )}
+          <div className="min-w-0 flex-1">
+            <span className={label}>Read</span>
+            <span className="block truncate font-semibold">
+              {current
+                ? `${reading ? "Continue" : currentIndex === 0 && done === 0 ? "Start" : "Next"} · Step ${currentIndex + 1}: ${plainTitle(current.node)}`
+                : steps.length
+                  ? "Every step read"
+                  : "Nothing to read here"}
+            </span>
             <Link
               href={chapterHref(course.id, chapterKey)}
               onClick={() => data.persistReadingPosition(chapterKey)}
-              className="text-meta text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
               Whole chapter at once
             </Link>
           </div>
+          {steps.length > 0 && (
+            <Link
+              href={chapterStepHref(course.id, chapterKey, Math.max(currentIndex, 0))}
+              className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              {reading ? "Continue reading" : current ? "Start reading" : "Read again"}
+            </Link>
+          )}
         </div>
         <div className={card}>
           <Badge count={n} />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Review</span>
-          <span className="flex-1 font-semibold">
-            {n > 0 ? `${n} card${n === 1 ? "" : "s"} due` : "Nothing due in this chapter"}
-          </span>
+          <div className="min-w-0 flex-1">
+            <span className={label}>Review</span>
+            <span className="block truncate font-semibold">
+              {n > 0 ? `${n} card${n === 1 ? "" : "s"} due` : "Nothing due in this chapter"}
+            </span>
+          </div>
           <Link href={chapterHref(course.id, chapterKey, { drawer: "review" })} className={action}>
             {n > 0 ? "Review now" : "Open review"}
           </Link>
@@ -198,37 +199,46 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
           className={cn(card, "scroll-mt-28 border-2")}
           style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : color }}
         >
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam ★</span>
-          {hasExam ? (
-            <>
-              <span className="flex-1 font-semibold">
-                {rec?.passed
-                  ? `Passed · best ${rec.best}%`
-                  : rec
-                    ? `Last try ${rec.last}% · needs ${PASS_MARK}%`
-                    : ready
-                      ? "You're ready"
-                      : `Pass ${PASS_MARK}% to complete this chapter`}
-              </span>
-              <span className="text-meta text-muted-foreground">
-                {done} of {steps.length} steps complete
-                {rec ? ` · ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}` : ""} · new questions every retake
-              </span>
-              <button
-                type="button"
-                className={cn(
-                  "mt-2 self-start rounded-lg px-3.5 py-2 text-meta font-semibold",
-                  rec?.passed || !ready ? "border border-border" : "bg-primary text-primary-foreground",
-                )}
-              >
-                {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
-              </button>
-              <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
-            </>
-          ) : (
-            <span className="flex-1 font-semibold text-muted-foreground">No exam for this part of the book</span>
+          <div className="min-w-0 flex-1">
+            <span className={label}>Chapter exam ★</span>
+            {hasExam ? (
+              <>
+                <span className="block truncate font-semibold">
+                  {rec?.passed
+                    ? `Passed · best ${rec.best}%`
+                    : rec
+                      ? `Last try ${rec.last}% · needs ${PASS_MARK}%`
+                      : ready
+                        ? "You're ready"
+                        : `Pass ${PASS_MARK}% to complete this chapter`}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {done} of {steps.length} steps complete
+                  {rec ? ` · ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}` : ""}
+                </span>
+              </>
+            ) : (
+              <span className="block font-semibold text-muted-foreground">No exam for this part</span>
+            )}
+          </div>
+          {hasExam && (
+            <button
+              type="button"
+              className={cn(
+                "shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold",
+                rec?.passed || !ready ? "border border-border" : "bg-primary text-primary-foreground",
+              )}
+            >
+              {rec?.passed ? "Retake" : rec ? "Retake exam" : "Take exam"}
+            </button>
           )}
         </div>
+      </div>
+      {hasExam && (
+        <div className="self-end text-xs [&>div]:mt-0 [&>div]:px-2 [&>div]:py-1">
+          <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
+        </div>
+      )}
       </div>
 
       <section className="flex flex-col gap-6">

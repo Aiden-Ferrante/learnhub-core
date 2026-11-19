@@ -3,20 +3,30 @@
 /** The Library (docs/ui-spec.md §3; Bookshelf since v0.31.0): the Today strip on top, then the course grid with its
  *  group sidebar. Admin entry points (Upload, Process) sit in the header, quietly. */
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { GraduationCap, Plus, Zap } from "lucide-react"
 import { Button } from "@/kit/ui/button"
+import { cn } from "@/kit/lib/utils"
 import { Input } from "@/kit/ui/input"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { PageHeader } from "@/kit/patterns/page-header"
 import { Sheet } from "@/kit/study"
 import { CourseCard } from "@/surfaces/library/course-card"
-import { addGroup, coursesInGroup, renameGroup, toggleMembership } from "@/surfaces/library/course-groups"
+import {
+  addGroup,
+  coursesInGroup,
+  dropCourse,
+  removeFromGroup,
+  renameGroup,
+  toggleMembership,
+  type GroupsState,
+} from "@/surfaces/library/course-groups"
 import { courseFromDocument, type Course } from "@/surfaces/library/courses"
 import { DeleteCourseDialog } from "@/surfaces/library/delete-course-dialog"
 import { GroupDialog, type GroupDialogState } from "@/surfaces/library/group-dialog"
 import { GroupPanel } from "@/surfaces/library/group-panel"
+import type { CourseDrag } from "@/surfaces/library/group-sidebar"
 import { TodayStrip } from "@/surfaces/library/up-next"
 import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
@@ -64,6 +74,44 @@ export function CourseShelf() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [dialog, setDialog] = useState<GroupDialogState>(null)
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
+
+  // Drag a course card onto a group to put it there; from inside a group, onto another group
+  // to move it, or onto All courses / the strip above the grid to take it out (2026-11-19:
+  // "very easy to drag and drop course groups in and out"). Every drop can be undone.
+  const [courseDrag, setCourseDrag] = useState<CourseDrag | null>(null)
+  const [overOut, setOverOut] = useState(false)
+  const [notice, setNotice] = useState<{ text: string; before?: GroupsState } | null>(null)
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 8000)
+    return () => clearTimeout(t)
+  }, [notice])
+  const nameOf = (id: string) => groups.state.groups.find((g) => g.id === id)?.name ?? "the group"
+  const dropOn = (toGroupId: string | null) => {
+    const d = courseDrag
+    setCourseDrag(null)
+    setOverOut(false)
+    if (!d) return
+    const before = groups.state
+    const next =
+      toGroupId === null
+        ? d.fromGroupId
+          ? removeFromGroup(before, d.courseId, d.fromGroupId)
+          : before
+        : dropCourse(before, d.courseId, d.fromGroupId, toGroupId)
+    if (next === before) {
+      if (toGroupId) setNotice({ text: `“${d.title}” is already in ${nameOf(toGroupId)}` })
+      return
+    }
+    groups.update(() => next)
+    const text =
+      toGroupId === null
+        ? `Took “${d.title}” out of ${nameOf(d.fromGroupId!)}`
+        : d.fromGroupId && !(next.membership[d.courseId] ?? []).includes(d.fromGroupId)
+          ? `Moved “${d.title}” to ${nameOf(toGroupId)}`
+          : `Added “${d.title}” to ${nameOf(toGroupId)}`
+    setNotice({ text, before })
+  }
 
   const [query, setQuery] = useState("")
   const visibleCourses = useMemo(() => {
@@ -130,6 +178,8 @@ export function CourseShelf() {
             onSelect={setSelectedGroupId}
             onNewGroup={() => newGroup(null)}
             onRenameGroup={(groupId, name) => setDialog({ mode: "rename", groupId, name })}
+            courseDrag={courseDrag}
+            onDropCourse={dropOn}
           />
 
           <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -141,6 +191,47 @@ export function CourseShelf() {
                 placeholder="Search courses…"
                 aria-label="Search courses"
               />
+            )}
+            {notice && (
+              <p role="status" className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-meta">
+                <span className="min-w-0 flex-1 truncate">{notice.text}</span>
+                {notice.before && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const before = notice.before!
+                      groups.update(() => before)
+                      setNotice(null)
+                    }}
+                    className="font-semibold text-brand hover:underline"
+                  >
+                    Undo
+                  </button>
+                )}
+                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="text-muted-foreground hover:text-foreground">
+                  ×
+                </button>
+              </p>
+            )}
+            {courseDrag?.fromGroupId && (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = "move"
+                  setOverOut(true)
+                }}
+                onDragLeave={() => setOverOut(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  dropOn(null)
+                }}
+                className={cn(
+                  "rounded-lg border-2 border-dashed px-4 py-4 text-center text-meta transition-colors",
+                  overOut ? "border-brand bg-brand/10 text-foreground" : "border-border text-muted-foreground",
+                )}
+              >
+                Drop here to take “{courseDrag.title}” out of {nameOf(courseDrag.fromGroupId)}
+              </div>
             )}
             {visibleCourses.length === 0 && query.trim() && (
               <p className="text-body text-muted-foreground">No courses match “{query}”.</p>
@@ -161,6 +252,16 @@ export function CourseShelf() {
                     groups.update((s) => toggleMembership(s, courseId, groupId))
                   }
                   onNewGroupForCourse={newGroup}
+                  onDragStart={
+                    groups.ready
+                      ? () => setCourseDrag({ courseId: course.id, title: course.title, fromGroupId: selectedGroupId })
+                      : undefined
+                  }
+                  onDragEnd={() => {
+                    setCourseDrag(null)
+                    setOverOut(false)
+                  }}
+                  dragging={courseDrag?.courseId === course.id}
                 />
               ))}
               {!selectedGroupId && (
@@ -176,7 +277,7 @@ export function CourseShelf() {
             {selectedGroupId && visibleCourses.length === 0 && !query.trim() && (
               <EmptyState
                 title="No courses in this group yet"
-                description="Use the menu on a course card to move one here."
+                description="Go to All courses and drag a course onto this group in the sidebar, or use a card's ⋮ menu."
               />
             )}
           </div>

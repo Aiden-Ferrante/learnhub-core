@@ -15,6 +15,7 @@ import {
 } from "@/kit/ui/dropdown-menu"
 import { StatusPill, type DomainStatus } from "@/kit/patterns/status-pill"
 import { chapterHref } from "@/kit/lib/scope-url"
+import { cn } from "@/kit/lib/utils"
 import { coverColor, coverMonogram } from "@/surfaces/library/cover"
 import type { SectionMemory } from "@/gateways/api/progress"
 import type { CourseGroup } from "@/surfaces/library/course-groups"
@@ -39,6 +40,9 @@ export function CourseCard({
   onToggleMembership,
   onNewGroupForCourse,
   onDelete,
+  onDragStart,
+  onDragEnd,
+  dragging,
 }: {
   course: Course
   /** The course's whole-book summary; undefined while loading, null when it has none. */
@@ -52,6 +56,10 @@ export function CourseCard({
   onToggleMembership: (courseId: string, groupId: string) => void
   onNewGroupForCourse: (courseId: string) => void
   onDelete: (course: Course) => void
+  /** Drag the card onto a group in the sidebar to put it there (v0.31.5). */
+  onDragStart?: () => void
+  onDragEnd?: () => void
+  dragging?: boolean
 }) {
   const badge = STATUS_BADGE[course.status]
   const ready = course.status === "ready"
@@ -60,7 +68,19 @@ export function CourseCard({
   const [coverFailed, setCoverFailed] = useState(false)
   const showCover = ready && !!course.learnDocId && !coverFailed
   return (
-    <article className="group relative flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/30">
+    <article
+      draggable={Boolean(onDragStart)}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "copyMove"
+        e.dataTransfer.setData("text/plain", course.title) // Firefox needs data to drag
+        onDragStart?.()
+      }}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "group relative flex cursor-grab flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-[colors,opacity] hover:border-foreground/30 active:cursor-grabbing",
+        dragging && "opacity-40",
+      )}
+    >
       {/* The cover: page 1 of the book's PDF, or (no PDF) a quiet tile in the course colour. */}
       <div className="relative mx-auto aspect-[3/4] w-[76%] overflow-hidden rounded-md border border-border bg-background shadow-sm">
         {showCover ? (
@@ -69,6 +89,7 @@ export function CourseCard({
             src={`/api/learn/cover?doc=${encodeURIComponent(course.learnDocId as string)}`}
             alt=""
             loading="lazy"
+            draggable={false}
             onError={() => setCoverFailed(true)}
             className="h-full w-full object-cover object-top"
           />
@@ -99,7 +120,7 @@ export function CourseCard({
             size="sm"
             className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 opacity-0 shadow transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
           >
-            <Link href={chapterHref(course.id, continueKey)}>
+            <Link href={chapterHref(course.id, continueKey)} draggable={false}>
               <BookOpen />
               {continueKey ? "Continue" : "Start"}
             </Link>
@@ -111,7 +132,7 @@ export function CourseCard({
         <span aria-hidden className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1 pl-1">
           <h3 className="line-clamp-2 text-meta font-medium leading-snug">
-            <Link href={`/courses/${course.id}`} className="after:absolute after:inset-0">
+            <Link href={`/courses/${course.id}`} draggable={false} className="after:absolute after:inset-0">
               {course.title}
             </Link>
           </h3>

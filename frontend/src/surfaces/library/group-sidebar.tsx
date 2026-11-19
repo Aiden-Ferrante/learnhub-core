@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -33,7 +33,14 @@ type GroupDnd = {
   onHover: (id: string, zone: DropZone) => void
   onEnd: () => void
   onDrop: (target: GroupDropTarget) => void
+  /** A course card is being dragged (from the shelf): rows take it instead of a group. */
+  courseDrag: CourseDrag | null
+  onDropCourse: (groupId: string | null) => void
+  expand: (id: string) => void
 }
+
+/** A course being dragged out of the grid, and the group being viewed when it started. */
+export type CourseDrag = { courseId: string; title: string; fromGroupId: string | null }
 
 /** Which zone of a row the pointer is over: top quarter = before, bottom quarter
  *  = after, the middle half = into (re-parent). */
@@ -54,6 +61,9 @@ type GroupSidebarProps = {
   onRenameGroup: (groupId: string, currentName: string) => void
   onDeleteGroup: (groupId: string) => void
   onMoveGroup: (dragId: string, target: GroupDropTarget) => void
+  courseDrag: CourseDrag | null
+  /** A course dropped on a group (or on All courses: null = take it out of the viewed group). */
+  onDropCourse: (groupId: string | null) => void
   /** False until the saved groups load: creating one waits for them. */
   canEdit: boolean
 }
@@ -100,6 +110,16 @@ function GroupRow({
         }}
         onDragEnd={dnd.onEnd}
         onDragOver={(e) => {
+          if (dnd.courseDrag) {
+            if (dnd.courseDrag.fromGroupId === group.id) return
+            e.preventDefault()
+            e.stopPropagation()
+            e.dataTransfer.dropEffect = dnd.courseDrag.fromGroupId ? "move" : "copy"
+            dnd.onHover(group.id, "into")
+            // Hovering a closed group opens it, so a course can go into a subgroup.
+            if (hasChildren && !isExpanded) dnd.expand(group.id)
+            return
+          }
           if (!dnd.dragId || dnd.dragId === group.id) return
           e.preventDefault()
           e.stopPropagation()
@@ -107,6 +127,12 @@ function GroupRow({
           dnd.onHover(group.id, zoneFor(e))
         }}
         onDrop={(e) => {
+          if (dnd.courseDrag) {
+            e.preventDefault()
+            e.stopPropagation()
+            dnd.onDropCourse(group.id)
+            return
+          }
           if (!dnd.dragId) return
           e.preventDefault()
           e.stopPropagation()
@@ -118,6 +144,7 @@ function GroupRow({
           isSelected ? "bg-brand/15 text-foreground" : "hover:bg-muted/60",
           isDragging && "opacity-40",
           hint === "into" && "ring-1 ring-inset ring-brand/70 bg-brand/10",
+          dnd.courseDrag && dnd.courseDrag.fromGroupId !== group.id && hint !== "into" && "outline-dashed outline-1 -outline-offset-1 outline-border",
           // before/after indicators: a 2px line hugging the row edge.
           hint === "before" && "before:absolute before:inset-x-1 before:-top-px before:h-0.5 before:rounded before:bg-brand",
           hint === "after" && "after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded after:bg-brand",
@@ -209,6 +236,8 @@ export function GroupSidebar({
   onRenameGroup,
   onDeleteGroup,
   onMoveGroup,
+  courseDrag,
+  onDropCourse,
   canEdit,
 }: GroupSidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
@@ -226,7 +255,16 @@ export function GroupSidebar({
   // guards invalid moves (own subtree) in the pure model.
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropHint, setDropHint] = useState<{ id: string; zone: DropZone } | null>(null)
+  useEffect(() => {
+    if (!courseDrag) setDropHint(null)
+  }, [courseDrag])
   const dnd: GroupDnd = {
+    courseDrag,
+    onDropCourse: (groupId) => {
+      onDropCourse(groupId)
+      setDropHint(null)
+    },
+    expand: (id) => setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id))),
     dragId,
     hint: dropHint,
     onDragStart: setDragId,
@@ -262,12 +300,25 @@ export function GroupSidebar({
               variant="ghost"
               onClick={() => onSelect(null)}
               onDragOver={(e) => {
+                // A course dropped here leaves the group being viewed.
+                if (courseDrag) {
+                  if (!courseDrag.fromGroupId) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = "move"
+                  dnd.onHover("__root__", "into")
+                  return
+                }
                 if (!dnd.dragId) return
                 e.preventDefault()
                 e.dataTransfer.dropEffect = "move"
                 dnd.onHover("__root__", "into")
               }}
               onDrop={(e) => {
+                if (courseDrag) {
+                  e.preventDefault()
+                  dnd.onDropCourse(null)
+                  return
+                }
                 if (!dnd.dragId) return
                 e.preventDefault()
                 dnd.onDrop({ kind: "into", groupId: null }) // un-nest to top level
@@ -282,7 +333,9 @@ export function GroupSidebar({
             >
               <span className="w-4 shrink-0" />
               <Layers className="text-muted-foreground" />
-              <span className="font-medium">All courses</span>
+              <span className="font-medium">
+                {courseDrag?.fromGroupId && dnd.hint?.id === "__root__" ? "Take out of this group" : "All courses"}
+              </span>
               <span className="ml-auto shrink-0 text-meta tabular-nums text-muted-foreground">{totalCount}</span>
             </Button>
           </li>
@@ -308,6 +361,13 @@ export function GroupSidebar({
           </p>
         )}
       </ScrollArea>
+      {/* Outside the scroll area: its table-layout viewport would clip a wrapping line. */}
+      {courseDrag && tree.length > 0 && (
+        <p className="px-1 pt-2 text-meta text-muted-foreground">
+          Drop on a group to {courseDrag.fromGroupId ? "move" : "add"} it
+          {courseDrag.fromGroupId ? ", or on All courses to take it out" : ""}.
+        </p>
+      )}
     </Sheet>
   )
 }
