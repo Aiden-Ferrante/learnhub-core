@@ -101,6 +101,13 @@ not add to it mid-build.
 
 ## Carries forward
 
+- **Doubled names in the chapter rail** (v0.31.3, pre-existing). "Introduction Introduction",
+  "Appendices Appendices": a section whose first block repeats its title shows both.
+- **Key-derived chapters** (v0.31.3). `chapter_key_of`, `scope.is_ancestor_section_key` and
+  `resolveChapterForScope`'s fallback read the chapter from a numeric key. A slug-keyed chapter
+  owns its sections in the tree but not in those queries. Consider deriving from the stored tree.
+- **Run `restructure_outlines.py --check` before every close** (v0.31.3), beside the PG tier.
+
 - **The Desk's right column** (v0.30.0 non-goal). The mockup's context panel: this section's
   concepts with known/due/new, where a review card lives in the book, the skills a test covers.
   The reader's drawers (Review, Tutor, Listen) already hold some of this.

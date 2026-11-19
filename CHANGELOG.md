@@ -7,6 +7,29 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.3] — 2026-11-19 — Grouped outlines
+
+### Fixed
+- **Flat outlines are regrouped.** Sections numbered N.x that were bookmarked beside their
+  "Module N" / "Chapter N" now sit under it; Appendix A, B … sit under "Appendices"; a top-level
+  "Exercises" joins the chapter before it. Python Essentials 1 shows Modules 1–4 instead of 23
+  loose sections.
+- **Real sections are no longer hidden.** The orphan rule hides only Part/Unit containers and the
+  book's title entry (it had hidden PE1's Modules, six Exercises in Mathematics for ML, and
+  Learning SQL's Appendix A). Prefaces and "about the cover illustration" count as front matter.
+- **No made-up numbers beside the book's own.** Unnumbered sections (Welcome, Introduction,
+  Appendices) at a numbered level get no positional number.
+- "Module N: …" is read as chapter N at conversion (key `toc:N`).
+
+### Changed
+- **Course Overview order:** Overview, Progress, study cards, Study activity, Course outline.
+
+### Added
+- Ingest flags `dotted-tops` (N.M sections at the top level) in the TOC decision log.
+- `scripts/restructure_outlines.py`: repairs stored outlines in place (keys and ids kept, or a
+  numbered container re-keyed with every reference repointed); `--check` is the library-wide
+  outline check.
+
 ## [0.31.2] — 2026-11-12 — Framed cards
 
 ### Changed
