@@ -49,6 +49,7 @@ function useConceptIndex(concepts: ConceptLesson[]) {
   return useMemo(() => {
     const list = concepts.map((c) => ({ c, n: norm(c.name) }))
     return (term: string): ConceptLesson | undefined => {
+      if (/:\s*$/.test(term)) return undefined // labels like "Step 1:" are not concepts
       const t = norm(term)
       if (t.length < 3 || t.split(" ").length > 5) return undefined
       return (
@@ -58,6 +59,16 @@ function useConceptIndex(concepts: ConceptLesson[]) {
       )
     }
   }, [concepts])
+}
+
+/** All the text inside rendered markdown children (for deciding how to render a block). */
+function nodeText(children: React.ReactNode): string {
+  if (typeof children === "string" || typeof children === "number") return String(children)
+  if (Array.isArray(children)) return children.map(nodeText).join("")
+  if (children && typeof children === "object" && "props" in children) {
+    return nodeText((children as { props: { children?: React.ReactNode } }).props.children)
+  }
+  return ""
 }
 
 function textOf(children: React.ReactNode): string {
@@ -147,9 +158,14 @@ export function StepReader({
             {children}
           </a>
         ),
-      blockquote: ({ children }) => (
-        <div className="not-prose my-4 font-sans text-xs text-muted-foreground/80 [&_p]:m-0">{children}</div>
-      ),
+      // Only the provenance lines (made into quotes by prepare()) are quieted; the book's own
+      // quote blocks ("Check yourself", "Important") read normally.
+      blockquote: ({ children }) =>
+        /^\s*Topics List\b/.test(nodeText(children)) ? (
+          <div className="not-prose my-4 font-sans text-xs text-muted-foreground/80 [&_p]:m-0">{children}</div>
+        ) : (
+          <blockquote>{children}</blockquote>
+        ),
     }),
     [index_],
   )
