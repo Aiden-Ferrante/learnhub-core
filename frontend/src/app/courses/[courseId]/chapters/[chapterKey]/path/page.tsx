@@ -21,7 +21,7 @@ export default function ChapterPathPage({
     )
   }
   return (
-    <StudyPage>
+    <StudyPage wide>
       <ChapterPath data={data} chapterKey={decodeURIComponent(chapterKey)} />
     </StudyPage>
   )

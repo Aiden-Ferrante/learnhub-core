@@ -20,7 +20,7 @@ export default function CourseHomePage({ params }: { params: Promise<{ courseId:
   }
 
   return (
-    <StudyPage>
+    <StudyPage wide>
       <ChapterCards data={data} />
     </StudyPage>
   )

@@ -15,14 +15,17 @@ export function StudyPage({
   children,
   bar,
   narrow = false,
+  wide = false,
   className,
 }: {
   children: React.ReactNode
   bar?: React.ReactNode
   narrow?: boolean
+  /** Laptop-wide pages (course cards, chapter hubs, the path): use the screen (v0.31.5). */
+  wide?: boolean
   className?: string
 }) {
-  const column = cn("mx-auto w-full px-6", narrow ? "max-w-3xl" : "max-w-6xl")
+  const column = cn("mx-auto w-full px-6", narrow ? "max-w-3xl" : wide ? "max-w-[88rem]" : "max-w-6xl")
   return (
     // min-height excludes the sticky app header, so an empty page does not scroll.
     <div className="study-page min-h-[calc(100vh_-_var(--fleet-header-h))]">

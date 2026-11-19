@@ -78,13 +78,24 @@ function textOf(children: React.ReactNode): string {
 }
 
 /** A bold term that names one of the step's concepts: tap to reveal its meaning. */
-function ConceptTerm({ concept, children }: { concept: ConceptLesson; children: React.ReactNode }) {
+const WIDE = "(min-width: 1024px)"
+
+/** On a laptop a tapped term opens in the concepts panel; on a narrow screen, in a popover. */
+function ConceptTerm({
+  concept,
+  onPick,
+  children,
+}: {
+  concept: ConceptLesson
+  onPick: (c: ConceptLesson) => void
+  children: React.ReactNode
+}) {
   const [open, setOpen] = useState(false)
   return (
     <span className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (window.matchMedia(WIDE).matches ? onPick(concept) : setOpen((v) => !v))}
         aria-expanded={open}
         className="cursor-pointer font-semibold text-foreground underline decoration-primary/60 decoration-dotted underline-offset-4 hover:decoration-primary"
       >
@@ -126,6 +137,13 @@ export function StepReader({
   const index_ = useConceptIndex(concepts)
   const [size, setSize] = useState(0)
   const [check, setCheck] = useState<"offer" | "open" | "skipped">("offer")
+  const [picked, setPicked] = useState<string | null>(null)
+  const pick = (c: ConceptLesson) => {
+    setPicked(c.name)
+    requestAnimationFrame(() =>
+      document.getElementById(`concept-${c.name}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+    )
+  }
 
   useEffect(() => {
     const v = Number(localStorage.getItem(SIZE_KEY) ?? 0)
@@ -133,6 +151,7 @@ export function StepReader({
   }, [])
   useEffect(() => {
     onOpen(key)
+    setPicked(null)
     // "Check understanding" on the path links here with #check: open the check at once.
     if (window.location.hash === "#check") {
       setCheck("open")
@@ -148,7 +167,13 @@ export function StepReader({
     () => ({
       strong: ({ children }) => {
         const c = index_(textOf(children))
-        return c ? <ConceptTerm concept={c}>{children}</ConceptTerm> : <strong>{children}</strong>
+        return c ? (
+          <ConceptTerm concept={c} onPick={pick}>
+            {children}
+          </ConceptTerm>
+        ) : (
+          <strong>{children}</strong>
+        )
       },
       a: ({ href, children }) =>
         href === "#src" ? (
@@ -177,7 +202,7 @@ export function StepReader({
   return (
     <div className="pb-24">
       <div className="sticky top-[var(--fleet-header-h)] z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[62ch] items-center gap-4 px-4 py-2.5 text-meta">
+        <div className="mx-auto flex max-w-[calc(62ch+24rem)] items-center gap-4 px-4 py-2.5 text-meta">
           <Link href={pathHref} className="shrink-0 text-muted-foreground hover:text-foreground">
             ← {chapterNumber ? `Chapter ${chapterNumber}` : chapterTitle}
           </Link>
@@ -209,7 +234,8 @@ export function StepReader({
         </div>
       </div>
 
-      <article className="mx-auto max-w-[62ch] px-4 pt-10">
+      <div className="mx-auto grid max-w-[calc(62ch+24rem)] items-start gap-12 px-4 lg:grid-cols-[minmax(0,62ch)_20rem]">
+      <article className="min-w-0 pt-10">
         <p className="mb-2 font-sans text-xs uppercase tracking-widest text-muted-foreground">
           {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}Step {index + 1}
         </p>
@@ -304,6 +330,50 @@ export function StepReader({
           </p>
         )}
       </article>
+
+      {/* Laptop: the step's concepts beside the text, so the width works for you (v0.31.5). */}
+      <aside className="sticky top-[calc(var(--fleet-header-h)+3.5rem)] hidden max-h-[calc(100vh_-_var(--fleet-header-h)_-_5rem)] flex-col gap-3 overflow-y-auto pt-10 font-sans lg:flex">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          In this step · {concepts.length} concepts
+        </p>
+        <p className="text-meta text-muted-foreground">Tap an underlined term in the text, or a concept here.</p>
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {concepts.map((c) => {
+            const open = picked === c.name
+            return (
+              <li key={c.conceptKey ?? c.name} id={`concept-${c.name}`}>
+                <button
+                  type="button"
+                  onClick={() => setPicked(open ? null : c.name)}
+                  className={cn(
+                    "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    open ? "bg-card ring-1 ring-border" : "hover:bg-muted/50",
+                  )}
+                >
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className={cn("font-medium", open ? "text-foreground" : "text-foreground/85")}>{c.name}</span>
+                    <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">{c.kind}</span>
+                  </span>
+                  {open && <span className="mt-1.5 block leading-relaxed text-foreground/90">{c.signal}</span>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        {concepts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setCheck("open")
+              requestAnimationFrame(() => document.getElementById("check")?.scrollIntoView({ block: "start" }))
+            }}
+            className="mt-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:border-muted-foreground/50"
+          >
+            Check understanding
+          </button>
+        )}
+      </aside>
+      </div>
     </div>
   )
 }

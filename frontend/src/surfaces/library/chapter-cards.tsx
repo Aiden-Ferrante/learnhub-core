@@ -201,8 +201,13 @@ export function ChapterCards({ data }: { data: CourseData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
-      {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
+      {data.isLive && (
+        // Side by side on a laptop: less scrolling past empty width (v0.31.5).
+        <div className="grid items-start gap-6 xl:grid-cols-2">
+          <CourseStats data={data} home={home} onOpenSection={openChapter} />
+          <StudyHeatmap doc={course.learnDocId} />
+        </div>
+      )}
       <ComprehensiveCard exams={exams} examChapters={examChapters} numbers={numbers} color={color} />
       <p className="-mb-3 text-meta text-muted-foreground">
         Exams are a preview: results come from the demo buttons and are saved in this browser only ·{" "}

@@ -21,7 +21,7 @@ export default function ChapterDashboardPage({
     )
   }
   return (
-    <StudyPage>
+    <StudyPage wide>
       <ChapterDashboard data={data} chapterKey={decodeURIComponent(chapterKey)} />
     </StudyPage>
   )

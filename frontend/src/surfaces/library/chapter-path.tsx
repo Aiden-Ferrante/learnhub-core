@@ -93,7 +93,7 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
   const rec = exams.chapters[chapterKey]
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4 text-meta text-muted-foreground">
           <Link href={chaptersHref(course.id)} className="hover:text-foreground">
@@ -122,133 +122,157 @@ export function ChapterPath({ data, chapterKey }: { data: CourseData; chapterKey
         </div>
       </div>
 
-      <ol className="relative m-0 flex list-none flex-col p-0">
-        {steps.map((step, i) => {
-          const s = step.node
-          const isDone = doneOf(s)
-          const isCurrent = current?.node === s
-          const n = due.get(s.sectionKey!) ?? 0
-          const share = pct(by[s.sectionKey!])
-          return (
-            <li key={s.id} className="relative flex gap-4 pb-6 last:pb-0">
-              {/* the path line */}
-              <span aria-hidden className="absolute bottom-0 left-[15px] top-8 w-px bg-border" />
-              <span
-                aria-hidden
-                className={cn(
-                  "relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-meta font-semibold tabular-nums",
-                  isDone ? "border-transparent text-background" : isCurrent ? "bg-background" : "border-border bg-background text-muted-foreground",
-                )}
-                style={isDone ? { background: color } : isCurrent ? { borderColor: color, color } : undefined}
-              >
-                {isDone ? "✓" : i + 1}
-              </span>
-              <div className="min-w-0 flex-1 pt-1">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <Link
-                    href={chapterStepHref(course.id, chapterKey, i)}
-                    className={cn("font-semibold hover:text-primary", !isCurrent && !isDone && "text-muted-foreground")}
-                  >
-                    {plainTitle(s)}
-                  </Link>
-                  {n > 0 && (
-                    <span className="rounded-full bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
-                      {n} to review
-                    </span>
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex min-w-0 flex-col gap-8">
+        <ol className="relative m-0 flex list-none flex-col p-0">
+          {steps.map((step, i) => {
+            const s = step.node
+            const isDone = doneOf(s)
+            const isCurrent = current?.node === s
+            const n = due.get(s.sectionKey!) ?? 0
+            const share = pct(by[s.sectionKey!])
+            return (
+              <li key={s.id} className="relative flex gap-4 pb-6 last:pb-0">
+                {/* the path line */}
+                <span aria-hidden className="absolute bottom-0 left-[15px] top-8 w-px bg-border" />
+                <span
+                  aria-hidden
+                  className={cn(
+                    "relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-meta font-semibold tabular-nums",
+                    isDone ? "border-transparent text-background" : isCurrent ? "bg-background" : "border-border bg-background text-muted-foreground",
                   )}
-                  {!isCurrent && (
-                    <span className="text-meta text-muted-foreground">
-                      {isDone ? "understood" : share > 0 ? `${share}%` : `${step.concepts.length} concepts`}
-                    </span>
+                  style={isDone ? { background: color } : isCurrent ? { borderColor: color, color } : undefined}
+                >
+                  {isDone ? "✓" : i + 1}
+                </span>
+                <div className="min-w-0 flex-1 pt-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Link
+                      href={chapterStepHref(course.id, chapterKey, i)}
+                      className={cn("font-semibold hover:text-primary", !isCurrent && !isDone && "text-muted-foreground")}
+                    >
+                      {plainTitle(s)}
+                    </Link>
+                    {n > 0 && (
+                      <span className="rounded-full bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
+                        {n} to review
+                      </span>
+                    )}
+                    {!isCurrent && (
+                      <span className="text-meta text-muted-foreground">
+                        {isDone ? "understood" : share > 0 ? `${share}%` : `${step.concepts.length} concepts`}
+                      </span>
+                    )}
+                  </div>
+                  {isCurrent && (
+                    <div className="mt-3 flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+                      <div>
+                        <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+                          You will learn · {step.concepts.length}
+                        </p>
+                        <p className="text-sm leading-relaxed text-foreground/90">
+                          {step.concepts.slice(0, 6).map((c) => c.name).join(" · ")}
+                          {step.concepts.length > 6 && <span className="text-muted-foreground"> · +{step.concepts.length - 6} more</span>}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link
+                          href={chapterStepHref(course.id, chapterKey, i)}
+                          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+                        >
+                          {share > 0 || reading ? "Continue reading" : "Read this step"}
+                        </Link>
+                        <Link
+                          href={`${chapterStepHref(course.id, chapterKey, i)}#check`}
+                          className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-muted-foreground/50"
+                        >
+                          Check understanding
+                        </Link>
+                        {share > 0 && <span className="text-meta tabular-nums text-muted-foreground">{share}% understood · done at {STEP_DONE}%</span>}
+                      </div>
+                    </div>
                   )}
                 </div>
-                {isCurrent && (
-                  <div className="mt-3 flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
-                    <div>
-                      <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-                        You will learn · {step.concepts.length}
-                      </p>
-                      <p className="text-sm leading-relaxed text-foreground/90">
-                        {step.concepts.slice(0, 6).map((c) => c.name).join(" · ")}
-                        {step.concepts.length > 6 && <span className="text-muted-foreground"> · +{step.concepts.length - 6} more</span>}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Link
-                        href={chapterStepHref(course.id, chapterKey, i)}
-                        className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
-                      >
-                        {share > 0 || reading ? "Continue reading" : "Read this step"}
-                      </Link>
-                      <Link
-                        href={`${chapterStepHref(course.id, chapterKey, i)}#check`}
-                        className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-muted-foreground/50"
-                      >
-                        Check understanding
-                      </Link>
-                      {share > 0 && <span className="text-meta tabular-nums text-muted-foreground">{share}% understood · done at {STEP_DONE}%</span>}
-                    </div>
-                  </div>
+              </li>
+            )
+          })}
+
+          {/* the destination: the exam card itself sits in the sticky column (lg) */}
+          <li className="relative flex items-center gap-4 pt-6">
+            <span
+              aria-hidden
+              className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 text-sm"
+              style={{ borderColor: color, color }}
+            >
+              ★
+            </span>
+            <span className="font-semibold">Chapter exam</span>
+            <span className="text-meta text-muted-foreground">
+              {rec?.passed ? `passed · ${rec.best}%` : hasExam ? `pass ${PASS_MARK}% to complete the chapter` : "none for this part"}
+            </span>
+          </li>
+        </ol>
+
+        {extras.length > 0 && (
+          <p className="text-meta text-muted-foreground">
+            Extras:{" "}
+            {extras.map((x, i) => (
+              <span key={x.id}>
+                {i > 0 && " · "}
+                <Link href={chapterHref(course.id, x.sectionKey!)} className="hover:text-foreground">
+                  {plainTitle(x)}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
+        </div>
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--fleet-header-h)+1.5rem)]">
+              <div
+                className="rounded-xl border-2 bg-card p-5"
+                style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : color }}
+              >
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam</p>
+                {hasExam ? (
+                  <>
+                    <p className="mt-1 font-serif text-xl font-semibold">
+                      {rec?.passed ? `Passed · ${rec.best}%` : done === steps.length && steps.length > 0 ? "You're ready" : `Pass ${PASS_MARK}% to complete the chapter`}
+                    </p>
+                    <p className="mt-1 text-meta text-muted-foreground">
+                      {done} of {steps.length} steps understood
+                      {rec && !rec.passed ? ` · last try ${rec.last}%` : ""} · every retake has new questions
+                    </p>
+                    <button
+                      type="button"
+                      className={cn(
+                        "mt-4 rounded-lg px-4 py-2.5 text-sm font-semibold",
+                        rec?.passed || done < steps.length ? "border border-border" : "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
+                    </button>
+                    <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
+                  </>
+                ) : (
+                  <p className="mt-1 font-semibold text-muted-foreground">No exam for this part of the book</p>
                 )}
               </div>
-            </li>
-          )
-        })}
-
-        {/* the destination */}
-        <li className="relative flex gap-4 pt-6">
-          <span
-            aria-hidden
-            className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 text-sm"
-            style={{ borderColor: color, color }}
-          >
-            ★
-          </span>
-          <div
-            className="min-w-0 flex-1 rounded-xl border-2 bg-card p-5"
-            style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : color }}
-          >
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam</p>
-            {hasExam ? (
-              <>
-                <p className="mt-1 font-serif text-xl font-semibold">
-                  {rec?.passed ? `Passed · ${rec.best}%` : done === steps.length && steps.length > 0 ? "You're ready" : `Pass ${PASS_MARK}% to complete the chapter`}
-                </p>
-                <p className="mt-1 text-meta text-muted-foreground">
-                  {done} of {steps.length} steps understood
-                  {rec && !rec.passed ? ` · last try ${rec.last}%` : ""} · every retake has new questions
-                </p>
-                <button
-                  type="button"
-                  className={cn(
-                    "mt-4 rounded-lg px-4 py-2.5 text-sm font-semibold",
-                    rec?.passed || done < steps.length ? "border border-border" : "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {rec?.passed ? "Retake for practice" : rec ? "Retake exam" : "Take chapter exam"}
-                </button>
-                <DemoControls label="result" onScore={(score) => exams.sitChapter(chapterKey, score)} />
-              </>
-            ) : (
-              <p className="mt-1 font-semibold text-muted-foreground">No exam for this part of the book</p>
-            )}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg border border-border bg-card px-2 py-3">
+              <div className="font-serif text-2xl font-semibold tabular-nums">{done}/{steps.length}</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">steps</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card px-2 py-3">
+              <div className="font-serif text-2xl font-semibold tabular-nums">{steps.reduce((a, x) => a + x.concepts.length, 0)}</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">concepts</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card px-2 py-3">
+              <div className="font-serif text-2xl font-semibold tabular-nums">{Array.from(due.values()).reduce((a, b) => a + b, 0)}</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">to review</div>
+            </div>
           </div>
-        </li>
-      </ol>
-
-      {extras.length > 0 && (
-        <p className="text-meta text-muted-foreground">
-          Extras:{" "}
-          {extras.map((x, i) => (
-            <span key={x.id}>
-              {i > 0 && " · "}
-              <Link href={chapterHref(course.id, x.sectionKey!)} className="hover:text-foreground">
-                {plainTitle(x)}
-              </Link>
-            </span>
-          ))}
-        </p>
-      )}
+        </aside>
+      </div>
     </div>
   )
 }
