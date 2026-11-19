@@ -355,7 +355,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
         </div>
         <div
           className="relative flex flex-col gap-1.5 rounded-[14px] border bg-card p-[18px]"
-          style={{ borderColor: rec?.passed ? "var(--status-mastered)" : undefined }}
+          style={{ borderColor: rec?.passed ? "hsl(var(--status-mastered))" : undefined }}
         >
           <span className="text-xs uppercase tracking-widest text-muted-foreground">Chapter exam</span>
           {hasExam ? (
