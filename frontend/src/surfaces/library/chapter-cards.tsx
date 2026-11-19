@@ -3,8 +3,9 @@
 /** TRIAL (v0.31.4): the course Overview as chapter cards, from the "Overview D · Cards only"
  *  and "Chapter dashboard" boards on the LearnHub design canvas (2026-11-12).
  *
- *  - ChapterCards: nothing but one card per top-level chapter, each with its number, title,
- *    studied share and a red badge for what is due in it (phone-app style).
+ *  - ChapterCards: Progress, then one card per top-level chapter (number, title, studied
+ *    share, a red phone-app badge for what is due in it), then Study activity. The human
+ *    asked for Progress and activity back on 2026-11-19 after trying the cards-only page.
  *  - ChapterDashboard: one chapter's own page — Read / Review / Practice, then its sections.
  *
  *  Due counts come from ONE whole-course review queue, bucketed by chapter through the tree,
@@ -12,6 +13,7 @@
  *  route beside the current Overview so the two can be compared. */
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useMemo } from "react"
 import { displaySectionTitle, numberSections, type LearnTreeNode } from "@/gateways/api/outline"
 import type { SectionMemory } from "@/gateways/api/progress"
@@ -19,8 +21,11 @@ import { fetchCourseReviewQueue } from "@/gateways/api/review"
 import { qk, useApi } from "@/kit/data"
 import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
+import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
+import { StudyHeatmap } from "@/surfaces/library/study-heatmap"
 import type { CourseData } from "@/surfaces/library/use-course-data"
+import { useCourseHome } from "@/surfaces/library/use-course-home"
 
 const COURSE_LIMIT = 200
 
@@ -98,10 +103,18 @@ export function ChapterCards({ data }: { data: CourseData }) {
   const { chapters, numbers } = useChapters(data.tree)
   const due = useDueByChapter(course.learnDocId, chapters)
   const by = data.mastery?.bySection ?? {}
+  const home = useCourseHome(course, data)
+  const router = useRouter()
+  // A chapter square in the Progress strip opens that chapter's dashboard, like its card.
+  const openChapter = (scope: string) => {
+    const ch = chapters.find((c) => contains(c, scope))
+    router.push(chaptersHref(course.id, ch?.sectionKey ?? undefined))
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <TrialNote courseId={course.id} />
+      {data.isLive && <CourseStats data={data} home={home} onOpenSection={openChapter} />}
       {data.loading && chapters.length === 0 ? (
         <p className="text-muted-foreground">Loading chapters…</p>
       ) : (
@@ -135,6 +148,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
           })}
         </div>
       )}
+      {data.isLive && <StudyHeatmap doc={course.learnDocId} />}
     </div>
   )
 }
