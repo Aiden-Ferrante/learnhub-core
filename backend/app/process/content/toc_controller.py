@@ -48,6 +48,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.process.content.outline import (
+    _parse_outline_number,
     assign_blocks_by_number,
     assign_blocks_to_outline,
     build_outline_from_bookmarks,
@@ -79,6 +80,10 @@ _SIGNAL_BARE_NUMBER = re.compile(r"^\d+(?:\.\d+)*\s*[.:)]?$")
 # books) are legitimate.
 SIGNAL_FLAT_SUSPECT_MIN_ENTRIES = 30
 
+# DOTTED_TOPS: sections numbered "2.3" sitting at the top level. A section's number names
+# its parent; at depth 0 the parent is missing (Python Essentials 1, 2026-11-19).
+SIGNAL_DOTTED_TOPS_MIN = 3
+
 QUALITY_CLEAN = "clean"
 QUALITY_MESSY = "messy"
 QUALITY_ABSENT = "absent"
@@ -105,6 +110,13 @@ def assess_bookmarks(raw: list[dict], page_count: int) -> tuple[str, list[str]]:
     junk = sum(1 for t in titles if not t or _SIGNAL_JUNK_TITLE.search(t) or _SIGNAL_BARE_NUMBER.match(t))
     if junk / len(titles) > SIGNAL_MAX_JUNK_TITLE_FRAC:
         reasons.append(f"junk-titles: {junk}/{len(titles)} titles are noise")
+
+    dotted = sum(
+        1 for e in raw
+        if int(e.get("level") or 1) <= 1 and "." in (_parse_outline_number(str(e.get("title") or ""))[0] or "")
+    )
+    if dotted >= SIGNAL_DOTTED_TOPS_MIN:
+        reasons.append(f"dotted-tops: {dotted} top-level entries numbered N.M (nesting lost?)")
 
     if len(raw) >= SIGNAL_FLAT_SUSPECT_MIN_ENTRIES and all(int(e.get("level") or 1) <= 1 for e in raw):
         reasons.append(f"depth-distribution: {len(raw)} entries, all level 1 (nesting lost?)")
@@ -169,9 +181,9 @@ _FRONT_BACK_EXACT = {
     "about the author", "about the authors", "acknowledgments", "acknowledgements",
     "notation", "list of figures", "list of tables", "revision history",
     "preface", "foreword", "epilogue", "contributors", "other books you may enjoy",
-    "bibliography", "glossary", "references",
+    "bibliography", "glossary", "references", "about the cover illustration",
 }
-_FRONT_BACK_PREFIX = ("praise for", "revision history for", "about the author")
+_FRONT_BACK_PREFIX = ("praise for", "revision history for", "about the author", "preface ")
 _TOC_NUMERIC_KEY = re.compile(r"^toc:\d+(?:\.\d+)*$")
 
 
@@ -224,6 +236,84 @@ def demote_part_containers(entries: list[dict]) -> tuple[list[dict], dict[str, s
     return out, hidden, log
 
 
+# stage: nest — repair an outline whose nesting was lost. Two shapes, both seen on prod:
+#   * a container ("Module 1: …", "Chapter 3", or a chapter numbered 3) followed by
+#     top-level siblings numbered 3.1, 3.2 … — the siblings (and their subtrees) move under
+#     it, and the container takes the number if it had none (Python Essentials 1);
+#   * a childless end-of-chapter section ("Exercises") at the top, straight after a
+#     numbered chapter — it becomes that chapter's last child (Mathematics for ML).
+# Section keys never change here: node ids are doc_id::section_key, and concepts, cards
+# and reading positions hang off them.
+_CONTAINER_TITLE_RE = re.compile(
+    r"^\s*(?:module|part|unit|chapter|week|lesson|book)\s+(\d+)\b", re.IGNORECASE
+)
+_TRAILING_TITLES = {
+    "exercises", "problems", "summary", "chapter summary", "further reading",
+    "questions", "review questions", "key terms", "problem set",
+}
+
+
+def _container_number(e: dict) -> str | None:
+    nk = e.get("numberKey")
+    if nk and nk.isdigit():
+        return nk
+    m = _CONTAINER_TITLE_RE.match(e.get("title") or "")
+    return m.group(1) if m else None
+
+
+def nest_flat_sections(entries: list[dict]) -> tuple[list[dict], str | None]:
+    """(entries', log line). Returns the SAME list object when nothing needed nesting."""
+    out = [dict(e) for e in entries]
+    adopted = containers = trailing = 0
+    i = 0
+    while i < len(out):
+        e = out[i]
+        n = _container_number(e) if int(e.get("listDepth") or 0) == 0 else None
+        if not n:
+            i += 1
+            continue
+        took = False
+        in_adopted = False
+        j = i + 1
+        while j < len(out):
+            f = out[j]
+            d = int(f.get("listDepth") or 0)
+            if d > 0:
+                if in_adopted:
+                    f["listDepth"] = d + 1
+            elif (f.get("numberKey") or "").startswith(f"{n}."):
+                f["listDepth"] = 1
+                in_adopted = took = True
+                adopted += 1
+            else:
+                break
+            j += 1
+        if took:
+            containers += 1
+            if not e.get("numberKey"):
+                e["numberKey"] = n
+        i = j
+
+    last_top: dict | None = None
+    for k, e in enumerate(out):
+        if int(e.get("listDepth") or 0) != 0:
+            continue
+        childless = k + 1 >= len(out) or int(out[k + 1].get("listDepth") or 0) == 0
+        title = re.sub(r"\s+", " ", e.get("title") or "").strip().lower()
+        if childless and title in _TRAILING_TITLES and last_top and last_top.get("numberKey"):
+            e["listDepth"] = 1
+            trailing += 1
+            continue
+        last_top = e
+
+    if not (adopted or trailing):
+        return entries, None
+    return out, (
+        f"nest: {adopted} sections under {containers} containers; "
+        f"{trailing} end-of-chapter sections under their chapter"
+    )
+
+
 def curate_outline(entries: list[dict], pre_hidden: set[str] | None = None) -> dict[str, str]:
     """sectionKey -> hide reason, over the flat canonical entries.
 
@@ -257,8 +347,14 @@ def curate_outline(entries: list[dict], pre_hidden: set[str] | None = None) -> d
     # Orphan-part pass over the tops that SURVIVE the front/back pass, preserving the
     # original adjacency semantics ("immediately followed by a chaptered sibling").
     visible_tops = [(i, e, ch) for (i, e, ch) in tops if e["sectionKey"] not in hidden]
+    # Only two things are ever an orphan: a Part/Unit-titled container that lost its
+    # chapters, and the book's own title entry (the first top, childless). Anything else
+    # childless at the top is content — an appendix, a module whose sections were
+    # bookmarked flat — and hiding it hides study material (v0.31.3).
     for pos, (idx, e, has_children) in enumerate(visible_tops):
         if has_children or _TOC_NUMERIC_KEY.match(e.get("sectionKey") or ""):
+            continue
+        if not (_PART_TITLE_RE.match(e.get("title") or "") or pos == 0):
             continue
         if pos + 1 < len(visible_tops) and visible_tops[pos + 1][2]:
             hidden[e["sectionKey"]] = HIDE_ORPHAN_PART
@@ -334,6 +430,10 @@ def resolve_toc(
     if part_log:
         decisions.append(part_log)
 
+    canonical, nest_log = nest_flat_sections(canonical)
+    if nest_log:
+        decisions.append(nest_log)
+
     # stage: reconcile — map blocks onto the canonical outline; on total failure,
     # fall back to page-matching the outline onto the blocks (reverse direction).
     # An outline derived FROM the heading numbering is reconciled BY that numbering — the
@@ -357,6 +457,9 @@ def resolve_toc(
     entries, np_hidden, np_log = demote_part_containers(entries)
     if np_log:
         decisions.append(np_log)
+    entries, nest_log = nest_flat_sections(entries)
+    if nest_log:
+        decisions.append(nest_log)
     route = derived_route or ROUTE_PAGEMATCHED
     decisions.append(
         "reconcile: 0 blocks matched — outline page-matched onto block keys "

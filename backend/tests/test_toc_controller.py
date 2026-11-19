@@ -506,3 +506,94 @@ def test_resolve_with_parts_promotes_chapters_and_logs_stage():
     assert "parts: demoted 2 container(s)" in log
     # curate must not double-report the demoted containers as orphan parts
     assert HIDE_ORPHAN_PART not in res.hidden.values()
+
+
+# --------------------------------------------------------------------------- #
+# stage: nest — flat outlines regrouped (v0.31.3, shapes taken from prod books)
+# --------------------------------------------------------------------------- #
+
+from app.process.content.toc_controller import (  # noqa: E402
+    assess_bookmarks,
+    nest_flat_sections,
+)
+
+
+def _pe1_flat():
+    """Python Essentials 1 as it was stored: Modules beside their N.x sections."""
+    return [
+        _o("toc:welcome", 0, "Welcome to Python Essentials 1"),
+        _o("toc:welcome-a", 1, "Learn Python"),
+        _o("toc:module-1", 0, "Module 1: Introduction to Python and Computer Programming"),
+        _o("toc:1.1", 0, "Introduction to programming", "1.1"),
+        _o("toc:1.2", 0, "Introduction to Python", "1.2"),
+        _o("toc:1.2-a", 1, "Python goes mainstream"),
+        _o("toc:module-2", 0, "Module 2: Python Data Types"),
+        _o("toc:2.1", 0, "The Hello, World! Program", "2.1"),
+        _o("toc:appendix-a", 0, "Appendix A: LAB Hints"),
+    ]
+
+
+def test_nest_puts_sections_under_their_module():
+    entries, log = nest_flat_sections(_pe1_flat())
+    d = {e["sectionKey"]: e["listDepth"] for e in entries}
+    assert d == {
+        "toc:welcome": 0, "toc:welcome-a": 1,
+        "toc:module-1": 0, "toc:1.1": 1, "toc:1.2": 1, "toc:1.2-a": 2,
+        "toc:module-2": 0, "toc:2.1": 1,
+        "toc:appendix-a": 0,
+    }
+    nums = {e["sectionKey"]: e["numberKey"] for e in entries}
+    assert nums["toc:module-1"] == "1" and nums["toc:module-2"] == "2"
+    assert [e["sectionKey"] for e in entries] == [e["sectionKey"] for e in _pe1_flat()]
+    assert log == "nest: 3 sections under 2 containers; 0 end-of-chapter sections under their chapter"
+
+
+def test_nest_then_curate_hides_no_module():
+    entries, _ = nest_flat_sections(_pe1_flat())
+    assert curate_outline(entries) == {}
+
+
+def test_nest_moves_exercises_under_the_chapter_before():
+    entries, log = nest_flat_sections([
+        _o("toc:2", 0, "Linear Algebra", "2"),
+        _o("toc:2.1", 1, "Systems of Linear Equations", "2.1"),
+        _o("toc:exercises", 0, "Exercises"),
+        _o("toc:3", 0, "Analytic Geometry", "3"),
+        _o("toc:3.1", 1, "Norms", "3.1"),
+    ])
+    assert [e["listDepth"] for e in entries] == [0, 1, 1, 0, 1]
+    assert "1 end-of-chapter" in log
+
+
+def test_nest_leaves_a_well_nested_book_alone():
+    outline = [
+        _o("toc:1", 0, "Intro", "1"), _o("toc:1.1", 1, "A", "1.1"),
+        _o("toc:2", 0, "Next", "2"), _o("toc:2.1", 1, "B", "2.1"),
+    ]
+    entries, log = nest_flat_sections(outline)
+    assert entries is outline and log is None
+
+
+def test_curate_keeps_appendix_and_hides_book_title_and_prefaces():
+    hidden = curate_outline([
+        _o("toc:book", 0, "Deep Learning with PyTorch"),
+        _o("toc:preface-for-students", 0, "Preface for Students"),
+        _o("toc:cover", 0, "about the cover illustration"),
+        _o("toc:1", 0, "Core PyTorch", "1"),
+        _o("toc:1.1", 1, "Intro", "1.1"),
+        _o("toc:appendix-a", 0, "Appendix A. ER Diagram"),
+        _o("toc:appendix-b", 0, "Appendix B. MySQL Extensions"),
+        _o("toc:appendix-b-1", 1, "Extensions"),
+    ])
+    assert hidden == {
+        "toc:book": HIDE_ORPHAN_PART,
+        "toc:preface-for-students": HIDE_FRONT_BACK,
+        "toc:cover": HIDE_FRONT_BACK,
+    }
+
+
+def test_assess_names_dotted_tops():
+    raw = [{"level": 1, "title": t, "page": i + 1} for i, t in enumerate(
+        ["Module 1: Intro", "1.1 Programming", "1.2 Python", "1.3 Install", "Module 2: Types"])]
+    quality, why = assess_bookmarks(raw, 10)
+    assert quality == "messy" and any(w.startswith("dotted-tops: 3") for w in why)
