@@ -27,6 +27,42 @@ const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; 
   empty: { label: "Not processed", status: "neutral" },
 }
 
+/** The cover: page 1 of the book's PDF, or (no PDF) a tile in the course colour with the
+ *  title set to fit. Fills its parent, which sets the size and frame. */
+export function CourseCover({ course, small }: { course: Course; small?: boolean }) {
+  const color = coverColor(course.title)
+  const [failed, setFailed] = useState(false)
+  if (course.status === "ready" && course.learnDocId && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- a same-origin proxy, sized by CSS
+      <img
+        src={`/api/learn/cover?doc=${encodeURIComponent(course.learnDocId)}`}
+        alt=""
+        loading="lazy"
+        draggable={false}
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover object-top"
+      />
+    )
+  }
+  return (
+    <div
+      className={cn("flex h-full flex-col justify-between", small ? "p-1.5" : "p-3")}
+      style={{ background: `linear-gradient(160deg, ${color}66, ${color}22 75%)` }}
+    >
+      <span aria-hidden className="text-micro font-semibold tracking-label" style={{ color }}>
+        {coverMonogram(course.title)}
+      </span>
+      {!small && (
+        <span aria-hidden className="line-clamp-5 hyphens-auto font-serif text-[0.82rem] font-semibold leading-snug text-foreground/90" lang="en">
+          {course.title}
+        </span>
+      )}
+      <span aria-hidden className="h-0.5 w-8 rounded-full" style={{ background: color }} />
+    </div>
+  )
+}
+
 /** One course on the shelf: a framed card with the book cover at about 70% of the card (v0.31.2). The title is a stretched link to the course home, so the whole
  *  card opens it; the menu and the reading button sit above that link. */
 export function CourseCard({
@@ -43,8 +79,11 @@ export function CourseCard({
   onDragStart,
   onDragEnd,
   dragging,
+  subtitle,
 }: {
   course: Course
+  /** A second line that tells apart two courses with the same title. */
+  subtitle?: string
   /** The course's whole-book summary; undefined while loading, null when it has none. */
   mastery: SectionMemory | null | undefined
   dueNow: number
@@ -65,8 +104,6 @@ export function CourseCard({
   const ready = course.status === "ready"
   const color = coverColor(course.title)
   const studied = mastery && mastery.total > 0 ? Math.round(mastery.coverage * 100) : null
-  const [coverFailed, setCoverFailed] = useState(false)
-  const showCover = ready && !!course.learnDocId && !coverFailed
   return (
     <article
       draggable={Boolean(onDragStart)}
@@ -81,28 +118,8 @@ export function CourseCard({
         dragging && "opacity-40",
       )}
     >
-      {/* The cover: page 1 of the book's PDF, or (no PDF) a quiet tile in the course colour. */}
       <div className="relative mx-auto aspect-[3/4] w-[76%] overflow-hidden rounded-md border border-border bg-background shadow-sm">
-        {showCover ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a same-origin proxy, sized by CSS
-          <img
-            src={`/api/learn/cover?doc=${encodeURIComponent(course.learnDocId as string)}`}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            onError={() => setCoverFailed(true)}
-            className="h-full w-full object-cover object-top"
-          />
-        ) : (
-          <div className="flex h-full flex-col justify-between p-3" style={{ background: `${color}1f` }}>
-            <span aria-hidden className="text-micro font-semibold tracking-label" style={{ color }}>
-              {coverMonogram(course.title)}
-            </span>
-            <span aria-hidden className="line-clamp-4 font-serif text-[1.05rem] font-semibold leading-snug text-foreground/90">
-              {course.title}
-            </span>
-          </div>
-        )}
+        <CourseCover course={course} />
         {dueNow > 0 && (
           <span className="absolute right-2 top-2 rounded-full bg-status-due px-2 py-px text-micro font-semibold tabular-nums text-background shadow">
             {dueNow} due
@@ -131,14 +148,15 @@ export function CourseCard({
       <div className="flex items-start gap-1">
         <span aria-hidden className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1 pl-1">
-          <h3 className="line-clamp-2 text-meta font-medium leading-snug">
+          <h3 className="line-clamp-3 text-meta font-medium leading-snug" title={course.title}>
             <Link href={`/courses/${course.id}`} draggable={false} className="after:absolute after:inset-0">
               {course.title}
             </Link>
           </h3>
+          {subtitle && <p className="line-clamp-2 text-micro text-muted-foreground" title={subtitle}>{subtitle}</p>}
           {ready ? (
             <p className="text-micro tabular-nums text-muted-foreground">
-              {studied != null ? `${studied}% studied` : mastery !== undefined ? "No concepts yet" : "\u00a0"}
+              {studied ? `${studied}% studied` : mastery !== undefined ? "Not started" : "\u00a0"}
             </p>
           ) : (
             <StatusPill status={badge.status} pulse={badge.pulse}>

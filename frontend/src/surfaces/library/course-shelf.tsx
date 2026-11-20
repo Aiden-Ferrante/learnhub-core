@@ -27,7 +27,7 @@ import { DeleteCourseDialog } from "@/surfaces/library/delete-course-dialog"
 import { GroupDialog, type GroupDialogState } from "@/surfaces/library/group-dialog"
 import { GroupPanel } from "@/surfaces/library/group-panel"
 import type { CourseDrag } from "@/surfaces/library/group-sidebar"
-import { TodayStrip } from "@/surfaces/library/up-next"
+import { InProgress, useInProgress } from "@/surfaces/library/in-progress"
 import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
 import { useReadingPositions, useShelfMastery, useStudyDebt } from "@/surfaces/library/use-library-queries"
@@ -125,6 +125,22 @@ export function CourseShelf() {
     return list
   }, [courses, selectedGroupId, groups.state, query])
 
+  // "In progress" first (2026-11-19 layout trial): only in All courses with no search, and
+  // those courses then leave the grid below so nothing shows twice.
+  const studiedOf = (c: Course) => {
+    const m = c.learnDocId ? shelfMastery.data?.overall[c.learnDocId] : undefined
+    return m && m.total > 0 ? Math.round(m.coverage * 100) : 0
+  }
+  const dueOf = (c: Course) => (c.learnDocId ? (dueByDoc.get(c.learnDocId) ?? 0) : 0)
+  const inProgress = useInProgress(courses, studiedOf, dueOf)
+  const showInProgress = !selectedGroupId && !query.trim()
+  const inProgressIds = new Set(inProgress.items.map((i) => i.course.id))
+  const gridCourses = showInProgress ? visibleCourses.filter((c) => !inProgressIds.has(c.id)) : visibleCourses
+  // Two courses with one title get their description as a second line.
+  const titleCount = new Map<string, number>()
+  for (const c of courses) titleCount.set(c.title.toLowerCase(), (titleCount.get(c.title.toLowerCase()) ?? 0) + 1)
+  const subtitleOf = (c: Course) => ((titleCount.get(c.title.toLowerCase()) ?? 0) > 1 ? c.description : undefined)
+
   const submitDialog = (name: string, parentId: string | null) => {
     if (dialog?.mode === "rename") {
       groups.update((s) => renameGroup(s, dialog.groupId, name))
@@ -165,8 +181,6 @@ export function CourseShelf() {
         }
       />
 
-      <TodayStrip />
-
       {courses.length === 0 ? (
         <FirstCourse />
       ) : (
@@ -192,6 +206,7 @@ export function CourseShelf() {
                 aria-label="Search courses"
               />
             )}
+            {showInProgress && <InProgress {...inProgress} />}
             {notice && (
               <p role="status" className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-meta">
                 <span className="min-w-0 flex-1 truncate">{notice.text}</span>
@@ -236,11 +251,17 @@ export function CourseShelf() {
             {visibleCourses.length === 0 && query.trim() && (
               <p className="text-body text-muted-foreground">No courses match “{query}”.</p>
             )}
+            {showInProgress && inProgress.items.length > 0 && (
+              <h2 className="-mb-1 mt-2 text-micro uppercase tracking-label text-muted-foreground">
+                On the shelf · {gridCourses.length}
+              </h2>
+            )}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-5 gap-y-6">
-              {visibleCourses.map((course) => (
+              {gridCourses.map((course) => (
                 <CourseCard
                   key={course.id}
                   course={course}
+                  subtitle={subtitleOf(course)}
                   mastery={course.learnDocId && shelfMastery.data ? (shelfMastery.data.overall[course.learnDocId] ?? null) : undefined}
                   dueNow={course.learnDocId ? (dueByDoc.get(course.learnDocId) ?? 0) : 0}
                   continueKey={positions.data?.[course.id] ?? null}
