@@ -2,8 +2,8 @@
 
 /** TRIAL (v0.31.5): read a chapter one step at a time, from the chapter path.
  *
- *  Human decisions 2026-11-19: laptop first; "Check understanding" closes each step and is
- *  optional, with Skip. Then, on A Philosophy of Software Design: bigger text, no concepts
+ *  Human decisions 2026-11-19: laptop first. (Its "Check understanding" left in v0.32.0:
+ *  review is the chapter hub's Review card, separate from reading, human 2026-11-21.) Then, on A Philosophy of Software Design: bigger text, no concepts
  *  panel ("I want to just read the material and have it be broken down").
  *
  *  A step is cut into short parts (~250 words, at headings or paragraph ends) shown one at a
@@ -19,7 +19,6 @@ import { qk, useApi } from "@/kit/data"
 import { useReadSteps } from "@/kit/lib/read-steps"
 import { cn } from "@/kit/lib/utils"
 import { MarkdownReader } from "@/surfaces/reading/markdown-reader"
-import { ReviewPanel } from "@/surfaces/studying"
 
 const SIZES = [
   { label: "A", className: "text-[20px]" },
@@ -156,10 +155,8 @@ export function StepReader({
   const step = steps[index]
   const key = step.node.sectionKey!
   const q = useApi(qk.guidedReading(docId, key), (signal) => fetchGuidedReading(docId, key, signal))
-  const conceptCount = q.data?.concepts?.length ?? 0
   const { markRead } = useReadSteps(docId)
   const [size, setSize] = useState(0)
-  const [check, setCheck] = useState<"offer" | "open" | "skipped">("offer")
   const [shown, setShown] = useState(1)
   const partRefs = useRef<(HTMLDivElement | null)[]>([])
 
@@ -175,16 +172,8 @@ export function StepReader({
   }, [])
   useEffect(() => {
     onOpen(key)
-    // "Check understanding" on the path links here with #check: the whole step, check open.
-    if (window.location.hash === "#check") {
-      setShown(Number.MAX_SAFE_INTEGER)
-      setCheck("open")
-      requestAnimationFrame(() => document.getElementById("check")?.scrollIntoView({ block: "start" }))
-    } else {
-      setShown(1)
-      setCheck("offer")
-      window.scrollTo({ top: 0 })
-    }
+    setShown(1)
+    window.scrollTo({ top: 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per step
   }, [key])
   useEffect(() => {
@@ -199,7 +188,6 @@ export function StepReader({
 
   const next = index + 1 < steps.length ? index + 1 : null
   const prev = index > 0 ? index - 1 : null
-  const offerCheck = check === "offer" && conceptCount > 0
 
   return (
     <div className="pb-24">
@@ -286,61 +274,20 @@ export function StepReader({
         )}
 
         {q.data && allShown && (
-          <section id="check" className="mt-16 scroll-mt-24 rounded-2xl border border-border bg-card p-6 font-sans text-base">
-            {check === "open" ? (
-              <>
-                <div className="mb-4 flex items-baseline justify-between gap-4">
-                  <h2 className="m-0 text-lg font-semibold">Check understanding</h2>
-                  <button
-                    type="button"
-                    onClick={() => setCheck("skipped")}
-                    className="text-meta text-muted-foreground hover:text-foreground"
-                  >
-                    Done
-                  </button>
-                </div>
-                <ReviewPanel scope={key} docId={docId} />
-              </>
-            ) : (
-              <>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">End of {step.label}</p>
-                <h2 className="mt-1 text-lg font-semibold">
-                  {offerCheck ? `Check your understanding · ${conceptCount} concepts` : "Section read"}
-                </h2>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {offerCheck && (
-                    <button
-                      type="button"
-                      onClick={() => setCheck("open")}
-                      className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
-                    >
-                      Check understanding
-                    </button>
-                  )}
-                  {next != null ? (
-                    <Link
-                      href={stepHref(next)}
-                      className={cn(
-                        "rounded-lg px-4 py-2.5 text-sm font-semibold",
-                        offerCheck ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground",
-                      )}
-                    >
-                      {offerCheck ? `Skip · next: ${steps[next].label} →` : `Next: ${steps[next].label} ${steps[next].title} →`}
-                    </Link>
-                  ) : (
-                    <Link
-                      href={pathHref}
-                      className={cn(
-                        "rounded-lg px-4 py-2.5 text-sm font-semibold",
-                        offerCheck ? "border border-border" : "bg-primary text-primary-foreground",
-                      )}
-                    >
-                      {offerCheck ? "Skip · back to the chapter" : "Back to the chapter exam"}
-                    </Link>
-                  )}
-                </div>
-              </>
-            )}
+          <section className="mt-16 rounded-2xl border border-border bg-card p-6 font-sans text-base">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">End of {step.label}</p>
+            <h2 className="mt-1 text-lg font-semibold">Section read</h2>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {next != null ? (
+                <Link href={stepHref(next)} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">
+                  {`Next: ${steps[next].label} ${steps[next].title} →`}
+                </Link>
+              ) : (
+                <Link href={pathHref} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">
+                  Back to the chapter
+                </Link>
+              )}
+            </div>
           </section>
         )}
 

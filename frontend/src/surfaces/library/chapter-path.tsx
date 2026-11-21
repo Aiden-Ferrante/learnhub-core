@@ -9,10 +9,10 @@
  *  into [steps] to make it easy to digest, and we want the reading to be guided and very clean.
  *  The reading is what leads to concept understanding which then leads to exams."
  *
- *  Steps are the chapter's reading sections, in order (2026-11-19: every section the reader
- *  reads is a step, concepts or not). A step with concepts is complete when understood
- *  (STEP_DONE of them studied), one without when read to the end. Exercises, solutions and
- *  notes are Extras. The exam closes the path and is always takeable; the path shows
+ *  Steps are the chapter's reading sections, in order. Since v0.32.0 this is the guided
+ *  READING path (human, 2026-11-21): a step is complete once read to the end; concepts and
+ *  review live on the Review card (chapter-review-card.tsx), never on the path. Exercises,
+ *  solutions and notes are Extras. The exam closes the path and is always takeable; the path shows
  *  readiness, it does not lock. */
 
 import Link from "next/link"
@@ -29,14 +29,14 @@ import {
   pct,
   plainTitle,
   useChapters,
-  useDueByChapter,
 } from "@/surfaces/library/chapter-cards"
+import { ReviewCard } from "@/surfaces/library/chapter-review-card"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams } from "@/surfaces/library/demo-exams"
 import { minutesOf, SectionDigest, useChapterDigest } from "@/surfaces/library/section-digest"
 import type { CourseData } from "@/surfaces/library/use-course-data"
+import { useChapterReview } from "@/surfaces/studying"
 
-const STEP_DONE = 80
 
 type Concept = { key?: string | null; name: string; kind?: string | null }
 
@@ -82,11 +82,12 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
     () => (chapter?.children ?? []).filter((s) => s.isSection && s.sectionKey),
     [chapter],
   )
-  const due = useDueByChapter(course.learnDocId, sections)
   const exams = useDemoExams(course.id)
   const { read } = useReadSteps(course.learnDocId ?? undefined)
   const by = data.mastery?.bySection ?? {}
   const digest = useChapterDigest(course.learnDocId, chapter)
+  const stepNodes = useMemo(() => (chapter ? chapterSteps(chapter) : []), [chapter])
+  const review = useChapterReview(course.learnDocId, chapter, stepNodes, read)
   // A step opens to its digest (in brief, concepts), never the reading; the current step
   // starts open. Reading is behind Read / "Start reading" only (human, 2026-11-19).
   const [opened, setOpened] = useState<Record<string, boolean>>({})
@@ -104,9 +105,9 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
 
   const steps = chapterSteps(chapter).map((node) => ({ node, concepts: conceptsOf(node) }))
   const extras = sections.filter((s) => EXTRA.test(plainTitle(s)))
-  const understood = (s: LearnTreeNode) => pct(by[s.sectionKey!]) >= STEP_DONE
-  const complete = (st: (typeof steps)[number]) =>
-    st.concepts.length > 0 ? understood(st.node) : read.has(st.node.sectionKey!)
+  // The guided reading path is about reading only (human, 2026-11-21): a section is complete
+  // once read to the end. Concepts are the Review card's business.
+  const complete = (st: (typeof steps)[number]) => read.has(st.node.sectionKey!)
   const done = steps.filter(complete).length
   // The current step: where you are reading, unless that step is complete; otherwise the
   // first step not yet complete.
@@ -184,13 +185,16 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             </Link>
           )}
         </div>
-        {/* Review: label only. The old card (due count, badge, link to the reader's review
-            drawer) was removed 2026-11-21 to be redesigned from scratch (human). */}
-        <div className={card}>
-          <div className="min-w-0 flex-1">
-            <span className={label}>Review</span>
-          </div>
-        </div>
+        <ReviewCard
+          className={card}
+          label={label}
+          review={review}
+          numbers={numbers}
+          steps={stepNodes}
+          learnHref={(key) => `${chaptersHref(course.id, chapterKey)}/learn?section=${encodeURIComponent(key)}`}
+          dueHref={`${chaptersHref(course.id, chapterKey)}/learn?due=1`}
+          anyRead={done > 0}
+        />
         <div
           id="exam"
           className={cn(card, "scroll-mt-28 border-2")}
@@ -240,9 +244,9 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
 
       <section className="flex flex-col gap-6">
         <div>
-          <h2 className="m-0 font-serif text-[22px] font-semibold">Your path</h2>
+          <h2 className="m-0 font-serif text-[22px] font-semibold">Guided reading path</h2>
           <p className="mt-1 text-meta text-muted-foreground">
-            Read each section, check your understanding, then take the exam. Open a section for its key concepts.
+            Read each section in order, then take the exam. Open a section for what it covers.
           </p>
         </div>
           <ol className="m-0 flex list-none flex-col p-0">
@@ -250,23 +254,11 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
               const s = step.node
               const isDone = complete(step)
               const isCurrent = current?.node === s
-              const n = due.get(s.sectionKey!) ?? 0
-              const share = pct(by[s.sectionKey!])
               const isOpen = opened[s.id] ?? isCurrent
               const num = stepLabel(numbers, s, i)
               const words = wordsOf(s)
-              const wasRead = read.has(s.sectionKey!)
-              const status = isDone
-                ? step.concepts.length > 0
-                  ? "Understood"
-                  : "Read"
-                : wasRead
-                  ? share > 0
-                    ? `Read · ${share}% understood`
-                    : "Read · check not taken"
-                  : share > 0
-                    ? `${share}% understood`
-                    : null
+              const wasRead = isDone
+              const status = isDone ? "Read" : null
               return (
                 <li key={s.id} className="relative flex gap-5 pb-4">
                   {/* the path line to the next stop, coloured once this step is complete */}
@@ -319,11 +311,6 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                       <span className="flex shrink-0 flex-col items-end gap-1 text-meta text-muted-foreground">
                         <span className="tabular-nums">{words > 0 ? `${minutesOf(words)} min read` : ""}</span>
                         {status && <span className={cn(isDone && "text-ink-ok")}>{status}</span>}
-                        {n > 0 && (
-                          <span className="rounded-full bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
-                            {n} to review
-                          </span>
-                        )}
                       </span>
                     </button>
                     {isOpen && (
@@ -339,14 +326,6 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                           >
                             {wasRead ? "Read again" : reading && isCurrent ? "Continue reading" : "Start reading"}
                           </Link>
-                          {step.concepts.length > 0 && (
-                            <Link
-                              href={`${chapterStepHref(course.id, chapterKey, i)}#check`}
-                              className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-muted-foreground/50"
-                            >
-                              Check understanding
-                            </Link>
-                          )}
                         </div>
                       </div>
                     )}
