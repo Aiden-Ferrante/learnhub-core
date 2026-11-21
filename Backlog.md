@@ -220,3 +220,5 @@ not add to it mid-build.
   Learn-mode review cycle if it replaces Check understanding.
 - **Trial appetite rule (retro):** a trial the human likes closes and re-plans; it does not grow in
   place.
+- **Key-point chips on the Learn reveal** (v0.32.0, cut at plan time 2026-11-21, human): 2–3 points
+  per concept generated from its book text, grounded, cached; criterion = the human reads them.
