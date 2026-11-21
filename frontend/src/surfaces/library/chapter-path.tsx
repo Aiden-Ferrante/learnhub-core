@@ -22,7 +22,6 @@ import { useReadSteps } from "@/kit/lib/read-steps"
 import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
 import {
-  Badge,
   Bar,
   chaptersHref,
   contains,
@@ -122,12 +121,9 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const totalWords = steps.reduce((a, s) => a + wordsOf(s.node), 0)
   const conceptCount = steps.reduce((a, x) => a + x.concepts.length, 0)
   const m = by[chapterKey]
-  const n = due.get(chapterKey) ?? Array.from(due.values()).reduce((a, b) => a + b, 0)
   const ready = done === steps.length && steps.length > 0
   const card = "relative flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm"
   const label = "block text-[10px] uppercase tracking-widest text-muted-foreground"
-  const action =
-    "shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-semibold hover:border-muted-foreground/50"
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,17 +184,12 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             </Link>
           )}
         </div>
+        {/* Review: label only. The old card (due count, badge, link to the reader's review
+            drawer) was removed 2026-11-21 to be redesigned from scratch (human). */}
         <div className={card}>
-          <Badge count={n} />
           <div className="min-w-0 flex-1">
             <span className={label}>Review</span>
-            <span className="block truncate font-semibold">
-              {n > 0 ? `${n} card${n === 1 ? "" : "s"} due` : "Nothing due in this chapter"}
-            </span>
           </div>
-          <Link href={chapterHref(course.id, chapterKey, { drawer: "review" })} className={action}>
-            {n > 0 ? "Review now" : "Open review"}
-          </Link>
         </div>
         <div
           id="exam"
