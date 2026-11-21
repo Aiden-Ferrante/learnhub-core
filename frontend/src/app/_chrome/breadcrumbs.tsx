@@ -13,6 +13,7 @@ import { fetchPack } from "@/gateways/api/packs"
 import { chaptersFromOutline, resolveChapterForScope } from "@/gateways/api/toc"
 import { qk } from "@/kit/data/query-keys"
 import { useApi } from "@/kit/data/use-api"
+import { usePrograms } from "@/surfaces/programs/use-programs"
 
 /** Fixed labels for course sub-routes (docs/ui-spec.md §2). `chapter` and `packs/[key]`
  *  get their titles from the outline and the pack. */
@@ -70,6 +71,7 @@ function CourseCrumbs() {
     enabled: Boolean(learnDocId && conceptKey),
   })
 
+  if (segments[0] === "programs" && segments[1]) return <ProgramCrumbs segments={segments} />
   if (!onCourse) return null
 
   const crumbs: Crumb[] = [{ label: "Library", href: "/courses" }]
@@ -109,6 +111,23 @@ function CourseCrumbs() {
     crumbs.push({ label: SUBPAGE_LABELS[sub] })
   }
 
+  return <CrumbTrail crumbs={crumbs} />
+}
+
+/** "Library › <program> [› <track>]" on program routes. */
+function ProgramCrumbs({ segments }: { segments: string[] }) {
+  const programs = usePrograms()
+  const pid = decodeURIComponent(segments[1])
+  const program = programs.state.programs.find((p) => p.id === pid)
+  const crumbs: Crumb[] = [{ label: "Library", href: "/courses" }, { label: program?.name ?? "Program", href: `/programs/${segments[1]}` }]
+  if (segments[2] === "tracks" && segments[3]) {
+    const track = program?.tracks.find((t) => t.id === decodeURIComponent(segments[3]))
+    crumbs.push({ label: track?.name ?? "Track" })
+  }
+  return <CrumbTrail crumbs={crumbs} />
+}
+
+function CrumbTrail({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
       {crumbs.map((c, i) => {

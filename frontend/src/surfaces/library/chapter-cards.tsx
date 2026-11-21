@@ -25,6 +25,7 @@ import { ChapterCardMenu, extractionLine, useChapterExtractions } from "@/surfac
 import { GroupHeader, GroupNameDialog } from "@/surfaces/library/chapter-group-ui"
 import { addGroup, layoutSections, moveChapter, moveGroup, removeGroup, renameGroup } from "@/surfaces/library/chapter-groups"
 import { useChapterGroups } from "@/surfaces/library/use-chapter-groups"
+import { CountsToward } from "@/surfaces/programs/counts-toward"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
@@ -254,6 +255,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <CountsToward courseId={course.id} />
       {data.isLive && (
         // Side by side on a laptop: less scrolling past empty width (v0.31.5).
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">

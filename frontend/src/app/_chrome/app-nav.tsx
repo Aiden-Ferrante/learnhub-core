@@ -45,8 +45,8 @@ export function AppNav() {
       <Link
         href="/courses"
         title="Library"
-        aria-current={isUnder(pathname, "/courses") ? "page" : undefined}
-        className={linkClass(isUnder(pathname, "/courses"))}
+        aria-current={(isUnder(pathname, "/courses") || isUnder(pathname, "/programs")) ? "page" : undefined}
+        className={linkClass((isUnder(pathname, "/courses") || isUnder(pathname, "/programs")))}
       >
         <Library className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">Library</span>

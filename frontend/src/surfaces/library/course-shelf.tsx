@@ -32,6 +32,7 @@ import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseGroups } from "@/surfaces/library/use-course-groups"
 import { useReadingPositions, useShelfMastery, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
+import { ProgramBanners } from "@/surfaces/programs/program-banners"
 
 function FirstCourse() {
   return (
@@ -181,6 +182,7 @@ export function CourseShelf() {
         }
       />
 
+      {courses.length > 0 && <ProgramBanners />}
       {courses.length === 0 ? (
         <FirstCourse />
       ) : (
