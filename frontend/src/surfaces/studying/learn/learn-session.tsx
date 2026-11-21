@@ -46,6 +46,7 @@ export function LearnSession({
   backLabel,
   bookHref,
   next,
+  groups,
 }: {
   docId: string
   mode: LearnMode
@@ -60,6 +61,8 @@ export function LearnSession({
   bookHref?: string
   /** Where the end screen sends you next. */
   next?: { href: string; label: string }
+  /** Rail groups (e.g. one per section, in book order). Absent → one flat list. */
+  groups?: { label: string; keys: string[] }[]
 }) {
   const byKey = new Map([...pool, ...concepts].map((c) => [c.key, c]))
   const [s, setS] = useState<Session>(() => startSession(concepts, [...pool, ...concepts], mode))
@@ -150,9 +153,7 @@ export function LearnSession({
         <main className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
           {done ? (
             <section className="flex flex-col items-start gap-4 pt-4">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-ok">
-                {mode === "due" ? "Review done" : `${title} learned`}
-              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-ok">Review done</span>
               <h1 className="m-0 font-serif text-[32px] font-semibold leading-tight">
                 {mastered} of {concepts.length} concept{concepts.length === 1 ? "" : "s"} mastered
               </h1>
@@ -337,16 +338,27 @@ export function LearnSession({
             <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-accent">{heading}</span>
             <span className="font-serif text-xl font-semibold leading-snug">{title}</span>
           </div>
-          <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-sm">
-            {rail.map((r) => (
-              <li key={r.c.key} className={cn("flex justify-between gap-3", r.now && "font-semibold")}>
-                <span className="min-w-0">{r.c.name}</span>
-                <span className={cn("shrink-0", r.now ? "text-foreground" : STAGE_INK[r.stage])}>
-                  {r.now ? "Now" : STAGE_LABEL[r.stage]}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex max-h-[52vh] flex-col gap-4 overflow-y-auto pr-1">
+            {(groups ?? [{ label: "", keys: rail.map((r) => r.c.key) }]).map((g) => {
+              const rows = g.keys.map((k) => rail.find((r) => r.c.key === k)).filter((r): r is (typeof rail)[number] => Boolean(r))
+              if (!rows.length) return null
+              return (
+                <div key={g.label || "all"} className="flex flex-col gap-2">
+                  {g.label && <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{g.label}</span>}
+                  <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
+                    {rows.map((r) => (
+                      <li key={r.c.key} className={cn("flex justify-between gap-3", r.now && "font-semibold")}>
+                        <span className="min-w-0">{r.c.name}</span>
+                        <span className={cn("shrink-0", r.now ? "text-foreground" : STAGE_INK[r.stage])}>
+                          {r.now ? "Now" : STAGE_LABEL[r.stage]}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
           <div className="flex gap-1" aria-label={`${mastered} of ${concepts.length} mastered`}>
             {rail.map((r) => (
               <span key={r.c.key} className="flex flex-1 gap-0.5">
@@ -356,7 +368,7 @@ export function LearnSession({
             ))}
           </div>
           <span className="text-xs text-muted-foreground">
-            {mode === "due" ? "Explain each one, then grade yourself." : "Pick the definition, then explain it yourself."}
+            {mode === "due" ? "Explain each one, then grade yourself." : "Pick the definition, then explain it yourself. Due ones come first."}
           </span>
           {bookHref && (
             <Link href={bookHref} className="text-meta text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">

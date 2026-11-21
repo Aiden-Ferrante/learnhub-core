@@ -86,8 +86,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
   const { read } = useReadSteps(course.learnDocId ?? undefined)
   const by = data.mastery?.bySection ?? {}
   const digest = useChapterDigest(course.learnDocId, chapter)
-  const stepNodes = useMemo(() => (chapter ? chapterSteps(chapter) : []), [chapter])
-  const review = useChapterReview(course.learnDocId, chapter, stepNodes, read)
+  const review = useChapterReview(course.learnDocId, chapter)
   // A step opens to its digest (in brief, concepts), never the reading; the current step
   // starts open. Reading is behind Read / "Start reading" only (human, 2026-11-19).
   const [opened, setOpened] = useState<Record<string, boolean>>({})
@@ -185,16 +184,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             </Link>
           )}
         </div>
-        <ReviewCard
-          className={card}
-          label={label}
-          review={review}
-          numbers={numbers}
-          steps={stepNodes}
-          learnHref={(key) => `${chaptersHref(course.id, chapterKey)}/learn?section=${encodeURIComponent(key)}`}
-          dueHref={`${chaptersHref(course.id, chapterKey)}/learn?due=1`}
-          anyRead={done > 0}
-        />
+        <ReviewCard className={card} label={label} review={review} href={`${chaptersHref(course.id, chapterKey)}/learn`} />
         <div
           id="exam"
           className={cn(card, "scroll-mt-28 border-2")}

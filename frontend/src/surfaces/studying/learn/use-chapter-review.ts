@@ -4,8 +4,7 @@
  *  queue split into due concepts and not-yet-learned concepts per section, plus the chapter's
  *  concept pool (wrong options for the pick step).
  *
- *  "Learned" = the concept has a review card (seeded by its first self-grade). A section is
- *  ready to learn once read (guided reading marks it) and still has unlearned concepts. */
+ *  "Learned" = the concept has a review card (seeded by its first self-grade). */
 
 import { useMemo } from "react"
 import { fetchDocumentConcepts } from "@/gateways/api/concepts"
@@ -26,21 +25,20 @@ export type ChapterReview = {
   error: string | null
   /** Concept cards due now in this chapter: what "Review now" serves, in that order. */
   due: LearnConcept[]
-  /** Unlearned concepts per reading section (keyed by the section's sectionKey). */
-  unlearned: Map<string, LearnConcept[]>
-  /** The first read section with unlearned concepts, in path order. */
-  nextLearn: { node: LearnTreeNode; concepts: LearnConcept[] } | null
   /** Concepts learned and scheduled for later. */
   later: number
   /** Every concept in the chapter with a definition: the source of wrong options. */
   pool: LearnConcept[]
+  /** The comprehensive chapter review (human, 2026-11-21: always available, the whole chapter):
+   *  due concepts first, then every other concept in book order. */
+  chapterSet: LearnConcept[]
+  /** Concepts never reviewed. */
+  newCount: number
 }
 
 export function useChapterReview(
   docId: string | undefined | null,
   chapter: LearnTreeNode | undefined,
-  sections: LearnTreeNode[],
-  read: Set<string>,
 ): ChapterReview {
   const scope = chapter?.sectionKey ?? ""
   const queue = useApi(
@@ -64,25 +62,22 @@ export function useChapterReview(
     })
     const due = cards.filter((c) => c.state !== "new").map(toConcept)
     const fresh = cards.filter((c) => c.state === "new").map(toConcept)
-    const unlearned = new Map<string, LearnConcept[]>()
-    for (const s of sections) {
-      const mine = fresh.filter((c) => within(s, c.sectionKey))
-      if (mine.length) unlearned.set(s.sectionKey!, mine)
-    }
-    const first = sections.find((s) => read.has(s.sectionKey!) && unlearned.has(s.sectionKey!))
     const pool = chapter
       ? (concepts.data?.concepts ?? [])
           .filter((c) => c.conceptKey && c.signal && within(chapter, c.sectionKey))
           .map((c) => ({ key: c.conceptKey!, name: c.name, kind: c.kind, signal: c.signal, source: c.source, sectionKey: c.sectionKey! }))
       : []
+    const dueKeys = new Set(due.map((c) => c.key))
+    const rest = pool.filter((c) => !dueKeys.has(c.key))
+    const inPool = new Set(pool.map((c) => c.key))
     return {
+      chapterSet: [...due, ...rest, ...fresh.filter((c) => !inPool.has(c.key) && !dueKeys.has(c.key))],
+      newCount: fresh.length,
       loading: queue.status === "loading" || concepts.status === "loading",
       error: queue.error?.message ?? null,
       due,
-      unlearned,
-      nextLearn: first ? { node: first, concepts: unlearned.get(first.sectionKey!)! } : null,
       later: queue.data?.counts.later ?? 0,
       pool,
     }
-  }, [queue.data, queue.status, queue.error, concepts.data, concepts.status, sections, read, chapter])
+  }, [queue.data, queue.status, queue.error, concepts.data, concepts.status, chapter])
 }
