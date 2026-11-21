@@ -7,6 +7,26 @@ commit.
 
 ## [Unreleased]
 
+## [0.31.5] — 2026-11-21 — Chapter path
+
+### Changed
+- **The chapter page is a path.** Under the Read / Review / Chapter exam row, "Your path" lists
+  every reading section as a step card (minutes, status) ending at the ★ chapter exam; a section
+  opens to its key concepts and an in-brief line, never the reading. `/path` redirects here.
+- **Steps are named by the book's section number** (2.1, 2.2 …), on the path, the Read card, the
+  step reader and the breadcrumbs.
+- **Library:** an In progress row first, the shelf below; wide pages use the laptop's width;
+  breadcrumbs reach the chapter and the step.
+- The chapter page's **Review card is its label only**, pending the Learn-mode redesign.
+
+### Added
+- **Step reader** (`/chapters/[key]/step/[n]`): one section at a time in ~250-word parts with
+  Continue, 20/22px serif, an optional Check understanding at the end.
+- **Library groups by drag and drop**, into, between and out of groups, with Undo.
+
+### Removed
+- The chapter rail on course routes; the reader's concepts panel and inline concept terms.
+
 ## [0.31.4] — 2026-11-19 — Chapter hubs
 
 ### Changed

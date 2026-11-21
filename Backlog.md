@@ -209,3 +209,14 @@ not add to it mid-build.
 - **`app_documents` cards resolve their own `learn_doc_id`**, so setting a version as main
   does not yet change what a shelf card opens. (ARCHITECTURE.md, book/course seam.)
 - **Cold study-debt (from v0.31.1).** After an API restart, `/api/study-debt` takes about 37 s on first read (2 ms warm), so the Library's Today strip says "Checking what is due…" that long. Warm it on startup, or make it cheaper.
+
+## Carried from v0.31.5 (2026-11-21)
+
+- **Read progress is browser-only** (`kit/lib/read-steps.ts`): a step marked read on one device is
+  unread on another. Store it server-side with the reading position.
+- **Old reader bugs, unfixed:** a deep link lands at the chapter top; margin notes overlap the text.
+  Matter only while "Whole chapter at once" keeps the old reader.
+- **Check understanding serves every concept in a step** (29 in CSE-5709 6.3). Superseded by the
+  Learn-mode review cycle if it replaces Check understanding.
+- **Trial appetite rule (retro):** a trial the human likes closes and re-plans; it does not grow in
+  place.
