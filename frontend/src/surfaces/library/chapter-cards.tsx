@@ -21,6 +21,7 @@ import type { SectionMemory } from "@/gateways/api/progress"
 import { fetchCourseReviewQueue } from "@/gateways/api/review"
 import { qk, useApi } from "@/kit/data"
 import { cn } from "@/kit/lib/utils"
+import { ChapterCardMenu, extractionLine, useChapterExtractions } from "@/surfaces/library/chapter-card-menu"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
@@ -192,6 +193,7 @@ export function ChapterCards({ data }: { data: CourseData }) {
   const exams = useDemoExams(course.id)
   const examChapters = chapters.filter((c) => numbers.get(c.id))
   const router = useRouter()
+  const extraction = useChapterExtractions(course.learnDocId)
   // A chapter square in the Progress strip opens that chapter's dashboard, like its card.
   const openChapter = (scope: string) => {
     const ch = chapters.find((c) => contains(c, scope))
@@ -222,11 +224,20 @@ export function ChapterCards({ data }: { data: CourseData }) {
             const num = numbers.get(c.id)
             const share = pct(by[c.sectionKey!])
             const n = due.get(c.sectionKey!) ?? 0
+            const job = extraction.job(c.sectionKey!)
+            const line = extractionLine(job)
+            const running = job?.status === "running" || job?.status === "queued"
             return (
+              // The menu sits beside the card's link, not inside it (no button inside a link).
+              <div key={c.id} className="relative transition hover:-translate-y-0.5">
+              <ChapterCardMenu
+                title={num ? `Chapter ${num} · ${plainTitle(c)}` : plainTitle(c)}
+                running={running}
+                onExtract={() => extraction.start.fire(c.sectionKey!)}
+              />
               <Link
-                key={c.id}
                 href={chaptersHref(course.id, c.sectionKey!)}
-                className="relative flex min-h-[180px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px] transition hover:-translate-y-0.5 hover:border-muted-foreground/50"
+                className="relative flex h-full min-h-[180px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px] hover:border-muted-foreground/50"
               >
                 <Badge count={n} />
                 <span
@@ -242,8 +253,10 @@ export function ChapterCards({ data }: { data: CourseData }) {
                   <span className="text-meta tabular-nums text-muted-foreground">{share}% studied</span>
                   <Bar value={share} color={color} />
                   {num ? <ExamLine rec={exams.chapters[c.sectionKey!]} /> : <span className="text-meta text-muted-foreground/60">No exam</span>}
+                  {line && <span className={cn("text-meta", job?.status === "error" ? "text-ink-danger" : "text-ink-accent")}>{line}</span>}
                 </span>
               </Link>
+              </div>
             )
           })}
         </div>

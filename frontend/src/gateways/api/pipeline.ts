@@ -197,3 +197,9 @@ export async function cancelChapterBuild(
   return parseJsonResponse<{ cancelled: boolean; cancelling?: boolean; reason?: string }>(res)
 }
 
+
+/** The course's whole processing ledger (every kind) — one request for every chapter card. */
+export async function fetchJobs(doc: string, signal?: AbortSignal): Promise<{ docId?: string; builds: ChapterBuildJob[]; error?: string }> {
+  const res = await fetch(`/api/learn/jobs?doc=${encodeURIComponent(doc)}`, { signal, cache: 'no-store' })
+  return parseJsonResponse<{ docId?: string; builds: ChapterBuildJob[] }>(res)
+}
