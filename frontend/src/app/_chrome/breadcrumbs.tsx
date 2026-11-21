@@ -97,6 +97,7 @@ function CourseCrumbs() {
     const chapter = chaptersFromOutline(outline.data?.outline ?? []).find((c) => c.key === hubKey)
     crumbs.push({ label: chapterLabel(chapter) || "Chapter", href: hubHref(hubKey) })
     if (segments[4] === "step") crumbs.push({ label: stepCrumb(outline.data?.outline ?? [], hubKey, Number(segments[5]) || 1) })
+    if (segments[4] === "learn") crumbs.push({ label: "Review" })
   } else if (sub === "packs" && packKey) {
     crumbs.push({ label: SUBPAGE_LABELS.packs, href: `/courses/${segments[1]}/packs` })
     crumbs.push({ label: pack.data?.title || "Pack" })
