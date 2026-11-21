@@ -34,6 +34,10 @@ export type ChapterReview = {
   chapterSet: LearnConcept[]
   /** Concepts never reviewed. */
   newCount: number
+  /** Every chapter concept in book order (the review page's master list). */
+  bookOrder: LearnConcept[]
+  /** due · new (never reviewed) · learned (has a card, not due). */
+  status: (key: string) => "due" | "new" | "learned"
 }
 
 export function useChapterReview(
@@ -62,16 +66,27 @@ export function useChapterReview(
     })
     const due = cards.filter((c) => c.state !== "new").map(toConcept)
     const fresh = cards.filter((c) => c.state === "new").map(toConcept)
+    // One entry per concept name: extraction can list the same concept twice under two keys.
+    const names = new Set<string>()
     const pool = chapter
       ? (concepts.data?.concepts ?? [])
           .filter((c) => c.conceptKey && c.signal && within(chapter, c.sectionKey))
+          .filter((c) => {
+            const n = c.name.trim().toLowerCase()
+            if (names.has(n)) return false
+            names.add(n)
+            return true
+          })
           .map((c) => ({ key: c.conceptKey!, name: c.name, kind: c.kind, signal: c.signal, source: c.source, sectionKey: c.sectionKey! }))
       : []
     const dueKeys = new Set(due.map((c) => c.key))
     const rest = pool.filter((c) => !dueKeys.has(c.key))
     const inPool = new Set(pool.map((c) => c.key))
+    const freshKeys = new Set(fresh.map((c) => c.key))
     return {
-      chapterSet: [...due, ...rest, ...fresh.filter((c) => !inPool.has(c.key) && !dueKeys.has(c.key))],
+      bookOrder: [...pool, ...[...due, ...fresh].filter((c) => !inPool.has(c.key) && !names.has(c.name.trim().toLowerCase()))],
+      status: (k: string) => (dueKeys.has(k) ? "due" : freshKeys.has(k) ? "new" : "learned"),
+      chapterSet: [...due, ...rest, ...fresh.filter((c) => !inPool.has(c.key) && !dueKeys.has(c.key) && !names.has(c.name.trim().toLowerCase()))],
       newCount: fresh.length,
       loading: queue.status === "loading" || concepts.status === "loading",
       error: queue.error?.message ?? null,

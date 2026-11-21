@@ -14,6 +14,7 @@ import { useCallback, useState } from "react"
 import { submitReviewGrade } from "@/gateways/api/review"
 import { GRADE_INVALIDATES, unwrap, useApiMutation } from "@/kit/data"
 import { cn } from "@/kit/lib/utils"
+import { ConceptMarkdown } from "@/surfaces/concepts"
 import { useStudyHotkeys } from "@/surfaces/studying/use-study-hotkeys"
 import {
   advance,
@@ -47,6 +48,7 @@ export function LearnSession({
   bookHref,
   next,
   groups,
+  endActions,
 }: {
   docId: string
   mode: LearnMode
@@ -63,6 +65,8 @@ export function LearnSession({
   next?: { href: string; label: string }
   /** Rail groups (e.g. one per section, in book order). Absent → one flat list. */
   groups?: { label: string; keys: string[] }[]
+  /** Buttons on the end screen in place of `next` (e.g. "Next block"). */
+  endActions?: { label: string; onClick: () => void; primary?: boolean }[]
 }) {
   const byKey = new Map([...pool, ...concepts].map((c) => [c.key, c]))
   const [s, setS] = useState<Session>(() => startSession(concepts, [...pool, ...concepts], mode))
@@ -70,6 +74,8 @@ export function LearnSession({
   const [typed, setTyped] = useState("")
   const [revealed, setRevealed] = useState(false)
   const [lastGrade, setLastGrade] = useState<SelfGrade | null>(null)
+  // Rail groups you opened or closed by hand; the current concept's group is open otherwise.
+  const [railOpen, setRailOpen] = useState<Record<string, boolean>>({})
 
   const grade = useApiMutation(
     (v: { key: string; g: 1 | 2 | 3 }) => unwrap(submitReviewGrade(v.key, v.g, docId)),
@@ -178,14 +184,29 @@ export function LearnSession({
                   : "They come back on the Review card when they're due, the shaky ones first."}
               </p>
               <div className="flex flex-wrap gap-3">
+                {endActions?.map((a) => (
+                  <button
+                    key={a.label}
+                    type="button"
+                    onClick={a.onClick}
+                    className={cn(
+                      "rounded-lg px-5 py-2.5 text-sm font-semibold",
+                      a.primary ? "bg-primary text-primary-foreground" : "border border-border hover:border-muted-foreground/50",
+                    )}
+                  >
+                    {a.label}
+                  </button>
+                ))}
                 {next && (
                   <Link href={next.href} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
                     {next.label}
                   </Link>
                 )}
-                <Link href={backHref} className="rounded-lg border border-border px-5 py-2.5 text-sm font-semibold hover:border-muted-foreground/50">
-                  Back to the chapter
-                </Link>
+                {!endActions && (
+                  <Link href={backHref} className="rounded-lg border border-border px-5 py-2.5 text-sm font-semibold hover:border-muted-foreground/50">
+                    Back to the chapter
+                  </Link>
+                )}
               </div>
             </section>
           ) : (
@@ -225,7 +246,7 @@ export function LearnSession({
                             >
                               {picked && isAns ? "✓" : picked && isPick ? "✕" : n + 1}
                             </span>
-                            <span>{o?.signal}</span>
+                            <ConceptMarkdown content={o?.signal ?? ""} className="min-w-0 [&_p]:leading-relaxed" />
                           </button>
                         )
                       })}
@@ -295,11 +316,12 @@ export function LearnSession({
                         </div>
                         <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3.5">
                           <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-accent">The definition</span>
-                          <p className="m-0 text-[15px] leading-relaxed">{c.signal}</p>
+                          <ConceptMarkdown content={c.signal} className="text-[15px] [&_p]:leading-relaxed" />
                           {c.source && (
-                            <p className="m-0 border-t border-border pt-2 font-serif text-base italic leading-relaxed text-muted-foreground">
-                              “{c.source}”
-                            </p>
+                            <ConceptMarkdown
+                              content={c.source}
+                              className="border-t border-border pt-2 font-serif text-base italic text-muted-foreground [&_p]:leading-relaxed"
+                            />
                           )}
                         </div>
                       </div>
@@ -342,19 +364,41 @@ export function LearnSession({
             {(groups ?? [{ label: "", keys: rail.map((r) => r.c.key) }]).map((g) => {
               const rows = g.keys.map((k) => rail.find((r) => r.c.key === k)).filter((r): r is (typeof rail)[number] => Boolean(r))
               if (!rows.length) return null
+              const id = g.label || "all"
+              const hasNow = rows.some((r) => r.now)
+              const isOpen = !g.label || (railOpen[id] ?? hasNow)
+              const m = rows.filter((r) => r.stage === 2).length
               return (
-                <div key={g.label || "all"} className="flex flex-col gap-2">
-                  {g.label && <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{g.label}</span>}
-                  <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
-                    {rows.map((r) => (
-                      <li key={r.c.key} className={cn("flex justify-between gap-3", r.now && "font-semibold")}>
-                        <span className="min-w-0">{r.c.name}</span>
-                        <span className={cn("shrink-0", r.now ? "text-foreground" : STAGE_INK[r.stage])}>
-                          {r.now ? "Now" : STAGE_LABEL[r.stage]}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                <div key={id} className="flex flex-col gap-2">
+                  {g.label && (
+                    <button
+                      type="button"
+                      onClick={() => setRailOpen((o) => ({ ...o, [id]: !isOpen }))}
+                      aria-expanded={isOpen}
+                      className={cn(
+                        "flex items-center gap-2 text-left text-[11px] font-semibold uppercase tracking-widest",
+                        hasNow ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      <span className={cn("inline-block transition-transform", isOpen && "rotate-90")}>›</span>
+                      <span className="min-w-0 flex-1 truncate">{g.label}</span>
+                      <span className="shrink-0 normal-case tracking-normal tabular-nums">
+                        {m}/{rows.length}
+                      </span>
+                    </button>
+                  )}
+                  {isOpen && (
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0 pl-4 text-sm">
+                      {rows.map((r) => (
+                        <li key={r.c.key} className={cn("flex justify-between gap-3", r.now && "font-semibold")}>
+                          <span className="min-w-0">{r.c.name}</span>
+                          <span className={cn("shrink-0", r.now ? "text-foreground" : STAGE_INK[r.stage])}>
+                            {r.now ? "Now" : STAGE_LABEL[r.stage]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )
             })}

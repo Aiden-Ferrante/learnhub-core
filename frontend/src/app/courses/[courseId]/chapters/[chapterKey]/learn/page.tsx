@@ -1,19 +1,29 @@
 "use client"
 
 /** /courses/[id]/chapters/[chapterKey]/learn — the chapter's Review (v0.32.0), entered from the
- *  hub's Review card only. Always available and comprehensive (human, 2026-11-21): every concept
- *  in the chapter, due ones first, then book order, in Learn mode. The concept list is a snapshot
- *  taken once the queue loads: grades refetch the queue and must not reshuffle a session. */
+ *  hub's Review card, always available (human, 2026-11-21).
+ *
+ *  Top page: the master list of the chapter's concepts as a tree by subchapter, a checkbox per
+ *  subchapter for what to pool from, and a block length of 10–25 minutes. A block runs in Learn
+ *  mode; its concept list is a snapshot so the grades' refetch cannot reshuffle it. After a
+ *  block: the next block (same choices, statuses refreshed) or back to the list. */
 
-import { use, useEffect, useMemo, useState } from "react"
+import { use, useMemo, useState } from "react"
 import { StudyPage } from "@/kit/study"
 import type { LearnTreeNode } from "@/gateways/api/outline"
 import { chaptersHref, chapterSteps, CourseFallback, plainTitle, stepLabel, useChapters, useCourseData } from "@/surfaces/library"
-import { LearnSession, useChapterReview, type LearnConcept } from "@/surfaces/studying"
-
-type Snapshot = { id: string; concepts: LearnConcept[]; pool: LearnConcept[] }
+import {
+  LearnSession,
+  pickBlock,
+  ReviewSetup,
+  useChapterReview,
+  type LearnConcept,
+  type ReviewGroup,
+} from "@/surfaces/studying"
 
 const within = (n: LearnTreeNode, key: string): boolean => n.sectionKey === key || n.children.some((c) => within(c, key))
+
+type Block = { n: number; concepts: LearnConcept[]; minutes: number; groupIds: string[] }
 
 export default function ChapterReviewPage({ params }: { params: Promise<{ courseId: string; chapterKey: string }> }) {
   const { courseId, chapterKey: raw } = use(params)
@@ -25,13 +35,21 @@ export default function ChapterReviewPage({ params }: { params: Promise<{ course
   const steps = useMemo(() => (chapter ? chapterSteps(chapter) : []), [chapter])
   const docId = data.course?.learnDocId ?? undefined
   const review = useChapterReview(docId, chapter)
+  const [block, setBlock] = useState<Block | null>(null)
 
-  const id = `${docId}:${chapterKey}`
-  const [snap, setSnap] = useState<Snapshot | null>(null)
-  useEffect(() => {
-    if (review.loading || (snap && snap.id === id)) return
-    setSnap({ id, concepts: review.chapterSet, pool: review.pool })
-  }, [review, id, snap])
+  // The master list: one group per reading section in book order, then chapter-level leftovers.
+  const groups: ReviewGroup[] = useMemo(() => {
+    const placed = new Set<string>()
+    const out = steps.map((s, i) => {
+      const concepts = review.bookOrder.filter((c) => within(s, c.sectionKey))
+      concepts.forEach((c) => placed.add(c.key))
+      return { id: s.sectionKey!, label: `${stepLabel(numbers, s, i)} ${plainTitle(s)}`, concepts }
+    })
+    const rest = review.bookOrder.filter((c) => !placed.has(c.key))
+    return [...out, ...(rest.length ? [{ id: "rest", label: "Also in this chapter", concepts: rest }] : [])].filter(
+      (g) => g.concepts.length > 0,
+    )
+  }, [steps, numbers, review.bookOrder])
 
   if (!data.course) {
     return (
@@ -42,27 +60,22 @@ export default function ChapterReviewPage({ params }: { params: Promise<{ course
   }
   const chapterNo = chapter ? numbers.get(chapter.id) : undefined
   const back = chaptersHref(courseId, chapterKey)
+  const title = chapter ? plainTitle(chapter) : "This chapter"
 
-  // Rail groups: one per reading section in book order, then anything left (chapter-level).
-  const groups = snap
-    ? (() => {
-        const placed = new Set<string>()
-        const out = steps.map((s, i) => {
-          const keys = snap.concepts.filter((c) => within(s, c.sectionKey)).map((c) => c.key)
-          keys.forEach((k) => placed.add(k))
-          return { label: `${stepLabel(numbers, s, i)} ${plainTitle(s)}`, keys }
-        })
-        const rest = snap.concepts.filter((c) => !placed.has(c.key)).map((c) => c.key)
-        return rest.length ? [...out, { label: "Also in this chapter", keys: rest }] : out
-      })()
-    : []
+  const start = (concepts: LearnConcept[], minutes: number, groupIds: string[], n = 1) =>
+    setBlock({ n, concepts, minutes, groupIds })
+  const nextBlock = () => {
+    if (!block) return
+    const chosen = groups.filter((g) => block.groupIds.includes(g.id))
+    start(pickBlock(chosen, review.status, block.minutes), block.minutes, block.groupIds, block.n + 1)
+  }
 
   let body: React.ReactNode
-  if (!snap || snap.id !== id) {
+  if (review.loading && !block) {
     body = <p className="text-muted-foreground">Loading…</p>
   } else if (review.error) {
     body = <p className="text-ink-danger">Couldn’t load this chapter’s concepts. {review.error}</p>
-  } else if (snap.concepts.length === 0) {
+  } else if (groups.length === 0) {
     body = (
       <p className="text-muted-foreground">
         This chapter has no concepts to review.{" "}
@@ -71,19 +84,34 @@ export default function ChapterReviewPage({ params }: { params: Promise<{ course
         </a>
       </p>
     )
+  } else if (!block) {
+    body = (
+      <ReviewSetup
+        storageKey={`lh-review-setup:${docId}:${chapterKey}`}
+        eyebrow={`Review · Chapter ${chapterNo ?? ""}`.trim()}
+        title={title}
+        groups={groups}
+        status={review.status}
+        onStart={start}
+      />
+    )
   } else {
     body = (
       <LearnSession
-        key={snap.id}
+        key={`${docId}:${chapterKey}:${block.n}`}
         docId={docId!}
         mode="learn"
-        concepts={snap.concepts}
-        pool={snap.pool}
-        heading={`Review · Chapter ${chapterNo ?? ""}`.trim()}
-        title={chapter ? plainTitle(chapter) : "This chapter"}
+        concepts={block.concepts}
+        pool={review.pool}
+        heading={`Block ${block.n} · ${block.minutes} min`}
+        title={title}
         backHref={back}
         backLabel={chapterNo ? `Chapter ${chapterNo}` : "Chapter"}
-        groups={groups}
+        groups={groups.map((g) => ({ label: g.label, keys: g.concepts.map((c) => c.key) }))}
+        endActions={[
+          { label: "Next block", onClick: nextBlock, primary: true },
+          { label: "Back to the concept list", onClick: () => setBlock(null) },
+        ]}
       />
     )
   }
