@@ -8,9 +8,22 @@ things land here and nothing else:
   happened not to do.
 - **ADR seeds** — a decision that wanted an ADR and didn't get one yet.
 - **Retro items** — "what carries forward" from a closed cycle.
+- **Waiting on the human** — questions only the human can answer. The LearnHub Home page lists
+  this section as its "Waiting on you" queue; remove an item once it is answered.
 
 An item here is not scheduled. The next light plan pulls from this file; it does
 not add to it mid-build.
+
+## Waiting on the human
+
+- **What is the next version?** v0.32.0 was earmarked for real chapter exams and became Learn mode; meaning search is the other candidate.
+- **Install pgvector?** It needs a migration on the live database. It starts meaning search and the concept graph's links.
+- **Play one Learn section end to end.** A self-grade landing in the review queue was not observed before v0.32.0 closed.
+- **Approve the docs classification table** before superseded `docs/` files are archived (~/Documents/reports/learnhub/classification).
+- **Write ADRs for the 49 decisions that have none, or let the Decision Timeline stand in for them?**
+- **Chapter Settings:** what should the dialog contain?
+- **Does a saved reading position count as "read"?**
+- **~/Desktop/code/_archive/learnhub** (the `upstream` remote) has 3 uncommitted changes: keep or drop them?
 
 ## Pruned
 
@@ -224,8 +237,6 @@ not add to it mid-build.
   per concept generated from its book text, grounded, cached; criterion = the human reads them.
 
 ## From v0.32.0 (2026-11-21)
-- Play a Learn section end to end and confirm the self-grade lands in the review queue (not observed before close).
 - Meaning search: pgvector in Postgres + an Ollama embedding model; replaces `search-model.ts` scoring. Needs a migration (human's OK).
 - "Where the books disagree" on the concept page: generated comparison, waits on meaning search.
-- Chapter Settings: contents undecided. Does a saved reading position count as "read"? Undecided.
 - Run `node frontend/scripts/check-hubs.mjs` per frontend rung (v0.32.0 shipped 14 deep imports until the restructure).
