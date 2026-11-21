@@ -222,3 +222,10 @@ not add to it mid-build.
   place.
 - **Key-point chips on the Learn reveal** (v0.32.0, cut at plan time 2026-11-21, human): 2–3 points
   per concept generated from its book text, grounded, cached; criterion = the human reads them.
+
+## From v0.32.0 (2026-11-21)
+- Play a Learn section end to end and confirm the self-grade lands in the review queue (not observed before close).
+- Meaning search: pgvector in Postgres + an Ollama embedding model; replaces `search-model.ts` scoring. Needs a migration (human's OK).
+- "Where the books disagree" on the concept page: generated comparison, waits on meaning search.
+- Chapter Settings: contents undecided. Does a saved reading position count as "read"? Undecided.
+- Run `node frontend/scripts/check-hubs.mjs` per frontend rung (v0.32.0 shipped 14 deep imports until the restructure).

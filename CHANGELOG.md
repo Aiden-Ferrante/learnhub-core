@@ -7,6 +7,37 @@ commit.
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-11-21 — Learn mode, programs, tags, search, four-part repo
+
+### Added
+- **Learn mode review.** The chapter hub's Review card is always open. It leads to a review page
+  showing the chapter's concepts as a tree by subchapter: tick which subchapters to pool, and pick
+  a 10 / 15 / 20 / 25-minute block. In a session you first pick the definition (wrong options come
+  from the same chapter), then explain the concept in your own sentences, compare with the book and
+  grade yourself. The first grade seeds or advances the spaced-repetition card.
+- **Chapter card ⋮ menu:** Extract concepts (with a confirm, and status on the card from one jobs
+  read) and Settings (empty for now).
+- **Chapter groups:** taken from the book's parts automatically, or made by hand (stored in
+  `chapterGroups`).
+- **Programs → tracks → courses**, each with its own page, plus a Library banner and a "Part of"
+  strip on the course page. Progress is concepts studied and courses done (≥ 90 %), not credits.
+- **Course tags.** Edit them from a card's ⋮ → Tags…; chips under the search filter with AND.
+- **Library search.** Results appear as you type: concepts with their status, passages and
+  courses. Also a results page `/search`, "One idea across your books" `/search/concept`, a review
+  of the concepts a search picked `/search/review`, and Ctrl/⌘K inside the reader. It matches by
+  words; Meaning search is shown as coming.
+
+### Changed
+- The chapter path is now the **Guided reading path**: a section is complete when read. The
+  "to review" tags, "% understood" and Check understanding have left it.
+- **Repo in four parts:** `frontend/`, `engine/` (was `backend/`), `postgres/` (init + migrations),
+  `models/` (ollama + claude-bridge). `deploy/compose/` only wires them together, and `MAP.md`
+  shows the four.
+- Library-wide `/api/search` matches carry `docId`.
+
+### Removed
+- Course groups and their sidebar (replaced by tags; `courseGroups` is left in settings, unread).
+
 ## [0.31.5] — 2026-11-21 — Chapter path
 
 ### Changed
