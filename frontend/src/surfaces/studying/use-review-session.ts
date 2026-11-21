@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import type { QueryKey } from "@tanstack/react-query"
 import { GRADE_INVALIDATES, qk, useApi, useApiMutation, unwrap } from "@/kit/data"
 import {
   fetchCourseReviewQueue,
@@ -29,17 +30,23 @@ type GradeVars = { conceptKey: string; grade: ReviewGrade; docId?: string }
 /** The review queue for a chapter/section scope, or the whole course (`scope="course"`),
  *  plus the grade mutation. A card advances only once its grade has landed; a failed
  *  grade leaves the card up with `grade.error` set, and `retryGrade` re-sends it. */
-export function useReviewSession(docId: string | undefined, scope: string, onAnswered?: () => void) {
+/** A hand-picked queue (library search's "Review these N concepts"): its own key and loader.
+ *  Its cards may come from several courses, so each grade goes to the card's own docId. */
+export type PresetQueue = { key: QueryKey; load: (signal: AbortSignal) => Promise<ReviewQueueResponse> }
+
+export function useReviewSession(docId: string | undefined, scope: string, onAnswered?: () => void, preset?: PresetQueue) {
   const course = scope === COURSE_SCOPE
   const q = useApi<ReviewQueueResponse>(
-    course ? qk.courseReview(docId ?? "") : qk.reviewQueue(docId, scope, CHAPTER_LIMIT),
+    preset ? preset.key : course ? qk.courseReview(docId ?? "") : qk.reviewQueue(docId, scope, CHAPTER_LIMIT),
     (signal) =>
-      unwrap(
-        course
-          ? fetchCourseReviewQueue(docId ?? "", COURSE_LIMIT, signal)
-          : fetchReviewQueue(docId, scope, CHAPTER_LIMIT, signal),
-      ),
-    { enabled: !course || Boolean(docId) },
+      preset
+        ? preset.load(signal)
+        : unwrap(
+            course
+              ? fetchCourseReviewQueue(docId ?? "", COURSE_LIMIT, signal)
+              : fetchReviewQueue(docId, scope, CHAPTER_LIMIT, signal),
+          ),
+    { enabled: Boolean(preset) || !course || Boolean(docId) },
   )
 
   const id = `${docId ?? ""}:${scope}`
@@ -81,7 +88,7 @@ export function useReviewSession(docId: string | undefined, scope: string, onAns
   const submit = useCallback(
     (g: ReviewGrade) => {
       if (!card || grade.pending) return
-      const v = { conceptKey: card.conceptKey, grade: g, docId }
+      const v = { conceptKey: card.conceptKey, grade: g, docId: card.docId ?? docId }
       setLastVars(v)
       grade.fire(v)
     },

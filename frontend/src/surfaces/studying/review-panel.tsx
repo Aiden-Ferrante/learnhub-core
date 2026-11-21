@@ -8,7 +8,7 @@ import { EmptyState } from "@/kit/patterns/empty-state"
 import type { ReviewGrade } from "@/gateways/api/review"
 import { GradeButtons } from "@/kit/study"
 import { ReviewCardFace } from "@/surfaces/studying/review-card"
-import { useReviewSession } from "@/surfaces/studying/use-review-session"
+import { useReviewSession, type PresetQueue } from "@/surfaces/studying/use-review-session"
 import { useStudyHotkeys } from "@/surfaces/studying/use-study-hotkeys"
 
 /** Spaced-repetition recall: name → recall → reveal signal/source → self-grade (Again/Hard/Good/Easy).
@@ -20,12 +20,15 @@ export function ReviewPanel({
   scope,
   docId,
   onAnswered,
+  preset,
 }: {
   scope: string
   docId?: string
   onAnswered?: () => void
+  /** A hand-picked queue instead of the scope's (library search). */
+  preset?: PresetQueue
 }) {
-  const s = useReviewSession(docId, scope, onAnswered)
+  const s = useReviewSession(docId, scope, onAnswered, preset)
   const { card, revealed, run } = s
 
   // Keyboard: space/enter reveals; 1-4 grade once revealed.
@@ -77,7 +80,7 @@ export function ReviewPanel({
               <Track tone="ok" label="Session progress" value={(run.idx / Math.max(1, run.cards.length)) * 100} />
             </div>
 
-            <ReviewCardFace card={card} docId={docId} revealed={revealed} onReveal={() => s.setRevealed(true)} />
+            <ReviewCardFace card={card} docId={card.docId ?? docId} revealed={revealed} onReveal={() => s.setRevealed(true)} />
 
             {revealed && (
               <GradeButtons

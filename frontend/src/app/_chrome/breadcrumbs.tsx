@@ -72,6 +72,7 @@ function CourseCrumbs() {
   })
 
   if (segments[0] === "programs" && segments[1]) return <ProgramCrumbs segments={segments} />
+  if (segments[0] === "search") return <SearchCrumbs segments={segments} q={search.get("q")} name={search.get("name")} />
   if (!onCourse) return null
 
   const crumbs: Crumb[] = [{ label: "Library", href: "/courses" }]
@@ -123,6 +124,17 @@ function ProgramCrumbs({ segments }: { segments: string[] }) {
   if (segments[2] === "tracks" && segments[3]) {
     const track = program?.tracks.find((t) => t.id === decodeURIComponent(segments[3]))
     crumbs.push({ label: track?.name ?? "Track" })
+  }
+  return <CrumbTrail crumbs={crumbs} />
+}
+
+/** "Library › Search [› idea | Review]" on search routes. */
+function SearchCrumbs({ segments, q, name }: { segments: string[]; q: string | null; name: string | null }) {
+  const crumbs: Crumb[] = [{ label: "Library", href: "/courses" }]
+  if (!segments[1]) crumbs.push({ label: q ? `Search · ${q}` : "Search" })
+  else {
+    crumbs.push({ label: "Search", href: q ? `/search?q=${encodeURIComponent(q)}` : undefined })
+    crumbs.push({ label: segments[1] === "concept" ? (name ?? "Idea") : "Review" })
   }
   return <CrumbTrail crumbs={crumbs} />
 }

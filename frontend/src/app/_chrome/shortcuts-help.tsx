@@ -33,6 +33,7 @@ const GROUPS: Group[] = [
     title: "Reader",
     items: [
       { keys: ["Ctrl", "F"], label: "Find in book" },
+      { keys: ["Ctrl", "K"], label: "Search this book or all books" },
       { keys: ["↵"], label: "Next match (Shift+↵ previous)" },
       { keys: ["Esc"], label: "Close find" },
     ],

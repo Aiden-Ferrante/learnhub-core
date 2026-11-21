@@ -52,6 +52,7 @@ export const roots = {
   packDraw: ["pack-draw"],
   sitting: ["sitting"],
   pdf: ["pdf-available"],
+  passageSearch: ["passage-search"],
 } as const satisfies Record<string, QueryKey>
 
 /** Query keys. `qk.x(args)` → the key for one read; see each gateway for the args. */
@@ -80,6 +81,11 @@ export const qk = {
   mastery: (doc?: string | null) => [...roots.mastery, n(doc)],
   conceptMastery: (doc?: string | null) => [...roots.conceptMastery, n(doc)],
   activity: (doc?: string | null) => [...roots.activity, n(doc)],
+  /** Library search's concept index: every listed course's concepts + their memory state.
+   *  Lives under conceptMastery, so a review grade refreshes the statuses it shows. */
+  searchIndex: (docs: string) => [...roots.conceptMastery, "search-index", docs],
+  /** Keyword passages (fetchPassages); no doc = the whole library. */
+  passageSearch: (q: string, doc?: string | null, limit = 8) => [...roots.passageSearch, q, n(doc), limit],
 
   // ── Course structure + content ─────────────────────────────────────────
   /** Every concept of a course (fetchDocumentConcepts). */

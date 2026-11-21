@@ -6,6 +6,7 @@ import { GuidedReading } from "@/surfaces/reading"
 import { CourseFallback } from "@/surfaces/library"
 import { useCourseData } from "@/surfaces/library"
 import { scopeFromSegments, scopeToPath } from "@/kit/lib/scope-url"
+import { ReaderPalette } from "@/surfaces/searching"
 
 type Params = Promise<{ courseId: string; scope?: string[] }>
 
@@ -49,6 +50,7 @@ function ChapterInner({ params }: { params: Params }) {
         onScopeChange={handleScopeChange}
         initialDrawer={initialDrawer}
       />
+      <ReaderPalette course={data.course} scope={scope} onOpenHere={handleScopeChange} />
     </main>
   )
 }

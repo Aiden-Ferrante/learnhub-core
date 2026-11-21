@@ -10,7 +10,6 @@ import Link from "next/link"
 import { GraduationCap, Plus, Zap } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { cn } from "@/kit/lib/utils"
-import { Input } from "@/kit/ui/input"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { PageHeader } from "@/kit/patterns/page-header"
 import { ErrorNotice } from "@/kit/data"
@@ -26,6 +25,7 @@ import { useCourseTags } from "@/surfaces/library/use-course-tags"
 import { useReadingPositions, useShelfMastery, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
 import { ProgramBanners } from "@/surfaces/programs/program-banners"
+import { LibrarySearchBox } from "@/surfaces/searching"
 
 function FirstCourse() {
   return (
@@ -123,13 +123,7 @@ export function CourseShelf() {
       ) : (
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search courses and tags…"
-              aria-label="Search courses"
-            />
+            <LibrarySearchBox query={query} onQuery={setQuery} picked={picked} matchingCourses={visibleCourses} />
             <div className="flex flex-wrap items-center gap-1.5" aria-label="Filter by tag">
               {known.length === 0 ? (
                 <span className="text-meta text-muted-foreground">

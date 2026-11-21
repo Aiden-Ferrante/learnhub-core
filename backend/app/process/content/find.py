@@ -40,7 +40,7 @@ def keyword_search(doc_id: str | None, query: str, limit: int = 8, full: bool = 
         # would return a shared block once per version that keeps it.
         with db() as conn:
             blocks = conn.execute(
-                'SELECT section_key AS "sectionKey", heading, markdown, '
+                'SELECT doc_id AS "docId", section_key AS "sectionKey", heading, markdown, '
                 'page_start AS "pageStart", page_end AS "pageEnd" '
                 "FROM raw_content WHERE markdown IS NOT NULL"
             ).fetchall()
@@ -59,6 +59,7 @@ def keyword_search(doc_id: str | None, query: str, limit: int = 8, full: bool = 
     scored.sort(key=lambda x: x[0], reverse=True)
     matches = [
         {
+            "docId": b.get("docId") or doc_id,
             "sectionKey": b.get("sectionKey"),
             "heading": b.get("heading"),
             "pageStart": b.get("pageStart"),
