@@ -11,12 +11,12 @@ service-based system topology (frontend / backend / tools as separate containers
 ```
 frontend/  Next.js 15 app (:3001) — auth, UI, and a proxy layer that forwards
            /api/learn/* to the backend with the X-User-Db tenancy header
-backend/   FastAPI service (:8010) — everything below
+engine/   FastAPI service (:8010) — everything below
 deploy/    docker-compose + service images (app, learn, ollama)
            Tools: PostgreSQL :5432, Ollama :11434
 ```
 
-## Backend packages (`backend/app/`)
+## Backend packages (`engine/app/`)
 
 Dependency rule: **`gateways` ← `process/content` ← domains ← `conductor` ← `api`**.
 `process/` and `supplemental/` are grouping folders — `process/` is everything that turns
@@ -185,19 +185,19 @@ are external contracts; this table is the disambiguator instead.
   page — nothing else. Every route lives in a router under `api/`.
 - Scope resolution (chapter → section keys) always goes through `process/content/scope.py`,
   so no two surfaces can disagree about a chapter's extent.
-- Rebuild the affected image after backend/frontend changes:
+- Rebuild the affected image after engine/frontend changes:
   `docker compose -f deploy/compose/docker-compose.yml build learn && ... up -d learn`
   (same for `app`, which serves :3001).
 - Tests — **mount `conftest.py` too**. It is not in the image, and without it the
   `integration` marker is unregistered, so the eight Postgres tests neither skip nor
   gate: they error out after ~30s each of connection retries (240s of "failures" that
   read as environment noise). Unit tier:
-  `docker run --rm -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
-  -v $PWD/backend/conftest.py:/app/conftest.py compose-learn:latest
+  `docker run --rm -v $PWD/engine/app:/app/app -v $PWD/engine/tests:/app/tests
+  -v $PWD/engine/conftest.py:/app/conftest.py compose-learn:latest
   sh -c "pip install -q pytest; python -m pytest tests -q"`
   Both tiers need the compose network and the gate:
   `docker run --rm --network compose_default -e LEARN_PG_TESTS=1
   -e "POSTGRES_DSN=host=postgres port=5432 user=learnhub password=learnhub_local dbname=learnhub"
-  -v $PWD/backend/app:/app/app -v $PWD/backend/tests:/app/tests
-  -v $PWD/backend/conftest.py:/app/conftest.py compose-learn:latest
+  -v $PWD/engine/app:/app/app -v $PWD/engine/tests:/app/tests
+  -v $PWD/engine/conftest.py:/app/conftest.py compose-learn:latest
   sh -c "pip install -q pytest; python -m pytest tests -q"`

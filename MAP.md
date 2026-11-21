@@ -2,8 +2,8 @@
 
 A navigable map of the codebase. Two levels:
 
-1. **System topology** — the running containers and which top-level directory each is.
-2. **Backend packages** — the domain packages + the conductor inside `backend/`, and every file in them.
+1. **System topology** — the four parts of the repo (Frontend, Learn Engine, Postgres, Models), the container each runs as, and its top-level directory.
+2. **Learn Engine packages** — the domain packages + the conductor inside `engine/`, and every file in them.
 
 **How to use it:** the **tables** below each diagram are the file-level index — every file
 name is a link that opens the file. The diagrams are color-coded to match and render with
@@ -24,17 +24,19 @@ flowchart LR
   browser["browser"]
 
   subgraph compose["docker compose network"]
-    app["app · frontend<br/>:3001"]
-    learn["learn · backend<br/>:8010"]
-    pg["PostgreSQL<br/>:5432"]
-    ollama["Ollama<br/>:11434"]
+    app["Frontend · app<br/>:3001"]
+    learn["Learn Engine · learn<br/>:8010"]
+    pg["Postgres<br/>:5432"]
+    ollama["Models · Ollama<br/>:11434"]
   end
+  bridge["Models · Claude bridge<br/>host :8897"]
 
   browser -->|:3001| app
   app -->|learn:8000| learn
   app -->|auth + user data| pg
   learn --> pg
   learn --> ollama
+  learn -->|claude:*| bridge
 
   classDef client fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
   classDef built fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
@@ -42,22 +44,28 @@ flowchart LR
   class browser client;
   class app,learn built;
   class pg,ollama tool;
+  class bridge built;
   style compose fill:none,stroke:#888780,stroke-dasharray:4 3;
 
   click app "https://github.com/Aiden-Ferrante/learnhub/tree/main/frontend" "frontend/"
-  click learn "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend" "backend/"
+  click learn "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine" "engine/"
+  click pg "https://github.com/Aiden-Ferrante/learnhub/tree/main/postgres" "postgres/"
+  click ollama "https://github.com/Aiden-Ferrante/learnhub/tree/main/models" "models/"
+  click bridge "https://github.com/Aiden-Ferrante/learnhub/tree/main/models/claude-bridge" "models/claude-bridge/"
 ```
 
-| Box | Directory | What it is |
-|---|---|---|
-| app | [`frontend/`](frontend) | Next.js UI + proxy layer (`/api/learn/*` → backend) |
-| learn | [`backend/`](backend) | FastAPI service — everything in section 2 below |
-| compose / tools | [`deploy/compose/`](deploy/compose) | docker-compose + service images |
-| Postgres / Ollama | (off-the-shelf images) | database · local LLM |
+| Part | Directory | Runs as | What it is |
+|---|---|---|---|
+| **Frontend** | [`frontend/`](frontend) | `app` | Next.js UI, sign-in, and the proxy layer (`/api/learn/*` → Learn Engine). Its image: [`frontend/Dockerfile`](frontend/Dockerfile) |
+| **Learn Engine** | [`engine/`](engine) | `learn` | FastAPI study engine: everything in section 2 below. Maintenance scripts in [`engine/scripts/`](engine/scripts) |
+| **Postgres** | [`postgres/`](postgres) | `postgres` | The one datastore. [`init/`](postgres/init) = schema for a fresh volume, [`migrations/`](postgres/migrations) = dated changes, [`tools/`](postgres/tools) = one-off data moves |
+| **Models** | [`models/`](models) | `ollama` + host `claude-bridge` | [`ollama/`](models/ollama) = the local model server image; [`claude-bridge/`](models/claude-bridge) = routes `claude:*` models to the host's Claude Code |
+| wiring | [`deploy/compose/`](deploy/compose) | — | docker-compose: the four parts on one network |
+| repo tools | [`scripts/`](scripts) | — | this map's generator and the hub-contract check |
 
 ---
 
-## 2. Backend packages
+## 2. Learn Engine packages
 
 Arrows read **"depends on"** (a package imports the one it points to). The rule — domains
 import `gateways` and `process/content`, never each other's internals; only `api` imports domains;
@@ -100,143 +108,143 @@ flowchart TD
   style process fill:none,stroke:#888780,stroke-dasharray:4 3;
   style supplemental fill:none,stroke:#888780,stroke-dasharray:4 3;
 
-  click api "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/api"
-  click study "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/supplemental/study"
-  click extraction "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/extraction"
-  click media "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/supplemental/media"
-  click content "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/content"
-  click ingestion "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/process/ingestion"
-  click gateways "https://github.com/Aiden-Ferrante/learnhub/tree/main/backend/app/gateways"
+  click api "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/api"
+  click study "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/supplemental/study"
+  click extraction "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/process/extraction"
+  click media "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/supplemental/media"
+  click content "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/process/content"
+  click ingestion "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/process/ingestion"
+  click gateways "https://github.com/Aiden-Ferrante/learnhub/tree/main/engine/app/gateways"
 ```
 
-Assembly point: [`backend/app/main.py`](backend/app/main.py) — middleware, routers, and
+Assembly point: [`engine/app/main.py`](engine/app/main.py) — middleware, routers, and
 `install_job_runners()`.
 
-<!-- GEN:backend START — auto-managed by scripts/gen_map.py; edit descriptions inline, they're preserved across regens -->
+<!-- GEN:engine START — auto-managed by scripts/gen_map.py; edit descriptions inline, they're preserved across regens -->
 
 ### gateways/ — connections to external programs (Postgres · Ollama) + the jobs ledger
 
-> Gateways — the connections to programs outside this process. — [`__init__.py`](backend/app/gateways/__init__.py) is the facade: import this package, not its modules.
+> Gateways — the connections to programs outside this process. — [`__init__.py`](engine/app/gateways/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`llm.py`](backend/app/gateways/llm.py) | Ollama client (plain httpx, native /api/chat) — schema-constrained JSON completions |
-| [`llm_schemas.py`](backend/app/gateways/llm_schemas.py) | Pydantic schemas for structured LLM output |
-| [`db.py`](backend/app/gateways/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
-| [`ledger.py`](backend/app/gateways/ledger.py) | Persistent job rows (enqueue/cancel/list/patch) — no worker; drained by conductor |
+| [`llm.py`](engine/app/gateways/llm.py) | Ollama client (plain httpx, native /api/chat) — schema-constrained JSON completions |
+| [`llm_schemas.py`](engine/app/gateways/llm_schemas.py) | Pydantic schemas for structured LLM output |
+| [`db.py`](engine/app/gateways/db.py) | Postgres pool + X-User-Db schema tenancy — the one DB seam |
+| [`ledger.py`](engine/app/gateways/ledger.py) | Persistent job rows (enqueue/cancel/list/patch) — no worker; drained by conductor |
 
 ### process/ingestion/ — PDF in
 
-> Ingestion — a document in. — [`__init__.py`](backend/app/process/ingestion/__init__.py) is the facade: import this package, not its modules.
+> Ingestion — a document in. — [`__init__.py`](engine/app/process/ingestion/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`reader.py`](backend/app/process/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
-| [`pdf_convert.py`](backend/app/process/ingestion/pdf_convert.py) | Conversion job driver |
-| [`md_convert.py`](backend/app/process/ingestion/md_convert.py) | Markdown → persisted content: ingestion for books that were authored, not scanned |
+| [`reader.py`](engine/app/process/ingestion/reader.py) | PDF → markdown (docling / pymupdf fallback) |
+| [`pdf_convert.py`](engine/app/process/ingestion/pdf_convert.py) | Conversion job driver |
+| [`md_convert.py`](engine/app/process/ingestion/md_convert.py) | Markdown → persisted content: ingestion for books that were authored, not scanned |
 
 ### process/content/ — the book itself
 
-> Content — the book itself, and the one scope resolver. — [`__init__.py`](backend/app/process/content/__init__.py) is the facade: import this package, not its modules.
+> Content — the book itself, and the one scope resolver. — [`__init__.py`](engine/app/process/content/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`documents.py`](backend/app/process/content/documents.py) | Document metadata lookup ("which document / what is it") |
-| [`sections.py`](backend/app/process/content/sections.py) | Markdown → `toc:` keyed section blocks (pure) |
-| [`pages.py`](backend/app/process/content/pages.py) | Page provenance math (pure) |
-| [`outline.py`](backend/app/process/content/outline.py) | Canonical TOC from bookmarks + block assignment (pure) |
-| [`elements.py`](backend/app/process/content/elements.py) | Figures/tables: save, link, read |
-| [`scope.py`](backend/app/process/content/scope.py) | THE scope owner: `scope_blocks` / `scope_section_keys` / `load_section_blocks` |
-| [`store.py`](backend/app/process/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
-| [`chapters.py`](backend/app/process/content/chapters.py) | Canonical chapter-unit list |
-| [`math_markdown.py`](backend/app/process/content/math_markdown.py) | LaTeX/KaTeX math rendering |
-| [`toc_tree.py`](backend/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
-| [`find.py`](backend/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
-| [`toc_controller.py`](backend/app/process/content/toc_controller.py) | Staged TOC routing loop (bookmarks / pagematched / none) + decision log (pure) |
-| [`blocks.py`](backend/app/process/content/blocks.py) | A version's material — the one join that turns a course version into its blocks (owns `concept_filter`) |
-| [`versions.py`](backend/app/process/content/versions.py) | Course versions — the lifecycle of the named paths through a book |
-| [`editing.py`](backend/app/process/content/editing.py) | Editing the material — the book's text, or one course's rewrite of it (owns `stale_sections`) |
-| [`outline_edit.py`](backend/app/process/content/outline_edit.py) | Editing a course's outline — its chapters, their nesting, and what sits in each |
+| [`documents.py`](engine/app/process/content/documents.py) | Document metadata lookup ("which document / what is it") |
+| [`sections.py`](engine/app/process/content/sections.py) | Markdown → `toc:` keyed section blocks (pure) |
+| [`pages.py`](engine/app/process/content/pages.py) | Page provenance math (pure) |
+| [`outline.py`](engine/app/process/content/outline.py) | Canonical TOC from bookmarks + block assignment (pure) |
+| [`elements.py`](engine/app/process/content/elements.py) | Figures/tables: save, link, read |
+| [`scope.py`](engine/app/process/content/scope.py) | THE scope owner: `scope_blocks` / `scope_section_keys` / `load_section_blocks` |
+| [`store.py`](engine/app/process/content/store.py) | `persist_document` + section/page reads (was `arango_content.py`) |
+| [`chapters.py`](engine/app/process/content/chapters.py) | Canonical chapter-unit list |
+| [`math_markdown.py`](engine/app/process/content/math_markdown.py) | LaTeX/KaTeX math rendering |
+| [`toc_tree.py`](engine/app/process/content/toc_tree.py) | Syllabus forest from the stored TOC outline |
+| [`find.py`](engine/app/process/content/find.py) | Keyword search over section content (coverage-scored, no embeddings) |
+| [`toc_controller.py`](engine/app/process/content/toc_controller.py) | Staged TOC routing loop (bookmarks / pagematched / none) + decision log (pure) |
+| [`blocks.py`](engine/app/process/content/blocks.py) | A version's material — the one join that turns a course version into its blocks (owns `concept_filter`) |
+| [`versions.py`](engine/app/process/content/versions.py) | Course versions — the lifecycle of the named paths through a book |
+| [`editing.py`](engine/app/process/content/editing.py) | Editing the material — the book's text, or one course's rewrite of it (owns `stale_sections`) |
+| [`outline_edit.py`](engine/app/process/content/outline_edit.py) | Editing a course's outline — its chapters, their nesting, and what sits in each |
 
 ### process/extraction/ — LLM generation passes
 
-> Extraction — the LLM generation passes over stored content. — [`__init__.py`](backend/app/process/extraction/__init__.py) is the facade: import this package, not its modules.
+> Extraction — the LLM generation passes over stored content. — [`__init__.py`](engine/app/process/extraction/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`concepts_extract.py`](backend/app/process/extraction/concepts_extract.py) | Concept extraction (the write side) |
-| [`concept_store.py`](backend/app/process/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
-| [`skeleton.py`](backend/app/process/extraction/skeleton.py) | Chapter skeleton essences + orientation |
-| [`reading_guide.py`](backend/app/process/extraction/reading_guide.py) | Per-section "what to look for" guides |
-| [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
-| [`guided_reading.py`](backend/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
-| [`grounding.py`](backend/app/process/extraction/grounding.py) | Does a concept's `source_sentence` actually appear in its own section — the check the extraction gate only implies |
+| [`concepts_extract.py`](engine/app/process/extraction/concepts_extract.py) | Concept extraction (the write side) |
+| [`concept_store.py`](engine/app/process/extraction/concept_store.py) | Concept reads (section/document views, reading ranks) |
+| [`skeleton.py`](engine/app/process/extraction/skeleton.py) | Chapter skeleton essences + orientation |
+| [`reading_guide.py`](engine/app/process/extraction/reading_guide.py) | Per-section "what to look for" guides |
+| [`eval_gate.py`](engine/app/process/extraction/eval_gate.py) | Critic gate — samples + grades each extraction run (quality as a number) |
+| [`guided_reading.py`](engine/app/process/extraction/guided_reading.py) | Deep Chapter — the assembled reading-first chapter surface, over the `ext_briefing` view |
+| [`grounding.py`](engine/app/process/extraction/grounding.py) | Does a concept's `source_sentence` actually appear in its own section — the check the extraction gate only implies |
 
 ### process/packs/ — exam packs built from a textbook
 
-> Exam packs — a textbook turned into Learn items and an exam pool. — [`__init__.py`](backend/app/process/packs/__init__.py) is the facade: import this package, not its modules.
+> Exam packs — a textbook turned into Learn items and an exam pool. — [`__init__.py`](engine/app/process/packs/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`author.py`](backend/app/process/packs/author.py) | Build a pack per chapter: chunk, skills, Learn items, exam pool; ungrounded output is dropped with its reason |
-| [`gen.py`](backend/app/process/packs/gen.py) | Generator specs: one skill, new numbers on every seed; a snippet's printed output is the answer |
-| [`sandbox.py`](backend/app/process/packs/sandbox.py) | Runs a generator's Python snippets in a limited child process behind an AST gate |
-| [`answers.py`](backend/app/process/packs/answers.py) | _(describe me)_ |
+| [`author.py`](engine/app/process/packs/author.py) | Build a pack per chapter: chunk, skills, Learn items, exam pool; ungrounded output is dropped with its reason |
+| [`gen.py`](engine/app/process/packs/gen.py) | Generator specs: one skill, new numbers on every seed; a snippet's printed output is the answer |
+| [`sandbox.py`](engine/app/process/packs/sandbox.py) | Runs a generator's Python snippets in a limited child process behind an AST gate |
+| [`answers.py`](engine/app/process/packs/answers.py) | _(describe me)_ |
 
 ### supplemental/study/ — learning state
 
-> Study — the learning loop over extracted concepts. — [`__init__.py`](backend/app/supplemental/study/__init__.py) is the facade: import this package, not its modules.
+> Study — the learning loop over extracted concepts. — [`__init__.py`](engine/app/supplemental/study/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`reviews.py`](backend/app/supplemental/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
-| [`mastery.py`](backend/app/supplemental/study/mastery.py) | Event floor + mastery/activity/forecast read models |
-| [`srs.py`](backend/app/supplemental/study/srs.py) | SM-2 schedule primitive |
-| [`sessions.py`](backend/app/supplemental/study/sessions.py) | Working sessions — derived, never stored |
-| [`calendar.py`](backend/app/supplemental/study/calendar.py) | Cross-course review calendar — when everything comes due |
-| [`manual.py`](backend/app/supplemental/study/manual.py) | Manual study-time blocks — the user's corrections layer over the derived sessions |
-| [`review_scope.py`](backend/app/supplemental/study/review_scope.py) | Which review rows belong to a course version — the retention/coverage split, in SQL |
-| [`pack_logic.py`](backend/app/supplemental/study/pack_logic.py) | Exam-pack decisions with no database: draw a paper, mark it, say what to do today |
-| [`packs.py`](backend/app/supplemental/study/packs.py) | Exam packs, the stored side: reads and writes packs; marked answers go to FSRS per skill |
+| [`reviews.py`](engine/app/supplemental/study/reviews.py) | SRS queue assembly + SM-2 grading (concept/skeleton/figure) |
+| [`mastery.py`](engine/app/supplemental/study/mastery.py) | Event floor + mastery/activity/forecast read models |
+| [`srs.py`](engine/app/supplemental/study/srs.py) | SM-2 schedule primitive |
+| [`sessions.py`](engine/app/supplemental/study/sessions.py) | Working sessions — derived, never stored |
+| [`calendar.py`](engine/app/supplemental/study/calendar.py) | Cross-course review calendar — when everything comes due |
+| [`manual.py`](engine/app/supplemental/study/manual.py) | Manual study-time blocks — the user's corrections layer over the derived sessions |
+| [`review_scope.py`](engine/app/supplemental/study/review_scope.py) | Which review rows belong to a course version — the retention/coverage split, in SQL |
+| [`pack_logic.py`](engine/app/supplemental/study/pack_logic.py) | Exam-pack decisions with no database: draw a paper, mark it, say what to do today |
+| [`packs.py`](engine/app/supplemental/study/packs.py) | Exam packs, the stored side: reads and writes packs; marked answers go to FSRS per skill |
 
 ### supplemental/media/ — audiobooks
 
-> Media — audio renditions of chapters. — [`__init__.py`](backend/app/supplemental/media/__init__.py) is the facade: import this package, not its modules.
+> Media — audio renditions of chapters. — [`__init__.py`](engine/app/supplemental/media/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`audiobook.py`](backend/app/supplemental/media/audiobook.py) | Checkpointed TTS job system |
-| [`tts_kokoro.py`](backend/app/supplemental/media/tts_kokoro.py) | Kokoro-82M text-to-speech, in-process on the GPU |
+| [`audiobook.py`](engine/app/supplemental/media/audiobook.py) | Checkpointed TTS job system |
+| [`tts_kokoro.py`](engine/app/supplemental/media/tts_kokoro.py) | Kokoro-82M text-to-speech, in-process on the GPU |
 
 ### conductor/ — wires job kinds to domain runners + the auto-chain
 
-> Conductor — decides what runs, and wires it. — [`__init__.py`](backend/app/conductor/__init__.py) is the facade: import this package, not its modules.
+> Conductor — decides what runs, and wires it. — [`__init__.py`](engine/app/conductor/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`build.py`](backend/app/conductor/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
-| [`ingest.py`](backend/app/conductor/ingest.py) | Phase 1: stash upload + `convert` job runner |
-| [`lifecycle.py`](backend/app/conductor/lifecycle.py) | Per-document state; extraction is on-demand (auto-chain opt-in via LEARN_AUTOCHAIN=1) |
-| [`registry.py`](backend/app/conductor/registry.py) | Composition root — registers every job-kind runner |
-| [`worker.py`](backend/app/conductor/worker.py) | The one daemon worker: runner registry, JobCtx, drain loop over the ledger |
+| [`build.py`](engine/app/conductor/build.py) | Phase 2 runner: `extract` (+ eval gate); `build` is a compat alias |
+| [`ingest.py`](engine/app/conductor/ingest.py) | Phase 1: stash upload + `convert` job runner |
+| [`lifecycle.py`](engine/app/conductor/lifecycle.py) | Per-document state; extraction is on-demand (auto-chain opt-in via LEARN_AUTOCHAIN=1) |
+| [`registry.py`](engine/app/conductor/registry.py) | Composition root — registers every job-kind runner |
+| [`worker.py`](engine/app/conductor/worker.py) | The one daemon worker: runner registry, JobCtx, drain loop over the ledger |
 
 ### api/ — thin routers + composition root
 
-> API — thin HTTP routers over the domains, one file per area of the app. — [`__init__.py`](backend/app/api/__init__.py) is the facade: import this package, not its modules.
+> API — thin HTTP routers over the domains, one file per area of the app. — [`__init__.py`](engine/app/api/__init__.py) is the facade: import this package, not its modules.
 
 | File | Purpose |
 |---|---|
-| [`reading_routes.py`](backend/app/api/reading_routes.py) | Reading guide + guided-reading reads |
-| [`study_routes.py`](backend/app/api/study_routes.py) | Doing study: chapter path (orient/skeleton/progress) + the spaced-review queue |
-| [`system_routes.py`](backend/app/api/system_routes.py) | Health, queue control, machine strip |
-| [`content_routes.py`](backend/app/api/content_routes.py) | The book: courses list/delete, outline, chapters, sections, elements, figures, keyword search |
-| [`concept_routes.py`](backend/app/api/concept_routes.py) | Concept layer: reads + curation (edit / delete) |
-| [`media_routes.py`](backend/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
-| [`process_routes.py`](backend/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
-| [`progress_routes.py`](backend/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
-| [`pack_routes.py`](backend/app/api/pack_routes.py) | Exam packs: thin routes over supplemental/study/packs |
+| [`reading_routes.py`](engine/app/api/reading_routes.py) | Reading guide + guided-reading reads |
+| [`study_routes.py`](engine/app/api/study_routes.py) | Doing study: chapter path (orient/skeleton/progress) + the spaced-review queue |
+| [`system_routes.py`](engine/app/api/system_routes.py) | Health, queue control, machine strip |
+| [`content_routes.py`](engine/app/api/content_routes.py) | The book: courses list/delete, outline, chapters, sections, elements, figures, keyword search |
+| [`concept_routes.py`](engine/app/api/concept_routes.py) | Concept layer: reads + curation (edit / delete) |
+| [`media_routes.py`](engine/app/api/media_routes.py) | Audiobook TTS: voices, generate, status, timeline, MP3 stream |
+| [`process_routes.py`](engine/app/api/process_routes.py) | Convert → extract → build queue/jobs + per-course pipeline status |
+| [`progress_routes.py`](engine/app/api/progress_routes.py) | Study read models: mastery, activity, forecast, planner, sessions, mistakes |
+| [`pack_routes.py`](engine/app/api/pack_routes.py) | Exam packs: thin routes over supplemental/study/packs |
 
-<!-- GEN:backend END -->
+<!-- GEN:engine END -->
 
 ---
 
@@ -322,10 +330,10 @@ Key `gateways/server/` seams:
 ## 4. Inside the extraction package
 
 Extraction is the app's core feature, so here is the folder one level deeper. The extraction flow
-itself is only two files (teal): [`concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
+itself is only two files (teal): [`concepts_extract.py`](engine/app/process/extraction/concepts_extract.py)
 builds the prompt, calls the LLM and writes concepts (section loading + scope resolution
-come from `process/content/scope.py`, the shared owner), and [`concept_store.py`](backend/app/process/extraction/concept_store.py)
-is the read side. The **conductor** ([`conductor/build.py`](backend/app/conductor/build.py))
+come from `process/content/scope.py`, the shared owner), and [`concept_store.py`](engine/app/process/extraction/concept_store.py)
+is the read side. The **conductor** ([`conductor/build.py`](engine/app/conductor/build.py))
 runs these as queue jobs (`extract`; `build` is a compat alias). Four other LLM *generation passes*
 (coral) live in the folder and are triggered independently — `guided_reading` assembles
 the reading briefing from cached artifacts (its per-concept explanations were retired).
@@ -352,12 +360,12 @@ flowchart TD
   class concepts,store core;
   class deep,skeleton,guide pass;
 
-  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/conductor/build.py"
-  click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/concepts_extract.py"
-  click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/concept_store.py"
-  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/guided_reading.py"
-  click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/skeleton.py"
-  click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/backend/app/process/extraction/reading_guide.py"
+  click build "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/conductor/build.py"
+  click concepts "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/process/extraction/concepts_extract.py"
+  click store "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/process/extraction/concept_store.py"
+  click deep "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/process/extraction/guided_reading.py"
+  click skeleton "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/process/extraction/skeleton.py"
+  click guide "https://github.com/Aiden-Ferrante/learnhub/blob/main/engine/app/process/extraction/reading_guide.py"
 ```
 
 Color key: purple = conductor · teal = extraction core · coral = generation passes.
@@ -369,6 +377,6 @@ Color key: purple = conductor · teal = extraction core · coral = generation pa
 Floor first (small, everything builds on these), then trace one journey:
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md) — the map's legend
-2. [`gateways/db.py`](backend/app/gateways/db.py) → [`gateways/llm.py`](backend/app/gateways/llm.py) → [`process/content/scope.py`](backend/app/process/content/scope.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py)
-3. Then a vertical slice — e.g. **build a chapter**: [`api/process_routes.py`](backend/app/api/process_routes.py) → [`gateways/ledger.py`](backend/app/gateways/ledger.py) → [`conductor/worker.py`](backend/app/conductor/worker.py) → [`conductor/registry.py`](backend/app/conductor/registry.py) → [`conductor/build.py`](backend/app/conductor/build.py) → [`extraction/concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
-4. Or the **document lifecycle**: an upload flows [`api/process_routes.py`](backend/app/api/process_routes.py) → [`conductor/ingest.py`](backend/app/conductor/ingest.py) (convert job) → readable; then on-demand per-chapter [`conductor/build.py`](backend/app/conductor/build.py) (extract) → studyable, tracked by [`conductor/lifecycle.py`](backend/app/conductor/lifecycle.py)
+2. [`gateways/db.py`](engine/app/gateways/db.py) → [`gateways/llm.py`](engine/app/gateways/llm.py) → [`process/content/scope.py`](engine/app/process/content/scope.py) → [`gateways/ledger.py`](engine/app/gateways/ledger.py)
+3. Then a vertical slice — e.g. **build a chapter**: [`api/process_routes.py`](engine/app/api/process_routes.py) → [`gateways/ledger.py`](engine/app/gateways/ledger.py) → [`conductor/worker.py`](engine/app/conductor/worker.py) → [`conductor/registry.py`](engine/app/conductor/registry.py) → [`conductor/build.py`](engine/app/conductor/build.py) → [`extraction/concepts_extract.py`](engine/app/process/extraction/concepts_extract.py)
+4. Or the **document lifecycle**: an upload flows [`api/process_routes.py`](engine/app/api/process_routes.py) → [`conductor/ingest.py`](engine/app/conductor/ingest.py) (convert job) → readable; then on-demand per-chapter [`conductor/build.py`](engine/app/conductor/build.py) (extract) → studyable, tracked by [`conductor/lifecycle.py`](engine/app/conductor/lifecycle.py)

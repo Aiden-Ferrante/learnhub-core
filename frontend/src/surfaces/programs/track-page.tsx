@@ -12,7 +12,7 @@ import { Button } from "@/kit/ui/button"
 import { ErrorNotice } from "@/kit/data"
 import { EmptyState } from "@/kit/patterns/empty-state"
 import { cn } from "@/kit/lib/utils"
-import { CourseCover } from "@/surfaces/library/course-card"
+import { CourseCover } from "@/surfaces/library"
 import { continueHref } from "@/surfaces/programs/program-banners"
 import { AddCoursesDialog, Bar, StatusText, TrackDialog, trackColor, type TrackDialogState } from "@/surfaces/programs/program-ui"
 import {

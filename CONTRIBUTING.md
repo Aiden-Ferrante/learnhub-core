@@ -1,6 +1,6 @@
 # Contributing
 
-- **Tests:** `python -m pytest backend/tests -q`. Postgres integration tests run only with
+- **Tests:** `python -m pytest engine/tests -q`. Postgres integration tests run only with
   `LEARN_PG_TESTS=1` and a reachable database (see [docs/testing.md](docs/testing.md)).
 - **Import rules:** every package's `__init__.py` is the only thing other packages may
   import. Run `python scripts/check_hubs.py` and `node frontend/scripts/check-hubs.mjs`

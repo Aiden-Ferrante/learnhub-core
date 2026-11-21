@@ -12,7 +12,7 @@ import { fetchDocumentConcepts } from "@/gateways/api/concepts"
 import { fetchConceptMastery } from "@/gateways/api/progress"
 import { fetchPassages } from "@/gateways/api/search"
 import { qk, useApi } from "@/kit/data"
-import { courseFromDocument, type Course } from "@/surfaces/library/courses"
+import { courseFromDocument, type Course } from "@/surfaces/library"
 import { useDocuments } from "@/surfaces/processing"
 import { statusOf, terms, type IndexedConcept } from "@/surfaces/searching/search-model"
 

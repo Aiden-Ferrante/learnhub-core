@@ -6,7 +6,7 @@ endpoints; TASK-18 unified them on one derivation. This script proves it live â€
 run it against a running learn backend (default http://127.0.0.1:8010) after any
 change to the outline/chapters pipeline:
 
-    python3 scripts/check_chapter_drift.py
+    python3 engine/scripts/check_chapter_drift.py
 
 Exit 0 = every ready document's chapter list matches the tree top level exactly
 (keys, titles, order). Exit 1 = drift, with a per-doc diff printed.

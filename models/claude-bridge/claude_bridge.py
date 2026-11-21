@@ -7,7 +7,7 @@ calling the same llm._claude_structured the host scripts use. It binds the compo
 network's gateway (only containers on that bridge reach it, never the LAN or tailnet)
 and refuses any request without the shared token. Approved by the human 2026-10-19.
 
-    CLAUDE_BRIDGE_TOKEN=... python scripts/claude_bridge.py   # 172.20.0.1:8897
+    CLAUDE_BRIDGE_TOKEN=... python models/claude-bridge/claude_bridge.py   # 172.20.0.1:8897
 
 Env: CLAUDE_BRIDGE_HOST (default 172.20.0.1), CLAUDE_BRIDGE_PORT (8897),
 CLAUDE_BRIDGE_TOKEN (required), LEARN_CLAUDE_USAGE_LOG (optional token log).
@@ -20,7 +20,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "engine"))
 from app.gateways.llm import _claude_structured  # noqa: E402
 
 TOKEN = os.environ.get("CLAUDE_BRIDGE_TOKEN", "")

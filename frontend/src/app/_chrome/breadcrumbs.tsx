@@ -13,7 +13,7 @@ import { fetchPack } from "@/gateways/api/packs"
 import { chaptersFromOutline, resolveChapterForScope } from "@/gateways/api/toc"
 import { qk } from "@/kit/data/query-keys"
 import { useApi } from "@/kit/data/use-api"
-import { usePrograms } from "@/surfaces/programs/use-programs"
+import { usePrograms } from "@/surfaces/programs"
 
 /** Fixed labels for course sub-routes (docs/ui-spec.md §2). `chapter` and `packs/[key]`
  *  get their titles from the outline and the pack. */

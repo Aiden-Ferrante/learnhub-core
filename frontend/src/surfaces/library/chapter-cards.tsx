@@ -25,7 +25,7 @@ import { ChapterCardMenu, extractionLine, useChapterExtractions } from "@/surfac
 import { GroupHeader, GroupNameDialog } from "@/surfaces/library/chapter-group-ui"
 import { addGroup, layoutSections, moveChapter, moveGroup, removeGroup, renameGroup } from "@/surfaces/library/chapter-groups"
 import { useChapterGroups } from "@/surfaces/library/use-chapter-groups"
-import { CountsToward } from "@/surfaces/programs/counts-toward"
+import { CountsToward } from "@/surfaces/programs"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"

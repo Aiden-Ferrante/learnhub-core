@@ -2,7 +2,7 @@
 """Does every extracted concept's source_sentence appear in its own section?
 
 Thin CLI over `app.process.extraction.grounding`, which owns the classification and is
-exercised in CI by `backend/tests/test_grounding_pg.py` against a seeded corpus containing
+exercised in CI by `engine/tests/test_grounding_pg.py` against a seeded corpus containing
 one of every verdict — including an invented quote, so the check can actually fail.
 
 **This script is deliberately NOT a CI step.** CI's Postgres is seeded from the schema and
@@ -11,9 +11,9 @@ non-zero to say so). The check that belongs in CI is the test; the check that be
 is the one you run against a real library.
 
 Usage:
-  python scripts/check_grounding.py                  # the whole library
-  python scripts/check_grounding.py --doc <source>   # one book
-  python scripts/check_grounding.py --json
+  python engine/scripts/check_grounding.py                  # the whole library
+  python engine/scripts/check_grounding.py --doc <source>   # one book
+  python engine/scripts/check_grounding.py --json
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import json
 import os
 import sys
 
-for _cand in (os.path.join(os.path.dirname(__file__), "..", "backend"), "/app", "."):
+for _cand in (os.path.join(os.path.dirname(__file__), ".."), "/app", "."):
     if os.path.isdir(os.path.join(_cand, "app")):
         sys.path.insert(0, _cand)
         break

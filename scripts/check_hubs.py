@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_hubs — the module-hub contract, enforced (see docs/module-hubs.md).
 
-Every package under backend/app is a hub: its __init__.py facade is the only
+Every package under engine/app is a hub: its __init__.py facade is the only
 cross-package import surface, and its docstring is the folder's documentation.
 This check fails (exit 1) on:
 
@@ -10,7 +10,7 @@ This check fails (exit 1) on:
   3. UPWARD imports (violating gateways <- process.content <- domains <- conductor <- api)
   4. a facade missing a real docstring, or containing logic (defs/classes)
 
-Exceptions, by design: backend/tests may deep-import (tests exercise internals);
+Exceptions, by design: engine/tests may deep-import (tests exercise internals);
 app/main.py is the assembly point (facade imports only — rules 2-3 still apply).
 
 Usage: python3 scripts/check_hubs.py [--report]
@@ -22,7 +22,7 @@ import ast
 import os
 import sys
 
-ROOT = os.path.join(os.path.dirname(__file__), "..", "backend")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "engine")
 APP = os.path.join(ROOT, "app")
 
 # Layer numbers: an import may only target a layer <= its own (same-layer domain

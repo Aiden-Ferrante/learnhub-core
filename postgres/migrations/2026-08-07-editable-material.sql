@@ -10,7 +10,7 @@
 -- without a flag anyone has to remember to set.
 --
 --   docker exec -i compose-postgres-1 psql -U learnhub -d learnhub \
---     -v ON_ERROR_STOP=1 < deploy/postgres/migrations/2026-08-07-editable-material.sql
+--     -v ON_ERROR_STOP=1 < postgres/migrations/2026-08-07-editable-material.sql
 --
 -- Idempotent: safe to re-run.
 

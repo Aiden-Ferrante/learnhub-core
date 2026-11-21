@@ -11,9 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/kit/ui/input"
 import { Label } from "@/kit/ui/label"
 import { cn } from "@/kit/lib/utils"
-import { CourseCover } from "@/surfaces/library/course-card"
-import { COURSE_COLORS, coverColor } from "@/surfaces/library/cover"
-import type { Course } from "@/surfaces/library/courses"
+import { CourseCover } from "@/surfaces/library"
+import { COURSE_COLORS, coverColor } from "@/surfaces/library"
+import type { Course } from "@/surfaces/library"
 import { num, statusOf } from "@/surfaces/programs/programs"
 
 /** A track's colour: by its place in the program, from the course palette. */

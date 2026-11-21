@@ -9,10 +9,10 @@
              item is left alone and listed
   receipts   each pack's receipt is recomputed from its chapters' stored receipts
 
-Only UPDATEs; nothing is deleted. ``--apply`` writes. Run from backend/ with the host venv,
+Only UPDATEs; nothing is deleted. ``--apply`` writes. Run from engine/ with the host venv,
 so ``claude:*`` models reach the CLI and the sandbox child runs as a normal user:
 
-  cd backend && .venv/bin/python ../scripts/repair_pack_items.py [--apply] [--only answers]
+  cd engine && .venv/bin/python engine/scripts/repair_pack_items.py [--apply] [--only answers]
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from psycopg.types.json import Json  # noqa: E402
 from pydantic import BaseModel  # noqa: E402

@@ -4,7 +4,7 @@
  *  highlighted text, the match bar and a book's colour dot. */
 
 import { cn } from "@/kit/lib/utils"
-import { coverColor } from "@/surfaces/library/cover"
+import { coverColor } from "@/surfaces/library"
 import { highlight, STATUS_LABEL, type MemoryStatus } from "@/surfaces/searching/search-model"
 
 /** Exact words works today; Meaning waits for the semantic backend and says so. */

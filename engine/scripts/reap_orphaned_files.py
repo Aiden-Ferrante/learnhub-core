@@ -27,7 +27,7 @@ Usage — the artifact trees live in a docker volume, not the repo, so this runs
 
   docker run --rm --network compose_default \
     -e "POSTGRES_DSN=host=postgres port=5432 user=learnhub password=learnhub_local dbname=learnhub" \
-    -v $PWD/backend/app:/app/app -v $PWD/scripts:/app/scripts \
+    -v $PWD/engine/app:/app/app -v $PWD/engine/scripts:/app/scripts \
     -v compose_learnhub_core_shared:/shared \
     compose-learn:latest python /app/scripts/reap_orphaned_files.py [--apply]
 

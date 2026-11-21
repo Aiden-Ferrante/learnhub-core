@@ -22,9 +22,9 @@ those queries. The node is copied under the new id, every reference is repointed
 old row goes; one transaction per document.
 
 Modes:
-  python scripts/restructure_outlines.py            # dry run: print what would change
-  python scripts/restructure_outlines.py --apply    # write it
-  python scripts/restructure_outlines.py --check    # the library-wide outline check:
+  python engine/scripts/restructure_outlines.py            # dry run: print what would change
+  python engine/scripts/restructure_outlines.py --apply    # write it
+  python engine/scripts/restructure_outlines.py --check    # the library-wide outline check:
                                                     # exit 1 if any outline would change,
                                                     # or has an N.M section at the top
 
@@ -37,7 +37,7 @@ import os
 import re
 import sys
 
-for _cand in (os.path.join(os.path.dirname(__file__), "..", "backend"), "/app", "."):
+for _cand in (os.path.join(os.path.dirname(__file__), ".."), "/app", "."):
     if os.path.isdir(os.path.join(_cand, "app")):
         sys.path.insert(0, _cand)
         break

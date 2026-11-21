@@ -197,7 +197,7 @@ not add to it mid-build.
   separate interpreter that never sees the service's warmed pipeline, so a working warm-up
   measured as broken.
 - **The documented test command disabled its own gate.** (2026-08-25.) It never mounted
-  `backend/conftest.py`, which is not in the image, so the `integration` marker went
+  `engine/conftest.py`, which is not in the image, so the `integration` marker went
   unregistered and the eight Postgres tests errored instead of skipping — ~240s of noise
   that read as environment trouble. The arc's own thesis, pointed at its own tooling. Both
   commands are now spelled out in ARCHITECTURE.md; the run is 0.5s.

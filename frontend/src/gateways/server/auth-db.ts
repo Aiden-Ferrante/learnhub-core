@@ -39,7 +39,7 @@ export async function findUserByUsername(username: string): Promise<UserRecord |
 }
 
 // Frontend-owned tables in a tenant schema. The backend's own study tables are
-// created for the primary tenant by deploy/postgres/init; a brand-new tenant gets
+// created for the primary tenant by postgres/init; a brand-new tenant gets
 // at least its document-list table here so login + the library work immediately.
 const APP_DOCUMENTS_DDL = `
 CREATE TABLE IF NOT EXISTS app_documents (

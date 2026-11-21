@@ -34,33 +34,33 @@ flowchart LR
     J --> L[verdict per concept]
 ```
 
-1. **Convert.** [`process/ingestion/reader.py`](backend/app/process/ingestion/reader.py)
+1. **Convert.** [`process/ingestion/reader.py`](engine/app/process/ingestion/reader.py)
    turns the PDF into markdown with Docling and falls back to PyMuPDF if Docling fails.
-2. **Find the structure.** [`toc_controller.py`](backend/app/process/content/toc_controller.py)
+2. **Find the structure.** [`toc_controller.py`](engine/app/process/content/toc_controller.py)
    uses the PDF's bookmarks when it has them. When it does not, it tries
-   [strategies](backend/app/process/content/toc_strategies/) in a fixed order: headings the
+   [strategies](engine/app/process/content/toc_strategies/) in a fixed order: headings the
    book numbered itself, then heading font sizes, then the printed Contents page. Each step
    writes down why it accepted or declined, so a strange book can be diagnosed from the log.
    An LLM strategy is registered but is a stub that always declines.
-3. **Extract concepts.** [`concepts_extract.py`](backend/app/process/extraction/concepts_extract.py)
+3. **Extract concepts.** [`concepts_extract.py`](engine/app/process/extraction/concepts_extract.py)
    asks a local model, one section at a time, for concepts as schema-checked JSON. Each
    concept has a short explanation and the sentence from the book that supports it. A
    concept with no supporting sentence is dropped.
 4. **Grade a sample.** After every extraction run,
-   [`eval_gate.py`](backend/app/process/extraction/eval_gate.py) has a second model judge
+   [`eval_gate.py`](engine/app/process/extraction/eval_gate.py) has a second model judge
    8 of the new concepts on three questions: is every claim in the quote, does it explain
    anything, and is it a general idea rather than a one-off fact. The pass rate is saved
    with the job, so a prompt change gets a number. It never blocks or fails an extraction.
-5. **Check the quotes.** [`grounding.py`](backend/app/process/extraction/grounding.py) gives
+5. **Check the quotes.** [`grounding.py`](engine/app/process/extraction/grounding.py) gives
    each concept one of 8 verdicts: `verbatim`, `partial`, `near-verbatim`, `paraphrase`,
    `elsewhere`, `invented`, `ungated`, or `no-section-text`. Only `invented`, `elsewhere` and
    `ungated` count as failures. Run it over a real library with
-   [`scripts/check_grounding.py`](scripts/check_grounding.py); CI runs
-   [`test_grounding_pg.py`](backend/tests/test_grounding_pg.py), which seeds one concept of
+   [`engine/scripts/check_grounding.py`](engine/scripts/check_grounding.py); CI runs
+   [`test_grounding_pg.py`](engine/tests/test_grounding_pg.py), which seeds one concept of
    every verdict, including an invented quote, so the check is shown to fail when it should.
 
 The same idea is used to build **exam packs**
-([`process/packs/`](backend/app/process/packs/)): each question must quote a section, the
+([`process/packs/`](engine/app/process/packs/)): each question must quote a section, the
 quote is checked against the stored text, and a second model judges what is left. Anything
 dropped is listed with its reason.
 
@@ -70,8 +70,8 @@ spaced repetition.
 **Models.** By default every LLM call goes to a local [Ollama](https://ollama.com), so no API
 key is needed. Claude is optional: a model named `claude:<model>` (for example
 `claude:sonnet`) is sent through the `claude` CLI on the host, using your own login
-([`gateways/llm.py`](backend/app/gateways/llm.py)). Inside Docker, where there is no CLI,
-those calls go through [`scripts/claude_bridge.py`](scripts/claude_bridge.py), a small
+([`gateways/llm.py`](engine/app/gateways/llm.py)). Inside Docker, where there is no CLI,
+those calls go through [`models/claude-bridge/claude_bridge.py`](models/claude-bridge/claude_bridge.py), a small
 token-protected server on the host. Nothing uses Claude unless you pick a `claude:` model.
 
 ## Quickstart
@@ -81,8 +81,8 @@ large download.
 
 ```bash
 git clone https://github.com/Aiden-Ferrante/learnhub-core.git && cd learnhub-core
-uv venv .venv && VIRTUAL_ENV=.venv uv pip install -r backend/requirements.txt pytest
-.venv/bin/python -m pytest backend/tests -q
+uv venv .venv && VIRTUAL_ENV=.venv uv pip install -r engine/requirements.txt pytest
+.venv/bin/python -m pytest engine/tests -q
 ```
 
 The full app (Next.js 15 + React 19 UI, FastAPI backend, Postgres, Ollama) runs under Docker
@@ -186,14 +186,14 @@ How other things talk to Learn Hub, and how its pieces talk to each other:
 
 ```
 frontend/   Next.js 15 + React 19 (pnpm) — auth, UI, proxy layer
-backend/    FastAPI service — a domain-partitioned modular monolith
+engine/    FastAPI service — a domain-partitioned modular monolith
 deploy/     compose stack, service Dockerfiles, Postgres init SQL
 docs/       ADRs, specs, generated code map
 scripts/    repo checks (import rules, grounding, chapter drift), the Claude bridge, MAP.md generator
 ```
 
 ```
-backend/app/
+engine/app/
   gateways/            Postgres, the job queue table, the LLM client (Ollama or claude:)
   process/ingestion/   PDF -> markdown
   process/content/     the book: TOC, sections, pages, figures
@@ -223,7 +223,7 @@ docker compose -f deploy/compose/docker-compose.yml up -d learn
 
 # Backend tests:
 docker run --rm \
-  -v "$PWD/backend/app:/app/app" -v "$PWD/backend/tests:/app/tests" \
+  -v "$PWD/engine/app:/app/app" -v "$PWD/engine/tests:/app/tests" \
   compose-learn:latest sh -c "pip install -q pytest; python -m pytest tests -q"
 ```
 

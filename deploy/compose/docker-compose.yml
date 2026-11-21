@@ -1,7 +1,8 @@
-# Learn Hub Docker Compose — Postgres + Ollama
-#
-# One datastore: Postgres (replaced ArangoDB and Qdrant). Services:
-#   app (Next.js UI) · learn (FastAPI study engine) · postgres · ollama
+# Learn Hub Docker Compose — wires the four parts of the repo:
+#   app      ← frontend/   (Next.js UI)
+#   learn    ← engine/     (FastAPI Learn Engine)
+#   postgres ← postgres/   (the one datastore; init schema + migrations)
+#   ollama   ← models/     (local models; claude:* goes to models/claude-bridge on the host)
 #
 # Usage:
 #   docker compose up -d
@@ -10,7 +11,7 @@ services:
   app:
     build:
       context: ../..
-      dockerfile: deploy/app/Dockerfile
+      dockerfile: frontend/Dockerfile
     ports:
       # Loopback-only publish: `tailscale serve` fronts this as https on 3001 and
       # needs the tailnet IP free (see fleet-ui/apps.js on the migration).
@@ -53,7 +54,7 @@ services:
   # Python learning app (placeholder UI; same Postgres + shared volume as the learn service)
   learn:
     build:
-      context: ../../backend
+      context: ../../engine
       dockerfile: Dockerfile
     ports:
       - '127.0.0.1:8010:8000'
@@ -84,7 +85,7 @@ services:
       # Opus judging kept 33 items (13 problems) in 8 min, ~218K tokens a chapter; the best
       # local model, gpt-oss:120b, kept 28 in 30 min; Lightning and qwen3.8 were worse or slower.
       # The human chose the Claude pair (2026-10-19). claude:* models run on the host's Claude
-      # Code login through scripts/claude_bridge.py (systemd: claude-bridge), which listens
+      # Code login through models/claude-bridge/claude_bridge.py (systemd: claude-bridge), which listens
       # only on this network's gateway and needs the token from compose/.env.
       - LEARN_PRACTICE_MODEL=claude:sonnet
       - LEARN_PRACTICE_JUDGE_MODEL=claude:opus
@@ -124,7 +125,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set in compose/.env}
     volumes:
       - postgres_core_data:/var/lib/postgresql/data
-      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+      - ../../postgres/init:/docker-entrypoint-initdb.d:ro
     networks:
       - default
     healthcheck:
@@ -137,7 +138,7 @@ services:
   # Ollama - Local LLM inference (first build mostly pulls ollama/ollama base image; can take many minutes)
   ollama:
     build:
-      context: ../services/ollama
+      context: ../../models/ollama
       dockerfile: Dockerfile
     image: ollama-custom:latest
     container_name: ollama-compose

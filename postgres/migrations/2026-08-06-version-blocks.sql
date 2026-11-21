@@ -8,7 +8,7 @@
 -- had, at the same order and the same section, so its reading experience is unchanged.
 --
 --   docker exec -i compose-postgres-1 psql -U learnhub -d learnhub \
---     -v ON_ERROR_STOP=1 < deploy/postgres/migrations/2026-08-06-version-blocks.sql
+--     -v ON_ERROR_STOP=1 < postgres/migrations/2026-08-06-version-blocks.sql
 --
 -- Idempotent: safe to re-run.
 

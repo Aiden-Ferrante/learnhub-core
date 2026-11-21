@@ -144,7 +144,7 @@ def _claude_structured(
 def _claude_via_bridge(
     messages: list[dict[str, str]], schema: dict[str, Any], model: str, timeout: float
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Inside the container there is no CLI: ``CLAUDE_BRIDGE_URL`` (scripts/claude_bridge.py
+    """Inside the container there is no CLI: ``CLAUDE_BRIDGE_URL`` (models/claude-bridge/claude_bridge.py
     on the host) makes the same call there."""
     url = os.environ.get("CLAUDE_BRIDGE_URL")
     if not url:

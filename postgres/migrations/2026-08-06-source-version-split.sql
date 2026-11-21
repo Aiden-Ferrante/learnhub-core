@@ -6,7 +6,7 @@
 -- already points at the right thing.
 --
 --   docker exec -i compose-postgres-1 psql -U learnhub -d learnhub \
---     -v ON_ERROR_STOP=1 < deploy/postgres/migrations/2026-08-06-source-version-split.sql
+--     -v ON_ERROR_STOP=1 < postgres/migrations/2026-08-06-source-version-split.sql
 --
 -- Idempotent: safe to re-run.
 

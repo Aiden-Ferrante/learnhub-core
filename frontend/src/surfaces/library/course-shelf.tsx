@@ -24,7 +24,7 @@ import { UnlistedBooks } from "@/surfaces/library/unlisted-books"
 import { useCourseTags } from "@/surfaces/library/use-course-tags"
 import { useReadingPositions, useShelfMastery, useStudyDebt } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
-import { ProgramBanners } from "@/surfaces/programs/program-banners"
+import { ProgramBanners } from "@/surfaces/programs"
 import { LibrarySearchBox } from "@/surfaces/searching"
 
 function FirstCourse() {

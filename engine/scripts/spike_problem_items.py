@@ -11,7 +11,7 @@ counted. If the output is recall wearing a problem's clothes, that is the Compet
 falsifier firing and v0.19.0 should abort rather than ship a pool that cannot test
 production.
 
-Usage:  python scripts/spike_problem_items.py --doc <source> --section toc:1.4.2
+Usage:  python engine/scripts/spike_problem_items.py --doc <source> --section toc:1.4.2
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import json
 import os
 import sys
 
-for _cand in (os.path.join(os.path.dirname(__file__), "..", "backend"), "/app", "."):
+for _cand in (os.path.join(os.path.dirname(__file__), ".."), "/app", "."):
     if os.path.isdir(os.path.join(_cand, "app")):
         sys.path.insert(0, _cand)
         break

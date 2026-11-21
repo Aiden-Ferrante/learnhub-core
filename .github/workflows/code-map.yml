@@ -8,9 +8,9 @@ name: code map
 on:
   push:
     branches: [main]
-    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py', 'frontend/scripts/check-hubs.mjs']
+    paths: ['engine/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py', 'frontend/scripts/check-hubs.mjs']
   pull_request:
-    paths: ['backend/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py', 'frontend/scripts/check-hubs.mjs']
+    paths: ['engine/app/**', 'frontend/**', 'mcp/**', 'MAP.md', 'scripts/gen_map.py', 'scripts/check_hubs.py', 'frontend/scripts/check-hubs.mjs']
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Enforce the module-hub contract — backend (always, hard fail)
+      - name: Enforce the module-hub contract — engine (always, hard fail)
         run: python scripts/check_hubs.py
 
       - uses: actions/setup-node@v4

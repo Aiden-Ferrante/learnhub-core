@@ -14,8 +14,8 @@ a quote; here there is no hurry and no reason to guess.
 Dry-run by default. `--apply` writes.
 
 Usage:
-  python scripts/repair_concept_sources.py                 # report only
-  python scripts/repair_concept_sources.py --apply
+  python engine/scripts/repair_concept_sources.py                 # report only
+  python engine/scripts/repair_concept_sources.py --apply
 """
 from __future__ import annotations
 
@@ -24,9 +24,9 @@ import os
 import re
 import sys
 
-# The app package sits at backend/ in the repo and at / in the service image; try both so
+# The app package sits at engine/ in the repo and at / in the service image; try both so
 # the script runs the same way from a checkout and from inside the container.
-for _cand in (os.path.join(os.path.dirname(__file__), "..", "backend"), "/app", "."):
+for _cand in (os.path.join(os.path.dirname(__file__), ".."), "/app", "."):
     if os.path.isdir(os.path.join(_cand, "app")):
         sys.path.insert(0, _cand)
         break
