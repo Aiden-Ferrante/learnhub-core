@@ -13,7 +13,7 @@ import { useApi, useApiMutation } from "@/kit/data"
 import { courseFromDocument, type Course } from "@/surfaces/library/courses"
 import { useReadingPositions, useShelfMastery } from "@/surfaces/library/use-library-queries"
 import { useDocuments } from "@/surfaces/processing"
-import { normalizePrograms, type ProgramsState } from "@/surfaces/programs/programs"
+import { normalizePrograms, shareOf, type ProgramsState } from "@/surfaces/programs/programs"
 
 export const PROGRAMS_KEY = ["user-settings", "programs"] as const
 
@@ -31,7 +31,7 @@ export function usePrograms() {
   }
   return {
     query,
-    state: state ?? { programs: [], credits: {} },
+    state: state ?? { programs: [] },
     ready: state !== undefined,
     update,
     saveError: save.error,
@@ -48,17 +48,21 @@ export function useProgramCourses() {
     useMemo(() => courses.filter((c) => c.status === "ready" && c.learnDocId).map((c) => c.learnDocId as string), [courses]),
   )
   const positions = useReadingPositions()
-  const studied = (id: string) => {
+  /** A course's concepts and how many you have studied (reviewed at least once). */
+  const concepts = (id: string) => {
     const doc = byId.get(id)?.learnDocId
     const m = doc ? mastery.data?.overall[doc] : undefined
-    return m && m.total > 0 ? m.coverage : 0
+    return { studied: m?.reviewed ?? 0, total: m?.total ?? 0 }
   }
+  /** 0..1 share of the course's concepts studied. */
+  const share = (id: string) => shareOf(concepts(id))
   return {
     courses,
     byId,
     get: (id: string): Course | undefined => byId.get(id),
     exists: (id: string) => byId.has(id),
-    studied,
+    concepts,
+    share,
     continueKey: (id: string) => positions.data?.[id] ?? null,
     isInitialized,
   }

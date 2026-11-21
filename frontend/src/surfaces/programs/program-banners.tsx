@@ -12,7 +12,7 @@ import { Button } from "@/kit/ui/button"
 import { ErrorNotice } from "@/kit/data"
 import { chapterHref } from "@/kit/lib/scope-url"
 import { Bar, ProgramDialog, trackColor, type ProgramDialogState } from "@/surfaces/programs/program-ui"
-import { addProgram, cr, nextInProgram, pctOf, programProgress, trackProgress, type Program } from "@/surfaces/programs/programs"
+import { addProgram, nextInProgram, num, pctOf, programProgress, trackProgress, type Program } from "@/surfaces/programs/programs"
 import { useProgramCourses, usePrograms, type ProgramCourses } from "@/surfaces/programs/use-programs"
 
 export function continueHref(courses: ProgramCourses, courseId: string) {
@@ -49,7 +49,7 @@ export function ProgramBanners() {
           <span className="font-medium text-brand">+ New program</span>
         </button>
       ) : (
-        list.map((p) => <Banner key={p.id} program={p} state={programs.state} courses={courses} />)
+        list.map((p) => <Banner key={p.id} program={p} courses={courses} />)
       )}
       {programs.saveError && <ErrorNotice compact title="Not saved" error={programs.saveError} onRetry={programs.retry} />}
       <ProgramDialog
@@ -70,10 +70,10 @@ export function ProgramBanners() {
   )
 }
 
-function Banner({ program, state, courses }: { program: Program; state: ReturnType<typeof usePrograms>["state"]; courses: ProgramCourses }) {
-  const total = programProgress(state, program, courses.studied)
-  const next = nextInProgram(program, courses.studied, courses.exists)
-  const courseCount = new Set(program.tracks.flatMap((t) => t.courseIds)).size
+function Banner({ program, courses }: { program: Program; courses: ProgramCourses }) {
+  const total = programProgress(program, courses.concepts)
+  const next = nextInProgram(program, courses.share, courses.exists)
+  const courseCount = total.count
   return (
     <article className="group relative grid gap-5 rounded-2xl border border-border bg-card px-6 py-5 transition-colors hover:border-foreground/30 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_auto] md:items-center">
       <div className="min-w-0">
@@ -91,13 +91,13 @@ function Banner({ program, state, courses }: { program: Program; state: ReturnTy
       <div className="flex min-w-0 flex-col gap-2">
         {program.tracks.length === 0 && <p className="text-meta text-muted-foreground">No tracks yet. Open the program to add one.</p>}
         {program.tracks.slice(0, 4).map((t, i) => {
-          const p = trackProgress(state, t, courses.studied)
+          const p = trackProgress(t, courses.concepts)
           return (
             <div key={t.id} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 text-meta">
               <span className="truncate">{t.name}</span>
               <Bar value={pctOf(p)} color={trackColor(i)} />
               <span className="tabular-nums text-muted-foreground">
-                {cr(p.earned)} / {cr(p.required)}
+                {p.done}/{p.count} done
               </span>
             </div>
           )
@@ -105,10 +105,15 @@ function Banner({ program, state, courses }: { program: Program; state: ReturnTy
         {program.tracks.length > 4 && <p className="text-micro text-muted-foreground">+ {program.tracks.length - 4} more tracks</p>}
       </div>
       <div className="flex items-center gap-4 md:flex-col md:items-end md:gap-2">
-        <p className="tabular-nums">
-          <span className="font-serif text-[1.5rem] font-semibold">{cr(total.earned)}</span>
-          <span className="text-meta text-muted-foreground"> of {cr(total.required)} credits</span>
-        </p>
+        <div className="tabular-nums md:text-right">
+          <p>
+            <span className="font-serif text-[1.5rem] font-semibold">{total.done}</span>
+            <span className="text-meta text-muted-foreground"> of {total.count} courses done</span>
+          </p>
+          <p className="text-micro text-muted-foreground">
+            {num(total.studied)} of {num(total.total)} concepts studied
+          </p>
+        </div>
         {next && (
           <Button asChild size="sm" className="relative z-10">
             <Link href={continueHref(courses, next)} title={courses.get(next)?.title}>

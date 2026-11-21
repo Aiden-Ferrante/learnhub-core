@@ -37,21 +37,21 @@ import {
 import {
   addCourses,
   addTrack,
-  cr,
+  countLabel,
   editProgram,
-  editTrack,
   moveTrack,
   nextInProgram,
+  num,
   otherPlaces,
   pctOf,
   programProgress,
   removeProgram,
   removeTrack,
-  ruleLabel,
-  statusOf,
+  renameTrack,
   trackProgress,
   type Program,
   type ProgramTrack,
+  type Progress,
 } from "@/surfaces/programs/programs"
 import { useProgramCourses, usePrograms } from "@/surfaces/programs/use-programs"
 
@@ -81,20 +81,15 @@ export function ProgramPage({ programId }: { programId: string }) {
   }
 
   const s = programs.state
-  const total = programProgress(s, program, courses.studied)
-  const ids = Array.from(new Set(program.tracks.flatMap((t) => t.courseIds))).filter(courses.exists)
-  const done = ids.filter((id) => statusOf(courses.studied(id)) === "done").length
-  const next = nextInProgram(program, courses.studied, courses.exists)
+  const total = programProgress(program, courses.concepts)
+  const next = nextInProgram(program, courses.share, courses.exists)
 
   return (
     <div className="flex flex-col gap-8">
       <Hero
         program={program}
-        parts={program.tracks.map((t, i) => ({ ...trackProgress(s, t, courses.studied), color: trackColor(i), name: t.name }))}
-        earned={total.earned}
-        required={total.required}
-        done={done}
-        count={ids.length}
+        parts={program.tracks.map((t, i) => ({ ...trackProgress(t, courses.concepts), color: trackColor(i), name: t.name }))}
+        total={total}
         nextHref={next ? continueHref(courses, next) : null}
         nextTitle={next ? courses.get(next)?.title : undefined}
         onEdit={() => setProgramDialog({ mode: "edit", id: program.id, name: program.name, goal: program.goal })}
@@ -111,7 +106,7 @@ export function ProgramPage({ programId }: { programId: string }) {
           courses={courses}
           state={s}
           onAdd={() => setAdding(t)}
-          onEdit={() => setTrackDialog({ mode: "edit", id: t.id, name: t.name, rule: t.rule, count: t.courseIds.length })}
+          onEdit={() => setTrackDialog({ mode: "edit", id: t.id, name: t.name })}
           onMove={(dir) => programs.update((x) => moveTrack(x, program.id, t.id, dir))}
           onRemove={() => setConfirm({ kind: "track", track: t })}
         />
@@ -137,10 +132,10 @@ export function ProgramPage({ programId }: { programId: string }) {
       <TrackDialog
         state={trackDialog}
         onClose={() => setTrackDialog(null)}
-        onSubmit={(name, rule) => {
+        onSubmit={(name) => {
           const d = trackDialog
-          if (d?.mode === "edit") programs.update((x) => editTrack(x, program.id, d.id, name, rule))
-          else programs.update((x) => addTrack(x, program.id, name, rule).state)
+          if (d?.mode === "edit") programs.update((x) => renameTrack(x, program.id, d.id, name))
+          else programs.update((x) => addTrack(x, program.id, name).state)
           setTrackDialog(null)
         }}
       />
@@ -190,21 +185,15 @@ export function ProgramPage({ programId }: { programId: string }) {
 function Hero({
   program,
   parts,
-  earned,
-  required,
-  done,
-  count,
+  total,
   nextHref,
   nextTitle,
   onEdit,
   onDelete,
 }: {
   program: Program
-  parts: { earned: number; required: number; color: string; name: string }[]
-  earned: number
-  required: number
-  done: number
-  count: number
+  parts: (Progress & { color: string; name: string })[]
+  total: Progress
   nextHref: string | null
   nextTitle?: string
   onEdit: () => void
@@ -212,24 +201,25 @@ function Hero({
 }) {
   return (
     <header className="relative flex flex-col gap-5 rounded-2xl border border-border bg-card px-7 py-6">
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pr-8">
+        <div className="min-w-[12rem] flex-1">
           <p className="text-micro uppercase tracking-label text-muted-foreground">Program</p>
           <h1 className="font-serif text-[2rem] font-semibold leading-tight">{program.name}</h1>
           {program.goal && <p className="mt-1 max-w-2xl text-body text-muted-foreground">{program.goal}</p>}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+        <div className="flex shrink-0 flex-col gap-1 sm:items-end sm:text-right">
           <p className="tabular-nums">
-            <span className="font-serif text-[2rem] font-semibold leading-none">{cr(earned)}</span>
-            <span className="text-meta text-muted-foreground"> of {cr(required)} credits</span>
+            <span className="font-serif text-[2rem] font-semibold leading-none">{total.done}</span>
+            <span className="text-meta text-muted-foreground"> of {total.count} courses done</span>
           </p>
-          <p className="text-meta text-muted-foreground">
-            {done} of {count} courses done
+          <p className="text-meta tabular-nums text-muted-foreground">
+            {num(total.studied)} of {num(total.total)} concepts studied
+            {total.going > 0 && ` · ${total.going} in progress`}
           </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="-mr-2 -mt-1 h-8 w-8 text-muted-foreground" aria-label="Program actions">
+            <Button variant="ghost" size="icon" className="absolute right-3 top-3 h-8 w-8 text-muted-foreground" aria-label="Program actions">
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
@@ -249,7 +239,7 @@ function Hero({
             <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: p.color }} />
             {p.name}
             <span className="tabular-nums text-muted-foreground">
-              {cr(p.earned)}/{cr(p.required)}
+              {p.done}/{p.count} done
             </span>
           </span>
         ))}
@@ -286,7 +276,7 @@ function TrackShelf({
   onMove: (dir: -1 | 1) => void
   onRemove: () => void
 }) {
-  const p = trackProgress(state, track, courses.studied)
+  const p = trackProgress(track, courses.concepts)
   const color = trackColor(index)
   const href = `/programs/${program.id}/tracks/${track.id}`
   const list = track.courseIds.map((id) => courses.get(id)).filter((c) => c !== undefined)
@@ -299,11 +289,11 @@ function TrackShelf({
             {track.name}
           </Link>
         </h2>
-        <span className="text-meta text-muted-foreground">{ruleLabel(track)}</span>
-        <div className="ml-auto flex items-center gap-3">
-          <Bar value={pctOf(p)} color={color} className="w-32" />
+        <span className="text-meta text-muted-foreground">{countLabel(track)}</span>
+        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Bar value={pctOf(p)} color={color} className="hidden w-32 sm:block" />
           <span className="text-meta tabular-nums text-muted-foreground">
-            {cr(p.earned)} / {cr(p.required)} cr
+            {p.done}/{p.count} done · {pctOf(p)}% of concepts
           </span>
           <Link href={href} className="flex items-center text-meta font-medium text-brand hover:underline">
             Open track <ChevronRight className="h-3.5 w-3.5" />
@@ -316,7 +306,7 @@ function TrackShelf({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={onAdd}>Add courses…</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onEdit}>Edit track…</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}>Rename track…</DropdownMenuItem>
               <DropdownMenuItem disabled={index === 0} onSelect={() => onMove(-1)}>Move up</DropdownMenuItem>
               <DropdownMenuItem disabled={index === program.tracks.length - 1} onSelect={() => onMove(1)}>Move down</DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -332,7 +322,7 @@ function TrackShelf({
           <ProgramCourseCard
             key={c.id}
             course={c}
-            studied={courses.studied(c.id)}
+            concepts={courses.concepts(c.id)}
             also={Array.from(new Set(otherPlaces(state, c.id, track.id).map((x) => (x.program.id === program.id ? x.track.name : x.program.name))))}
           />
         ))}

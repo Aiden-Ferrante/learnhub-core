@@ -2,14 +2,12 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { BookOpen, MoreVertical, Plus, Trash2 } from "lucide-react"
+import { BookOpen, MoreVertical, Tag, Trash2 } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/kit/ui/dropdown-menu"
@@ -18,7 +16,6 @@ import { chapterHref } from "@/kit/lib/scope-url"
 import { cn } from "@/kit/lib/utils"
 import { coverColor, coverMonogram } from "@/surfaces/library/cover"
 import type { SectionMemory } from "@/gateways/api/progress"
-import type { CourseGroup } from "@/surfaces/library/course-groups"
 import type { Course, CourseStatus } from "@/surfaces/library/courses"
 
 const STATUS_BADGE: Record<CourseStatus, { label: string; status: DomainStatus; pulse?: boolean }> = {
@@ -63,22 +60,18 @@ export function CourseCover({ course, small }: { course: Course; small?: boolean
   )
 }
 
-/** One course on the shelf: a framed card with the book cover at about 70% of the card (v0.31.2). The title is a stretched link to the course home, so the whole
+/** One course on the shelf (tags replaced groups and dragging, 2026-11-21): a framed card with the book cover at about 70% of the card (v0.31.2). The title is a stretched link to the course home, so the whole
  *  card opens it; the menu and the reading button sit above that link. */
 export function CourseCard({
   course,
   mastery,
   dueNow,
   continueKey,
-  groups,
-  courseGroupIds,
-  groupsReady,
-  onToggleMembership,
-  onNewGroupForCourse,
+  tags,
+  activeTags,
+  onTagClick,
+  onEditTags,
   onDelete,
-  onDragStart,
-  onDragEnd,
-  dragging,
   subtitle,
 }: {
   course: Course
@@ -88,36 +81,19 @@ export function CourseCard({
   mastery: SectionMemory | null | undefined
   dueNow: number
   continueKey: string | null
-  groups: CourseGroup[]
-  courseGroupIds: string[]
-  /** False until the saved groups load: membership edits wait for them. */
-  groupsReady: boolean
-  onToggleMembership: (courseId: string, groupId: string) => void
-  onNewGroupForCourse: (courseId: string) => void
+  tags: string[]
+  /** Tags the shelf is filtered by (shown filled). */
+  activeTags: string[]
+  onTagClick: (tag: string) => void
+  onEditTags: (course: Course) => void
   onDelete: (course: Course) => void
-  /** Drag the card onto a group in the sidebar to put it there (v0.31.5). */
-  onDragStart?: () => void
-  onDragEnd?: () => void
-  dragging?: boolean
 }) {
   const badge = STATUS_BADGE[course.status]
   const ready = course.status === "ready"
   const color = coverColor(course.title)
   const studied = mastery && mastery.total > 0 ? Math.round(mastery.coverage * 100) : null
   return (
-    <article
-      draggable={Boolean(onDragStart)}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "copyMove"
-        e.dataTransfer.setData("text/plain", course.title) // Firefox needs data to drag
-        onDragStart?.()
-      }}
-      onDragEnd={onDragEnd}
-      className={cn(
-        "group relative flex cursor-grab flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-[colors,opacity] hover:border-foreground/30 active:cursor-grabbing",
-        dragging && "opacity-40",
-      )}
-    >
+    <article className="group relative flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/30">
       <div className="relative mx-auto aspect-[3/4] w-[76%] overflow-hidden rounded-md border border-border bg-background shadow-sm">
         <CourseCover course={course} />
         {dueNow > 0 && (
@@ -163,6 +139,27 @@ export function CourseCard({
               {badge.label}
             </StatusPill>
           )}
+          {tags.length > 0 && (
+            <div className="relative z-10 mt-1 flex flex-wrap gap-1">
+              {tags.map((t) => {
+                const on = activeTags.some((a) => a.toLowerCase() === t.toLowerCase())
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => onTagClick(t)}
+                    title={on ? `Showing ${t}` : `Show only ${t}`}
+                    className={cn(
+                      "max-w-full truncate rounded-full border px-1.5 py-px text-micro transition-colors",
+                      on ? "border-brand/60 bg-brand/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -171,28 +168,9 @@ export function CourseCard({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel>Move to group</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {!groupsReady ? (
-            <DropdownMenuItem disabled>Groups are loading…</DropdownMenuItem>
-          ) : groups.length === 0 ? (
-            <DropdownMenuItem disabled>No groups yet</DropdownMenuItem>
-          ) : (
-            groups.map((g) => (
-              <DropdownMenuCheckboxItem
-                key={g.id}
-                checked={courseGroupIds.includes(g.id)}
-                onSelect={(e) => e.preventDefault()}
-                onCheckedChange={() => onToggleMembership(course.id, g.id)}
-              >
-                {g.name}
-              </DropdownMenuCheckboxItem>
-            ))
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={!groupsReady} onClick={() => onNewGroupForCourse(course.id)}>
-            <Plus className="h-4 w-4" />
-            New group…
+          <DropdownMenuItem onClick={() => onEditTags(course)}>
+            <Tag className="h-4 w-4" />
+            Tags…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-ink-danger focus:text-ink-danger" onClick={() => onDelete(course)}>

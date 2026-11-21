@@ -11,29 +11,25 @@ import { ArrowDown, ArrowUp, Check, Plus, X } from "lucide-react"
 import { Button } from "@/kit/ui/button"
 import { ErrorNotice } from "@/kit/data"
 import { EmptyState } from "@/kit/patterns/empty-state"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kit/ui/select"
 import { cn } from "@/kit/lib/utils"
 import { CourseCover } from "@/surfaces/library/course-card"
 import { continueHref } from "@/surfaces/programs/program-banners"
 import { AddCoursesDialog, Bar, StatusText, TrackDialog, trackColor, type TrackDialogState } from "@/surfaces/programs/program-ui"
 import {
   addCourses,
-  creditsOf,
-  cr,
-  editTrack,
+  countLabel,
   moveCourse,
   nextInTrack,
+  num,
   otherPlaces,
   pctOf,
   removeCourse,
-  ruleLabel,
-  setCredits,
+  renameTrack,
+  shareOf,
   statusOf,
   trackProgress,
 } from "@/surfaces/programs/programs"
 import { useProgramCourses, usePrograms } from "@/surfaces/programs/use-programs"
-
-const CREDIT_CHOICES = [0, 1, 1.5, 2, 3, 4, 5, 6]
 
 export function TrackPage({ programId, trackId }: { programId: string; trackId: string }) {
   const programs = usePrograms()
@@ -61,9 +57,9 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
 
   const s = programs.state
   const color = trackColor(index)
-  const p = trackProgress(s, track, courses.studied)
+  const p = trackProgress(track, courses.concepts)
   const ids = track.courseIds.filter(courses.exists)
-  const next = nextInTrack(track, courses.studied, courses.exists)
+  const next = nextInTrack(track, courses.share, courses.exists)
   const shared = ids.map((id) => ({ id, places: otherPlaces(s, id, track.id) })).filter((x) => x.places.length > 0)
   const update = programs.update
 
@@ -82,12 +78,12 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
             {track.name}
           </h1>
           <p className="text-meta text-muted-foreground">
-            {ruleLabel(track)} · take them in this order
+            {countLabel(track)} · take them in this order
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setEditing({ mode: "edit", id: track.id, name: track.name, rule: track.rule, count: track.courseIds.length })}>
-            Edit track
+          <Button variant="ghost" size="sm" onClick={() => setEditing({ mode: "edit", id: track.id, name: track.name })}>
+            Rename track
           </Button>
           <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
             <Plus />
@@ -109,7 +105,8 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
           )}
           {ids.map((id, i) => {
             const c = courses.get(id)!
-            const studied = courses.studied(id)
+            const concepts = courses.concepts(id)
+            const studied = shareOf(concepts)
             const st = statusOf(studied)
             const places = Array.from(new Set(otherPlaces(s, id, track.id).map((x) => (x.program.id === program.id ? x.track.name : `${x.program.name} › ${x.track.name}`))))
             return (
@@ -130,24 +127,12 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
                     {c.title}
                   </Link>
                   <p className="flex flex-wrap items-center gap-x-3 text-micro text-muted-foreground">
-                    <StatusText studied={studied} />
+                    <StatusText concepts={concepts} />
                     {id === next && <span className="font-medium text-brand">Up next</span>}
                     {places.length > 0 && <span>also counts toward {places.join(", ")}</span>}
                   </p>
                   {st === "going" && <Bar value={studied * 100} color={color} className="mt-1 h-1 w-40" />}
                 </div>
-                <Select value={String(creditsOf(s, id))} onValueChange={(v) => update((x) => setCredits(x, id, Number(v)))}>
-                  <SelectTrigger className="h-8 w-[5.5rem] text-meta" aria-label={`Credits for ${c.title}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CREDIT_CHOICES.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n} cr
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <div className="flex items-center opacity-60 transition-opacity group-hover:opacity-100">
                   <Button variant="ghost" size="icon" className="h-8 w-8" disabled={i === 0} aria-label={`Move ${c.title} up`} onClick={() => update((x) => moveCourse(x, program.id, track.id, id, -1))}>
                     <ArrowUp />
@@ -166,14 +151,14 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
 
         <aside className="flex flex-col gap-4">
           <section className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-micro uppercase tracking-label text-muted-foreground">Credits</p>
+            <p className="text-micro uppercase tracking-label text-muted-foreground">Progress</p>
             <p className="mt-1 tabular-nums">
-              <span className="font-serif text-[1.75rem] font-semibold">{cr(p.earned)}</span>
-              <span className="text-meta text-muted-foreground"> / {cr(p.required)}</span>
+              <span className="font-serif text-[1.75rem] font-semibold">{p.done}</span>
+              <span className="text-meta text-muted-foreground"> of {p.count} courses done</span>
             </p>
             <Bar value={pctOf(p)} color={color} className="mt-2" />
-            <p className="mt-2 text-meta text-muted-foreground">
-              {p.done} of {p.count} courses done
+            <p className="mt-2 text-meta tabular-nums text-muted-foreground">
+              {num(p.studied)} of {num(p.total)} concepts studied
             </p>
           </section>
           <section className="rounded-2xl border border-border bg-card p-5">
@@ -182,7 +167,7 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
               <>
                 <p className="mt-1.5 font-medium leading-snug">{courses.get(next)?.title}</p>
                 <p className="text-micro text-muted-foreground">
-                  <StatusText studied={courses.studied(next)} />
+                  <StatusText concepts={courses.concepts(next)} />
                 </p>
                 <Button asChild size="sm" className="mt-3">
                   <Link href={continueHref(courses, next)}>{courses.continueKey(next) ? "Continue reading" : "Start"}</Link>
@@ -231,8 +216,8 @@ export function TrackPage({ programId, trackId }: { programId: string; trackId: 
       <TrackDialog
         state={editing}
         onClose={() => setEditing(null)}
-        onSubmit={(name, rule) => {
-          update((x) => editTrack(x, program.id, track.id, name, rule))
+        onSubmit={(name) => {
+          update((x) => renameTrack(x, program.id, track.id, name))
           setEditing(null)
         }}
       />

@@ -40,7 +40,6 @@ export const roots = {
   unplacedBlocks: ["unplaced-blocks"],
   versions: ["versions"],
   readingProgress: ["reading-progress"],
-  groups: ["course-groups"],
   courseStatus: ["course-status"],
   deletion: ["deletion-impact"],
   extraction: ["extraction-status"],
@@ -65,7 +64,6 @@ export const qk = {
   /** Whole-library due rollup (fetchStudyDebt). Feeds every due badge. */
   studyDebt: (days = 7) => [...roots.studyDebt, days],
   readingProgress: () => [...roots.readingProgress],
-  groups: () => [...roots.groups],
   versions: (book: string) => [...roots.versions, book],
   courseStatus: (doc: string) => [...roots.courseStatus, doc],
   /** Impact read before deleting a course (fetchLearnDeletion). */

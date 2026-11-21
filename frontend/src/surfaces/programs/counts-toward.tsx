@@ -11,7 +11,7 @@ import { Button } from "@/kit/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/kit/ui/dialog"
 import { Label } from "@/kit/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kit/ui/select"
-import { addCourses, cr, creditsOf, placements, removeCourse, trackProgress } from "@/surfaces/programs/programs"
+import { addCourses, placements, removeCourse, trackProgress } from "@/surfaces/programs/programs"
 import { useProgramCourses, usePrograms } from "@/surfaces/programs/use-programs"
 
 export function CountsToward({ courseId }: { courseId: string }) {
@@ -21,21 +21,20 @@ export function CountsToward({ courseId }: { courseId: string }) {
   if (!programs.ready) return null
   const s = programs.state
   const here = placements(s, courseId)
-  const credits = creditsOf(s, courseId)
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-meta">
-      <span className="mr-1 text-micro uppercase tracking-label text-muted-foreground">Counts toward</span>
+      <span className="mr-1 text-micro uppercase tracking-label text-muted-foreground">Part of</span>
       {here.length === 0 && <span className="text-muted-foreground">No program yet</span>}
       {here.map(({ program, track }) => {
-        const p = trackProgress(s, track, courses.studied)
+        const p = trackProgress(track, courses.concepts)
         return (
           <span key={track.id} className="group flex items-center gap-1 rounded-full border border-border bg-background py-0.5 pl-3 pr-1">
             <Link href={`/programs/${program.id}/tracks/${track.id}`} className="hover:underline">
               {program.name} <span className="text-muted-foreground">›</span> {track.name}
             </Link>
             <span className="tabular-nums text-muted-foreground">
-              · {cr(credits)} cr · track {cr(p.earned)}/{cr(p.required)}
+              · track {p.done}/{p.count} done
             </span>
             <button
               type="button"

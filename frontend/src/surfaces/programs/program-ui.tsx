@@ -10,12 +10,11 @@ import { Button } from "@/kit/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/kit/ui/dialog"
 import { Input } from "@/kit/ui/input"
 import { Label } from "@/kit/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kit/ui/select"
 import { cn } from "@/kit/lib/utils"
 import { CourseCover } from "@/surfaces/library/course-card"
 import { COURSE_COLORS, coverColor } from "@/surfaces/library/cover"
 import type { Course } from "@/surfaces/library/courses"
-import { statusOf, type TrackRule } from "@/surfaces/programs/programs"
+import { num, statusOf } from "@/surfaces/programs/programs"
 
 /** A track's colour: by its place in the program, from the course palette. */
 export const trackColor = (i: number) => COURSE_COLORS[i % COURSE_COLORS.length]
@@ -28,31 +27,34 @@ export function Bar({ value, color, className }: { value: number; color: string;
   )
 }
 
-/** One bar for a program, a segment per track sized by its required credits, filled by what is earned. */
-export function SegmentedBar({ parts, className }: { parts: { earned: number; required: number; color: string }[]; className?: string }) {
-  const total = parts.reduce((a, p) => a + p.required, 0)
+/** One bar for a program, a segment per track sized by its concepts, filled by those studied. */
+export function SegmentedBar({ parts, className }: { parts: { studied: number; total: number; color: string }[]; className?: string }) {
+  const total = parts.reduce((a, p) => a + p.total, 0)
   if (total <= 0) return <div className={cn("h-2 rounded-full bg-muted", className)} />
   return (
     <div className={cn("flex h-2 gap-0.5", className)}>
       {parts.map((p, i) => (
-        <div key={i} className="h-full overflow-hidden rounded-full bg-muted" style={{ width: `${(p.required / total) * 100}%` }}>
-          <div className="h-full" style={{ width: `${p.required ? (p.earned / p.required) * 100 : 0}%`, background: p.color }} />
+        <div key={i} className="h-full overflow-hidden rounded-full bg-muted" style={{ width: `${(p.total / total) * 100}%` }}>
+          <div className="h-full" style={{ width: `${p.total ? (p.studied / p.total) * 100 : 0}%`, background: p.color }} />
         </div>
       ))}
     </div>
   )
 }
 
-export function StatusText({ studied }: { studied: number }) {
-  const s = statusOf(studied)
-  if (s === "done") return <span className="text-ink-ok">✓ Done</span>
-  if (s === "going") return <span>{Math.round(studied * 100)}% studied</span>
-  return <span>Not started</span>
+/** "✓ Done", "84 of 145 concepts", or "Not started · 145 concepts". */
+export function StatusText({ concepts }: { concepts: { studied: number; total: number } }) {
+  const share = concepts.total > 0 ? concepts.studied / concepts.total : 0
+  const s = statusOf(share)
+  if (s === "done") return <span className="text-ink-ok">✓ Done · {num(concepts.total)} concepts</span>
+  if (s === "going") return <span>{num(concepts.studied)} of {num(concepts.total)} concepts</span>
+  return <span>Not started{concepts.total > 0 ? ` · ${num(concepts.total)} concepts` : ""}</span>
 }
 
 /** A course in a track shelf: today's cover card, smaller, with where else it counts. */
-export function ProgramCourseCard({ course, studied, also }: { course: Course; studied: number; also: string[] }) {
+export function ProgramCourseCard({ course, concepts, also }: { course: Course; concepts: { studied: number; total: number }; also: string[] }) {
   const color = coverColor(course.title)
+  const studied = concepts.total > 0 ? concepts.studied / concepts.total : 0
   return (
     <article className="group relative flex flex-col gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/30">
       <div className="relative mx-auto aspect-[3/4] w-[76%] overflow-hidden rounded-md border border-border bg-background shadow-sm">
@@ -67,7 +69,7 @@ export function ProgramCourseCard({ course, studied, also }: { course: Course; s
         </Link>
       </h3>
       <p className="text-micro tabular-nums text-muted-foreground">
-        <StatusText studied={studied} />
+        <StatusText concepts={concepts} />
       </p>
       {also.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -130,9 +132,9 @@ function ProgramForm({ state, onClose, onSubmit }: { state: Exclude<ProgramDialo
   )
 }
 
-export type TrackDialogState = { mode: "new" } | { mode: "edit"; id: string; name: string; rule: TrackRule; count: number } | null
+export type TrackDialogState = { mode: "new" } | { mode: "edit"; id: string; name: string } | null
 
-export function TrackDialog({ state, onClose, onSubmit }: { state: TrackDialogState; onClose: () => void; onSubmit: (name: string, rule: TrackRule) => void }) {
+export function TrackDialog({ state, onClose, onSubmit }: { state: TrackDialogState; onClose: () => void; onSubmit: (name: string) => void }) {
   return (
     <Dialog open={state !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">{state && <TrackForm key={state.mode} state={state} onClose={onClose} onSubmit={onSubmit} />}</DialogContent>
@@ -140,37 +142,18 @@ export function TrackDialog({ state, onClose, onSubmit }: { state: TrackDialogSt
   )
 }
 
-function TrackForm({ state, onClose, onSubmit }: { state: Exclude<TrackDialogState, null>; onClose: () => void; onSubmit: (n: string, r: TrackRule) => void }) {
+function TrackForm({ state, onClose, onSubmit }: { state: Exclude<TrackDialogState, null>; onClose: () => void; onSubmit: (n: string) => void }) {
   const [name, setName] = useState(state.mode === "edit" ? state.name : "")
-  const [kind, setKind] = useState<"all" | "any">(state.mode === "edit" ? state.rule.kind : "all")
-  const [n, setN] = useState(state.mode === "edit" && state.rule.kind === "any" ? state.rule.n : 2)
-  const submit = () => name.trim() && onSubmit(name, kind === "all" ? { kind: "all" } : { kind: "any", n: Math.max(1, n) })
+  const submit = () => name.trim() && onSubmit(name)
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{state.mode === "edit" ? "Edit track" : "New track"}</DialogTitle>
+        <DialogTitle>{state.mode === "edit" ? "Rename track" : "New track"}</DialogTitle>
         <DialogDescription>A track is a set of courses inside the program, in the order you would take them.</DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="track-name">Name</Label>
-          <Input id="track-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Machine Learning" autoFocus onKeyDown={(e) => e.key === "Enter" && submit()} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>What counts</Label>
-          <div className="flex items-center gap-2">
-            <Select value={kind} onValueChange={(v) => setKind(v as "all" | "any")}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Every course</SelectItem>
-                <SelectItem value="any">Any number of them</SelectItem>
-              </SelectContent>
-            </Select>
-            {kind === "any" && (
-              <Input type="number" min={1} value={n} onChange={(e) => setN(Number(e.target.value) || 1)} className="w-20" aria-label="How many courses count" />
-            )}
-          </div>
-        </div>
+      <div className="space-y-1.5 py-2">
+        <Label htmlFor="track-name">Name</Label>
+        <Input id="track-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Machine Learning" autoFocus onKeyDown={(e) => e.key === "Enter" && submit()} />
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>

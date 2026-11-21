@@ -1,7 +1,7 @@
 /** Library — the shelf and the course home: pick a course, see where you stand.
  *
  *  This file is the surface's HUB: the only legal import surface from outside.
- *  Owns the course model (courses/course-groups/cover), the shelf + course home
+ *  Owns the course model (courses/course-tags/cover), the shelf + course home
  *  screens, the syllabus tree, the next-step rule, and the course data hooks.
  *  Depends on: processing (document list), concepts (mastery dot), gateways/, kit/. */
 
