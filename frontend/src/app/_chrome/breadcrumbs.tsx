@@ -96,7 +96,7 @@ function CourseCrumbs() {
   } else if (sub === "chapters" && hubKey) {
     const chapter = chaptersFromOutline(outline.data?.outline ?? []).find((c) => c.key === hubKey)
     crumbs.push({ label: chapterLabel(chapter) || "Chapter", href: hubHref(hubKey) })
-    if (segments[4] === "step") crumbs.push({ label: `Step ${segments[5] ?? ""}`.trim() })
+    if (segments[4] === "step") crumbs.push({ label: stepCrumb(outline.data?.outline ?? [], hubKey, Number(segments[5]) || 1) })
   } else if (sub === "packs" && packKey) {
     crumbs.push({ label: SUBPAGE_LABELS.packs, href: `/courses/${segments[1]}/packs` })
     crumbs.push({ label: pack.data?.title || "Pack" })
@@ -137,4 +137,26 @@ function CourseCrumbs() {
       })}
     </nav>
   )
+}
+
+const EXTRA = /^(exercises?|solutions?|answers?|problems?|notes|references|bibliography|further reading|projects?)\b/i
+
+/** The step crumb names the section by the book's number (6.3), like the path does; it walks
+ *  the chapter's depth-1 outline entries the way chapterSteps walks the tree. Falls back to
+ *  "Step N" for an unnumbered section. */
+function stepCrumb(
+  entries: { sectionKey: string; title: string; listDepth: number; numberKey: string | null; hiddenReason?: string | null }[],
+  chapterKey: string,
+  n: number,
+): string {
+  const start = entries.findIndex((e) => e.listDepth === 0 && e.sectionKey === chapterKey)
+  const kids: typeof entries = []
+  for (let i = start + 1; start >= 0 && i < entries.length && entries[i].listDepth > 0; i++) {
+    const e = entries[i]
+    const title = e.title.replace(/^\s*\d+(\.\d+)*\s*[.:)]?\s*/, "").replace(/^[\s–—-]+/, "")
+    if (e.listDepth === 1 && !e.hiddenReason && !EXTRA.test(title)) kids.push(e)
+  }
+  const e = kids[n - 1]
+  const num = e?.numberKey ?? (e ? /^toc:(\d+(?:\.\d+)+)$/.exec(e.sectionKey)?.[1] : undefined)
+  return num ?? `Step ${n}`
 }

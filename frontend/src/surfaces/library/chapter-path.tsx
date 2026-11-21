@@ -59,6 +59,12 @@ export function chapterSteps(chapter: LearnTreeNode): LearnTreeNode[] {
   return chapter.children.filter((s) => s.isSection && s.sectionKey && !EXTRA.test(plainTitle(s)))
 }
 
+/** What a step is called: the book's own section number (6.1, 6.2 …; human, 2026-11-21),
+ *  or "Step N" when the section has none (an unnumbered introduction). */
+export function stepLabel(numbers: Map<string, string>, node: LearnTreeNode, index: number): string {
+  return numbers.get(node.id) ?? `Step ${index + 1}`
+}
+
 export function chapterStepHref(courseId: string, chapterKey: string, index: number): string {
   return `/courses/${courseId}/chapters/${encodeURIComponent(chapterKey)}/step/${index + 1}`
 }
@@ -138,7 +144,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
           <div>
             <h1 className="m-0 font-serif text-[26px] font-semibold leading-tight">{plainTitle(chapter)}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {steps.length} steps
+              {steps.length} sections
               {totalWords > 0 && ` · about ${minutesOf(totalWords)} min of reading`}
               {conceptCount > 0 && ` · ${conceptCount} concepts`}
               {m && m.total > 0 ? ` · ${pct(m)}% studied` : ""}
@@ -148,7 +154,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
         <div className="mt-1.5 flex max-w-[520px] items-center gap-3">
           <Bar value={steps.length ? (done / steps.length) * 100 : 0} color={color} className="h-[5px] flex-1" />
           <span className="shrink-0 text-meta tabular-nums text-muted-foreground">
-            {done} of {steps.length} steps
+            {done} of {steps.length} sections
           </span>
         </div>
       </header>
@@ -160,9 +166,9 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
             <span className={label}>Read</span>
             <span className="block truncate font-semibold">
               {current
-                ? `${reading ? "Continue" : currentIndex === 0 && done === 0 ? "Start" : "Next"} · Step ${currentIndex + 1}: ${plainTitle(current.node)}`
+                ? `${reading ? "Continue" : currentIndex === 0 && done === 0 ? "Start" : "Next"} · ${stepLabel(numbers, current.node, currentIndex)} ${plainTitle(current.node)}`
                 : steps.length
-                  ? "Every step read"
+                  ? "Every section read"
                   : "Nothing to read here"}
             </span>
             <Link
@@ -213,7 +219,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                         : `Pass ${PASS_MARK}% to complete this chapter`}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {done} of {steps.length} steps complete
+                  {done} of {steps.length} sections complete
                   {rec ? ` · ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}` : ""}
                 </span>
               </>
@@ -245,7 +251,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
         <div>
           <h2 className="m-0 font-serif text-[22px] font-semibold">Your path</h2>
           <p className="mt-1 text-meta text-muted-foreground">
-            Read each step, check your understanding, then take the exam. Open a step for its key concepts.
+            Read each section, check your understanding, then take the exam. Open a section for its key concepts.
           </p>
         </div>
           <ol className="m-0 flex list-none flex-col p-0">
@@ -256,6 +262,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
               const n = due.get(s.sectionKey!) ?? 0
               const share = pct(by[s.sectionKey!])
               const isOpen = opened[s.id] ?? isCurrent
+              const num = stepLabel(numbers, s, i)
               const words = wordsOf(s)
               const wasRead = read.has(s.sectionKey!)
               const status = isDone
@@ -280,7 +287,8 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                   <span
                     aria-hidden
                     className={cn(
-                      "relative z-10 mt-3 grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 text-sm font-semibold tabular-nums",
+                      "relative z-10 mt-3 grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 font-semibold tabular-nums",
+                      num.length > 3 ? "text-[11px]" : "text-sm",
                       !isDone && !isCurrent && "border-border bg-background text-muted-foreground",
                     )}
                     style={
@@ -291,7 +299,7 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                           : undefined
                     }
                   >
-                    {isDone ? "✓" : i + 1}
+                    {isDone ? "✓" : numbers.get(s.id) ?? i + 1}
                   </span>
                   <div
                     className={cn(
@@ -309,7 +317,8 @@ export function ChapterDashboard({ data, chapterKey }: { data: CourseData; chapt
                       <span className="min-w-0 flex-1">
                         <span className="block text-[11px] font-semibold uppercase tracking-widest" style={isCurrent ? { color } : undefined}>
                           <span className={cn(!isCurrent && "text-muted-foreground")}>
-                            {isCurrent ? (reading ? "You are here" : "Up next") : `Step ${i + 1}`}
+                            {num}
+                            {isCurrent && ` · ${reading ? "You are here" : "Up next"}`}
                           </span>
                         </span>
                         <span className={cn("mt-0.5 block font-serif text-[20px] font-semibold leading-snug", isDone && !isCurrent && "text-foreground/70")}>

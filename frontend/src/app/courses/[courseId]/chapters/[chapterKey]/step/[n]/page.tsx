@@ -9,6 +9,7 @@ import {
   chapterSteps,
   CourseFallback,
   plainTitle,
+  stepLabel,
   useChapters,
   useCourseData,
 } from "@/surfaces/library"
@@ -25,8 +26,8 @@ export default function ChapterStepPage({
   const { chapters, numbers } = useChapters(data.tree)
   const chapter = chapters.find((c) => c.sectionKey === chapterKey)
   const steps = useMemo(
-    () => (chapter ? chapterSteps(chapter).map((node) => ({ node, title: plainTitle(node) })) : []),
-    [chapter],
+    () => (chapter ? chapterSteps(chapter).map((node, i) => ({ node, title: plainTitle(node), label: stepLabel(numbers, node, i) })) : []),
+    [chapter, numbers],
   )
 
   if (!data.course) return <CourseFallback isInitialized={data.isInitialized} />

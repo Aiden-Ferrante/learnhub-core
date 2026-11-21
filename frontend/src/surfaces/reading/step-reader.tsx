@@ -30,7 +30,7 @@ const SOURCE_TAG = /\[((?:pp?\.|v\d{2}\.|beyond)[^\]]*)\]/g
 const PART_WORDS = 250
 const WPM = 230
 
-export type Step = { node: LearnTreeNode; title: string }
+export type Step = { node: LearnTreeNode; title: string; label: string }
 
 /** Drop the section's own heading (the page names the step), quiet the provenance lines
  *  ("*Topics List … · [pp.11–92 · v06.03]*") and turn inline source tags into marker links. */
@@ -209,7 +209,7 @@ export function StepReader({
             ← {chapterNumber ? `Chapter ${chapterNumber}` : chapterTitle}
           </Link>
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
-            Step {index + 1} of {steps.length}
+            {step.label} · {index + 1} of {steps.length}
             {parts.length > 1 && ` · part ${Math.min(shown, parts.length)} of ${parts.length}`}
             {parts.length > 0 && !allShown && ` · ${minutesLeft} min left`}
           </span>
@@ -218,7 +218,7 @@ export function StepReader({
               <Link
                 key={s.node.id}
                 href={stepHref(i)}
-                aria-label={`Step ${i + 1}: ${s.title}`}
+                aria-label={`${s.label}: ${s.title}`}
                 className={cn("h-1.5 w-5 rounded-full", i === index ? "bg-primary" : i < index ? "bg-foreground/40" : "bg-muted")}
               />
             ))}
@@ -240,7 +240,7 @@ export function StepReader({
 
       <article className={cn("mx-auto max-w-[88rem] px-8 pt-12", SIZES[size].className)}>
         <p className="mb-3 font-sans text-xs uppercase tracking-widest text-muted-foreground">
-          {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}Step {index + 1}
+          {chapterNumber ? `Chapter ${chapterNumber} · ` : ""}{step.label}
           {parts.length > 0 && ` · ${totalMinutes} min read`}
         </p>
         <h1 className="m-0 mb-10 font-serif text-[1.9em] font-semibold leading-tight">{step.title}</h1>
@@ -303,9 +303,9 @@ export function StepReader({
               </>
             ) : (
               <>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">End of step {index + 1}</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">End of {step.label}</p>
                 <h2 className="mt-1 text-lg font-semibold">
-                  {offerCheck ? `Check your understanding · ${conceptCount} concepts` : "Step read"}
+                  {offerCheck ? `Check your understanding · ${conceptCount} concepts` : "Section read"}
                 </h2>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {offerCheck && (
@@ -325,7 +325,7 @@ export function StepReader({
                         offerCheck ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground",
                       )}
                     >
-                      {offerCheck ? "Skip · next step →" : `Next: ${steps[next].title} →`}
+                      {offerCheck ? `Skip · next: ${steps[next].label} →` : `Next: ${steps[next].label} ${steps[next].title} →`}
                     </Link>
                   ) : (
                     <Link
@@ -347,7 +347,7 @@ export function StepReader({
         {prev != null && (
           <p className="mt-6 font-sans text-meta text-muted-foreground">
             <Link href={stepHref(prev)} className="hover:text-foreground">
-              ← Previous: {steps[prev].title}
+              ← Previous: {steps[prev].label} {steps[prev].title}
             </Link>
           </p>
         )}
