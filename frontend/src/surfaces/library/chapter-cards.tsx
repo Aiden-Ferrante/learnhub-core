@@ -15,13 +15,16 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { displaySectionTitle, numberSections, type LearnTreeNode } from "@/gateways/api/outline"
 import type { SectionMemory } from "@/gateways/api/progress"
 import { fetchCourseReviewQueue } from "@/gateways/api/review"
 import { qk, useApi } from "@/kit/data"
 import { cn } from "@/kit/lib/utils"
 import { ChapterCardMenu, extractionLine, useChapterExtractions } from "@/surfaces/library/chapter-card-menu"
+import { GroupHeader, GroupNameDialog } from "@/surfaces/library/chapter-group-ui"
+import { addGroup, layoutSections, moveChapter, moveGroup, removeGroup, renameGroup } from "@/surfaces/library/chapter-groups"
+import { useChapterGroups } from "@/surfaces/library/use-chapter-groups"
 import { CourseStats } from "@/surfaces/library/course-stats"
 import { coverColor } from "@/surfaces/library/cover"
 import { PASS_MARK, useDemoExams, type ExamRecord } from "@/surfaces/library/demo-exams"
@@ -194,6 +197,55 @@ export function ChapterCards({ data }: { data: CourseData }) {
   const examChapters = chapters.filter((c) => numbers.get(c.id))
   const router = useRouter()
   const extraction = useChapterExtractions(course.learnDocId)
+  const chapterKeys = useMemo(() => chapters.map((c) => c.sectionKey!), [chapters])
+  const cg = useChapterGroups(course.id, course.learnDocId, chapterKeys)
+  const sections = useMemo(() => layoutSections(chapters, cg.groups), [chapters, cg.groups])
+  const [closed, setClosed] = useState<Set<string>>(new Set())
+  const [naming, setNaming] = useState<
+    { mode: "new"; chapterKey?: string } | { mode: "rename"; id: string; name: string } | null
+  >(null)
+
+  const renderCard = (c: LearnTreeNode, groupId: string | null) => {
+    const num = numbers.get(c.id)
+    const share = pct(by[c.sectionKey!])
+    const n = due.get(c.sectionKey!) ?? 0
+    const job = extraction.job(c.sectionKey!)
+    const line = extractionLine(job)
+    const running = job?.status === "running" || job?.status === "queued"
+    return (
+      // The menu sits beside the card's link, not inside it (no button inside a link).
+      <div key={c.id} className="relative transition hover:-translate-y-0.5">
+        <ChapterCardMenu
+          title={num ? `Chapter ${num} · ${plainTitle(c)}` : plainTitle(c)}
+          running={running}
+          onExtract={() => extraction.start.fire(c.sectionKey!)}
+          groups={cg.ready ? cg.groups.map((g) => ({ id: g.id, name: g.name })) : undefined}
+          groupId={groupId}
+          onMove={cg.ready ? (gid) => cg.update((gs) => moveChapter(gs, c.sectionKey!, gid)) : undefined}
+          onNewGroup={() => setNaming({ mode: "new", chapterKey: c.sectionKey! })}
+        />
+        <Link
+          href={chaptersHref(course.id, c.sectionKey!)}
+          className="relative flex h-full min-h-[180px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px] hover:border-muted-foreground/50"
+        >
+          <Badge count={n} />
+          <span
+            className={cn("font-serif text-[44px] font-semibold leading-none", !(n > 0 || share > 0) && "text-muted-foreground/50")}
+            style={n > 0 || share > 0 ? { color } : undefined}
+          >
+            {num ?? "·"}
+          </span>
+          <span className="flex-1 text-[15px] font-semibold leading-snug">{plainTitle(c)}</span>
+          <span className="flex flex-col gap-1.5">
+            <span className="text-meta tabular-nums text-muted-foreground">{share}% studied</span>
+            <Bar value={share} color={color} />
+            {num ? <ExamLine rec={exams.chapters[c.sectionKey!]} /> : <span className="text-meta text-muted-foreground/60">No exam</span>}
+            {line && <span className={cn("text-meta", job?.status === "error" ? "text-ink-danger" : "text-ink-accent")}>{line}</span>}
+          </span>
+        </Link>
+      </div>
+    )
+  }
   // A chapter square in the Progress strip opens that chapter's dashboard, like its card.
   const openChapter = (scope: string) => {
     const ch = chapters.find((c) => contains(c, scope))
@@ -219,48 +271,81 @@ export function ChapterCards({ data }: { data: CourseData }) {
       {data.loading && chapters.length === 0 ? (
         <p className="text-muted-foreground">Loading chapters…</p>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-[18px] pt-3">
-          {chapters.map((c) => {
-            const num = numbers.get(c.id)
-            const share = pct(by[c.sectionKey!])
-            const n = due.get(c.sectionKey!) ?? 0
-            const job = extraction.job(c.sectionKey!)
-            const line = extractionLine(job)
-            const running = job?.status === "running" || job?.status === "queued"
+        <div className="flex flex-col gap-7 pt-3">
+          <div className="-mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted-foreground">
+            {cg.groups.length > 0 && cg.isAuto && <span>Grouped by the book’s parts</span>}
+            <button type="button" disabled={!cg.ready} onClick={() => setNaming({ mode: "new" })} className="hover:text-foreground disabled:opacity-50">
+              + New chapter group
+            </button>
+            {!cg.isAuto && cg.hasBookParts && (
+              <button type="button" onClick={cg.reset} className="hover:text-foreground">
+                Reset to the book’s parts
+              </button>
+            )}
+            {cg.saveError && (
+              <span className="text-ink-danger">
+                Groups not saved ·{" "}
+                <button type="button" onClick={cg.retry} className="underline">
+                  Retry
+                </button>
+              </span>
+            )}
+          </div>
+          {sections.map((sec, si) => {
+            const g = sec.group
+            const isOpen = !g || !closed.has(g.id)
+            const gi = g ? cg.groups.findIndex((x) => x.id === g.id) : -1
+            const studied = sec.chapters.length
+              ? Math.round(sec.chapters.reduce((a, c) => a + pct(by[c.sectionKey!]), 0) / sec.chapters.length)
+              : 0
             return (
-              // The menu sits beside the card's link, not inside it (no button inside a link).
-              <div key={c.id} className="relative transition hover:-translate-y-0.5">
-              <ChapterCardMenu
-                title={num ? `Chapter ${num} · ${plainTitle(c)}` : plainTitle(c)}
-                running={running}
-                onExtract={() => extraction.start.fire(c.sectionKey!)}
-              />
-              <Link
-                href={chaptersHref(course.id, c.sectionKey!)}
-                className="relative flex h-full min-h-[180px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px] hover:border-muted-foreground/50"
-              >
-                <Badge count={n} />
-                <span
-                  className={cn("font-serif text-[44px] font-semibold leading-none", !(n > 0 || share > 0) && "text-muted-foreground/50")}
-                  style={n > 0 || share > 0 ? { color } : undefined}
-                >
-                  {num ?? "·"}
-                </span>
-                <span className="flex-1 text-[15px] font-semibold leading-snug">
-                  {plainTitle(c)}
-                </span>
-                <span className="flex flex-col gap-1.5">
-                  <span className="text-meta tabular-nums text-muted-foreground">{share}% studied</span>
-                  <Bar value={share} color={color} />
-                  {num ? <ExamLine rec={exams.chapters[c.sectionKey!]} /> : <span className="text-meta text-muted-foreground/60">No exam</span>}
-                  {line && <span className={cn("text-meta", job?.status === "error" ? "text-ink-danger" : "text-ink-accent")}>{line}</span>}
-                </span>
-              </Link>
-              </div>
+              <section key={g?.id ?? `loose-${si}`} className="flex flex-col gap-3">
+                {g ? (
+                  <GroupHeader
+                    group={g}
+                    count={sec.chapters.length}
+                    studied={studied}
+                    open={isOpen}
+                    onToggle={() => setClosed((c) => toggleSet(c, g.id))}
+                    editable={cg.ready}
+                    first={gi === 0}
+                    last={gi === cg.groups.length - 1}
+                    onRename={() => setNaming({ mode: "rename", id: g.id, name: g.name })}
+                    onMove={(dir) => cg.update((gs) => moveGroup(gs, g.id, dir))}
+                    onDelete={() => cg.update((gs) => removeGroup(gs, g.id))}
+                  />
+                ) : (
+                  cg.groups.length > 0 && (
+                    <div className="border-b border-border pb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      {si === 0 ? "Before the first group" : "Not in a group"}
+                    </div>
+                  )
+                )}
+                {isOpen && sec.chapters.length === 0 && (
+                  <p className="m-0 text-meta text-muted-foreground">
+                    No chapters yet. Use a chapter’s ⋮ → Move to group.
+                  </p>
+                )}
+                {isOpen && sec.chapters.length > 0 && (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-[18px]">
+                    {sec.chapters.map((c) => renderCard(c, g?.id ?? null))}
+                  </div>
+                )}
+              </section>
             )
           })}
         </div>
       )}
+      <GroupNameDialog
+        open={naming !== null}
+        title={naming?.mode === "rename" ? "Rename group" : "New chapter group"}
+        initial={naming?.mode === "rename" ? naming.name : ""}
+        onClose={() => setNaming(null)}
+        onSave={(name) => {
+          if (naming?.mode === "rename") cg.update((gs) => renameGroup(gs, naming.id, name))
+          else cg.update((gs) => addGroup(gs, name, naming?.mode === "new" ? naming.chapterKey : undefined))
+        }}
+      />
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-meta text-muted-foreground">
         <Link href={`/courses/${course.id}/review`} className="hover:text-foreground">
           Review everything due{data.reviewDue ? ` (${data.reviewDue})` : ""}
@@ -271,4 +356,11 @@ export function ChapterCards({ data }: { data: CourseData }) {
       </p>
     </div>
   )
+}
+
+function toggleSet(set: Set<string>, id: string): Set<string> {
+  const n = new Set(set)
+  if (n.has(id)) n.delete(id)
+  else n.add(id)
+  return n
 }

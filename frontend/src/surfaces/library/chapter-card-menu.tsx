@@ -8,6 +8,7 @@
  *  after a confirm, because it replaces the chapter's concepts (review progress carries over to
  *  concepts that come back under the same or a similar name — concepts_extract.py). While it runs
  *  the card shows its progress (one ledger request for all cards); when it ends the concept and review data refresh.
+ *  Move to group: chapter groups (chapter-groups.ts).
  *  Settings: a dialog for per-chapter settings; nothing is settable yet. */
 
 import { MoreVertical } from "lucide-react"
@@ -27,8 +28,13 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/kit/ui/dialog"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/kit/ui/dropdown-menu"
 
@@ -70,11 +76,20 @@ export function ChapterCardMenu({
   title,
   running,
   onExtract,
+  groups,
+  groupId,
+  onMove,
+  onNewGroup,
 }: {
   /** e.g. "Chapter 6 · Unsupervised Learning: Clustering" */
   title: string
   running: boolean
   onExtract: () => void
+  /** Chapter groups to move this chapter into (absent → no "Move to group" item). */
+  groups?: { id: string; name: string }[]
+  groupId?: string | null
+  onMove?: (groupId: string | null) => void
+  onNewGroup?: () => void
 }) {
   const [confirm, setConfirm] = useState(false)
   const [settings, setSettings] = useState(false)
@@ -94,6 +109,21 @@ export function ChapterCardMenu({
           <DropdownMenuItem disabled={running} onSelect={() => setConfirm(true)}>
             {running ? "Extracting concepts…" : "Extract concepts"}
           </DropdownMenuItem>
+          {onMove && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Move to group</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-60">
+                {(groups ?? []).map((g) => (
+                  <DropdownMenuCheckboxItem key={g.id} checked={groupId === g.id} onSelect={() => onMove(g.id)}>
+                    {g.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {groupId && <DropdownMenuItem onSelect={() => onMove(null)}>Take out of its group</DropdownMenuItem>}
+                {(groups ?? []).length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuItem onSelect={() => onNewGroup?.()}>New group…</DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
           <DropdownMenuItem onSelect={() => setSettings(true)}>Settings</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
